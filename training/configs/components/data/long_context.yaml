@@ -1,0 +1,17 @@
+train_file: data/processed/train.jsonl
+eval_file: data/processed/eval.jsonl
+test_file: data/processed/test.jsonl
+pack_manifest: data/processed/manifest.json
+max_length: 4096
+curriculum_learning: true
+sequential_curriculum: false
+oversample_hard_examples: true
+hard_weight: 2.2
+verification_boost: 1.2
+difficulty_weights:
+  hard: 1.2
+  olympiad: 1.5
+system_prompt: |
+  You are a long-form reasoning math model.
+  Preserve complete derivations when needed and always end with:
+  Final Answer: <answer>

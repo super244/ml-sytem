@@ -1,0 +1,33 @@
+{
+  "schema_version": "v2",
+  "manifest_type": "dataset",
+  "build": {
+    "build_id": "custom_limits_series_lab-244",
+    "created_at": "2026-03-17T07:38:24.314104+00:00",
+    "git_sha": "7de4e6b817be1eb33a55f9539c45c7302555a79a",
+    "config_path": "data/configs/generation.yaml",
+    "config_sha256": "cfe7f364605f00b1c917a64c80cac5a10565991b0b588e50a0b887b10c8e62e6",
+    "seed": 244,
+    "notes": []
+  },
+  "pack_id": "custom_limits_series_lab",
+  "description": "l'Hospital style limits / convergence tests / asymptotic reasoning",
+  "inputs": [],
+  "outputs": [
+    {
+      "path": "data/custom/custom_limits_series_lab.jsonl",
+      "sha256": "f56f642aef26febaa94f51c076bcab7512cbf6b4f6b223f9fd5bde5970025f4e",
+      "size_bytes": 3251940,
+      "num_rows": 2095
+    }
+  ],
+  "source_lineage": [],
+  "stats": {
+    "num_rows": 2095,
+    "topic": "calculus",
+    "family": "limits_series"
+  },
+  "metadata": {
+    "card_path": "data/custom/custom_limits_series_lab.md"
+  }
+}

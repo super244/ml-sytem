@@ -1,0 +1,33 @@
+{
+  "schema_version": "v2",
+  "manifest_type": "dataset",
+  "build": {
+    "build_id": "custom_olympiad_reasoning_studio-547",
+    "created_at": "2026-03-17T07:39:10.880393+00:00",
+    "git_sha": "7de4e6b817be1eb33a55f9539c45c7302555a79a",
+    "config_path": "data/configs/generation.yaml",
+    "config_sha256": "cfe7f364605f00b1c917a64c80cac5a10565991b0b588e50a0b887b10c8e62e6",
+    "seed": 547,
+    "notes": []
+  },
+  "pack_id": "custom_olympiad_reasoning_studio",
+  "description": "proof construction / invariant discovery / inequality reasoning / contest-style synthesis",
+  "inputs": [],
+  "outputs": [
+    {
+      "path": "data/custom/custom_olympiad_reasoning_studio.jsonl",
+      "sha256": "ffe6b7fce330ddecc6793736f2125291eecacda1894e614c29c8354df4aa8bf4",
+      "size_bytes": 3250617,
+      "num_rows": 1827
+    }
+  ],
+  "source_lineage": [],
+  "stats": {
+    "num_rows": 1827,
+    "topic": "olympiad reasoning",
+    "family": "olympiad_reasoning"
+  },
+  "metadata": {
+    "card_path": "data/custom/custom_olympiad_reasoning_studio.md"
+  }
+}

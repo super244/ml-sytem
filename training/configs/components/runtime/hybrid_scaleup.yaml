@@ -1,0 +1,7 @@
+profile_name: hybrid_scaleup
+accelerate_config: training/configs/runtime/accelerate_zero2.yaml
+deepspeed_config: training/configs/runtime/deepspeed_zero2.json
+validate_tokenization_samples: 32
+validate_model_load: false
+torch_compile: false
+low_cpu_mem_usage: true

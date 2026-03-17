@@ -1,0 +1,10 @@
+name: qwen25_math_0p5b
+base_model_name: Qwen/Qwen2.5-Math-0.5B-Instruct
+trust_remote_code: true
+use_4bit: true
+use_8bit: false
+use_full_precision: false
+bnb_4bit_quant_type: nf4
+bnb_compute_dtype: bfloat16
+double_quant: true
+gradient_checkpointing: true

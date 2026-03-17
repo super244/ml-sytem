@@ -1,0 +1,6 @@
+publish_model_name: atlas-math-default
+export_merged_model: false
+publish_latest: true
+save_tokenizer: true
+final_adapter_subdir: published/final_adapter
+merged_model_subdir: published/merged_model

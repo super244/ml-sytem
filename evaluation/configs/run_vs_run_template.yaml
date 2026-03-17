@@ -1,0 +1,27 @@
+name: atlas_run_vs_run_template
+prompt_library_path: inference/configs/prompt_presets.yaml
+output_dir: evaluation/results/run_vs_run
+
+benchmark:
+  registry_path: evaluation/benchmarks/registry.yaml
+  benchmark_id: benchmark_holdout
+
+models:
+  registry_path: inference/configs/model_registry.yaml
+  primary_model: finetuned
+  secondary_model: curriculum_specialist
+  primary_label: Failure-Aware
+  secondary_label: Curriculum Specialist
+
+generation:
+  prompt_preset: atlas_rigorous
+  temperature: 0.2
+  top_p: 0.95
+  max_new_tokens: 768
+  num_samples: 3
+  show_reasoning: true
+  difficulty_target: olympiad
+  use_calculator: true
+  solver_mode: rigorous
+  output_format: text
+  use_cache: true

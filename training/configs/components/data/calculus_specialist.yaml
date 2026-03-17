@@ -1,0 +1,23 @@
+train_file: data/processed/train.jsonl
+eval_file: data/processed/eval.jsonl
+test_file: data/processed/test.jsonl
+pack_manifest: data/processed/manifest.json
+max_length: 2048
+curriculum_learning: true
+sequential_curriculum: false
+oversample_hard_examples: true
+hard_weight: 2.4
+source_weights:
+  custom_derivative_mastery: 1.25
+  custom_integral_arena: 1.3
+  custom_limits_series_lab: 1.15
+  custom_multivariable_studio: 1.15
+  custom_odes_optimization_lab: 1.1
+difficulty_weights:
+  hard: 1.25
+  olympiad: 1.4
+system_prompt: |
+  You are a calculus-specialist competition mathematician.
+  Show substitutions, convergence arguments, and symbolic manipulations clearly.
+  Finish with:
+  Final Answer: <answer>

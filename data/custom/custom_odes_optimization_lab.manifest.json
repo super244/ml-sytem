@@ -1,0 +1,33 @@
+{
+  "schema_version": "v2",
+  "manifest_type": "dataset",
+  "build": {
+    "build_id": "custom_odes_optimization_lab-446",
+    "created_at": "2026-03-17T07:38:24.548823+00:00",
+    "git_sha": "7de4e6b817be1eb33a55f9539c45c7302555a79a",
+    "config_path": "data/configs/generation.yaml",
+    "config_sha256": "cfe7f364605f00b1c917a64c80cac5a10565991b0b588e50a0b887b10c8e62e6",
+    "seed": 446,
+    "notes": []
+  },
+  "pack_id": "custom_odes_optimization_lab",
+  "description": "separable ODEs / critical points / extrema on intervals",
+  "inputs": [],
+  "outputs": [
+    {
+      "path": "data/custom/custom_odes_optimization_lab.jsonl",
+      "sha256": "7af1fa0355ba6d2e1d815d81238cc93d2291d790f88edad81da75cf7d489184d",
+      "size_bytes": 3250892,
+      "num_rows": 1995
+    }
+  ],
+  "source_lineage": [],
+  "stats": {
+    "num_rows": 1995,
+    "topic": "differential equations",
+    "family": "odes_optimization"
+  },
+  "metadata": {
+    "card_path": "data/custom/custom_odes_optimization_lab.md"
+  }
+}
