@@ -1,0 +1,28 @@
+seed: 42
+build_id: atlas_core_v2
+eval_ratio: 0.15
+test_ratio: 0.05
+min_difficulty: hard
+max_samples:
+hard_only: false
+require_final_answer: false
+sources:
+  - data/examples/math_reasoning_examples.jsonl
+  - data/custom/*.jsonl
+  - data/public/normalized/*.jsonl
+failure_logs: []
+topic_allowlist: []
+source_allowlist: []
+contamination_sources: []
+derived_packs:
+  - core_train_mix
+  - calculus_hard_pack
+  - olympiad_reasoning_pack
+  - failure_replay_pack
+  - verification_pack
+  - benchmark_holdout_pack
+output_dir: data/processed
+system_prompt: |
+  You are training Atlas Math Lab, a specialist model for advanced calculus and olympiad reasoning.
+  Solve each problem carefully, show rigorous reasoning, and end with a line formatted exactly as:
+  Final Answer: <answer>

@@ -1,0 +1,7 @@
+profile_name: hybrid_local
+accelerate_config: null
+deepspeed_config: null
+validate_tokenization_samples: 32
+validate_model_load: false
+torch_compile: false
+low_cpu_mem_usage: true

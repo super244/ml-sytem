@@ -1,0 +1,82 @@
+PYTHON ?= python3
+
+.PHONY: doctor refresh-lab latest-run api-smoke generate-datasets prepare-data validate-data audit-data preview-data export-subset dedupe-near benchmark-pack mine-failures train train-dry validate-model serve evaluate analyze-failures notebooks frontend-typecheck frontend-build frontend-dev frontend-install test smoke
+
+doctor:
+	$(PYTHON) scripts/doctor.py
+
+refresh-lab:
+	$(PYTHON) scripts/refresh_lab.py
+
+latest-run:
+	$(PYTHON) scripts/latest_run.py
+
+api-smoke:
+	$(PYTHON) scripts/api_smoke.py
+
+generate-datasets:
+	$(PYTHON) data/generator/generate_calculus_datasets.py --config data/configs/generation.yaml
+
+prepare-data:
+	$(PYTHON) data/prepare_dataset.py --config data/configs/processing.yaml
+
+validate-data:
+	$(PYTHON) data/tools/validate_dataset.py --input data/processed/*.jsonl --manifest data/processed/manifest.json
+
+audit-data:
+	$(PYTHON) data/tools/audit_dataset.py --input data/processed/normalized_all.jsonl --output data/processed/audit.json
+
+preview-data:
+	$(PYTHON) data/tools/preview_dataset.py --input data/processed/normalized_all.jsonl --limit 5
+
+export-subset:
+	$(PYTHON) data/tools/export_subset.py --input data/processed/normalized_all.jsonl --output data/processed/calculus_hard_preview.jsonl --topic calculus --difficulty hard --limit 64
+
+dedupe-near:
+	$(PYTHON) data/tools/deduplicate_simhash.py --input data/processed/normalized_all.jsonl --output data/processed/normalized_all.dedup.jsonl
+
+benchmark-pack:
+	$(PYTHON) data/tools/build_benchmark_pack.py --input data/processed/normalized_all.jsonl --output-dir data/processed/packs
+
+mine-failures:
+	$(PYTHON) data/mine_failure_cases.py --input evaluation/results/latest/per_example.jsonl --output data/raw/failure_cases.jsonl
+
+train:
+	$(PYTHON) -m training.train --config training/configs/profiles/failure_aware.yaml
+
+train-dry:
+	$(PYTHON) -m training.train --config training/configs/profiles/failure_aware.yaml --dry-run
+
+validate-model:
+	$(PYTHON) -m training.train --config training/configs/profiles/failure_aware.yaml --dry-run --validate-model-load
+
+serve:
+	uvicorn inference.app.main:app --host 0.0.0.0 --port 8000 --reload
+
+evaluate:
+	$(PYTHON) -m evaluation.evaluate --config evaluation/configs/base_vs_finetuned.yaml
+
+analyze-failures:
+	$(PYTHON) evaluation/analysis/analyze_failures.py --input evaluation/results/latest/per_example.jsonl --output evaluation/results/latest/failure_analysis.json
+
+notebooks:
+	$(PYTHON) notebooks/build_notebooks.py
+
+frontend-install:
+	cd frontend && npm install
+
+frontend-typecheck:
+	cd frontend && npm run typecheck
+
+frontend-build:
+	cd frontend && npm run build
+
+frontend-dev:
+	cd frontend && npm run dev
+
+test:
+	$(PYTHON) -m pytest
+
+smoke:
+	$(PYTHON) -m compileall ai_factory data training inference evaluation
+	$(PYTHON) notebooks/build_notebooks.py

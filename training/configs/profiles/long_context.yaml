@@ -1,0 +1,18 @@
+profile_name: long_context
+run_name: atlas_long_context
+seed: 314
+refs:
+  model: ../components/models/qwen25_math_7b.yaml
+  adapter: ../components/adapters/long_context_lora.yaml
+  data: ../components/data/long_context.yaml
+  runtime: ../components/runtime/hybrid_scaleup.yaml
+  logging: ../components/logging/default.yaml
+  packaging: ../components/packaging/default.yaml
+training:
+  num_train_epochs: 1.5
+  per_device_train_batch_size: 1
+  gradient_accumulation_steps: 16
+  learning_rate: 0.0001
+  artifacts_dir: artifacts
+packaging:
+  publish_model_name: atlas-math-long-context

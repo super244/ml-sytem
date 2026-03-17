@@ -1,0 +1,73 @@
+models:
+  - name: base
+    label: Base 1.5B
+    base_model: Qwen/Qwen2.5-Math-1.5B-Instruct
+    adapter_path:
+    load_in_4bit: true
+    load_in_8bit: false
+    dtype: bfloat16
+    description: Untuned base math model for side-by-side comparison.
+    tags: [baseline, local]
+  - name: finetuned
+    label: Atlas Failure-Aware
+    base_model: Qwen/Qwen2.5-Math-1.5B-Instruct
+    adapter_path: artifacts/models/atlas-math-failure-aware/latest
+    load_in_4bit: true
+    load_in_8bit: false
+    dtype: bfloat16
+    description: Failure-aware calculus and verification specialist adapter.
+    tags: [specialist, failure_aware, local]
+  - name: calculus_specialist
+    label: Atlas Calculus Specialist
+    base_model: Qwen/Qwen2.5-Math-1.5B-Instruct
+    adapter_path: artifacts/models/atlas-math-calculus-specialist/latest
+    load_in_4bit: true
+    load_in_8bit: false
+    dtype: bfloat16
+    description: Calculus-weighted specialist adapter.
+    tags: [specialist, calculus, local]
+  - name: curriculum_specialist
+    label: Atlas Curriculum Specialist
+    base_model: Qwen/Qwen2.5-Math-1.5B-Instruct
+    adapter_path: artifacts/models/atlas-math-curriculum-specialist/latest
+    load_in_4bit: true
+    load_in_8bit: false
+    dtype: bfloat16
+    description: Curriculum-ordered specialist adapter.
+    tags: [specialist, curriculum, local]
+  - name: verifier_augmented
+    label: Atlas Verifier Augmented
+    base_model: Qwen/Qwen2.5-Math-1.5B-Instruct
+    adapter_path: artifacts/models/atlas-math-verifier-augmented/latest
+    load_in_4bit: true
+    load_in_8bit: false
+    dtype: bfloat16
+    description: Verifier-aware specialist adapter.
+    tags: [specialist, verification, local]
+  - name: fast_iteration
+    label: Atlas Fast Iteration
+    base_model: Qwen/Qwen2.5-Math-0.5B-Instruct
+    adapter_path: artifacts/models/atlas-math-fast-iteration/latest
+    load_in_4bit: true
+    load_in_8bit: false
+    dtype: bfloat16
+    description: Small fast-iteration adapter for rapid local experimentation.
+    tags: [specialist, fast_iteration, local]
+  - name: long_context_base
+    label: Base 7B
+    base_model: Qwen/Qwen2.5-Math-7B-Instruct
+    adapter_path:
+    load_in_4bit: true
+    load_in_8bit: false
+    dtype: bfloat16
+    description: Larger 7B base profile for scale-up experiments.
+    tags: [baseline, scaleup]
+  - name: long_context_specialist
+    label: Atlas Long Context
+    base_model: Qwen/Qwen2.5-Math-7B-Instruct
+    adapter_path: artifacts/models/atlas-math-long-context/latest
+    load_in_4bit: true
+    load_in_8bit: false
+    dtype: bfloat16
+    description: Long-context specialist template for scale-up experiments.
+    tags: [specialist, scaleup, long_context]

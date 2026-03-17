@@ -1,0 +1,16 @@
+profile_name: verifier_augmented
+run_name: atlas_verifier_augmented
+seed: 99
+refs:
+  model: ../components/models/qwen25_math_1p5b.yaml
+  adapter: ../components/adapters/qlora_math.yaml
+  data: ../components/data/verifier_augmented.yaml
+  runtime: ../components/runtime/hybrid_local.yaml
+  logging: ../components/logging/default.yaml
+  packaging: ../components/packaging/default.yaml
+training:
+  num_train_epochs: 2.25
+  learning_rate: 0.00013
+  artifacts_dir: artifacts
+packaging:
+  publish_model_name: atlas-math-verifier-augmented

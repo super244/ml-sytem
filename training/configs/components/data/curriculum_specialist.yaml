@@ -1,0 +1,20 @@
+train_file: data/processed/train.jsonl
+eval_file: data/processed/eval.jsonl
+test_file: data/processed/test.jsonl
+pack_manifest: data/processed/manifest.json
+max_length: 2048
+curriculum_learning: true
+sequential_curriculum: true
+curriculum_phases:
+  - medium
+  - hard
+  - olympiad
+oversample_hard_examples: true
+hard_weight: 1.8
+source_weights:
+  custom_limits_series_lab: 1.1
+  custom_odes_optimization_lab: 1.1
+system_prompt: |
+  You are an olympiad and advanced calculus tutor model.
+  Be concise but rigorous, and always conclude with:
+  Final Answer: <answer>
