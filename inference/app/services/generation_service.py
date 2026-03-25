@@ -1,11 +1,16 @@
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
+
 from inference.app.config import AppSettings
-from inference.app.generation import GenerationParameters, MathGenerator
+from inference.app.parameters import GenerationParameters
+
+if TYPE_CHECKING:
+    from inference.app.generation import MathGenerator
 
 
 class GenerationService:
-    def __init__(self, generator: MathGenerator, settings: AppSettings):
+    def __init__(self, generator: "MathGenerator", settings: AppSettings):
         self.generator = generator
         self.settings = settings
 

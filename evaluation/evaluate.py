@@ -14,17 +14,20 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
-from ai_factory.core.io import read_jsonl, write_json, write_jsonl
-from evaluation.benchmark_registry import resolve_benchmark_file
-from evaluation.metrics import score_prediction
-from evaluation.reporting import build_summary, write_markdown_report
-from inference.app.generation import GenerationParameters, MathGenerator
-from inference.app.model_loader import MathModelRegistry, load_registry_from_yaml
-from inference.app.prompts import load_prompt_presets
+from ai_factory.core.io import read_jsonl, write_json, write_jsonl  # noqa: E402
+from evaluation.benchmark_registry import resolve_benchmark_file  # noqa: E402
+from evaluation.metrics import score_prediction  # noqa: E402
+from evaluation.reporting import build_summary, write_markdown_report  # noqa: E402
+from inference.app.generation import MathGenerator  # noqa: E402
+from inference.app.model_loader import MathModelRegistry, load_registry_from_yaml  # noqa: E402
+from inference.app.parameters import GenerationParameters  # noqa: E402
+from inference.app.prompts import load_prompt_presets  # noqa: E402
 
 
 def parse_args() -> argparse.Namespace:
-    parser = argparse.ArgumentParser(description="Evaluate two Atlas math model configurations side by side.")
+    parser = argparse.ArgumentParser(
+        description="Evaluate two Atlas math model configurations side by side."
+    )
     parser.add_argument("--config", required=True)
     return parser.parse_args()
 
@@ -60,7 +63,10 @@ def run_generation(
         top_p=generation_config.get("top_p", 0.95),
         max_new_tokens=generation_config.get("max_new_tokens", 768),
         show_reasoning=generation_config.get("show_reasoning", True),
-        difficulty_target=generation_config.get("difficulty_target", example.get("difficulty", "hard")),
+        difficulty_target=generation_config.get(
+            "difficulty_target",
+            example.get("difficulty", "hard"),
+        ),
         num_samples=generation_config.get("num_samples", 3),
         use_calculator=generation_config.get("use_calculator", True),
         solver_mode=generation_config.get("solver_mode", "rigorous"),
@@ -132,7 +138,12 @@ def main() -> None:
             "topic": example.get("topic", "general"),
             "source": example.get("source", "unknown"),
             "pack_id": example.get("pack_id", "unknown"),
-            "generator_family": ((example.get("generator") or {}).get("generator_family") if isinstance(example.get("generator"), dict) else None) or "unknown",
+            "generator_family": (
+                ((example.get("generator") or {}).get("generator_family"))
+                if isinstance(example.get("generator"), dict)
+                else None
+            )
+            or "unknown",
             "step_checks": example.get("step_checks", []),
             "benchmark_id": benchmark_entry.get("id"),
         }
@@ -155,7 +166,14 @@ def main() -> None:
     summary = build_summary(results, labels=labels)
     write_jsonl(output_dir / "per_example.jsonl", results)
     write_json(output_dir / "summary.json", summary)
-    write_json(output_dir / "leaderboard.json", {"labels": labels, "primary": summary["primary"], "secondary": summary["secondary"]})
+    write_json(
+        output_dir / "leaderboard.json",
+        {
+            "labels": labels,
+            "primary": summary["primary"],
+            "secondary": summary["secondary"],
+        },
+    )
     write_markdown_report(output_dir / "summary.md", summary)
 
     print(json.dumps(summary, indent=2))

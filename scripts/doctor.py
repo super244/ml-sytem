@@ -4,24 +4,25 @@ import argparse
 import importlib.util
 
 from common import emit_payload, repo_root
-from ai_factory.core.discovery import list_training_runs, load_benchmark_registry
+
+from ai_factory.core.discovery import (
+    latest_training_run,
+    list_training_runs,
+    load_benchmark_registry,
+)
 from data.catalog import load_catalog, load_pack_summary
 
 
 def parse_args() -> argparse.Namespace:
-    parser = argparse.ArgumentParser(description="Inspect the local Atlas Math Lab environment and artifact state.")
+    parser = argparse.ArgumentParser(
+        description="Inspect the local Atlas Math Lab environment and artifact state."
+    )
     parser.add_argument("--json", action="store_true", help="Emit machine-readable JSON.")
     return parser.parse_args()
 
 
 def has_package(name: str) -> bool:
     return importlib.util.find_spec(name) is not None
-
-
-def latest_run_name(runs: list[dict]) -> str | None:
-    if not runs:
-        return None
-    return sorted(runs, key=lambda run: str(run.get("output_dir", "")))[-1].get("run_name")
 
 
 def main() -> None:
@@ -42,7 +43,8 @@ def main() -> None:
         recommended_next_steps.append("python scripts/latest_run.py")
     else:
         recommended_next_steps.append(
-            "python -m training.train --config training/configs/profiles/baseline_qlora.yaml --dry-run"
+            "python -m training.train --config "
+            "training/configs/profiles/baseline_qlora.yaml --dry-run"
         )
     if not frontend_ready:
         recommended_next_steps.append("cd frontend && npm install")
@@ -65,7 +67,7 @@ def main() -> None:
         },
         "artifacts": {
             "num_runs": len(runs),
-            "latest_run": latest_run_name(runs),
+            "latest_run": (latest_training_run(runs) or {}).get("run_name"),
         },
         "evaluation": {
             "num_benchmarks": len(benchmarks),

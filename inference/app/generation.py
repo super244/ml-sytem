@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-from dataclasses import asdict, dataclass
-import json
 import time
 from typing import Any
 
@@ -15,34 +13,12 @@ from ai_factory.core.answers import (
     split_reasoning,
     verify_prediction,
 )
-from ai_factory.core.hashing import sha256_text
 from ai_factory.core.tokens import approximate_token_count
 from inference.app.cache import FileResponseCache
 from inference.app.model_loader import MathModelRegistry
+from inference.app.parameters import GenerationParameters
 from inference.app.prompts import DEFAULT_PROMPT_PRESET_ID, PromptPreset, build_user_prompt
 from inference.app.telemetry import JsonlTelemetryLogger
-
-
-@dataclass
-class GenerationParameters:
-    question: str
-    model_variant: str = "finetuned"
-    prompt_preset: str = DEFAULT_PROMPT_PRESET_ID
-    temperature: float = 0.2
-    top_p: float = 0.95
-    max_new_tokens: int = 768
-    show_reasoning: bool = True
-    difficulty_target: str | None = "hard"
-    num_samples: int = 3
-    use_calculator: bool = True
-    solver_mode: str = "rigorous"
-    output_format: str = "text"
-    use_cache: bool = True
-    reference_answer: str | None = None
-    step_checks: list[Any] | None = None
-
-    def cache_key(self) -> str:
-        return sha256_text(json.dumps(asdict(self), sort_keys=True, ensure_ascii=False))
 
 
 class MathGenerator:
