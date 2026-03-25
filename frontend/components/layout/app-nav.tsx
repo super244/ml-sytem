@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation";
 
 const NAV_ITEMS = [
   { href: "/", label: "Solve" },
+  { href: "/workspace", label: "Workspace" },
   { href: "/compare", label: "Compare" },
   { href: "/datasets", label: "Datasets" },
   { href: "/benchmarks", label: "Benchmarks" },
@@ -36,8 +37,8 @@ export function AppNav() {
       </div>
 
       <div className="nav-actions">
-        <Link className="ghost-button small" href="/">
-          New Session
+        <Link className="ghost-button small" href="/workspace">
+          Command Center
         </Link>
         <Link className="primary-button small" href="/compare">
           Compare Models

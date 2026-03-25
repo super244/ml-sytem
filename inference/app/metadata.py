@@ -1,26 +1,22 @@
 from __future__ import annotations
 
-import json
-from pathlib import Path
 from typing import Any
 
 from ai_factory.core.discovery import list_training_runs, load_benchmark_registry
-from data.catalog import load_catalog, list_sample_prompts, load_pack_summary
+from data.catalog import list_sample_prompts, load_catalog, load_pack_summary
 from inference.app.config import AppSettings
-from inference.app.model_loader import MathModelRegistry
-from inference.app.prompts import PromptPreset
 
 
 class MetadataService:
     def __init__(
         self,
         settings: AppSettings,
-        registry: MathModelRegistry,
-        prompt_presets: dict[str, PromptPreset],
-        cache,
+        models_catalog: list[dict[str, Any]],
+        prompt_presets: dict[str, Any],
+        cache: Any,
     ):
         self.settings = settings
-        self.registry = registry
+        self.models_catalog = models_catalog
         self.prompt_presets = prompt_presets
         self.cache = cache
 
@@ -48,7 +44,7 @@ class MetadataService:
         return list_training_runs(self.settings.artifacts_dir)
 
     def models(self) -> list[dict[str, Any]]:
-        return self.registry.list_models()
+        return self.models_catalog
 
     def status(self) -> dict[str, Any]:
         return {

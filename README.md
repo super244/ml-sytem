@@ -82,11 +82,14 @@ Run outputs are standardized around:
 ```text
 artifacts/
 ├── runs/<run_id>/
-│   ├── manifest.json
-│   ├── events.jsonl
-│   ├── summary.md
+│   ├── checkpoints/
+│   ├── logs/
+│   ├── manifests/
+│   │   ├── config_snapshot.json
+│   │   └── run_manifest.json
 │   ├── metrics/
 │   └── reports/
+│       └── run_summary.md
 └── models/<model_name>/
     ├── latest
     ├── adapter/

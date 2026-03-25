@@ -207,6 +207,56 @@ export type StatusInfo = {
   runs: number;
 };
 
+export type WorkspaceCheck = {
+  id: string;
+  label: string;
+  ok: boolean;
+  detail: string;
+};
+
+export type WorkspaceRecipe = {
+  id: string;
+  title: string;
+  description: string;
+  command: string;
+  category: string;
+};
+
+export type WorkspaceTrainingProfile = {
+  id: string;
+  title: string;
+  path: string;
+  dry_run_command: string;
+  train_command: string;
+};
+
+export type WorkspaceEvaluationConfig = {
+  id: string;
+  title: string;
+  path: string;
+  run_command: string;
+};
+
+export type WorkspaceOverview = {
+  repo_root: string;
+  summary: {
+    datasets: number;
+    packs: number;
+    models: number;
+    benchmarks: number;
+    runs: number;
+    training_profiles: number;
+    evaluation_configs: number;
+    ready_checks: number;
+    total_checks: number;
+  };
+  models: ModelInfo[];
+  readiness_checks: WorkspaceCheck[];
+  command_recipes: WorkspaceRecipe[];
+  training_profiles: WorkspaceTrainingProfile[];
+  evaluation_configs: WorkspaceEvaluationConfig[];
+};
+
 async function fetchJson<T>(path: string, options?: RequestInit): Promise<T> {
   const response = await fetch(`${API_BASE}${path}`, {
     cache: "no-store",
@@ -264,4 +314,8 @@ export async function getRuns(): Promise<RunInfo[]> {
 
 export async function getStatus(): Promise<StatusInfo> {
   return fetchJson<StatusInfo>("/v1/status");
+}
+
+export async function getWorkspaceOverview(): Promise<WorkspaceOverview> {
+  return fetchJson<WorkspaceOverview>("/v1/workspace");
 }

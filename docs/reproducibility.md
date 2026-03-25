@@ -15,6 +15,7 @@ Atlas Math Lab uses manifests and config snapshots to make runs easier to replay
 
 - keep generated data configs under version control
 - prefer dry-run before expensive training
-- preserve `artifacts/runs/<run_id>/manifest.json`
+- preserve `artifacts/runs/<run_id>/manifests/run_manifest.json`
+- preserve `artifacts/runs/<run_id>/reports/run_summary.md`
 - avoid mutating benchmark files in place
 - refresh notebooks from the builder rather than editing them by hand

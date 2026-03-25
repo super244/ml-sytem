@@ -2,9 +2,8 @@ from __future__ import annotations
 
 from fastapi import APIRouter, HTTPException
 
-from ai_factory.core.answers import verify_prediction
 from inference.app.dependencies import get_generation_service
-from inference.app.generation import GenerationParameters
+from inference.app.parameters import GenerationParameters
 from inference.app.schemas import (
     CompareRequest,
     CompareResponse,
@@ -16,12 +15,13 @@ from inference.app.schemas import (
     VerifyResponse,
 )
 
-
 router = APIRouter(tags=["generation"])
 
 
 @router.post("/verify", response_model=VerifyResponse)
 def verify_answer(request: VerifyRequest) -> VerifyResponse:
+    from ai_factory.core.answers import verify_prediction
+
     verification = verify_prediction(
         request.prediction_text or f"Final Answer: {request.candidate_answer}",
         request.reference_answer,
@@ -61,7 +61,9 @@ def generate_answer(request: GenerateRequest) -> GenerateResponse:
             )
         )
         comparison = None
-        compare_to_model = request.compare_to_model or ("base" if request.compare_to_base and request.model_variant != "base" else None)
+        compare_to_model = request.compare_to_model or (
+            "base" if request.compare_to_base and request.model_variant != "base" else None
+        )
         if compare_to_model:
             comparison = service.generate(
                 GenerationParameters(

@@ -3,11 +3,14 @@ from __future__ import annotations
 import argparse
 
 from common import emit_payload, repo_root
-from ai_factory.core.discovery import list_training_runs
+
+from ai_factory.core.discovery import latest_training_run, list_training_runs
 
 
 def parse_args() -> argparse.Namespace:
-    parser = argparse.ArgumentParser(description="Print a compact summary for the latest Atlas training run.")
+    parser = argparse.ArgumentParser(
+        description="Print a compact summary for the latest Atlas training run."
+    )
     parser.add_argument("--json", action="store_true")
     return parser.parse_args()
 
@@ -15,10 +18,10 @@ def parse_args() -> argparse.Namespace:
 def main() -> None:
     args = parse_args()
     runs = list_training_runs(str(repo_root() / "artifacts"))
-    if not runs:
+    latest = latest_training_run(runs)
+    if latest is None:
         emit_payload({"status": "no_runs_found"}, as_json=args.json)
         return
-    latest = sorted(runs, key=lambda run: str(run.get("output_dir", "")))[-1]
     payload = {
         "run_name": latest.get("run_name"),
         "profile_name": latest.get("profile_name"),

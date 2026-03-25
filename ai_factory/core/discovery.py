@@ -1,8 +1,56 @@
 from __future__ import annotations
 
 import json
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
+
+
+def _load_json_if_exists(path: Path) -> dict[str, Any]:
+    if not path.exists():
+        return {}
+    return json.loads(path.read_text())
+
+
+def _parse_created_at(value: Any) -> datetime | None:
+    if not value:
+        return None
+    try:
+        normalized = str(value).replace("Z", "+00:00")
+        parsed = datetime.fromisoformat(normalized)
+    except ValueError:
+        return None
+    if parsed.tzinfo is None:
+        return parsed.replace(tzinfo=timezone.utc)
+    return parsed.astimezone(timezone.utc)
+
+
+def _parse_run_id_timestamp(value: Any) -> datetime | None:
+    if not value:
+        return None
+    try:
+        suffix = str(value).rsplit("-", 2)[-2:]
+        timestamp = "-".join(suffix)
+        return datetime.strptime(timestamp, "%Y%m%d-%H%M%S").replace(tzinfo=timezone.utc)
+    except ValueError:
+        return None
+
+
+def _run_recency_key(run: dict[str, Any]) -> tuple[int, datetime, str]:
+    created_at = _parse_created_at(run.get("created_at"))
+    if created_at is not None:
+        return (3, created_at, str(run.get("run_id") or run.get("output_dir") or ""))
+
+    run_id_timestamp = _parse_run_id_timestamp(run.get("run_id"))
+    if run_id_timestamp is not None:
+        return (2, run_id_timestamp, str(run.get("run_id") or ""))
+
+    output_dir = Path(str(run.get("output_dir") or "."))
+    try:
+        modified_at = datetime.fromtimestamp(output_dir.stat().st_mtime, tz=timezone.utc)
+    except OSError:
+        modified_at = datetime.fromtimestamp(0, tz=timezone.utc)
+    return (1, modified_at, str(output_dir))
 
 
 def list_training_runs(artifacts_dir: str = "artifacts") -> list[dict[str, Any]]:
@@ -25,14 +73,21 @@ def list_training_runs(artifacts_dir: str = "artifacts") -> list[dict[str, Any]]
                 "run_id": run_payload.get("run_id"),
                 "run_name": run_payload.get("run_name"),
                 "profile_name": run_payload.get("profile_name"),
+                "created_at": run_payload.get("created_at"),
                 "base_model": run_payload.get("base_model"),
                 "output_dir": str(child),
-                "metrics": json.loads(metrics_path.read_text()) if metrics_path.exists() else {},
-                "model_report": json.loads(model_report_path.read_text()) if model_report_path.exists() else {},
-                "dataset_report": json.loads(dataset_report_path.read_text()) if dataset_report_path.exists() else {},
+                "metrics": _load_json_if_exists(metrics_path),
+                "model_report": _load_json_if_exists(model_report_path),
+                "dataset_report": _load_json_if_exists(dataset_report_path),
             }
         )
     return runs
+
+
+def latest_training_run(runs: list[dict[str, Any]]) -> dict[str, Any] | None:
+    if not runs:
+        return None
+    return max(runs, key=_run_recency_key)
 
 
 def load_benchmark_registry(path: str | Path) -> list[dict[str, Any]]:
