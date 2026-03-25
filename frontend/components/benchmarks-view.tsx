@@ -4,6 +4,7 @@ import Link from "next/link";
 
 import { formatCount } from "@/lib/formatting";
 import { useLabMetadata } from "@/hooks/use-lab-metadata";
+import { ROUTES } from "@/lib/routes";
 
 import { AppShell } from "@/components/layout/app-shell";
 import { PageHeader } from "@/components/ui/page-header";
@@ -26,10 +27,10 @@ export function BenchmarksView() {
           ]}
           actions={
             <>
-              <Link className="ghost-button small" href="/datasets">
+              <Link className="ghost-button small" href={ROUTES.datasets}>
                 Back to datasets
               </Link>
-              <Link className="primary-button small" href="/runs">
+              <Link className="primary-button small" href={ROUTES.runs}>
                 Inspect runs
               </Link>
             </>

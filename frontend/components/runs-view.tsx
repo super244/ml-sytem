@@ -4,6 +4,7 @@ import Link from "next/link";
 
 import { formatCount, formatFixed, formatPercent } from "@/lib/formatting";
 import { useLabMetadata } from "@/hooks/use-lab-metadata";
+import { ROUTES } from "@/lib/routes";
 
 import { AppShell } from "@/components/layout/app-shell";
 import { MetricBadge } from "@/components/panels/metric-badge";
@@ -39,10 +40,10 @@ export function RunsView() {
           ]}
           actions={
             <>
-              <Link className="ghost-button small" href="/benchmarks">
+              <Link className="ghost-button small" href={ROUTES.benchmarks}>
                 Benchmark library
               </Link>
-              <Link className="primary-button small" href="/">
+              <Link className="primary-button small" href={ROUTES.solve}>
                 Open solve workspace
               </Link>
             </>
