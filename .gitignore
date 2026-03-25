@@ -11,8 +11,8 @@ node_modules/
 dist/
 build/
 coverage/
+*.tsbuildinfo
 evaluation/results/*
 !evaluation/results/.gitkeep
 data/processed/*.jsonl
 data/processed/*.json
-

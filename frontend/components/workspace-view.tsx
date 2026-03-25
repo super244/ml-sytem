@@ -13,6 +13,7 @@ import {
   type WorkspaceTrainingProfile,
 } from "@/lib/api";
 import { formatCount } from "@/lib/formatting";
+import { ROUTES } from "@/lib/routes";
 
 import { AppShell } from "@/components/layout/app-shell";
 import { MetricBadge } from "@/components/panels/metric-badge";
@@ -145,10 +146,10 @@ export function WorkspaceView() {
           ]}
           actions={
             <>
-              <Link className="ghost-button small" href="/runs">
+              <Link className="ghost-button small" href={ROUTES.runs}>
                 Inspect runs
               </Link>
-              <Link className="primary-button small" href="/">
+              <Link className="primary-button small" href={ROUTES.solve}>
                 Open solve workspace
               </Link>
             </>

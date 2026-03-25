@@ -15,6 +15,7 @@ import {
 import { FALLBACK_EXAMPLES, FALLBACK_MODELS, FALLBACK_PROMPTS, RESEARCH_RESOURCES } from "@/lib/demo-content";
 import { formatCount, formatLatency, formatPercent } from "@/lib/formatting";
 import { DIFFICULTY_OPTIONS, OUTPUT_FORMAT_OPTIONS, SAMPLE_OPTIONS, SOLVER_MODE_OPTIONS } from "@/lib/options";
+import { ROUTES } from "@/lib/routes";
 import { useLabMetadata } from "@/hooks/use-lab-metadata";
 
 import { MathBlock } from "@/components/math-block";
@@ -157,10 +158,10 @@ export function ChatShell() {
           ]}
           actions={
             <>
-              <Link className="ghost-button small" href="/datasets">
+              <Link className="ghost-button small" href={ROUTES.datasets}>
                 Explore datasets
               </Link>
-              <Link className="primary-button small" href="/compare">
+              <Link className="primary-button small" href={ROUTES.compare}>
                 Open compare lab
               </Link>
             </>
@@ -407,7 +408,7 @@ export function ChatShell() {
                 <button className="secondary-button small" type="button" onClick={resetConversation}>
                   New thread
                 </button>
-                <Link className="ghost-button small" href="/compare">
+                <Link className="ghost-button small" href={ROUTES.compare}>
                   Compare response
                 </Link>
               </div>

@@ -7,6 +7,7 @@ import { compareModels, type CompareResponse, type Difficulty, type OutputFormat
 import { FALLBACK_EXAMPLES, FALLBACK_MODELS, FALLBACK_PROMPTS } from "@/lib/demo-content";
 import { formatCount, formatLatency, formatPercent } from "@/lib/formatting";
 import { DIFFICULTY_OPTIONS, OUTPUT_FORMAT_OPTIONS, SOLVER_MODE_OPTIONS } from "@/lib/options";
+import { ROUTES } from "@/lib/routes";
 import { useLabMetadata } from "@/hooks/use-lab-metadata";
 
 import { MathBlock } from "@/components/math-block";
@@ -53,10 +54,10 @@ export function CompareLab() {
           ]}
           actions={
             <>
-              <Link className="ghost-button small" href="/">
+              <Link className="ghost-button small" href={ROUTES.solve}>
                 Back to solve
               </Link>
-              <Link className="primary-button small" href="/runs">
+              <Link className="primary-button small" href={ROUTES.runs}>
                 Inspect runs
               </Link>
             </>

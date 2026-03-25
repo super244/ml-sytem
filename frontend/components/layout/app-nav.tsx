@@ -3,21 +3,14 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
-const NAV_ITEMS = [
-  { href: "/", label: "Solve" },
-  { href: "/workspace", label: "Workspace" },
-  { href: "/compare", label: "Compare" },
-  { href: "/datasets", label: "Datasets" },
-  { href: "/benchmarks", label: "Benchmarks" },
-  { href: "/runs", label: "Runs" },
-];
+import { NAV_ITEMS, ROUTES } from "@/lib/routes";
 
 export function AppNav() {
   const pathname = usePathname();
   return (
     <nav className="app-nav">
       <div className="nav-brand-row">
-        <Link className="brand-mark" href="/">
+        <Link className="brand-mark" href={ROUTES.solve}>
           <span className="brand-kicker">Atlas Math Lab</span>
           <strong>Competitive reasoning platform</strong>
         </Link>
@@ -37,10 +30,10 @@ export function AppNav() {
       </div>
 
       <div className="nav-actions">
-        <Link className="ghost-button small" href="/workspace">
+        <Link className="ghost-button small" href={ROUTES.workspace}>
           Command Center
         </Link>
-        <Link className="primary-button small" href="/compare">
+        <Link className="primary-button small" href={ROUTES.compare}>
           Compare Models
         </Link>
       </div>
