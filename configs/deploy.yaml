@@ -1,0 +1,18 @@
+instance:
+  type: deploy
+  name: atlas-deploy
+  environment:
+    kind: local
+execution:
+  backend: local
+subsystem:
+  provider: ollama
+  provider_options:
+    dry_run: true
+    model_name: atlas-local
+    modelfile: Modelfile
+monitoring:
+  collect_gpu: false
+  write_timeseries: true
+pipeline:
+  auto_continue: false

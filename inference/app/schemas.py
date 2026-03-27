@@ -4,6 +4,11 @@ from typing import Any, Literal
 
 from pydantic import BaseModel, Field
 
+from ai_factory.core.instances.models import (
+    EnvironmentSpec,
+    InstanceManifest,
+    MetricPoint,
+)
 
 ModelVariant = str
 Difficulty = Literal["easy", "medium", "hard", "olympiad"]
@@ -129,3 +134,43 @@ class VerifyResponse(BaseModel):
     arithmetic_slip: bool = False
     error_type: str = "unknown"
     details: dict[str, Any] = Field(default_factory=dict)
+
+
+class InstanceCreateRequest(BaseModel):
+    config_path: str = Field(..., min_length=1)
+    start: bool = True
+    environment: EnvironmentSpec | None = None
+    parent_instance_id: str | None = None
+
+
+class InstanceEvaluateRequest(BaseModel):
+    config_path: str | None = None
+    start: bool = True
+
+
+class InstanceDeployRequest(BaseModel):
+    target: Literal["huggingface", "ollama", "lmstudio"]
+    config_path: str | None = None
+    start: bool = True
+
+
+class InstanceLogsResponse(BaseModel):
+    stdout: str = ""
+    stderr: str = ""
+    stdout_path: str | None = None
+    stderr_path: str | None = None
+
+
+class InstanceMetricsResponse(BaseModel):
+    summary: dict[str, Any] = Field(default_factory=dict)
+    points: list[MetricPoint] = Field(default_factory=list)
+
+
+class InstanceDetail(InstanceManifest):
+    config_snapshot: dict[str, Any] = Field(default_factory=dict)
+    logs: InstanceLogsResponse | None = None
+    metrics: InstanceMetricsResponse = Field(default_factory=InstanceMetricsResponse)
+
+
+class InstanceListResponse(BaseModel):
+    instances: list[InstanceManifest]
