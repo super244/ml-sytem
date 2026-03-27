@@ -3,6 +3,9 @@ instance:
   name: atlas-train-from-scratch
   environment:
     kind: local
+orchestration_mode: local_parallel
+experience:
+  level: dev
 execution:
   backend: local
 subsystem:
@@ -11,6 +14,16 @@ subsystem:
 monitoring:
   collect_gpu: true
   write_timeseries: true
+  heartbeat_interval_s: 15
+remote_access:
+  enable_ssh: true
+  sync_mode: git
+sub_agents:
+  enabled: true
+  max_parallelism: 2
+  workloads:
+    - evaluation
+    - metrics
 decision_policy:
   min_accuracy: 0.75
   min_parse_rate: 0.70
@@ -18,7 +31,12 @@ decision_policy:
   max_no_answer_rate: 0.15
   max_latency_s: 20.0
   finetune_accuracy_floor: 0.45
+feedback_loop:
+  enabled: true
+  queue_follow_up_evaluation: true
+  auto_queue_retrain: false
 pipeline:
   auto_continue: false
+  max_auto_cycles: 1
 metadata:
-  note: "Modeled for V1; execution currently fails with a structured unsupported message."
+  note: "Managed training template with feedback-loop recommendations and sub-agent evaluation handoff."

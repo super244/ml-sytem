@@ -13,6 +13,7 @@ Start with `quickstart.md` if you want the fastest path to a working local works
 - Public dataset registry and adapters for calculus-heavy competition and instruction corpora.
 - Derived pack construction for `core_train_mix`, `calculus_hard_pack`, `olympiad_reasoning_pack`, `failure_replay_pack`, `verification_pack`, and `benchmark_holdout_pack`.
 - Composed training profiles for `baseline_qlora`, `calculus_specialist`, `curriculum_specialist`, `failure_aware`, `verifier_augmented`, `long_context`, and `fast_iteration_small_model`.
+- A shared orchestration control plane for managed `prepare`, `train`, `finetune`, `evaluate`, `report`, `inference`, and `deploy` instances with user levels, remote SSH metadata, port forwards, child-task lineage, publish hooks, and follow-up recommendations.
 - FastAPI inference with prompt presets, lazy model loading, best-of-N candidate selection, self-consistency, answer extraction, safe calculator hooks, structured output, and compare-two-models mode.
 - Benchmark-oriented evaluation with per-topic, per-difficulty, per-source, and per-pack reporting plus failure taxonomy and win-case extraction.
 - A multi-route Next.js frontend for solving, comparing, browsing datasets, exploring benchmarks, and inspecting training/evaluation runs.
@@ -73,6 +74,16 @@ Start with `quickstart.md` if you want the fastest path to a working local works
    ```bash
    python3 -m evaluation.evaluate --config evaluation/configs/base_vs_finetuned.yaml
    python3 notebooks/build_notebooks.py
+   ```
+
+6. Optional: use the managed control plane instead of raw subsystem commands.
+
+   ```bash
+   ai-factory new --config configs/finetune.yaml
+   ai-factory list
+   ai-factory status <instance-id> --json
+   ai-factory recommendations <instance-id> --json
+   ai-factory children <instance-id> --json
    ```
 
 ## Artifact Layout
@@ -140,6 +151,9 @@ make train-dry
 make evaluate
 make notebooks
 make frontend-typecheck
+ai-factory new --config configs/finetune.yaml
+ai-factory list --type finetune
+ai-factory new --config configs/finetune.yaml --environment cloud --port-forward 6006:6006
 ```
 
 Start with `docs/runbook.md` for the end-to-end local workflow and `docs/experiment-playbook.md` for the recommended research loop.

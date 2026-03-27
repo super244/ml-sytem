@@ -3,6 +3,9 @@ instance:
   name: atlas-baseline-finetune
   environment:
     kind: local
+orchestration_mode: hybrid
+experience:
+  level: hobbyist
 execution:
   backend: local
 subsystem:
@@ -11,6 +14,19 @@ subsystem:
 monitoring:
   collect_gpu: true
   write_timeseries: true
+remote_access:
+  enable_ssh: true
+  sync_mode: git
+  port_forwards:
+    - local_port: 6006
+      remote_port: 6006
+      description: tensorboard
+sub_agents:
+  enabled: true
+  max_parallelism: 2
+  workloads:
+    - evaluation
+    - metrics
 decision_policy:
   min_accuracy: 0.75
   min_parse_rate: 0.70
@@ -18,5 +34,13 @@ decision_policy:
   max_no_answer_rate: 0.15
   max_latency_s: 20.0
   finetune_accuracy_floor: 0.45
+feedback_loop:
+  enabled: true
+  queue_follow_up_evaluation: true
+publish_hooks:
+  - target: huggingface
+    enabled: false
+    when: after_evaluation
 pipeline:
   auto_continue: false
+  max_auto_cycles: 1

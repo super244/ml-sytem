@@ -41,10 +41,22 @@ class InstanceService:
         detail.config_snapshot = snapshot
         detail.logs = logs
         detail.metrics = metrics
+        detail.children = self.manager.list_instances(parent_instance_id=manifest.id)
+        detail.events = self.store.read_events(manifest.id)
         return detail
 
-    def list_instances(self) -> list[InstanceManifest]:
-        return self.manager.list_instances()
+    def list_instances(
+        self,
+        *,
+        instance_type: str | None = None,
+        status: str | None = None,
+        parent_instance_id: str | None = None,
+    ) -> list[InstanceManifest]:
+        return self.manager.list_instances(
+            instance_type=instance_type,
+            status=status,
+            parent_instance_id=parent_instance_id,
+        )
 
     def get_instance(self, instance_id: str) -> InstanceDetail:
         try:

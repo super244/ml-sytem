@@ -9,20 +9,23 @@ import yaml
 
 from ai_factory.core.config.loader import (
     apply_environment_override,
+    apply_experience_guardrails,
     build_orchestration_config,
     load_cloud_profile,
     load_orchestration_config,
+    resolve_path_from_config,
 )
-from ai_factory.core.decisions.rules import decide_next_step
+from ai_factory.core.decisions.rules import build_feedback_recommendations, decide_next_step
 from ai_factory.core.execution.commands import UnsupportedInstanceTypeError, build_command
 from ai_factory.core.execution.local import LocalExecutor
 from ai_factory.core.execution.ssh import SshExecutor
 from ai_factory.core.instances.models import (
     EnvironmentSpec,
     ExecutionHandle,
+    FeedbackRecommendation,
     InstanceError,
     InstanceManifest,
-    InstanceStatus,
+    ProgressSnapshot,
     utc_now_iso,
 )
 from ai_factory.core.instances.queries import InstanceQueryService
@@ -32,13 +35,40 @@ from ai_factory.core.monitoring.collectors import collect_metrics_for_instance
 from ai_factory.core.monitoring.events import InstanceEvent
 
 
+class _SafeTemplateDict(dict[str, Any]):
+    def __missing__(self, key: str) -> str:
+        return "{" + key + "}"
+
+
+def _deep_merge(left: dict[str, Any], right: dict[str, Any]) -> dict[str, Any]:
+    merged = deepcopy(left)
+    for key, value in right.items():
+        if isinstance(value, dict) and isinstance(merged.get(key), dict):
+            merged[key] = _deep_merge(merged[key], value)
+        else:
+            merged[key] = value
+    return merged
+
+
+def _source_artifact_ref(manifest: InstanceManifest) -> str | None:
+    return (
+        (manifest.artifact_refs.get("published") or {}).get("final_adapter")
+        or (manifest.artifact_refs.get("published") or {}).get("merged_model")
+        or manifest.artifact_refs.get("source_artifact")
+    )
+
+
 class InstanceManager:
     def __init__(self, store: FileInstanceStore):
         self.store = store
         self.queries = InstanceQueryService(store)
 
     def _make_instance_id(self, instance_type: str) -> str:
-        return f"{instance_type}-{utc_now_iso().replace(':', '').replace('+00:00', 'z').replace('-', '').replace('.', '')}-{uuid.uuid4().hex[:8]}"
+        return (
+            f"{instance_type}-"
+            f"{utc_now_iso().replace(':', '').replace('+00:00', 'z').replace('-', '').replace('.', '')}-"
+            f"{uuid.uuid4().hex[:8]}"
+        )
 
     def _resolve_environment(self, environment: EnvironmentSpec) -> EnvironmentSpec:
         if environment.kind != "cloud" or environment.host:
@@ -57,12 +87,48 @@ class InstanceManager:
     def _persist_snapshot(self, instance_id: str, snapshot: dict[str, Any]) -> None:
         write_json(self.store.config_snapshot_path(instance_id), snapshot)
 
+    def _progress(
+        self,
+        *,
+        stage: str,
+        message: str,
+        percent: float | None = None,
+        completed_steps: int | None = None,
+        total_steps: int | None = None,
+        metrics: dict[str, Any] | None = None,
+    ) -> ProgressSnapshot:
+        return ProgressSnapshot(
+            stage=stage,
+            status_message=message,
+            percent=percent,
+            completed_steps=completed_steps,
+            total_steps=total_steps,
+            metrics=metrics or {},
+        )
+
+    def _base_metadata(
+        self,
+        config,
+        *,
+        metadata_updates: dict[str, Any] | None = None,
+    ) -> dict[str, Any]:
+        metadata = deepcopy(config.metadata)
+        metadata.setdefault("guardrail_notes", [])
+        metadata["remote_access"] = config.remote_access.model_dump(mode="json")
+        metadata["sub_agents"] = config.sub_agents.model_dump(mode="json")
+        metadata["publish_hooks"] = [hook.model_dump(mode="json") for hook in config.publish_hooks]
+        if metadata_updates:
+            metadata = _deep_merge(metadata, metadata_updates)
+        metadata.setdefault("automation_depth", 0)
+        return metadata
+
     def _base_manifest(
         self,
         config,
         *,
         config_path: str | None,
         parent_instance_id: str | None = None,
+        metadata_updates: dict[str, Any] | None = None,
     ) -> InstanceManifest:
         instance_id = self._make_instance_id(config.instance.type)
         environment = self._resolve_environment(config.instance.environment)
@@ -71,12 +137,95 @@ class InstanceManager:
             type=config.instance.type,
             status="pending",
             environment=environment,
+            user_level=config.experience.level,
+            orchestration_mode=config.orchestration_mode,
             name=config.instance.name or instance_id,
             parent_instance_id=parent_instance_id or config.instance.parent_instance_id,
             config_path=config_path or config.config_path,
             config_snapshot_path=str(self.store.config_snapshot_path(instance_id)),
             artifact_refs={"instance_dir": str(self.store.instance_dir(instance_id))},
+            progress=self._progress(stage="created", message="Instance created and waiting to start.", percent=0.0),
+            metadata=self._base_metadata(config, metadata_updates=metadata_updates),
         )
+
+    def _child_context(
+        self,
+        manifest: InstanceManifest,
+        *,
+        summary: dict[str, Any] | None = None,
+        refs: dict[str, Any] | None = None,
+        decision=None,
+    ) -> dict[str, Any]:
+        context: dict[str, Any] = {
+            "instance_id": manifest.id,
+            "instance_name": manifest.name,
+            "instance_type": manifest.type,
+            "source_instance_id": manifest.id,
+            "source_artifact": _source_artifact_ref(manifest) or "",
+            "decision_action": decision.action if decision else "",
+            "decision_rule": decision.rule if decision else "",
+        }
+        for payload in (refs or {}, summary or {}):
+            for key, value in payload.items():
+                if value is None:
+                    continue
+                if isinstance(value, (str, int, float, bool)):
+                    context[key] = value
+        return context
+
+    def _render_templates(self, value: Any, context: dict[str, Any]) -> Any:
+        if isinstance(value, str):
+            return value.format_map(_SafeTemplateDict(context))
+        if isinstance(value, list):
+            return [self._render_templates(item, context) for item in value]
+        if isinstance(value, dict):
+            return {key: self._render_templates(item, context) for key, item in value.items()}
+        return value
+
+    def _apply_snapshot_overrides(
+        self,
+        instance_id: str,
+        *,
+        context: dict[str, Any] | None = None,
+        subsystem_updates: dict[str, Any] | None = None,
+        metadata_updates: dict[str, Any] | None = None,
+    ) -> None:
+        snapshot = self.store.load_config_snapshot(instance_id)
+        snapshot.setdefault("subsystem", {})
+        if subsystem_updates:
+            updates = self._render_templates(subsystem_updates, context or {})
+            snapshot["subsystem"] = _deep_merge(snapshot["subsystem"], updates)
+        if metadata_updates:
+            snapshot["metadata"] = _deep_merge(snapshot.get("metadata", {}), metadata_updates)
+        self._persist_snapshot(instance_id, snapshot)
+
+    def _apply_manifest_metadata(self, instance_id: str, metadata_updates: dict[str, Any] | None) -> None:
+        if not metadata_updates:
+            return
+        manifest = self.store.load(instance_id)
+        manifest.metadata = _deep_merge(manifest.metadata, metadata_updates)
+        self.store.save(manifest)
+
+    def _child_metadata(self, parent: InstanceManifest, *, reason: str, extra: dict[str, Any] | None = None) -> dict[str, Any]:
+        metadata = {
+            "automation_reason": reason,
+            "automation_parent_instance_id": parent.id,
+            "automation_depth": int(parent.metadata.get("automation_depth", 0)) + 1,
+        }
+        if extra:
+            metadata = _deep_merge(metadata, extra)
+        return metadata
+
+    def _can_spawn_children(self, manifest: InstanceManifest, config) -> bool:
+        current_children = len(self.queries.get_children(manifest.id))
+        if current_children >= config.pipeline.max_auto_children:
+            return False
+        if not config.sub_agents.allow_nested and manifest.parent_instance_id:
+            return False
+        return int(manifest.metadata.get("automation_depth", 0)) < config.pipeline.max_auto_cycles
+
+    def _workload_enabled(self, config, workload: str) -> bool:
+        return bool(config.sub_agents.enabled and workload in config.sub_agents.workloads)
 
     def create_instance(
         self,
@@ -85,11 +234,33 @@ class InstanceManager:
         start: bool = True,
         environment_override: EnvironmentSpec | None = None,
         parent_instance_id: str | None = None,
+        metadata_updates: dict[str, Any] | None = None,
     ) -> InstanceManifest:
         config = load_orchestration_config(config_path)
         config = apply_environment_override(config, environment_override)
-        manifest = self._base_manifest(config, config_path=config_path, parent_instance_id=parent_instance_id)
+        config = apply_experience_guardrails(config)
+        manifest = self._base_manifest(
+            config,
+            config_path=config_path,
+            parent_instance_id=parent_instance_id,
+            metadata_updates=metadata_updates,
+        )
         self.store.create(manifest, config.model_dump(mode="json"))
+
+        if (
+            self._workload_enabled(config, "preprocess")
+            and manifest.type in {"train", "finetune"}
+            and self._can_spawn_children(manifest, config)
+        ):
+            self.create_instance(
+                resolve_path_from_config(manifest.config_path, config.pipeline.default_prepare_config)
+                or config.pipeline.default_prepare_config,
+                start=True,
+                environment_override=manifest.environment,
+                parent_instance_id=manifest.id,
+                metadata_updates=self._child_metadata(manifest, reason="preprocess_sub_agent"),
+            )
+
         return self.start_instance(manifest.id) if start else manifest
 
     def start_instance(self, instance_id: str) -> InstanceManifest:
@@ -113,12 +284,14 @@ class InstanceManager:
                 details={"instance_type": manifest.type},
             )
 
-        executor = SshExecutor() if manifest.environment.kind == "cloud" else LocalExecutor()
+        use_ssh = config.execution.backend == "ssh" or manifest.environment.kind == "cloud"
+        executor = SshExecutor() if use_ssh else LocalExecutor()
         manifest.execution = ExecutionHandle(
             backend=executor.backend_name,
             stdout_path=str(self.store.stdout_path(instance_id)),
             stderr_path=str(self.store.stderr_path(instance_id)),
         )
+        manifest.progress = self._progress(stage="queued", message="Execution requested.", percent=0.0)
         self.store.save(manifest)
         handle = executor.start(
             manifest,
@@ -142,7 +315,7 @@ class InstanceManager:
                 payload={"backend": handle.backend, "pid": handle.pid},
             ),
         )
-        return manifest
+        return refreshed
 
     def mark_running(self, instance_id: str) -> InstanceManifest:
         manifest = self.store.load(instance_id)
@@ -154,6 +327,7 @@ class InstanceManager:
         )
         execution.started_at = utc_now_iso()
         manifest.execution = execution
+        manifest.progress = self._progress(stage="running", message=f"{manifest.type} instance is running.")
         self.store.save(manifest)
         self.store.append_event(
             instance_id,
@@ -165,6 +339,26 @@ class InstanceManager:
         )
         return manifest
 
+    def _retry_failed_instance(self, manifest: InstanceManifest, config) -> bool:
+        retry_limit = max(int(config.execution.retry_limit or 0), int(config.sub_agents.retry_limit or 0))
+        if retry_limit <= 0 or not self._can_spawn_children(manifest, config):
+            return False
+        current_attempt = int(manifest.metadata.get("retry_attempt", 0))
+        if current_attempt >= retry_limit:
+            return False
+        self.create_instance(
+            manifest.config_path or "",
+            start=True,
+            environment_override=manifest.environment,
+            parent_instance_id=manifest.parent_instance_id or manifest.id,
+            metadata_updates=self._child_metadata(
+                manifest,
+                reason="retry",
+                extra={"retry_attempt": current_attempt + 1, "retry_source_instance_id": manifest.id},
+            ),
+        )
+        return True
+
     def mark_failed(
         self,
         instance_id: str,
@@ -174,8 +368,11 @@ class InstanceManager:
         details: dict[str, Any],
     ) -> InstanceManifest:
         manifest = self.store.load(instance_id)
+        snapshot = self.store.load_config_snapshot(instance_id)
+        config = build_orchestration_config(snapshot, config_path=manifest.config_path)
         manifest.status = "failed"
         manifest.error = InstanceError(code=code, message=message, details=details)
+        manifest.progress = self._progress(stage="failed", message=message, percent=100.0)
         if manifest.execution is not None:
             manifest.execution.ended_at = utc_now_iso()
             manifest.execution.exit_code = manifest.execution.exit_code if manifest.execution.exit_code is not None else 1
@@ -184,7 +381,165 @@ class InstanceManager:
             instance_id,
             InstanceEvent(type="instance.failed", message=message, payload={"code": code, **details}),
         )
+        self._retry_failed_instance(manifest, config)
         return manifest
+
+    def _schedule_report_instance(
+        self,
+        parent: InstanceManifest,
+        config,
+        *,
+        context: dict[str, Any],
+        reason: str,
+    ) -> None:
+        if not self._can_spawn_children(parent, config):
+            return
+        report_config = resolve_path_from_config(parent.config_path, config.pipeline.default_report_config)
+        if not report_config:
+            return
+        child = self.create_instance(
+            report_config,
+            start=False,
+            environment_override=parent.environment,
+            parent_instance_id=parent.id,
+            metadata_updates=self._child_metadata(parent, reason=reason),
+        )
+        self._apply_snapshot_overrides(child.id, context=context)
+        self.start_instance(child.id)
+
+    def _schedule_publish_hooks(
+        self,
+        parent: InstanceManifest,
+        config,
+        *,
+        when: str,
+        context: dict[str, Any],
+    ) -> bool:
+        if not self._can_spawn_children(parent, config):
+            return False
+        scheduled = False
+        for hook in config.publish_hooks:
+            if not hook.enabled or hook.when != when:
+                continue
+            deploy_config = resolve_path_from_config(
+                parent.config_path,
+                hook.config_path or config.pipeline.default_deploy_config,
+            )
+            if not deploy_config:
+                continue
+            target = "custom_api" if hook.target == "api" else hook.target
+            child = self.create_deployment_instance(
+                parent.id,
+                target=target,
+                config_path=deploy_config,
+                start=False,
+                metadata_updates=self._child_metadata(parent, reason=f"publish_hook:{target}"),
+            )
+            self._apply_snapshot_overrides(
+                child.id,
+                context=context,
+                subsystem_updates={"provider_options": hook.provider_options},
+            )
+            self.start_instance(child.id)
+            scheduled = True
+        return scheduled
+
+    def _queue_recommendations(self, manifest: InstanceManifest, config, *, context: dict[str, Any]) -> bool:
+        if not self._can_spawn_children(manifest, config):
+            return False
+        scheduled = False
+        for recommendation in manifest.recommendations[: config.feedback_loop.max_recommendations]:
+            should_queue = (
+                (recommendation.action == "finetune" and config.feedback_loop.auto_queue_finetune)
+                or (recommendation.action == "retrain" and config.feedback_loop.auto_queue_retrain)
+            )
+            if not should_queue or not recommendation.target_instance_type or not recommendation.config_path:
+                continue
+            if recommendation.target_instance_type == "deploy":
+                child = self.create_deployment_instance(
+                    manifest.id,
+                    target=recommendation.deployment_target or "huggingface",
+                    config_path=resolve_path_from_config(manifest.config_path, recommendation.config_path)
+                    or recommendation.config_path,
+                    start=False,
+                    metadata_updates=self._child_metadata(
+                        manifest,
+                        reason=f"recommendation:{recommendation.action}",
+                    ),
+                )
+                self._apply_snapshot_overrides(child.id, context=context)
+                self.start_instance(child.id)
+                scheduled = True
+                continue
+            if recommendation.target_instance_type == "evaluate":
+                child = self.create_evaluation_instance(
+                    manifest.id,
+                    config_path=resolve_path_from_config(manifest.config_path, recommendation.config_path)
+                    or recommendation.config_path,
+                    start=False,
+                    metadata_updates=self._child_metadata(
+                        manifest,
+                        reason=f"recommendation:{recommendation.action}",
+                    ),
+                )
+                self._apply_snapshot_overrides(child.id, context=context)
+                self.start_instance(child.id)
+                scheduled = True
+                continue
+            child = self.create_instance(
+                resolve_path_from_config(manifest.config_path, recommendation.config_path)
+                or recommendation.config_path,
+                start=False,
+                environment_override=manifest.environment,
+                parent_instance_id=manifest.id,
+                metadata_updates=self._child_metadata(
+                    manifest,
+                    reason=f"recommendation:{recommendation.action}",
+                ),
+            )
+            subsystem_updates = {"command_override": recommendation.command} if recommendation.command else None
+            self._apply_snapshot_overrides(child.id, context=context, subsystem_updates=subsystem_updates)
+            self.start_instance(child.id)
+            scheduled = True
+        return scheduled
+
+    def _post_success_automation(
+        self,
+        manifest: InstanceManifest,
+        config,
+        *,
+        summary: dict[str, Any],
+        refs: dict[str, Any],
+    ) -> None:
+        context = self._child_context(manifest, summary=summary, refs=refs, decision=manifest.decision)
+        scheduled = False
+
+        if manifest.type in {"train", "finetune"}:
+            if self._workload_enabled(config, "evaluation") or config.feedback_loop.queue_follow_up_evaluation:
+                child = self.create_evaluation_instance(
+                    manifest.id,
+                    config_path=resolve_path_from_config(manifest.config_path, config.pipeline.default_eval_config)
+                    or config.pipeline.default_eval_config,
+                    start=False,
+                    metadata_updates=self._child_metadata(manifest, reason="evaluation_follow_up"),
+                )
+                self._apply_snapshot_overrides(child.id, context=context)
+                self.start_instance(child.id)
+                scheduled = True
+            if self._schedule_publish_hooks(manifest, config, when="on_success", context=context):
+                scheduled = True
+
+        if manifest.type == "evaluate":
+            if self._workload_enabled(config, "metrics") or config.feedback_loop.suggest_failure_analysis:
+                self._schedule_report_instance(manifest, config, context=context, reason="failure_analysis")
+                scheduled = True
+            if manifest.decision and manifest.decision.action == "deploy":
+                if self._schedule_publish_hooks(manifest, config, when="after_evaluation", context=context):
+                    scheduled = True
+            if self._queue_recommendations(manifest, config, context=context):
+                scheduled = True
+            if (config.pipeline.auto_continue or config.decision_policy.auto_continue) and manifest.decision and not scheduled:
+                self._auto_continue(manifest, config, manifest.decision.action)
 
     def finalize_instance(
         self,
@@ -221,6 +576,14 @@ class InstanceManager:
         )
         manifest.metrics_summary = summary
         manifest.artifact_refs.update(refs)
+        manifest.progress = self._progress(
+            stage="completed" if manifest.status == "completed" else "failed",
+            message=f"{manifest.type} instance {manifest.status}.",
+            percent=100.0,
+            completed_steps=summary.get("latest_step"),
+            total_steps=summary.get("total_steps"),
+            metrics={key: value for key, value in summary.items() if isinstance(value, (int, float, bool))},
+        )
         self.store.write_current_metrics(instance_id, summary)
         if config.monitoring.write_timeseries:
             self.store.append_metric_points(instance_id, points)
@@ -228,9 +591,55 @@ class InstanceManager:
         if manifest.type == "evaluate" and manifest.status == "completed":
             decision = decide_next_step(summary, config.decision_policy)
             manifest.decision = decision
+            manifest.recommendations = build_feedback_recommendations(
+                summary,
+                config.decision_policy,
+                default_prepare_config=resolve_path_from_config(manifest.config_path, config.pipeline.default_prepare_config)
+                or config.pipeline.default_prepare_config,
+                default_train_config=resolve_path_from_config(manifest.config_path, config.pipeline.default_train_config)
+                or config.pipeline.default_train_config,
+                default_finetune_config=resolve_path_from_config(
+                    manifest.config_path,
+                    config.pipeline.default_finetune_config,
+                )
+                or config.pipeline.default_finetune_config,
+                default_eval_config=resolve_path_from_config(manifest.config_path, config.pipeline.default_eval_config)
+                or config.pipeline.default_eval_config,
+                default_deploy_config=resolve_path_from_config(
+                    manifest.config_path,
+                    config.pipeline.default_deploy_config,
+                )
+                or config.pipeline.default_deploy_config,
+                default_report_config=resolve_path_from_config(
+                    manifest.config_path,
+                    config.pipeline.default_report_config,
+                )
+                or config.pipeline.default_report_config,
+                improvement_floor=config.feedback_loop.improvement_floor,
+                suggest_failure_analysis=config.feedback_loop.suggest_failure_analysis,
+            )[: config.feedback_loop.max_recommendations]
             self.store.write_decision_report(instance_id, decision.model_dump(mode="json"))
-            if config.pipeline.auto_continue or config.decision_policy.auto_continue:
-                self._auto_continue(manifest, config, decision.action)
+            self.store.write_recommendations_report(
+                instance_id,
+                [item.model_dump(mode="json") for item in manifest.recommendations],
+            )
+        elif manifest.type in {"train", "finetune"} and manifest.status == "completed":
+            if self._workload_enabled(config, "evaluation") or config.feedback_loop.queue_follow_up_evaluation:
+                manifest.recommendations = [
+                    FeedbackRecommendation(
+                        action="evaluate",
+                        reason="A follow-up evaluation is recommended so training metrics can feed the next orchestration step.",
+                        priority=2,
+                        target_instance_type="evaluate",
+                        config_path=resolve_path_from_config(manifest.config_path, config.pipeline.default_eval_config)
+                        or config.pipeline.default_eval_config,
+                        metadata={"source": manifest.type},
+                    )
+                ]
+                self.store.write_recommendations_report(
+                    instance_id,
+                    [item.model_dump(mode="json") for item in manifest.recommendations],
+                )
 
         self.store.save(manifest)
         self.store.append_event(
@@ -241,32 +650,50 @@ class InstanceManager:
                 payload={"exit_code": exit_code, "metrics_summary": summary},
             ),
         )
+
+        if manifest.status == "completed":
+            self._post_success_automation(manifest, config, summary=summary, refs=refs)
+        else:
+            self._retry_failed_instance(manifest, config)
         return manifest
 
     def _auto_continue(self, manifest: InstanceManifest, config, action: str) -> None:
+        if not self._can_spawn_children(manifest, config):
+            return
         if action == "deploy":
             self.create_deployment_instance(
                 manifest.parent_instance_id or manifest.id,
                 target="huggingface",
-                config_path=config.pipeline.default_deploy_config,
+                config_path=resolve_path_from_config(manifest.config_path, config.pipeline.default_deploy_config)
+                or config.pipeline.default_deploy_config,
                 start=True,
+                metadata_updates=self._child_metadata(manifest, reason="auto_continue_deploy"),
             )
         elif action == "finetune":
             self.create_instance(
-                config.pipeline.default_finetune_config,
+                resolve_path_from_config(manifest.config_path, config.pipeline.default_finetune_config)
+                or config.pipeline.default_finetune_config,
                 start=True,
+                environment_override=manifest.environment,
                 parent_instance_id=manifest.id,
+                metadata_updates=self._child_metadata(manifest, reason="auto_continue_finetune"),
+            )
+        elif action == "retrain":
+            self.create_instance(
+                resolve_path_from_config(manifest.config_path, config.pipeline.default_train_config)
+                or config.pipeline.default_train_config,
+                start=True,
+                environment_override=manifest.environment,
+                parent_instance_id=manifest.id,
+                metadata_updates=self._child_metadata(manifest, reason="auto_continue_retrain"),
             )
 
     def _build_eval_snapshot(self, manifest: InstanceManifest, source: InstanceManifest) -> dict[str, Any]:
         snapshot = self.store.load_config_snapshot(manifest.id)
-        source_artifact = (
-            (source.artifact_refs.get("published") or {}).get("final_adapter")
-            or (source.artifact_refs.get("published") or {}).get("merged_model")
-            or source.artifact_refs.get("source_artifact")
-        )
+        source_artifact = _source_artifact_ref(source)
         if not source_artifact:
             snapshot["subsystem"]["source_instance_id"] = source.id
+            snapshot.setdefault("metadata", {})
             snapshot["metadata"]["source_instance_id"] = source.id
             return snapshot
 
@@ -320,6 +747,7 @@ class InstanceManager:
         *,
         config_path: str = "configs/eval.yaml",
         start: bool = True,
+        metadata_updates: dict[str, Any] | None = None,
     ) -> InstanceManifest:
         source = self.store.load(source_instance_id)
         manifest = self.create_instance(
@@ -327,6 +755,7 @@ class InstanceManager:
             start=False,
             environment_override=source.environment,
             parent_instance_id=source.id,
+            metadata_updates=metadata_updates,
         )
         snapshot = self._build_eval_snapshot(manifest, source)
         self._persist_snapshot(manifest.id, snapshot)
@@ -339,6 +768,7 @@ class InstanceManager:
         target: str,
         config_path: str = "configs/deploy.yaml",
         start: bool = True,
+        metadata_updates: dict[str, Any] | None = None,
     ) -> InstanceManifest:
         source = self.store.load(source_instance_id)
         manifest = self.create_instance(
@@ -346,15 +776,12 @@ class InstanceManager:
             start=False,
             environment_override=EnvironmentSpec(kind="local"),
             parent_instance_id=source.id,
+            metadata_updates=metadata_updates,
         )
         snapshot = self.store.load_config_snapshot(manifest.id)
         snapshot["subsystem"]["provider"] = target
         snapshot["subsystem"]["source_instance_id"] = source.id
-        snapshot["subsystem"]["source_artifact_ref"] = (
-            (source.artifact_refs.get("published") or {}).get("final_adapter")
-            or (source.artifact_refs.get("published") or {}).get("merged_model")
-            or source.artifact_refs.get("source_artifact")
-        )
+        snapshot["subsystem"]["source_artifact_ref"] = _source_artifact_ref(source)
         snapshot.setdefault("metadata", {})
         snapshot["metadata"]["source_instance_id"] = source.id
         self._persist_snapshot(manifest.id, snapshot)
@@ -363,8 +790,21 @@ class InstanceManager:
     def get_instance(self, instance_id: str) -> InstanceManifest:
         return self.store.load(instance_id)
 
-    def list_instances(self) -> list[InstanceManifest]:
-        return self.queries.list_instances()
+    def list_instances(
+        self,
+        *,
+        instance_type: str | None = None,
+        status: str | None = None,
+        parent_instance_id: str | None = None,
+    ) -> list[InstanceManifest]:
+        return self.queries.list_instances(
+            instance_type=instance_type,
+            status=status,
+            parent_instance_id=parent_instance_id,
+        )
+
+    def get_children(self, instance_id: str) -> list[InstanceManifest]:
+        return self.queries.get_children(instance_id)
 
     def get_logs(self, instance_id: str) -> dict[str, str]:
         return self.store.read_logs(instance_id)

@@ -23,6 +23,14 @@ def _resolve_ref(config_path: Path, ref: str | None) -> str | None:
     return str((config_path.parent / ref_path).resolve())
 
 
+def resolve_path_from_config(config_path: str | None, ref: str | None) -> str | None:
+    if not ref:
+        return None
+    if not config_path:
+        return str(Path(ref).resolve()) if Path(ref).is_absolute() else ref
+    return _resolve_ref(Path(config_path).resolve(), ref)
+
+
 def _coerce_environment(raw: dict[str, Any]) -> dict[str, Any]:
     environment = raw.get("environment")
     if isinstance(environment, str):
@@ -62,6 +70,42 @@ def apply_environment_override(
         if value is not None and value != {}:
             current[key] = value
     merged["instance"]["environment"] = current
+    return build_orchestration_config(merged, config_path=config.config_path)
+
+
+def apply_experience_guardrails(config: OrchestrationConfig) -> OrchestrationConfig:
+    merged = config.model_dump(mode="json")
+    experience = config.experience
+    notes: list[str] = list(merged.setdefault("metadata", {}).get("guardrail_notes", []))
+
+    if not experience.allow_command_override and merged["subsystem"].get("command_override"):
+        merged["subsystem"]["command_override"] = None
+        notes.append("command_override removed by user-level guardrails")
+
+    if not experience.allow_extra_args and merged["subsystem"].get("extra_args"):
+        merged["subsystem"]["extra_args"] = []
+        notes.append("extra_args removed by user-level guardrails")
+
+    if not experience.allow_remote_shell and merged["instance"].get("environment", {}).get("kind") == "cloud":
+        merged["instance"]["environment"] = {"kind": "local"}
+        merged["remote_access"] = {"enable_ssh": False, "sync_before_start": False, "sync_mode": "none"}
+        merged["orchestration_mode"] = "single"
+        notes.append("cloud execution downgraded to local by user-level guardrails")
+
+    if experience.require_safe_defaults and config.instance.type in {"train", "finetune"}:
+        current = int((merged.get("sub_agents") or {}).get("max_parallelism") or 1)
+        safe_limit = int(experience.max_parallel_sub_agents or 1)
+        if current > safe_limit:
+            merged["sub_agents"]["max_parallelism"] = safe_limit
+            notes.append(f"sub-agent parallelism capped at {safe_limit}")
+
+    if experience.require_safe_defaults and config.instance.type == "deploy":
+        merged.setdefault("subsystem", {}).setdefault("provider_options", {})
+        if not merged["subsystem"]["provider_options"].get("dry_run", False):
+            merged["subsystem"]["provider_options"]["dry_run"] = True
+            notes.append("deployment switched to dry_run by user-level guardrails")
+
+    merged["metadata"]["guardrail_notes"] = notes
     return build_orchestration_config(merged, config_path=config.config_path)
 
 

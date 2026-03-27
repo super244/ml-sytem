@@ -237,6 +237,22 @@ export type WorkspaceEvaluationConfig = {
   run_command: string;
 };
 
+export type WorkspaceCapability = {
+  id: string;
+  title: string;
+  detail: string;
+};
+
+export type WorkspaceOrchestrationTemplate = {
+  id: string;
+  title: string;
+  path: string;
+  instance_type: string;
+  user_level: string;
+  orchestration_mode: string;
+  command: string;
+};
+
 export type WorkspaceOverview = {
   repo_root: string;
   summary: {
@@ -247,12 +263,15 @@ export type WorkspaceOverview = {
     runs: number;
     training_profiles: number;
     evaluation_configs: number;
+    orchestration_templates: number;
     ready_checks: number;
     total_checks: number;
   };
   models: ModelInfo[];
   readiness_checks: WorkspaceCheck[];
   command_recipes: WorkspaceRecipe[];
+  orchestration_capabilities: WorkspaceCapability[];
+  orchestration_templates: WorkspaceOrchestrationTemplate[];
   training_profiles: WorkspaceTrainingProfile[];
   evaluation_configs: WorkspaceEvaluationConfig[];
 };

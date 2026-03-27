@@ -68,12 +68,16 @@ def test_collect_metrics_for_training_instance(tmp_path: Path, monkeypatch: pyte
     }
 
     summary, points, refs = collectors.collect_metrics_for_instance(manifest, snapshot, collect_gpu=False)
+    progress = collectors.collect_progress_for_instance(manifest, snapshot)
 
     assert summary["eval_loss"] == 0.42
     assert summary["train_rows"] == 12
     assert summary["trainable_ratio"] == 0.123
     assert len(points) == 4
     assert refs["published"]["final_adapter"] == "artifacts/models/demo"
+    assert progress is not None
+    assert progress.completed_steps == 2
+    assert progress.metrics["loss"] == 1.0
 
 
 def test_collect_metrics_for_evaluation_instance(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
@@ -96,8 +100,11 @@ def test_collect_metrics_for_evaluation_instance(tmp_path: Path, monkeypatch: py
     snapshot = {"resolved_subsystem_config": {"output_dir": str(output_dir)}}
 
     summary, points, refs = collectors.collect_metrics_for_instance(manifest, snapshot, collect_gpu=False)
+    progress = collectors.collect_progress_for_instance(manifest, snapshot)
 
     assert summary["accuracy"] == 0.88
     assert summary["parse_rate"] == 0.75
     assert any(point.name == "accuracy" for point in points)
     assert refs["summary_json"].endswith("summary.json")
+    assert progress is not None
+    assert progress.percent == 1.0

@@ -6,6 +6,7 @@ import subprocess
 import sys
 import threading
 from pathlib import Path
+from typing import Any
 
 from ai_factory.core.execution.base import BaseExecutor, CommandSpec, RunnerPayload, decode_payload, encode_payload
 from ai_factory.core.instances.models import ExecutionHandle, InstanceManifest
@@ -27,6 +28,33 @@ def _build_remote_command(payload: RunnerPayload) -> str:
     if env_prefix:
         command = f"{env_prefix} {command}"
     return f"cd {shlex.quote(cwd)} && {command}"
+
+
+def _port_forward_args(metadata: dict[str, Any]) -> list[str]:
+    remote_access = metadata.get("remote_access") or {}
+    forwards = remote_access.get("port_forwards") or []
+    argv: list[str] = []
+    for forward in forwards:
+        local_port = forward.get("local_port")
+        remote_port = forward.get("remote_port")
+        bind_host = forward.get("bind_host", "127.0.0.1")
+        if local_port is None or remote_port is None:
+            continue
+        argv.extend(["-L", f"{bind_host}:{local_port}:127.0.0.1:{remote_port}"])
+    if remote_access.get("agent_forwarding"):
+        argv.append("-A")
+    keepalive = remote_access.get("ssh_keepalive_s")
+    if isinstance(keepalive, int) and keepalive > 0:
+        argv.extend(["-o", f"ServerAliveInterval={keepalive}"])
+    return argv
+
+
+def _build_ssh_argv(environment, metadata: dict[str, Any]) -> list[str]:
+    argv = ["ssh", "-p", str(environment.port)]
+    if environment.key_path:
+        argv.extend(["-i", environment.key_path])
+    argv.extend(_port_forward_args(metadata))
+    return argv
 
 
 def _stream_pipe(pipe, path: Path) -> None:
@@ -53,6 +81,7 @@ class SshExecutor(BaseExecutor):
             artifacts_dir=str(artifacts_dir),
             instance_id=manifest.id,
             environment=manifest.environment,
+            manifest_metadata=manifest.metadata,
             command=command,
         )
         process = subprocess.Popen(
@@ -77,9 +106,7 @@ class SshExecutor(BaseExecutor):
 
     def read_remote_file(self, manifest: InstanceManifest, path: str) -> str:
         target = _ssh_target(manifest.environment)
-        argv = ["ssh", "-p", str(manifest.environment.port)]
-        if manifest.environment.key_path:
-            argv.extend(["-i", manifest.environment.key_path])
+        argv = _build_ssh_argv(manifest.environment, manifest.metadata)
         argv.extend([target, f"cat {shlex.quote(path)}"])
         result = subprocess.run(argv, capture_output=True, text=True, check=True)
         return result.stdout
@@ -93,9 +120,7 @@ def _run_payload(payload: RunnerPayload) -> int:
     manager = InstanceManager(store)
     manager.mark_running(payload.instance_id)
 
-    ssh_command = ["ssh", "-p", str(payload.environment.port)]
-    if payload.environment.key_path:
-        ssh_command.extend(["-i", payload.environment.key_path])
+    ssh_command = _build_ssh_argv(payload.environment, payload.manifest_metadata)
     ssh_command.extend([_ssh_target(payload.environment), _build_remote_command(payload)])
 
     process = subprocess.Popen(

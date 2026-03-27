@@ -4,6 +4,8 @@ import importlib.util
 from pathlib import Path
 from typing import Any
 
+import yaml
+
 from ai_factory.core.discovery import list_training_runs, load_benchmark_registry
 from data.catalog import load_catalog, load_pack_summary
 
@@ -43,6 +45,27 @@ def _load_model_catalog(repo_root: Path) -> list[dict[str, Any]]:
         return []
 
 
+def _load_orchestration_templates(repo_root: Path) -> list[dict[str, str]]:
+    templates: list[dict[str, str]] = []
+    for path in sorted((repo_root / "configs").glob("*.yaml")):
+        payload = yaml.safe_load(path.read_text()) or {}
+        relative = path.relative_to(repo_root)
+        instance = payload.get("instance") or {}
+        experience = payload.get("experience") or {}
+        templates.append(
+            {
+                "id": path.stem,
+                "title": _config_title(path),
+                "path": str(relative),
+                "instance_type": str(instance.get("type", "unknown")),
+                "user_level": str(experience.get("level", "hobbyist")),
+                "orchestration_mode": str(payload.get("orchestration_mode", "single")),
+                "command": f"ai-factory new --config {relative}",
+            }
+        )
+    return templates
+
+
 def build_workspace_overview(root: Path | None = None) -> dict[str, Any]:
     repo_root = (root or REPO_ROOT).resolve()
     catalog = load_catalog(repo_root / "data" / "catalog.json")
@@ -54,6 +77,7 @@ def build_workspace_overview(root: Path | None = None) -> dict[str, Any]:
         repo_root / "evaluation" / "benchmarks" / "registry.yaml"
     )
     models = _load_model_catalog(repo_root)
+    orchestration_templates = _load_orchestration_templates(repo_root)
 
     training_profiles = []
     for path in sorted((repo_root / "training" / "configs" / "profiles").glob("*.yaml")):
@@ -184,6 +208,43 @@ def build_workspace_overview(root: Path | None = None) -> dict[str, Any]:
             "python -m evaluation.evaluate --config evaluation/configs/base_vs_finetuned.yaml",
             "evaluation",
         ),
+        _command_recipe(
+            "orchestrated-finetune",
+            "Orchestrated finetune",
+            "Create a managed finetune instance that records progress, lineage, metrics, and follow-up recommendations.",
+            "ai-factory new --config configs/finetune.yaml",
+            "control-plane",
+        ),
+        _command_recipe(
+            "cloud-finetune",
+            "Cloud finetune",
+            "Create a cloud-backed finetune instance with SSH profile resolution and remote execution.",
+            "ai-factory new --config configs/finetune.yaml --environment cloud --cloud-profile default",
+            "control-plane",
+        ),
+    ]
+
+    orchestration_capabilities = [
+        {
+            "id": "shared-contracts",
+            "title": "Shared control-plane contracts",
+            "detail": "CLI, API, and future TUI/desktop layers consume the same instance manifests, progress state, recommendations, and child-instance lineage.",
+        },
+        {
+            "id": "remote-ssh",
+            "title": "Remote SSH orchestration",
+            "detail": "Cloud profiles, SSH key selection, and SSH port-forward definitions are modeled directly in orchestration configs and instance metadata.",
+        },
+        {
+            "id": "feedback-loop",
+            "title": "Continuous feedback loop",
+            "detail": "Training can recommend evaluation, evaluation can recommend deploy or more training, and bounded automatic child instances can carry those steps forward.",
+        },
+        {
+            "id": "publish-hooks",
+            "title": "Publish hooks",
+            "detail": "Deployment hooks can target HuggingFace, Ollama, LM Studio, or custom APIs through the shared deployment pipeline.",
+        },
     ]
 
     return {
@@ -196,12 +257,15 @@ def build_workspace_overview(root: Path | None = None) -> dict[str, Any]:
             "runs": len(runs),
             "training_profiles": len(training_profiles),
             "evaluation_configs": len(evaluation_configs),
+            "orchestration_templates": len(orchestration_templates),
             "ready_checks": ready_count,
             "total_checks": len(readiness_checks),
         },
         "models": models,
         "readiness_checks": readiness_checks,
         "command_recipes": command_recipes,
+        "orchestration_capabilities": orchestration_capabilities,
+        "orchestration_templates": orchestration_templates,
         "training_profiles": training_profiles,
         "evaluation_configs": evaluation_configs,
     }

@@ -28,6 +28,7 @@ class LocalExecutor(BaseExecutor):
             artifacts_dir=str(artifacts_dir),
             instance_id=manifest.id,
             environment=manifest.environment,
+            manifest_metadata=manifest.metadata,
             command=command,
         )
         process = subprocess.Popen(
