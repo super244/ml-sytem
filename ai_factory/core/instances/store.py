@@ -41,6 +41,9 @@ class FileInstanceStore:
     def decision_path(self, instance_id: str) -> Path:
         return self.instance_dir(instance_id) / "reports" / "decision.json"
 
+    def recommendations_path(self, instance_id: str) -> Path:
+        return self.instance_dir(instance_id) / "reports" / "recommendations.json"
+
     def _ensure_layout(self, instance_id: str) -> None:
         for path in (
             self.instance_dir(instance_id),
@@ -126,3 +129,12 @@ class FileInstanceStore:
 
     def write_decision_report(self, instance_id: str, payload: dict[str, Any]) -> None:
         write_json(self.decision_path(instance_id), payload)
+
+    def read_decision_report(self, instance_id: str) -> dict[str, Any]:
+        return load_json(self.decision_path(instance_id), default={}) or {}
+
+    def write_recommendations_report(self, instance_id: str, payload: list[dict[str, Any]]) -> None:
+        write_json(self.recommendations_path(instance_id), payload)
+
+    def read_recommendations_report(self, instance_id: str) -> list[dict[str, Any]]:
+        return load_json(self.recommendations_path(instance_id), default=[]) or []
