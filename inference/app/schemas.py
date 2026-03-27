@@ -149,7 +149,7 @@ class InstanceEvaluateRequest(BaseModel):
 
 
 class InstanceDeployRequest(BaseModel):
-    target: Literal["huggingface", "ollama", "lmstudio"]
+    target: Literal["huggingface", "ollama", "lmstudio", "custom_api"]
     config_path: str | None = None
     start: bool = True
 
@@ -170,6 +170,8 @@ class InstanceDetail(InstanceManifest):
     config_snapshot: dict[str, Any] = Field(default_factory=dict)
     logs: InstanceLogsResponse | None = None
     metrics: InstanceMetricsResponse = Field(default_factory=InstanceMetricsResponse)
+    children: list[InstanceManifest] = Field(default_factory=list)
+    events: list[dict[str, Any]] = Field(default_factory=list)
 
 
 class InstanceListResponse(BaseModel):

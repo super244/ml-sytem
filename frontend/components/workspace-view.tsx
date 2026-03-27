@@ -5,9 +5,11 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 
 import {
+  type WorkspaceCapability,
   getWorkspaceOverview,
   type WorkspaceCheck,
   type WorkspaceEvaluationConfig,
+  type WorkspaceOrchestrationTemplate,
   type WorkspaceOverview,
   type WorkspaceRecipe,
   type WorkspaceTrainingProfile,
@@ -113,6 +115,8 @@ export function WorkspaceView() {
 
   const summary = overview?.summary;
   const recipes = overview?.command_recipes ?? [];
+  const orchestrationCapabilities = overview?.orchestration_capabilities ?? [];
+  const orchestrationTemplates = overview?.orchestration_templates ?? [];
   const readinessChecks = overview?.readiness_checks ?? [];
   const trainingProfiles = overview?.training_profiles ?? [];
   const evaluationConfigs = overview?.evaluation_configs ?? [];
@@ -138,6 +142,11 @@ export function WorkspaceView() {
               label: "Eval configs",
               value: formatCount(summary?.evaluation_configs),
               tone: "accent",
+            },
+            {
+              label: "Control templates",
+              value: formatCount(summary?.orchestration_templates),
+              tone: "secondary",
             },
             {
               label: "Runs",
@@ -233,6 +242,59 @@ export function WorkspaceView() {
                           {copied[recipe.id] ? "Copied" : "Copy command"}
                         </button>
                       </div>
+                    </article>
+                  ))}
+                </div>
+              </section>
+            </section>
+
+            <section className="workspace-section-grid">
+              <section className="panel workspace-section">
+                <div className="section-heading">
+                  <div>
+                    <div className="eyebrow">Control plane</div>
+                    <h2 className="workspace-title">Orchestration capabilities</h2>
+                  </div>
+                </div>
+                <div className="workspace-card-grid compact">
+                  {orchestrationCapabilities.map((capability: WorkspaceCapability) => (
+                    <article key={capability.id} className="workspace-card">
+                      <div className="message-meta">
+                        <span>Capability</span>
+                        <span className="status-pill">Shared</span>
+                      </div>
+                      <h2>{capability.title}</h2>
+                      <p className="hero-copy">{capability.detail}</p>
+                    </article>
+                  ))}
+                </div>
+              </section>
+
+              <section className="panel workspace-section">
+                <div className="section-heading">
+                  <div>
+                    <div className="eyebrow">Starter templates</div>
+                    <h2 className="workspace-title">Managed instance entry points</h2>
+                  </div>
+                </div>
+                <div className="workspace-card-grid">
+                  {orchestrationTemplates.map((template: WorkspaceOrchestrationTemplate) => (
+                    <article key={template.id} className="workspace-card">
+                      <div className="message-meta">
+                        <span>{template.instance_type}</span>
+                        <span className="status-pill">{template.path}</span>
+                      </div>
+                      <h2>{template.title}</h2>
+                      <div className="badge-row">
+                        <MetricBadge label="User level" value={template.user_level} />
+                        <MetricBadge label="Mode" value={template.orchestration_mode} tone="secondary" />
+                      </div>
+                      <CommandBlock
+                        label="Create instance"
+                        command={template.command}
+                        copied={Boolean(copied[template.command])}
+                        onCopy={copyCommand}
+                      />
                     </article>
                   ))}
                 </div>

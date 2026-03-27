@@ -63,8 +63,22 @@ def test_manager_creates_runs_and_finalizes_instances(tmp_path: Path, monkeypatc
     profile_dir = tmp_path / "training" / "configs" / "profiles"
     profile_dir.mkdir(parents=True)
     (profile_dir / "baseline_qlora.yaml").write_text("run_name: demo-run\ntraining:\n  artifacts_dir: artifacts\n")
+    eval_config_path = tmp_path / "configs" / "eval.yaml"
+    eval_config_path.parent.mkdir(parents=True, exist_ok=True)
+    eval_config_path.write_text(
+        "\n".join(
+            [
+                "instance:",
+                "  type: evaluate",
+                "  environment: local",
+                "subsystem:",
+                "  config_ref: ../evaluation/configs/base_vs_finetuned.yaml",
+            ]
+        )
+    )
+    (tmp_path / "evaluation" / "configs").mkdir(parents=True, exist_ok=True)
+    (tmp_path / "evaluation" / "configs" / "base_vs_finetuned.yaml").write_text("output_dir: evaluation/results/demo\n")
     config_path = tmp_path / "configs" / "finetune.yaml"
-    config_path.parent.mkdir(parents=True, exist_ok=True)
     config_path.write_text(
         "\n".join(
             [
@@ -72,6 +86,15 @@ def test_manager_creates_runs_and_finalizes_instances(tmp_path: Path, monkeypatc
                 "  type: finetune",
                 "  environment: local",
                 "  name: demo-finetune",
+                "sub_agents:",
+                "  enabled: true",
+                "  workloads:",
+                "    - evaluation",
+                "feedback_loop:",
+                "  enabled: true",
+                "  queue_follow_up_evaluation: true",
+                "pipeline:",
+                f"  default_eval_config: {eval_config_path}",
                 "subsystem:",
                 "  config_ref: ../training/configs/profiles/baseline_qlora.yaml",
             ]
@@ -107,8 +130,10 @@ def test_manager_creates_runs_and_finalizes_instances(tmp_path: Path, monkeypatc
     assert finalized.execution is not None
     assert finalized.execution.exit_code == 0
     assert finalized.metrics_summary["accuracy"] == 0.93
+    assert finalized.recommendations[0].action == "evaluate"
     assert store.read_current_metrics(created.id)["parse_rate"] == 0.91
     assert store.read_metric_points(created.id)[0]["name"] == "accuracy"
+    assert manager.list_instances(parent_instance_id=created.id)[0].type == "evaluate"
 
 
 def test_manager_can_create_evaluation_children(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
@@ -158,3 +183,77 @@ def test_manager_can_create_evaluation_children(tmp_path: Path, monkeypatch: pyt
     assert child.parent_instance_id == source.id
     assert child.type == "evaluate"
     assert Path(child.config_snapshot_path).exists()
+
+
+def test_manager_finalize_evaluation_schedules_reports_and_publish_hooks(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+):
+    _prime_manager_packages(monkeypatch)
+    models = importlib.import_module("ai_factory.core.instances.models")
+    store_mod = importlib.import_module("ai_factory.core.instances.store")
+    manager_mod = importlib.import_module("ai_factory.core.instances.manager")
+
+    store = store_mod.FileInstanceStore(tmp_path)
+    manager = manager_mod.InstanceManager(store)
+
+    eval_manifest = models.InstanceManifest(
+        id="evaluate-001",
+        type="evaluate",
+        name="eval",
+        environment=models.EnvironmentSpec(kind="local"),
+        artifact_refs={"source_artifact": "artifacts/models/demo"},
+    )
+    store.create(
+        eval_manifest,
+        {
+            "instance": {"type": "evaluate", "environment": {"kind": "local"}},
+            "subsystem": {"config_ref": "evaluation/configs/base_vs_finetuned.yaml"},
+            "feedback_loop": {"enabled": True, "suggest_failure_analysis": True},
+            "publish_hooks": [{"target": "ollama", "enabled": True, "when": "after_evaluation"}],
+            "pipeline": {"default_report_config": "configs/report.yaml", "default_deploy_config": "configs/deploy.yaml"},
+        },
+    )
+
+    monkeypatch.setattr(
+        manager_mod,
+        "collect_metrics_for_instance",
+        lambda manifest, snapshot, collect_gpu=True: (
+            {
+                "accuracy": 0.91,
+                "parse_rate": 0.86,
+                "verifier_agreement_rate": 0.73,
+                "no_answer_rate": 0.04,
+                "avg_latency_s": 1.2,
+            },
+            [models.MetricPoint(name="accuracy", value=0.91)],
+            {
+                "evaluation_dir": str(tmp_path / "evaluation" / "results" / "demo"),
+                "per_example": str(tmp_path / "evaluation" / "results" / "demo" / "per_example.jsonl"),
+            },
+        ),
+    )
+
+    scheduled: dict[str, list[dict[str, str]]] = {"instances": [], "deployments": []}
+
+    monkeypatch.setattr(
+        manager,
+        "create_instance",
+        lambda config_path, **kwargs: scheduled["instances"].append({"config_path": config_path}) or eval_manifest,
+    )
+    monkeypatch.setattr(
+        manager,
+        "create_deployment_instance",
+        lambda source_instance_id, **kwargs: scheduled["deployments"].append(
+            {"source_instance_id": source_instance_id, "target": kwargs["target"], "config_path": kwargs["config_path"]}
+        )
+        or eval_manifest,
+    )
+    monkeypatch.setattr(manager, "start_instance", lambda instance_id: eval_manifest)
+
+    finalized = manager.finalize_instance(eval_manifest.id, 0)
+
+    assert finalized.decision is not None
+    assert finalized.decision.action == "deploy"
+    assert any(item["config_path"] == "configs/report.yaml" for item in scheduled["instances"])
+    assert scheduled["deployments"][0]["target"] == "ollama"

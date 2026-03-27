@@ -3,6 +3,9 @@ instance:
   name: atlas-baseline-eval
   environment:
     kind: local
+orchestration_mode: local_parallel
+experience:
+  level: hobbyist
 execution:
   backend: local
 subsystem:
@@ -10,6 +13,11 @@ subsystem:
 monitoring:
   collect_gpu: false
   write_timeseries: true
+sub_agents:
+  enabled: true
+  max_parallelism: 2
+  workloads:
+    - publish
 decision_policy:
   min_accuracy: 0.75
   min_parse_rate: 0.70
@@ -17,5 +25,17 @@ decision_policy:
   max_no_answer_rate: 0.15
   max_latency_s: 20.0
   finetune_accuracy_floor: 0.45
+feedback_loop:
+  enabled: true
+  auto_queue_finetune: false
+  auto_queue_retrain: false
+publish_hooks:
+  - target: huggingface
+    enabled: false
+    when: after_evaluation
+  - target: ollama
+    enabled: false
+    when: after_evaluation
 pipeline:
   auto_continue: false
+  max_auto_cycles: 1

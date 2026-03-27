@@ -92,6 +92,18 @@ python3 -m training.train --config training/configs/profiles/failure_aware.yaml
 
 Training runs write standardized artifacts under `artifacts/runs/<run_id>/` and publish packaged model assets under `artifacts/models/<name>/`.
 
+Managed control-plane alternative:
+
+```bash
+ai-factory new --config configs/finetune.yaml
+ai-factory list
+ai-factory status <instance-id> --json
+ai-factory recommendations <instance-id> --json
+ai-factory children <instance-id> --json
+```
+
+The managed path tracks progress, metrics summaries, recommendations, and parent/child follow-up instances under `artifacts/instances/<instance-id>/`.
+
 ## 7. Serve The API
 
 ```bash
@@ -139,6 +151,12 @@ python3 -m evaluation.evaluate --config evaluation/configs/base_vs_finetuned.yam
 python3 -m evaluation.evaluate --config evaluation/configs/verifier_on_off.yaml
 ```
 
+Managed alternative:
+
+```bash
+ai-factory evaluate <instance-id> --config configs/eval.yaml
+```
+
 Evaluation outputs include:
 
 - `summary.json`
@@ -177,3 +195,23 @@ docker compose up --build
 ```
 
 Use `Dockerfile.api`, `Dockerfile.frontend`, and `docker-compose.yml` for a lightweight demo stack. See `docs/deployment-guide.md` for environment and artifact-mount details.
+
+## 13. Optional Cloud SSH Workflow
+
+Create or reuse a cloud profile and launch a managed remote run:
+
+```bash
+ai-factory new --config configs/finetune.yaml --environment cloud --cloud-profile default
+```
+
+Cloud manifests store the resolved SSH profile, key path, and any configured port forwards so the same instance can be inspected through the CLI or API later.
+
+You can attach port forwards directly from the CLI when creating the instance:
+
+```bash
+ai-factory new \
+  --config configs/finetune.yaml \
+  --environment cloud \
+  --cloud-profile default \
+  --port-forward 6006:6006
+```

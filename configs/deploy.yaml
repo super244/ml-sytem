@@ -3,6 +3,9 @@ instance:
   name: atlas-deploy
   environment:
     kind: local
+orchestration_mode: single
+experience:
+  level: dev
 execution:
   backend: local
 subsystem:
@@ -14,5 +17,9 @@ subsystem:
 monitoring:
   collect_gpu: false
   write_timeseries: true
+publish_hooks:
+  - target: ollama
+    enabled: true
+    when: on_success
 pipeline:
   auto_continue: false

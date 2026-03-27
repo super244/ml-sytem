@@ -23,6 +23,7 @@ class RunnerPayload(BaseModel):
     artifacts_dir: str
     instance_id: str
     environment: EnvironmentSpec
+    manifest_metadata: dict[str, Any] = Field(default_factory=dict)
     command: CommandSpec
 
 

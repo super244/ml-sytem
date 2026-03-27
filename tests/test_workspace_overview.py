@@ -32,6 +32,10 @@ def test_build_workspace_overview_discovers_profiles_and_commands(tmp_path: Path
     )
     _write(tmp_path / "evaluation" / "configs" / "base_vs_finetuned.yaml", "models: {}\n")
     _write(
+        tmp_path / "configs" / "finetune.yaml",
+        "instance:\n  type: finetune\nexperience:\n  level: hobbyist\norchestration_mode: hybrid\nsubsystem:\n  config_ref: training/configs/profiles/baseline_qlora.yaml\n",
+    )
+    _write(
         tmp_path / "inference" / "configs" / "model_registry.yaml",
         "models:\n  - name: base\n    base_model: Qwen/Qwen2.5-Math-1.5B-Instruct\n",
     )
@@ -43,4 +47,7 @@ def test_build_workspace_overview_discovers_profiles_and_commands(tmp_path: Path
     assert overview["summary"]["models"] == 1
     assert overview["summary"]["training_profiles"] == 1
     assert overview["summary"]["evaluation_configs"] == 1
+    assert overview["summary"]["orchestration_templates"] == 1
     assert any(recipe["id"] == "refresh-lab" for recipe in overview["command_recipes"])
+    assert any(capability["id"] == "feedback-loop" for capability in overview["orchestration_capabilities"])
+    assert overview["orchestration_templates"][0]["orchestration_mode"] == "hybrid"

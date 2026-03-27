@@ -83,6 +83,7 @@ def test_orchestration_config_loads_and_resolves_refs(tmp_path: Path, monkeypatc
 
     assert config.instance.type == "finetune"
     assert config.instance.environment.kind == "local"
+    assert config.experience.level == "hobbyist"
     assert config.resolved_subsystem_config_path is not None
     assert config.resolved_subsystem_config["run_name"] == "baseline-run"
 
@@ -116,6 +117,7 @@ def test_file_instance_store_round_trip(tmp_path: Path, monkeypatch: pytest.Monk
     store.stdout_path("finetune-001").write_text("hello\n")
     store.stderr_path("finetune-001").write_text("warn\n")
     store.write_decision_report("finetune-001", {"action": "deploy"})
+    store.write_recommendations_report("finetune-001", [{"action": "evaluate"}])
 
     loaded = store.load("finetune-001")
 
@@ -127,6 +129,7 @@ def test_file_instance_store_round_trip(tmp_path: Path, monkeypatch: pytest.Monk
     assert len(store.read_metric_points("finetune-001")) == 2
     assert store.read_logs("finetune-001") == {"stdout": "hello\n", "stderr": "warn\n"}
     assert store.decision_path("finetune-001").exists()
+    assert store.read_recommendations_report("finetune-001")[0]["action"] == "evaluate"
 
 
 def test_decision_rules_cover_deploy_finetune_and_retrain(monkeypatch: pytest.MonkeyPatch):
@@ -206,22 +209,120 @@ def test_command_builder_covers_instance_types(monkeypatch: pytest.MonkeyPatch):
             environment=models.EnvironmentSpec(kind="local"),
         ),
     )
+    train_cmd = commands.build_command(
+        schema.OrchestrationConfig.model_validate(
+            {
+                "instance": {"type": "train", "environment": {"kind": "local"}},
+                "orchestration_mode": "hybrid",
+                "experience": {"level": "dev"},
+                "subsystem": {"config_ref": "training/configs/profiles/baseline_qlora.yaml"},
+            }
+        ),
+        models.InstanceManifest(
+            id="train-001",
+            type="train",
+            name="train",
+            environment=models.EnvironmentSpec(kind="local"),
+        ),
+    )
+    prepare_cmd = commands.build_command(
+        schema.OrchestrationConfig.model_validate(
+            {
+                "instance": {"type": "prepare", "environment": {"kind": "local"}},
+                "subsystem": {"config_ref": "data/configs/processing.yaml"},
+            }
+        ),
+        models.InstanceManifest(
+            id="prepare-001",
+            type="prepare",
+            name="prepare",
+            environment=models.EnvironmentSpec(kind="local"),
+        ),
+    )
+    report_cmd = commands.build_command(
+        schema.OrchestrationConfig.model_validate(
+            {
+                "instance": {"type": "report", "environment": {"kind": "local"}},
+                "subsystem": {
+                    "command_override": [
+                        "python3",
+                        "-m",
+                        "evaluation.analysis.analyze_failures",
+                        "--input",
+                        "evaluation/results/latest/per_example.jsonl",
+                    ]
+                },
+            }
+        ),
+        models.InstanceManifest(
+            id="report-001",
+            type="report",
+            name="report",
+            environment=models.EnvironmentSpec(kind="local"),
+        ),
+    )
+    custom_api_cmd = commands.build_command(
+        schema.OrchestrationConfig.model_validate(
+            {
+                "instance": {"type": "deploy", "environment": {"kind": "local"}},
+                "subsystem": {
+                    "provider": "custom_api",
+                    "provider_options": {"endpoint": "https://example.invalid/publish"},
+                    "source_artifact_ref": "artifacts/models/demo",
+                },
+            }
+        ),
+        models.InstanceManifest(
+            id="deploy-002",
+            type="deploy",
+            name="deploy-api",
+            environment=models.EnvironmentSpec(kind="local"),
+        ),
+    )
 
     assert finetune_cmd.argv[-2:] == ["--config", "training/configs/profiles/baseline_qlora.yaml"]
     assert evaluate_cmd.argv[-2:] == ["--config", "evaluation/configs/base_vs_finetuned.yaml"]
     assert deploy_cmd.argv[1] == "-c"
-    with pytest.raises(commands.UnsupportedInstanceTypeError):
-        commands.build_command(
-            schema.OrchestrationConfig.model_validate(
-                {
-                    "instance": {"type": "train", "environment": {"kind": "local"}},
-                    "subsystem": {"config_ref": "training/configs/profiles/baseline_qlora.yaml"},
-                }
-            ),
-            models.InstanceManifest(
-                id="train-001",
-                type="train",
-                name="train",
-                environment=models.EnvironmentSpec(kind="local"),
-            ),
+    assert train_cmd.argv[-2:] == ["--config", "training/configs/profiles/baseline_qlora.yaml"]
+    assert prepare_cmd.argv[-2:] == ["--config", "data/configs/processing.yaml"]
+    assert report_cmd.argv[:3] == ["python3", "-m", "evaluation.analysis.analyze_failures"]
+    assert custom_api_cmd.argv[1] == "-c"
+    assert train_cmd.env["AI_FACTORY_INSTANCE_TYPE"] == "train"
+    assert train_cmd.env["AI_FACTORY_ORCHESTRATION_MODE"] == "hybrid"
+
+
+def test_experience_guardrails_strip_unsafe_overrides(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
+    _prime_orchestration_packages(monkeypatch)
+    loader = importlib.import_module("ai_factory.core.config.loader")
+
+    (tmp_path / "training" / "configs" / "profiles").mkdir(parents=True)
+    (tmp_path / "training" / "configs" / "profiles" / "baseline_qlora.yaml").write_text("run_name: baseline\n")
+    config_path = tmp_path / "configs" / "train.yaml"
+    config_path.parent.mkdir(parents=True, exist_ok=True)
+    config_path.write_text(
+        "\n".join(
+            [
+                "instance:",
+                "  type: train",
+                "  environment: local",
+                "experience:",
+                "  level: beginner",
+                "sub_agents:",
+                "  enabled: true",
+                "  max_parallelism: 4",
+                "subsystem:",
+                "  config_ref: ../training/configs/profiles/baseline_qlora.yaml",
+                "  extra_args:",
+                "    - --unsafe",
+                "  command_override:",
+                "    - python",
+                "    - train.py",
+            ]
         )
+    )
+
+    config = loader.apply_experience_guardrails(loader.load_orchestration_config(str(config_path)))
+
+    assert config.subsystem.extra_args == []
+    assert config.subsystem.command_override is None
+    assert config.sub_agents.max_parallelism == 1

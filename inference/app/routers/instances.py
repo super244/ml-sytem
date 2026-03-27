@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from fastapi import APIRouter
+from fastapi import APIRouter, Query
 
 from inference.app.dependencies import get_instance_service
 from inference.app.schemas import (
@@ -17,9 +17,19 @@ router = APIRouter(tags=["instances"])
 
 
 @router.get("/instances", response_model=InstanceListResponse)
-def list_instances() -> InstanceListResponse:
+def list_instances(
+    instance_type: str | None = Query(default=None),
+    status: str | None = Query(default=None),
+    parent_instance_id: str | None = Query(default=None),
+) -> InstanceListResponse:
     service = get_instance_service()
-    return InstanceListResponse(instances=service.list_instances())
+    return InstanceListResponse(
+        instances=service.list_instances(
+            instance_type=instance_type,
+            status=status,
+            parent_instance_id=parent_instance_id,
+        )
+    )
 
 
 @router.post("/instances", response_model=InstanceDetail)

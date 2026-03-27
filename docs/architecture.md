@@ -73,6 +73,19 @@ Training is composed from reusable config parts:
 
 Profiles such as `baseline_qlora` or `verifier_augmented` are thin compositions over these components. The trainer stack supports LoRA/QLoRA by default, optional full-precision exports, difficulty-aware sample weights, curriculum ordering, failure-case replay, checkpoint policies, and packaged serving artifacts.
 
+## Orchestration Architecture
+
+The control plane sits alongside the subsystem-specific stacks rather than replacing them. Orchestration configs under `configs/*.yaml` describe:
+
+- managed instance type: `prepare`, `train`, `finetune`, `evaluate`, `report`, `inference`, or `deploy`
+- user experience level: `beginner`, `hobbyist`, or `dev`
+- orchestration mode: single-node, local-parallel, cloud-parallel, or hybrid
+- remote-access metadata: cloud profile resolution, SSH settings, and port-forward definitions
+- sub-agent policy: bounded parallel follow-up workloads such as preprocessing, evaluation, metrics/reporting, or publish steps
+- feedback loop policy: when to recommend or automatically queue the next training or deployment action
+
+Each managed instance writes a typed manifest with status, progress, metrics summary, recommendations, execution metadata, and parent/child lineage. The default orchestration templates now include reusable `prepare` and `report` jobs so evaluation misses can flow directly into failure-analysis artifacts and the next training loop. That same contract is consumed by the CLI, FastAPI instance routes, and the workspace overview so the UI layers stay thin.
+
 ## Inference Architecture
 
 The FastAPI layer is organized around:
@@ -113,6 +126,6 @@ The solve view mirrors the backend capabilities by surfacing model selection, pr
 
 1. Build or normalize datasets into canonical `v2` records.
 2. Construct processed splits and derived packs with manifests and cards.
-3. Train an adapter or specialist profile and package artifacts.
+3. Launch raw subsystem commands or managed orchestration instances for training and packaging.
 4. Serve models through the inference API and frontend.
-5. Evaluate against benchmark packs, mine failures, and feed them back into the next training run.
+5. Evaluate against benchmark packs, mine failures, and let the control plane recommend or queue the next step.
