@@ -39,14 +39,24 @@ dev = [
   "ruff>=0.8.4",
 ]
 
+[project.scripts]
+ai-factory = "ai_factory.cli:main"
+
 [tool.setuptools]
 packages = [
   "ai_factory",
   "ai_factory.core",
+  "ai_factory.core.config",
+  "ai_factory.core.decisions",
+  "ai_factory.core.execution",
+  "ai_factory.core.instances",
+  "ai_factory.core.monitoring",
   "training",
   "training.src",
   "inference",
   "inference.app",
+  "inference.app.routers",
+  "inference.app.services",
   "evaluation",
   "data",
   "data.adapters",

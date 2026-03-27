@@ -10,6 +10,7 @@ from inference.app.telemetry import JsonlTelemetryLogger
 
 if TYPE_CHECKING:
     from inference.app.services.generation_service import GenerationService
+    from inference.app.services.instance_service import InstanceService
 
 
 def get_app_settings() -> AppSettings:
@@ -46,3 +47,11 @@ def get_generation_service() -> GenerationService:
     )
     generator = MathGenerator(registry, prompt_presets=presets, cache=cache, telemetry=telemetry)
     return GenerationService(generator, settings)
+
+
+@lru_cache(maxsize=1)
+def get_instance_service() -> InstanceService:
+    settings = get_settings()
+    from inference.app.services.instance_service import InstanceService
+
+    return InstanceService(settings)

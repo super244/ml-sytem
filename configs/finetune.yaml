@@ -1,0 +1,22 @@
+instance:
+  type: finetune
+  name: atlas-baseline-finetune
+  environment:
+    kind: local
+execution:
+  backend: local
+subsystem:
+  config_ref: training/configs/profiles/baseline_qlora.yaml
+  dry_run: true
+monitoring:
+  collect_gpu: true
+  write_timeseries: true
+decision_policy:
+  min_accuracy: 0.75
+  min_parse_rate: 0.70
+  min_verifier_agreement: 0.60
+  max_no_answer_rate: 0.15
+  max_latency_s: 20.0
+  finetune_accuracy_floor: 0.45
+pipeline:
+  auto_continue: false
