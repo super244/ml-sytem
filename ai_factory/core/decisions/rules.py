@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from ai_factory.core.config.schema import DecisionPolicy
-from ai_factory.core.instances.models import DecisionResult
+from ai_factory.core.instances.models import DecisionResult, FeedbackRecommendation
 
 
 def decide_next_step(summary: dict, policy: DecisionPolicy) -> DecisionResult:
@@ -48,3 +48,113 @@ def decide_next_step(summary: dict, policy: DecisionPolicy) -> DecisionResult:
         summary=summary,
         explanation="The metrics are below the iteration floor, so a broader retraining pass is recommended.",
     )
+
+
+def build_feedback_recommendations(
+    summary: dict,
+    policy: DecisionPolicy,
+    *,
+    default_prepare_config: str,
+    default_train_config: str,
+    default_finetune_config: str,
+    default_eval_config: str,
+    default_deploy_config: str,
+    default_report_config: str,
+    improvement_floor: float,
+    suggest_failure_analysis: bool,
+) -> list[FeedbackRecommendation]:
+    recommendations: list[FeedbackRecommendation] = []
+    decision = decide_next_step(summary, policy)
+
+    accuracy = float(summary.get("accuracy") or 0.0)
+    parse_rate = float(summary.get("parse_rate") or 0.0)
+    verifier = float(summary.get("verifier_agreement_rate") or 0.0)
+    no_answer = float(summary.get("no_answer_rate") or 1.0)
+    latency = summary.get("avg_latency_s")
+    latency_value = float(latency) if isinstance(latency, (int, float)) else None
+    max_latency = float(policy.max_latency_s)
+
+    if decision.action == "deploy":
+        recommendations.append(
+            FeedbackRecommendation(
+                action="deploy",
+                reason="The evaluation metrics meet deployment thresholds, so this build is ready for publishing.",
+                priority=1,
+                target_instance_type="deploy",
+                config_path=default_deploy_config,
+                deployment_target="huggingface",
+                metadata={"source": "decision", "rule": decision.rule},
+            )
+        )
+    elif decision.action == "finetune":
+        accuracy_gap = max(policy.min_accuracy - accuracy, 0.0)
+        parse_gap = max(policy.min_parse_rate - parse_rate, 0.0)
+        recommendations.append(
+            FeedbackRecommendation(
+                action="finetune",
+                reason=(
+                    "The evaluation is close enough to target to justify another fine-tuning pass. "
+                    f"Accuracy gap={accuracy_gap:.3f}, parse-rate gap={parse_gap:.3f}."
+                ),
+                priority=1,
+                target_instance_type="finetune",
+                config_path=default_finetune_config,
+                metadata={
+                    "source": "decision",
+                    "rule": decision.rule,
+                    "improvement_floor": improvement_floor,
+                },
+            )
+        )
+    else:
+        recommendations.append(
+            FeedbackRecommendation(
+                action="retrain",
+                reason=(
+                    "The evaluation is below the fine-tuning floor, so a broader retraining pass is the safer next step."
+                ),
+                priority=1,
+                target_instance_type="train",
+                config_path=default_train_config,
+                metadata={"source": "decision", "rule": decision.rule},
+            )
+        )
+
+    if suggest_failure_analysis:
+        failure_signals: list[str] = []
+        if accuracy + improvement_floor < policy.min_accuracy:
+            failure_signals.append("accuracy")
+        if parse_rate + improvement_floor < policy.min_parse_rate:
+            failure_signals.append("parse_rate")
+        if verifier + improvement_floor < policy.min_verifier_agreement:
+            failure_signals.append("verifier_agreement_rate")
+        if no_answer - improvement_floor > policy.max_no_answer_rate:
+            failure_signals.append("no_answer_rate")
+        if latency_value is not None and latency_value - improvement_floor > max_latency:
+            failure_signals.append("avg_latency_s")
+
+        if failure_signals:
+            recommendations.append(
+                FeedbackRecommendation(
+                    action="report",
+                    reason="A failure-analysis report would help explain the weak metrics before the next iteration.",
+                    priority=2,
+                    target_instance_type="report",
+                    config_path=default_report_config,
+                    metadata={"signals": failure_signals, "improvement_floor": improvement_floor},
+                )
+            )
+
+    if decision.action in {"finetune", "retrain"}:
+        recommendations.append(
+            FeedbackRecommendation(
+                action="evaluate",
+                reason="Queue a follow-up evaluation after the next training cycle to measure whether the changes helped.",
+                priority=3,
+                target_instance_type="evaluate",
+                config_path=default_eval_config,
+                metadata={"source": "feedback_loop"},
+            )
+        )
+
+    return recommendations
