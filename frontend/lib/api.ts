@@ -276,6 +276,79 @@ export type WorkspaceOverview = {
   evaluation_configs: WorkspaceEvaluationConfig[];
 };
 
+export type OrchestrationRun = {
+  id: string;
+  legacy_instance_id?: string | null;
+  name: string;
+  status: string;
+  root_run_id?: string | null;
+  parent_run_id?: string | null;
+  created_at: string;
+  updated_at: string;
+  metadata: Record<string, unknown>;
+};
+
+export type OrchestrationTask = {
+  id: string;
+  run_id: string;
+  legacy_instance_id?: string | null;
+  task_type: string;
+  agent_type: string;
+  status: string;
+  current_attempt: number;
+  resource_class: string;
+  available_at: string;
+  checkpoint_hint?: string | null;
+  metadata: Record<string, unknown>;
+};
+
+export type OrchestrationEvent = {
+  id: string;
+  run_id: string;
+  task_id?: string | null;
+  attempt_id?: string | null;
+  event_type: string;
+  level: string;
+  message: string;
+  created_at: string;
+  payload: Record<string, unknown>;
+};
+
+export type OrchestrationRunDetail = {
+  run: OrchestrationRun;
+  tasks: OrchestrationTask[];
+  events: OrchestrationEvent[];
+  summary: Record<string, unknown>;
+};
+
+export type InstanceSummary = {
+  id: string;
+  type: string;
+  status: string;
+  name: string;
+  created_at: string;
+  updated_at: string;
+  parent_instance_id?: string | null;
+  orchestration_run_id?: string | null;
+  environment: {
+    kind: string;
+  };
+  metrics_summary: Record<string, unknown>;
+  task_summary: Record<string, unknown>;
+  progress?: {
+    stage: string;
+    status_message?: string | null;
+    percent?: number | null;
+  } | null;
+};
+
+export type OrchestrationSummary = {
+  runs?: number;
+  tasks?: number;
+  task_status_counts?: Record<string, number>;
+  open_circuits?: string[];
+};
+
 async function fetchJson<T>(path: string, options?: RequestInit): Promise<T> {
   const response = await fetch(`${API_BASE}${path}`, {
     cache: "no-store",
@@ -337,4 +410,23 @@ export async function getStatus(): Promise<StatusInfo> {
 
 export async function getWorkspaceOverview(): Promise<WorkspaceOverview> {
   return fetchJson<WorkspaceOverview>("/v1/workspace");
+}
+
+export async function getOrchestrationRuns(): Promise<OrchestrationRun[]> {
+  const payload = await fetchJson<{ runs: OrchestrationRun[] }>("/v1/orchestration/runs");
+  return payload.runs;
+}
+
+export async function getOrchestrationRun(runId: string): Promise<OrchestrationRunDetail> {
+  return fetchJson<OrchestrationRunDetail>(`/v1/orchestration/runs/${runId}`);
+}
+
+export async function getInstances(): Promise<InstanceSummary[]> {
+  const payload = await fetchJson<{ instances: InstanceSummary[] }>("/v1/instances");
+  return payload.instances;
+}
+
+export async function getOrchestrationSummary(): Promise<OrchestrationSummary> {
+  const payload = await fetchJson<{ summary: OrchestrationSummary }>("/v1/orchestration/summary");
+  return payload.summary;
 }

@@ -35,6 +35,12 @@ feedback_loop:
   enabled: true
   queue_follow_up_evaluation: true
   auto_queue_retrain: false
+resilience:
+  circuit_breaker_threshold: 3
+  base_delay_s: 10
+  max_delay_s: 180
+alerting:
+  enabled: false
 pipeline:
   auto_continue: false
   max_auto_cycles: 1

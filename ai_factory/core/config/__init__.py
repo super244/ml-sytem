@@ -5,6 +5,7 @@ from ai_factory.core.config.loader import (
     save_cloud_profile,
 )
 from ai_factory.core.config.schema import (
+    AlertingConfig,
     DecisionPolicy,
     ExecutionConfig,
     FeedbackLoopConfig,
@@ -14,12 +15,14 @@ from ai_factory.core.config.schema import (
     PipelineConfig,
     PublishHookConfig,
     RemoteAccessConfig,
+    ResilienceConfig,
     SubsystemConfig,
     SubAgentConfig,
     UserExperienceConfig,
 )
 
 __all__ = [
+    "AlertingConfig",
     "DecisionPolicy",
     "ExecutionConfig",
     "FeedbackLoopConfig",
@@ -29,6 +32,7 @@ __all__ = [
     "PipelineConfig",
     "PublishHookConfig",
     "RemoteAccessConfig",
+    "ResilienceConfig",
     "SubsystemConfig",
     "SubAgentConfig",
     "UserExperienceConfig",

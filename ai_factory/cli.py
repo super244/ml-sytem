@@ -7,14 +7,17 @@ import time
 from pathlib import Path
 from typing import Any
 
-from ai_factory.core.config.loader import save_cloud_profile
+from ai_factory.core.config.loader import load_orchestration_config, save_cloud_profile
 from ai_factory.core.instances.manager import InstanceManager
 from ai_factory.core.instances.models import EnvironmentSpec, InstanceManifest, PortForward
-from ai_factory.core.instances.store import FileInstanceStore
+from ai_factory.core.platform.container import build_platform_container
 
 
-def _build_manager() -> InstanceManager:
-    return InstanceManager(FileInstanceStore("artifacts"))
+def _build_manager(args: argparse.Namespace) -> InstanceManager:
+    return build_platform_container(
+        repo_root=args.repo_root,
+        artifacts_dir=args.artifacts_dir,
+    ).manager
 
 
 def _render_payload(payload: Any, *, as_json: bool) -> None:
@@ -43,10 +46,38 @@ def _prompt(text: str, default: str | None = None) -> str:
     return response or (default or "")
 
 
+def _interactive_enabled(args: argparse.Namespace) -> bool:
+    return bool(getattr(args, "interactive", False) and sys.stdin.isatty())
+
+
+def _new_config_path(args: argparse.Namespace) -> str:
+    if args.config:
+        return args.config
+    if _interactive_enabled(args):
+        return _prompt("Config path", "configs/finetune.yaml")
+    raise SystemExit("ai-factory new requires --config outside interactive mode")
+
+
+def _deploy_target_from_config(config_path: str) -> str | None:
+    try:
+        return load_orchestration_config(config_path).subsystem.provider
+    except Exception:
+        return None
+
+
+def _resolve_deploy_target(args: argparse.Namespace) -> str:
+    if args.target:
+        return args.target
+    config_target = _deploy_target_from_config(args.config)
+    if config_target:
+        return config_target
+    raise SystemExit("ai-factory deploy requires --target or a subsystem.provider in the deploy config")
+
+
 def _environment_from_args(args: argparse.Namespace) -> EnvironmentSpec | None:
     kind = args.environment
     if kind is None and args.command == "new":
-        if getattr(args, "interactive", True) and sys.stdin.isatty():
+        if _interactive_enabled(args):
             kind = _prompt("Environment (local/cloud)", "local")
         else:
             return None
@@ -55,7 +86,7 @@ def _environment_from_args(args: argparse.Namespace) -> EnvironmentSpec | None:
     if kind == "local":
         return EnvironmentSpec(kind="local")
 
-    interactive = bool(args.interactive and sys.stdin.isatty())
+    interactive = _interactive_enabled(args)
     host = args.cloud_host or (_prompt("Cloud host") if interactive else None)
     user = args.cloud_user or (_prompt("Cloud user") if interactive else None)
     key_path = args.cloud_key_path or (_prompt("SSH key path", "") if interactive else "")
@@ -114,13 +145,15 @@ def _tail_file(path: Path, *, initial: str = "") -> None:
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(prog="ai-factory", description="Unified instance control plane for Atlas Math Lab.")
+    parser.add_argument("--repo-root")
+    parser.add_argument("--artifacts-dir")
     subparsers = parser.add_subparsers(dest="command", required=True)
 
     common_json = argparse.ArgumentParser(add_help=False)
     common_json.add_argument("--json", action="store_true")
 
     new_parser = subparsers.add_parser("new", parents=[common_json])
-    new_parser.add_argument("--config", required=True)
+    new_parser.add_argument("--config")
     new_parser.add_argument("--environment", choices=["local", "cloud"])
     new_parser.add_argument("--cloud-profile")
     new_parser.add_argument("--cloud-host")
@@ -150,6 +183,23 @@ def parse_args() -> argparse.Namespace:
     children_parser = subparsers.add_parser("children", parents=[common_json])
     children_parser.add_argument("instance_id")
 
+    tasks_parser = subparsers.add_parser("tasks", parents=[common_json])
+    tasks_parser.add_argument("target")
+
+    events_parser = subparsers.add_parser("events", parents=[common_json])
+    events_parser.add_argument("target")
+    events_parser.add_argument("--limit", type=int)
+
+    retry_parser = subparsers.add_parser("retry", parents=[common_json])
+    retry_parser.add_argument("target")
+
+    cancel_parser = subparsers.add_parser("cancel", parents=[common_json])
+    cancel_parser.add_argument("target")
+
+    watch_parser = subparsers.add_parser("watch", parents=[common_json])
+    watch_parser.add_argument("target")
+    watch_parser.add_argument("--timeout", type=float, default=30.0)
+
     recommendations_parser = subparsers.add_parser("recommendations", parents=[common_json])
     recommendations_parser.add_argument("instance_id")
 
@@ -165,20 +215,33 @@ def parse_args() -> argparse.Namespace:
 
     deploy_parser = subparsers.add_parser("deploy", parents=[common_json])
     deploy_parser.add_argument("instance_id")
-    deploy_parser.add_argument("--target", required=True, choices=["huggingface", "ollama", "lmstudio", "custom_api"])
+    deploy_parser.add_argument("--target", choices=["huggingface", "ollama", "lmstudio", "custom_api"])
     deploy_parser.add_argument("--config", default="configs/deploy.yaml")
     deploy_parser.add_argument("--no-start", action="store_true")
+
+    tui_parser = subparsers.add_parser("tui")
+    tui_parser.add_argument("--refresh-seconds", type=float, default=2.0)
     return parser.parse_args()
 
 
 def main() -> None:
     args = parse_args()
-    manager = _build_manager()
+    if args.command == "tui":
+        from ai_factory.tui import run_tui
+
+        run_tui(
+            repo_root=args.repo_root,
+            artifacts_dir=args.artifacts_dir,
+            refresh_seconds=args.refresh_seconds,
+        )
+        return
+
+    manager = _build_manager(args)
 
     if args.command == "new":
         environment = _environment_from_args(args)
         manifest = manager.create_instance(
-            args.config,
+            _new_config_path(args),
             start=not args.no_start,
             environment_override=environment,
         )
@@ -212,6 +275,31 @@ def main() -> None:
     if args.command == "children":
         manifests = manager.get_children(args.instance_id)
         _render_payload([_manifest_payload(item) for item in manifests], as_json=args.json)
+        return
+
+    if args.command == "tasks":
+        payload = manager.list_tasks(args.target)
+        _render_payload(payload, as_json=args.json)
+        return
+
+    if args.command == "events":
+        payload = manager.list_orchestration_events(args.target, limit=args.limit)
+        _render_payload(payload, as_json=args.json)
+        return
+
+    if args.command == "retry":
+        manifest = manager.retry_instance(args.target)
+        _render_payload(_manifest_payload(manifest), as_json=args.json)
+        return
+
+    if args.command == "cancel":
+        manifest = manager.cancel_instance(args.target)
+        _render_payload(_manifest_payload(manifest), as_json=args.json)
+        return
+
+    if args.command == "watch":
+        payload = manager.watch_instance(args.target, timeout_s=args.timeout)
+        _render_payload(payload, as_json=True if args.json else False)
         return
 
     if args.command == "recommendations":
@@ -254,7 +342,7 @@ def main() -> None:
     if args.command == "deploy":
         manifest = manager.create_deployment_instance(
             args.instance_id,
-            target=args.target,
+            target=_resolve_deploy_target(args),
             config_path=args.config,
             start=not args.no_start,
         )

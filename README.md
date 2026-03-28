@@ -13,10 +13,11 @@ Start with `quickstart.md` if you want the fastest path to a working local works
 - Public dataset registry and adapters for calculus-heavy competition and instruction corpora.
 - Derived pack construction for `core_train_mix`, `calculus_hard_pack`, `olympiad_reasoning_pack`, `failure_replay_pack`, `verification_pack`, and `benchmark_holdout_pack`.
 - Composed training profiles for `baseline_qlora`, `calculus_specialist`, `curriculum_specialist`, `failure_aware`, `verifier_augmented`, `long_context`, and `fast_iteration_small_model`.
-- A shared orchestration control plane for managed `prepare`, `train`, `finetune`, `evaluate`, `report`, `inference`, and `deploy` instances with user levels, remote SSH metadata, port forwards, child-task lineage, publish hooks, and follow-up recommendations.
+- A SQLite-backed orchestration control plane for managed `prepare`, `train`, `finetune`, `evaluate`, `report`, `inference`, and `deploy` instances with async task attempts, heartbeats, retries/backoff, child-task lineage, publish hooks, and follow-up recommendations.
+- Config-driven instance templates under `configs/` for `prepare`, `train`, `finetune`, `eval`, `inference`, `deploy`, and `report`, all routed through the same orchestration backend.
 - FastAPI inference with prompt presets, lazy model loading, best-of-N candidate selection, self-consistency, answer extraction, safe calculator hooks, structured output, and compare-two-models mode.
 - Benchmark-oriented evaluation with per-topic, per-difficulty, per-source, and per-pack reporting plus failure taxonomy and win-case extraction.
-- A multi-route Next.js frontend for solving, comparing, browsing datasets, exploring benchmarks, and inspecting training/evaluation runs.
+- A multi-route Next.js frontend for solving, comparing, browsing datasets, exploring benchmarks, and inspecting training/evaluation runs, including the shared runs/control-plane view.
 
 ## Repo Spine
 
@@ -27,7 +28,7 @@ Start with `quickstart.md` if you want the fastest path to a working local works
 ├── training/                 composed configs, trainer extensions, packaging, comparisons, run scripts
 ├── inference/                FastAPI app, model registry, prompts, generation services, metadata services
 ├── evaluation/               benchmark registry, metrics, reporting, failure analysis, eval configs
-├── frontend/                 Next.js research product UI with solve/compare/datasets/benchmarks/runs routes
+├── frontend/                 Next.js research product UI with solve/compare/datasets/benchmarks/runs views and control-plane surface
 ├── notebooks/                generated notebook lab for data, training, inference, and evaluation exploration
 ├── docs/                     architecture, subsystem guides, API/deployment/contributor documentation
 ├── tests/                    unit and contract coverage across shared-core, data, training, inference, evaluation
@@ -82,8 +83,13 @@ Start with `quickstart.md` if you want the fastest path to a working local works
    ai-factory new --config configs/finetune.yaml
    ai-factory list
    ai-factory status <instance-id> --json
+   ai-factory tasks <instance-id> --json
+   ai-factory events <instance-id> --json
+   ai-factory watch <instance-id> --timeout 30 --json
    ai-factory recommendations <instance-id> --json
    ai-factory children <instance-id> --json
+   ai-factory --artifacts-dir /tmp/ai-factory-artifacts new --config configs/train.yaml --no-start
+   ai-factory tui --refresh-seconds 2
    ```
 
 ## Artifact Layout
@@ -109,6 +115,16 @@ artifacts/
 ```
 
 The data system emits matching manifests and cards under `data/processed/`, `data/custom/`, `data/public/normalized/`, and `data/processed/packs/`.
+
+The orchestration runtime stores durable control-plane state under:
+
+```text
+artifacts/control_plane/
+├── control_plane.db
+└── events.jsonl
+```
+
+Legacy `artifacts/instances/<instance-id>/...` directories are still materialized as compatibility projections for the CLI, API, and frontend.
 
 ## Training Profiles
 
@@ -153,7 +169,13 @@ make notebooks
 make frontend-typecheck
 ai-factory new --config configs/finetune.yaml
 ai-factory list --type finetune
+ai-factory tasks <instance-id>
+ai-factory events <instance-id>
+ai-factory retry <instance-id>
+ai-factory cancel <instance-id>
 ai-factory new --config configs/finetune.yaml --environment cloud --port-forward 6006:6006
+ai-factory tui --refresh-seconds 2
 ```
 
 Start with `docs/runbook.md` for the end-to-end local workflow and `docs/experiment-playbook.md` for the recommended research loop.
+See `docs/foundation-layer.md` for the shared control-plane backend, instance lifecycle, and CLI/TUI surface.

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import importlib
+import os
 import sys
 import types
 from pathlib import Path
@@ -86,6 +87,63 @@ def test_orchestration_config_loads_and_resolves_refs(tmp_path: Path, monkeypatc
     assert config.experience.level == "hobbyist"
     assert config.resolved_subsystem_config_path is not None
     assert config.resolved_subsystem_config["run_name"] == "baseline-run"
+
+
+def test_repository_prepare_template_loads(monkeypatch: pytest.MonkeyPatch):
+    _prime_orchestration_packages(monkeypatch)
+    loader = importlib.import_module("ai_factory.core.config.loader")
+
+    config = loader.load_orchestration_config("configs/prepare.yaml")
+
+    assert config.instance.type == "prepare"
+    assert config.subsystem.config_ref == "data/configs/processing.yaml"
+
+
+def test_save_cloud_profile_uses_nested_store_and_secure_permissions(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+):
+    _prime_orchestration_packages(monkeypatch)
+    loader = importlib.import_module("ai_factory.core.config.loader")
+    models = importlib.import_module("ai_factory.core.instances.models")
+
+    store_path = tmp_path / "nested" / "profiles" / "cloud_profiles.yaml"
+    monkeypatch.setenv("AI_FACTORY_CLOUD_PROFILES_PATH", str(store_path))
+
+    first = models.EnvironmentSpec(
+        kind="cloud",
+        profile_name="primary",
+        host="10.0.0.5",
+        user="ubuntu",
+        key_path="~/.ssh/id_ed25519",
+        port=2222,
+    )
+    second = models.EnvironmentSpec(
+        kind="cloud",
+        profile_name="secondary",
+        host="10.0.0.6",
+        user="runner",
+        port=2200,
+    )
+
+    saved_path = loader.save_cloud_profile("primary", first)
+    loader.save_cloud_profile("secondary", second)
+    loaded = loader.load_cloud_profile("primary")
+
+    assert saved_path == store_path.resolve()
+    assert saved_path.exists()
+    assert loaded is not None
+    assert loaded.host == "10.0.0.5"
+    secondary = loader.load_cloud_profile("secondary")
+    assert secondary is not None
+    assert secondary.user == "runner"
+    assert loaded.key_path == "~/.ssh/id_ed25519"
+
+    if os.name != "nt" and saved_path.parent.exists():
+        import stat
+
+        assert stat.S_IMODE(saved_path.parent.stat().st_mode) == 0o700
+        assert stat.S_IMODE(saved_path.stat().st_mode) == 0o600
 
 
 def test_file_instance_store_round_trip(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):

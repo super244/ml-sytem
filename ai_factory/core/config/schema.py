@@ -11,6 +11,7 @@ from ai_factory.core.instances.models import (
     PortForward,
     UserLevel,
 )
+from ai_factory.core.orchestration.models import AgentType
 
 
 class InstanceConfig(BaseModel):
@@ -92,9 +93,24 @@ class SubAgentConfig(BaseModel):
     workloads: list[Literal["preprocess", "metrics", "evaluation", "finetune", "publish"]] = Field(
         default_factory=list
     )
+    agent_roles: list[AgentType] = Field(default_factory=list)
     allow_nested: bool = True
     retry_limit: int = 1
     failure_budget: int = 1
+
+    @model_validator(mode="after")
+    def _translate_workloads(self) -> "SubAgentConfig":
+        if self.agent_roles:
+            return self
+        mapping = {
+            "preprocess": "data_processing",
+            "metrics": "monitoring_telemetry",
+            "evaluation": "evaluation_benchmarking",
+            "finetune": "optimization_feedback",
+            "publish": "deployment",
+        }
+        self.agent_roles = [mapping[item] for item in self.workloads if item in mapping]
+        return self
 
 
 class PublishHookConfig(BaseModel):
@@ -113,6 +129,20 @@ class FeedbackLoopConfig(BaseModel):
     suggest_failure_analysis: bool = True
     improvement_floor: float = 0.02
     max_recommendations: int = 4
+
+
+class ResilienceConfig(BaseModel):
+    circuit_breaker_threshold: int = 3
+    base_delay_s: int = 5
+    max_delay_s: int = 300
+    enable_dead_letter: bool = True
+    enable_checkpoint_resume: bool = True
+
+
+class AlertingConfig(BaseModel):
+    enabled: bool = False
+    sink: Literal["jsonl", "stdout", "none"] = "jsonl"
+    anomaly_window_s: int = 300
 
 
 class DecisionPolicy(BaseModel):
@@ -165,6 +195,8 @@ class OrchestrationConfig(BaseModel):
     sub_agents: SubAgentConfig = Field(default_factory=SubAgentConfig)
     decision_policy: DecisionPolicy = Field(default_factory=DecisionPolicy)
     feedback_loop: FeedbackLoopConfig = Field(default_factory=FeedbackLoopConfig)
+    resilience: ResilienceConfig = Field(default_factory=ResilienceConfig)
+    alerting: AlertingConfig = Field(default_factory=AlertingConfig)
     publish_hooks: list[PublishHookConfig] = Field(default_factory=list)
     pipeline: PipelineConfig = Field(default_factory=PipelineConfig)
     metadata: dict[str, Any] = Field(default_factory=dict)

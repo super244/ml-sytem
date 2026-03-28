@@ -18,6 +18,13 @@ def utc_now_iso() -> str:
     return datetime.now(timezone.utc).isoformat()
 
 
+class PortForward(BaseModel):
+    local_port: int
+    remote_port: int
+    bind_host: str = "127.0.0.1"
+    description: str | None = None
+
+
 class EnvironmentSpec(BaseModel):
     kind: EnvironmentKind = "local"
     profile_name: str | None = None
@@ -29,20 +36,13 @@ class EnvironmentSpec(BaseModel):
     remote_repo_root: str | None = None
     python_bin: str | None = None
     env: dict[str, str] = Field(default_factory=dict)
-    port_forwards: list["PortForward"] = Field(default_factory=list)
+    port_forwards: list[PortForward] = Field(default_factory=list)
 
     @model_validator(mode="after")
     def _validate_cloud_fields(self) -> "EnvironmentSpec":
         if self.kind == "cloud" and not (self.profile_name or self.host):
             raise ValueError("cloud environments require either a profile_name or host")
         return self
-
-
-class PortForward(BaseModel):
-    local_port: int
-    remote_port: int
-    bind_host: str = "127.0.0.1"
-    description: str | None = None
 
 
 class ExecutionHandle(BaseModel):
@@ -124,7 +124,14 @@ class InstanceManifest(BaseModel):
     decision: DecisionResult | None = None
     recommendations: list[FeedbackRecommendation] = Field(default_factory=list)
     error: InstanceError | None = None
+    orchestration_run_id: str | None = None
+    task_summary: dict[str, Any] = Field(default_factory=dict)
+    last_heartbeat_at: str | None = None
+    active_agents: list[str] = Field(default_factory=list)
     metadata: dict[str, Any] = Field(default_factory=dict)
 
     def touch(self) -> None:
         self.updated_at = utc_now_iso()
+
+
+EnvironmentSpec.model_rebuild()

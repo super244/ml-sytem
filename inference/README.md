@@ -6,6 +6,7 @@ The inference layer is a product and research backend for math-specialist servin
 
 - `app/main.py`: FastAPI assembly and route registration.
 - `app/routers/`: health, metadata, and generation endpoints.
+- `app/routers/orchestration.py`: additive control-plane routes for runs, tasks, events, retry/cancel, and summary views.
 - `app/services/generation_service.py`: end-to-end request orchestration.
 - `app/services/metadata_service.py`: models, datasets, prompts, benchmarks, and runs metadata.
 - `app/model_loader.py`: YAML-backed model registry plus lazy loading.
@@ -36,6 +37,13 @@ The inference layer is a product and research backend for math-specialist servin
 - `GET /v1/prompts`
 - `GET /v1/benchmarks`
 - `GET /v1/runs`
+- `GET /v1/orchestration/runs`
+- `GET /v1/orchestration/runs/{run_id}`
+- `GET /v1/orchestration/runs/{run_id}/tasks`
+- `GET /v1/orchestration/runs/{run_id}/events`
+- `GET /v1/orchestration/summary`
+- `POST /v1/orchestration/runs/{run_id}/cancel`
+- `POST /v1/orchestration/tasks/{task_id}/retry`
 - `POST /v1/generate`
 - `POST /v1/generate/batch`
 - `POST /v1/compare`

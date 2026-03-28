@@ -75,7 +75,9 @@ Profiles such as `baseline_qlora` or `verifier_augmented` are thin compositions 
 
 ## Orchestration Architecture
 
-The control plane sits alongside the subsystem-specific stacks rather than replacing them. Orchestration configs under `configs/*.yaml` describe:
+The control plane sits alongside the subsystem-specific stacks rather than replacing them. A SQLite local-first control plane under `artifacts/control_plane/` is the durable source of truth for orchestration runs, tasks, attempts, events, leases, and circuit state, while the existing JSON/JSONL artifact outputs remain the canonical subsystem outputs.
+
+Orchestration configs under `configs/*.yaml` describe:
 
 - managed instance type: `prepare`, `train`, `finetune`, `evaluate`, `report`, `inference`, or `deploy`
 - user experience level: `beginner`, `hobbyist`, or `dev`
@@ -83,8 +85,27 @@ The control plane sits alongside the subsystem-specific stacks rather than repla
 - remote-access metadata: cloud profile resolution, SSH settings, and port-forward definitions
 - sub-agent policy: bounded parallel follow-up workloads such as preprocessing, evaluation, metrics/reporting, or publish steps
 - feedback loop policy: when to recommend or automatically queue the next training or deployment action
+- resilience policy: retry/backoff, circuit-breaker thresholds, dead-letter behavior, and checkpoint-resume defaults
+- alert policy: telemetry sink and anomaly detection toggles
 
-Each managed instance writes a typed manifest with status, progress, metrics summary, recommendations, execution metadata, and parent/child lineage. The default orchestration templates now include reusable `prepare` and `report` jobs so evaluation misses can flow directly into failure-analysis artifacts and the next training loop. That same contract is consumed by the CLI, FastAPI instance routes, and the workspace overview so the UI layers stay thin.
+Each managed instance now projects onto:
+
+- an orchestration run
+- one or more orchestration tasks
+- one or more task attempts with heartbeats, leases, stdout/stderr refs, and checkpoint hints
+
+The existing `artifacts/instances/<instance-id>/...` layout is preserved as a compatibility projection so the CLI, FastAPI instance routes, and frontend views stay thin while the runtime becomes more durable.
+
+The built-in agent registry covers:
+
+- data processing
+- training orchestration
+- evaluation and benchmarking
+- monitoring and telemetry
+- optimization and feedback loops
+- deployment
+
+The default orchestration templates include reusable `prepare` and `report` jobs so evaluation misses can flow directly into failure-analysis artifacts and the next training loop.
 
 ## Inference Architecture
 
@@ -127,5 +148,6 @@ The solve view mirrors the backend capabilities by surfacing model selection, pr
 1. Build or normalize datasets into canonical `v2` records.
 2. Construct processed splits and derived packs with manifests and cards.
 3. Launch raw subsystem commands or managed orchestration instances for training and packaging.
-4. Serve models through the inference API and frontend.
-5. Evaluate against benchmark packs, mine failures, and let the control plane recommend or queue the next step.
+4. The async control plane dispatches tasks, records attempts, heartbeats, retries, and structured events, and projects status back into instance manifests.
+5. Serve models through the inference API and frontend.
+6. Evaluate against benchmark packs, mine failures, and let the control plane recommend or queue the next step.

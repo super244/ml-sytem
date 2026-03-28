@@ -65,6 +65,14 @@ def _stream_pipe(pipe, path: Path) -> None:
     pipe.close()
 
 
+def _heartbeat_loop(manager, instance_id: str, attempt_id: str, stop_event: threading.Event, interval_s: int) -> None:
+    while not stop_event.wait(interval_s):
+        try:
+            manager.heartbeat_instance_attempt(instance_id, attempt_id)
+        except Exception:
+            return
+
+
 class SshExecutor(BaseExecutor):
     backend_name = "ssh"
 
@@ -119,6 +127,8 @@ def _run_payload(payload: RunnerPayload) -> int:
     store = FileInstanceStore(payload.artifacts_dir)
     manager = InstanceManager(store)
     manager.mark_running(payload.instance_id)
+    manifest = store.load(payload.instance_id)
+    attempt_id = (((manifest.execution or ExecutionHandle(backend="ssh")).metadata) or {}).get("attempt_id")
 
     ssh_command = _build_ssh_argv(payload.environment, payload.manifest_metadata)
     ssh_command.extend([_ssh_target(payload.environment), _build_remote_command(payload)])
@@ -137,13 +147,26 @@ def _run_payload(payload: RunnerPayload) -> int:
         manifest.execution.metadata["argv"] = ssh_command
         store.save(manifest)
 
+    stop_event = threading.Event()
+    heartbeat_thread = None
+    if isinstance(attempt_id, str):
+        heartbeat_thread = threading.Thread(
+            target=_heartbeat_loop,
+            args=(manager, payload.instance_id, attempt_id, stop_event, manager.platform_settings.heartbeat_interval_s),
+            daemon=True,
+        )
+        heartbeat_thread.start()
+
     stdout_thread = threading.Thread(target=_stream_pipe, args=(process.stdout, store.stdout_path(payload.instance_id)))
     stderr_thread = threading.Thread(target=_stream_pipe, args=(process.stderr, store.stderr_path(payload.instance_id)))
     stdout_thread.start()
     stderr_thread.start()
     exit_code = process.wait()
+    stop_event.set()
     stdout_thread.join()
     stderr_thread.join()
+    if heartbeat_thread is not None:
+        heartbeat_thread.join(timeout=1.0)
     manager.finalize_instance(
         payload.instance_id,
         exit_code,

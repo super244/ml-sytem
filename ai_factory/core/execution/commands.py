@@ -126,7 +126,20 @@ def _build_report_command(config: OrchestrationConfig) -> CommandSpec:
     override = _command_override(config)
     if override is not None:
         return override
-    raise ValueError("report instances require subsystem.command_override")
+    input_path = config.subsystem.source_artifact_ref
+    output_path = config.subsystem.output_dir_override or "evaluation/results/failure_analysis.json"
+    if not input_path:
+        raise ValueError("report instances require subsystem.source_artifact_ref")
+    argv = [
+        _python_bin(config),
+        "evaluation/analysis/analyze_failures.py",
+        "--input",
+        input_path,
+        "--output",
+        output_path,
+    ]
+    argv.extend(config.subsystem.extra_args)
+    return CommandSpec(argv=argv, cwd=config.execution.cwd, env=_command_env(config))
 
 
 def _build_deploy_command(config: OrchestrationConfig, manifest: InstanceManifest) -> CommandSpec:

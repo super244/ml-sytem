@@ -1,0 +1,18 @@
+instance:
+  type: report
+  name: atlas-failure-analysis
+  environment:
+    kind: local
+orchestration_mode: single
+experience:
+  level: hobbyist
+execution:
+  backend: local
+subsystem:
+  source_artifact_ref: "{per_example}"
+  output_dir_override: "evaluation/results/{source_instance_id}/failure_analysis.json"
+monitoring:
+  collect_gpu: false
+  write_timeseries: true
+pipeline:
+  auto_continue: false

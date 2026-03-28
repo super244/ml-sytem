@@ -8,6 +8,7 @@ from ai_factory.core.config.loader import save_cloud_profile
 from ai_factory.core.instances.manager import InstanceManager
 from ai_factory.core.instances.models import InstanceManifest
 from ai_factory.core.instances.store import FileInstanceStore
+from ai_factory.core.platform.container import build_platform_container
 from inference.app.config import AppSettings
 from inference.app.schemas import (
     InstanceCreateRequest,
@@ -16,14 +17,30 @@ from inference.app.schemas import (
     InstanceEvaluateRequest,
     InstanceLogsResponse,
     InstanceMetricsResponse,
+    OrchestrationEventListResponse,
+    OrchestrationRunDetail,
+    OrchestrationRunListResponse,
+    OrchestrationSummaryResponse,
+    OrchestrationTaskListResponse,
 )
 
 
 class InstanceService:
-    def __init__(self, settings: AppSettings):
+    def __init__(
+        self,
+        settings: AppSettings,
+        *,
+        store: FileInstanceStore | None = None,
+        manager: InstanceManager | None = None,
+    ):
         self.settings = settings
-        self.store = FileInstanceStore(settings.artifacts_dir)
-        self.manager = InstanceManager(self.store)
+        if store is not None and manager is not None:
+            self.store = store
+            self.manager = manager
+            return
+        container = build_platform_container(artifacts_dir=settings.artifacts_dir)
+        self.store = container.store
+        self.manager = container.manager
 
     def _ensure_config_path(self, config_path: str | None) -> str:
         if not config_path:
@@ -123,3 +140,49 @@ class InstanceService:
             summary=metrics.get("summary", {}),
             points=metrics.get("points", []),
         )
+
+    def list_orchestration_runs(self) -> OrchestrationRunListResponse:
+        return OrchestrationRunListResponse(runs=self.manager.list_orchestration_runs())
+
+    def get_orchestration_run(self, run_id: str) -> OrchestrationRunDetail:
+        try:
+            payload = self.manager.get_orchestration_run(run_id)
+        except FileNotFoundError as exc:
+            raise HTTPException(status_code=404, detail=str(exc)) from exc
+        return OrchestrationRunDetail.model_validate(payload)
+
+    def list_orchestration_tasks(self, run_id: str) -> OrchestrationTaskListResponse:
+        try:
+            self.manager.get_orchestration_run(run_id)
+        except FileNotFoundError as exc:
+            raise HTTPException(status_code=404, detail=str(exc)) from exc
+        return OrchestrationTaskListResponse(tasks=self.manager.list_tasks(run_id))
+
+    def list_orchestration_events(
+        self,
+        run_id: str,
+        *,
+        limit: int | None = None,
+    ) -> OrchestrationEventListResponse:
+        try:
+            self.manager.get_orchestration_run(run_id)
+        except FileNotFoundError as exc:
+            raise HTTPException(status_code=404, detail=str(exc)) from exc
+        return OrchestrationEventListResponse(events=self.manager.list_orchestration_events(run_id, limit=limit))
+
+    def cancel_orchestration_run(self, run_id: str) -> OrchestrationRunDetail:
+        try:
+            self.manager.cancel_instance(run_id)
+        except FileNotFoundError as exc:
+            raise HTTPException(status_code=404, detail=str(exc)) from exc
+        return self.get_orchestration_run(run_id)
+
+    def retry_orchestration_task(self, task_id: str) -> OrchestrationRunDetail:
+        try:
+            self.manager.retry_instance(task_id)
+        except FileNotFoundError as exc:
+            raise HTTPException(status_code=404, detail=str(exc)) from exc
+        return self.get_orchestration_run(task_id)
+
+    def get_orchestration_summary(self) -> OrchestrationSummaryResponse:
+        return OrchestrationSummaryResponse(summary=self.manager.monitoring_summary())

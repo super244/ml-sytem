@@ -17,5 +17,9 @@ subsystem:
 monitoring:
   collect_gpu: false
   write_timeseries: true
+resilience:
+  circuit_breaker_threshold: 3
+  base_delay_s: 5
+  max_delay_s: 60
 pipeline:
   auto_continue: false

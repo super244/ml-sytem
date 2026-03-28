@@ -30,3 +30,29 @@ def test_dependencies_import_is_lightweight():
     assert "inference.app.model_catalog" not in sys.modules
     assert "inference.app.model_loader" not in sys.modules
     assert "inference.app.prompts" not in sys.modules
+
+
+def test_orchestration_service_import_is_lightweight():
+    _clear_modules(
+        "ai_factory.core.orchestration.service",
+        "torch",
+        "transformers",
+    )
+
+    importlib.import_module("ai_factory.core.orchestration.service")
+
+    assert "torch" not in sys.modules
+    assert "transformers" not in sys.modules
+
+
+def test_tui_import_is_lightweight():
+    _clear_modules(
+        "ai_factory.tui",
+        "torch",
+        "transformers",
+    )
+
+    importlib.import_module("ai_factory.tui")
+
+    assert "torch" not in sys.modules
+    assert "transformers" not in sys.modules

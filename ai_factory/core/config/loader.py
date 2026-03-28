@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import os
+import tempfile
 from pathlib import Path
 from typing import Any
 
@@ -112,8 +113,40 @@ def apply_experience_guardrails(config: OrchestrationConfig) -> OrchestrationCon
 def _cloud_profile_store_path() -> Path:
     override = os.getenv("AI_FACTORY_CLOUD_PROFILES_PATH")
     if override:
-        return Path(override).expanduser()
-    return Path.home() / ".ai-factory" / "cloud_profiles.json"
+        return Path(override).expanduser().resolve()
+    return (Path.home() / ".ai-factory" / "cloud_profiles.json").resolve()
+
+
+def _secure_path_permissions(path: Path, mode: int) -> None:
+    try:
+        path.chmod(mode)
+    except OSError:
+        pass
+
+
+def _ensure_profile_store_parent(path: Path) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    _secure_path_permissions(path.parent, 0o700)
+
+
+def _write_yaml_atomic(path: Path, payload: dict[str, Any]) -> None:
+    _ensure_profile_store_parent(path)
+    serialized = yaml.safe_dump(payload, sort_keys=True)
+    with tempfile.NamedTemporaryFile("w", encoding="utf-8", dir=str(path.parent), delete=False) as handle:
+        tmp_path = Path(handle.name)
+        handle.write(serialized)
+        handle.flush()
+        os.fsync(handle.fileno())
+    try:
+        _secure_path_permissions(tmp_path, 0o600)
+        tmp_path.replace(path)
+        _secure_path_permissions(path, 0o600)
+    finally:
+        if tmp_path.exists() and tmp_path != path:
+            try:
+                tmp_path.unlink()
+            except OSError:
+                pass
 
 
 def load_cloud_profile(name: str) -> EnvironmentSpec | None:
@@ -136,6 +169,5 @@ def save_cloud_profile(name: str, environment: EnvironmentSpec) -> Path:
         for key, value in environment.model_dump(mode="json").items()
         if key != "kind" and value not in (None, {})
     }
-    path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(yaml.safe_dump(payload, sort_keys=True))
+    _write_yaml_atomic(path, payload)
     return path
