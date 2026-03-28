@@ -27,7 +27,9 @@ from ai_factory.core.instances.models import (
     FeedbackRecommendation,
     InstanceError,
     InstanceManifest,
+    LifecycleProfile,
     ProgressSnapshot,
+    UserLevel,
     utc_now_iso,
 )
 from ai_factory.core.instances.queries import InstanceQueryService
@@ -61,6 +63,19 @@ def _source_artifact_ref(manifest: InstanceManifest) -> str | None:
         or (manifest.artifact_refs.get("published") or {}).get("merged_model")
         or manifest.artifact_refs.get("source_artifact")
     )
+
+
+def _stage_for_instance_type(instance_type: str) -> str:
+    mapping = {
+        "prepare": "prepare",
+        "train": "train",
+        "finetune": "finetune",
+        "evaluate": "evaluate",
+        "inference": "infer",
+        "deploy": "publish",
+        "report": "decide",
+    }
+    return mapping.get(instance_type, "train")
 
 
 class InstanceManager:
@@ -178,6 +193,51 @@ class InstanceManager:
         metadata.setdefault("automation_depth", 0)
         return metadata
 
+    def _resolved_lifecycle(self, config) -> LifecycleProfile:
+        payload = config.lifecycle.model_dump(mode="json")
+        if not payload.get("stage"):
+            payload["stage"] = _stage_for_instance_type(config.instance.type)
+        return LifecycleProfile.model_validate(payload)
+
+    def _apply_config_overrides(
+        self,
+        config,
+        *,
+        name_override: str | None = None,
+        user_level_override: UserLevel | None = None,
+        lifecycle_override: LifecycleProfile | None = None,
+        subsystem_updates: dict[str, Any] | None = None,
+        execution_updates: dict[str, Any] | None = None,
+        metadata_updates: dict[str, Any] | None = None,
+    ):
+        merged = config.model_dump(mode="json")
+        if name_override:
+            merged.setdefault("instance", {})["name"] = name_override
+        if user_level_override:
+            merged.setdefault("experience", {})["level"] = user_level_override
+        if lifecycle_override is not None:
+            merged["lifecycle"] = lifecycle_override.model_dump(mode="json")
+        if subsystem_updates:
+            merged["subsystem"] = _deep_merge(merged.get("subsystem", {}), subsystem_updates)
+        if execution_updates:
+            merged["execution"] = _deep_merge(merged.get("execution", {}), execution_updates)
+        if metadata_updates:
+            merged["metadata"] = _deep_merge(merged.get("metadata", {}), metadata_updates)
+        return build_orchestration_config(merged, config_path=config.config_path)
+
+    def _inherit_lifecycle(
+        self,
+        source: InstanceManifest,
+        *,
+        stage: str,
+        evaluation_suite: dict[str, Any] | None = None,
+    ) -> LifecycleProfile:
+        payload = source.lifecycle.model_dump(mode="json")
+        payload["stage"] = stage
+        if evaluation_suite:
+            payload["evaluation_suite"] = evaluation_suite
+        return LifecycleProfile.model_validate(payload)
+
     def _base_manifest(
         self,
         config,
@@ -195,6 +255,7 @@ class InstanceManager:
             environment=environment,
             user_level=config.experience.level,
             orchestration_mode=config.orchestration_mode,
+            lifecycle=self._resolved_lifecycle(config),
             name=config.instance.name or instance_id,
             parent_instance_id=parent_instance_id or config.instance.parent_instance_id,
             config_path=config_path or config.config_path,
@@ -292,9 +353,23 @@ class InstanceManager:
         start: bool = True,
         environment_override: EnvironmentSpec | None = None,
         parent_instance_id: str | None = None,
+        name_override: str | None = None,
+        user_level_override: UserLevel | None = None,
+        lifecycle_override: LifecycleProfile | None = None,
+        subsystem_updates: dict[str, Any] | None = None,
+        execution_updates: dict[str, Any] | None = None,
         metadata_updates: dict[str, Any] | None = None,
     ) -> InstanceManifest:
         config = load_orchestration_config(config_path)
+        config = self._apply_config_overrides(
+            config,
+            name_override=name_override,
+            user_level_override=user_level_override,
+            lifecycle_override=lifecycle_override,
+            subsystem_updates=subsystem_updates,
+            execution_updates=execution_updates,
+            metadata_updates=metadata_updates,
+        )
         config = apply_environment_override(config, environment_override)
         config = apply_experience_guardrails(config)
         manifest = self._base_manifest(
@@ -323,7 +398,7 @@ class InstanceManager:
                 metadata_updates=self._child_metadata(manifest, reason="preprocess_sub_agent"),
             )
 
-        return self.start_instance(manifest.id) if start else manifest
+        return self.start_instance(manifest.id) if start else self.get_instance(manifest.id)
 
     def start_instance(self, instance_id: str) -> InstanceManifest:
         manifest = self.store.load(instance_id)
@@ -687,6 +762,11 @@ class InstanceManager:
                 or config.pipeline.default_finetune_config,
                 default_eval_config=resolve_path_from_config(manifest.config_path, config.pipeline.default_eval_config)
                 or config.pipeline.default_eval_config,
+                default_inference_config=resolve_path_from_config(
+                    manifest.config_path,
+                    config.pipeline.default_inference_config,
+                )
+                or config.pipeline.default_inference_config,
                 default_deploy_config=resolve_path_from_config(
                     manifest.config_path,
                     config.pipeline.default_deploy_config,
@@ -784,6 +864,62 @@ class InstanceManager:
                 parent_instance_id=manifest.id,
                 metadata_updates=self._child_metadata(manifest, reason="auto_continue_retrain"),
             )
+        elif action == "open_inference":
+            self.create_inference_instance(
+                manifest.parent_instance_id or manifest.id,
+                config_path=resolve_path_from_config(manifest.config_path, config.pipeline.default_inference_config)
+                or config.pipeline.default_inference_config,
+                start=True,
+                metadata_updates=self._child_metadata(manifest, reason="auto_continue_inference"),
+            )
+        elif action == "re_evaluate":
+            self.create_evaluation_instance(
+                manifest.parent_instance_id or manifest.id,
+                config_path=resolve_path_from_config(manifest.config_path, config.pipeline.default_eval_config)
+                or config.pipeline.default_eval_config,
+                start=True,
+                metadata_updates=self._child_metadata(manifest, reason="auto_continue_re_evaluate"),
+            )
+
+    def _write_generated_model_registry(
+        self,
+        manifest: InstanceManifest,
+        source: InstanceManifest,
+        *,
+        registry_path: str,
+        description: str,
+        tags: list[str],
+    ) -> tuple[str, str]:
+        source_artifact = _source_artifact_ref(source)
+        if not source_artifact:
+            raise ValueError("source instance does not expose a publishable artifact yet")
+        registry_payload = yaml.safe_load(Path(registry_path).read_text()) or {}
+        generated_name = f"instance_{source.id.replace('-', '_')}"
+        registry_payload.setdefault("models", [])
+        registry_payload["models"] = [
+            item for item in registry_payload["models"] if item.get("name") != generated_name
+        ]
+        registry_payload["models"].append(
+            {
+                "name": generated_name,
+                "label": source.name,
+                "base_model": source.artifact_refs.get("base_model", "Qwen/Qwen2.5-Math-1.5B-Instruct"),
+                "adapter_path": source_artifact,
+                "load_in_4bit": True,
+                "load_in_8bit": False,
+                "dtype": "bfloat16",
+                "description": description,
+                "tags": tags,
+            }
+        )
+        generated_registry_path = self.store.instance_dir(manifest.id) / "generated_model_registry.yaml"
+        generated_registry_path.write_text(yaml.safe_dump(registry_payload, sort_keys=False))
+        return generated_name, str(generated_registry_path)
+
+    def _write_lifecycle(self, instance_id: str, lifecycle: LifecycleProfile) -> None:
+        manifest = self.store.load(instance_id)
+        manifest.lifecycle = lifecycle
+        self.store.save(manifest)
 
     def _build_eval_snapshot(self, manifest: InstanceManifest, source: InstanceManifest) -> dict[str, Any]:
         snapshot = self.store.load_config_snapshot(manifest.id)
@@ -801,31 +937,17 @@ class InstanceManager:
 
         eval_payload = yaml.safe_load(Path(eval_config_path).read_text()) or {}
         registry_path = Path(eval_payload.get("models", {}).get("registry_path", "inference/configs/model_registry.yaml"))
-        registry_payload = yaml.safe_load(registry_path.read_text()) or {}
-        generated_name = f"instance_{source.id.replace('-', '_')}"
-        registry_payload.setdefault("models", [])
-        registry_payload["models"] = [
-            item for item in registry_payload["models"] if item.get("name") != generated_name
-        ]
-        registry_payload["models"].append(
-            {
-                "name": generated_name,
-                "label": source.name,
-                "base_model": source.artifact_refs.get("base_model", "Qwen/Qwen2.5-Math-1.5B-Instruct"),
-                "adapter_path": source_artifact,
-                "load_in_4bit": True,
-                "load_in_8bit": False,
-                "dtype": "bfloat16",
-                "description": f"Generated instance model for {source.id}",
-                "tags": ["instance", source.type],
-            }
+        generated_name, generated_registry_path = self._write_generated_model_registry(
+            manifest,
+            source,
+            registry_path=str(registry_path),
+            description=f"Generated evaluation model for {source.id}",
+            tags=["instance", "evaluation", source.type],
         )
-        generated_registry_path = self.store.instance_dir(manifest.id) / "generated_model_registry.yaml"
         generated_eval_path = self.store.instance_dir(manifest.id) / "generated_eval_config.yaml"
-        generated_registry_path.write_text(yaml.safe_dump(registry_payload, sort_keys=False))
 
         eval_payload.setdefault("models", {})
-        eval_payload["models"]["registry_path"] = str(generated_registry_path)
+        eval_payload["models"]["registry_path"] = generated_registry_path
         eval_payload["models"]["primary_model"] = generated_name
         eval_payload["models"]["primary_label"] = source.name
         generated_eval_path.write_text(yaml.safe_dump(eval_payload, sort_keys=False))
@@ -834,6 +956,33 @@ class InstanceManager:
         snapshot["subsystem"]["source_artifact_ref"] = source_artifact
         snapshot["resolved_subsystem_config_path"] = str(generated_eval_path)
         snapshot["resolved_subsystem_config"] = eval_payload
+        snapshot.setdefault("metadata", {})
+        snapshot["metadata"]["source_instance_id"] = source.id
+        return snapshot
+
+    def _build_inference_snapshot(self, manifest: InstanceManifest, source: InstanceManifest) -> dict[str, Any]:
+        snapshot = self.store.load_config_snapshot(manifest.id)
+        source_artifact = _source_artifact_ref(source)
+        if not source_artifact:
+            snapshot["subsystem"]["source_instance_id"] = source.id
+            snapshot.setdefault("metadata", {})
+            snapshot["metadata"]["source_instance_id"] = source.id
+            return snapshot
+
+        execution = snapshot.setdefault("execution", {})
+        env = execution.setdefault("env", {})
+        registry_path = env.get("MODEL_REGISTRY_PATH") or "inference/configs/model_registry.yaml"
+        generated_name, generated_registry_path = self._write_generated_model_registry(
+            manifest,
+            source,
+            registry_path=registry_path,
+            description=f"Generated inference model for {source.id}",
+            tags=["instance", "inference", source.type],
+        )
+        env["MODEL_REGISTRY_PATH"] = generated_registry_path
+        snapshot["subsystem"]["model_variant"] = generated_name
+        snapshot["subsystem"]["source_instance_id"] = source.id
+        snapshot["subsystem"]["source_artifact_ref"] = source_artifact
         snapshot.setdefault("metadata", {})
         snapshot["metadata"]["source_instance_id"] = source.id
         return snapshot
@@ -856,7 +1005,26 @@ class InstanceManager:
         )
         snapshot = self._build_eval_snapshot(manifest, source)
         self._persist_snapshot(manifest.id, snapshot)
-        return self.start_instance(manifest.id) if start else manifest
+        eval_payload = snapshot.get("resolved_subsystem_config") or {}
+        models_payload = eval_payload.get("models") if isinstance(eval_payload.get("models"), dict) else {}
+        self._write_lifecycle(
+            manifest.id,
+            self._inherit_lifecycle(
+                source,
+                stage="evaluate",
+                evaluation_suite={
+                    "id": Path(str(snapshot.get("resolved_subsystem_config_path") or config_path)).stem,
+                    "label": source.name,
+                    "benchmark_config": str(snapshot.get("resolved_subsystem_config_path") or config_path),
+                    "compare_to_models": [
+                        str(models_payload.get("primary_model"))
+                    ]
+                    if models_payload.get("primary_model")
+                    else [],
+                },
+            ),
+        )
+        return self.start_instance(manifest.id) if start else self.get_instance(manifest.id)
 
     def create_deployment_instance(
         self,
@@ -882,6 +1050,31 @@ class InstanceManager:
         snapshot.setdefault("metadata", {})
         snapshot["metadata"]["source_instance_id"] = source.id
         self._persist_snapshot(manifest.id, snapshot)
+        lifecycle = self._inherit_lifecycle(source, stage="publish")
+        if target not in lifecycle.deployment_targets:
+            lifecycle.deployment_targets = [*lifecycle.deployment_targets, target]
+        self._write_lifecycle(manifest.id, lifecycle)
+        return self.start_instance(manifest.id) if start else self.get_instance(manifest.id)
+
+    def create_inference_instance(
+        self,
+        source_instance_id: str,
+        *,
+        config_path: str = "configs/inference.yaml",
+        start: bool = True,
+        metadata_updates: dict[str, Any] | None = None,
+    ) -> InstanceManifest:
+        source = self.store.load(source_instance_id)
+        manifest = self.create_instance(
+            config_path,
+            start=False,
+            environment_override=source.environment,
+            parent_instance_id=source.id,
+            metadata_updates=metadata_updates,
+        )
+        snapshot = self._build_inference_snapshot(manifest, source)
+        self._persist_snapshot(manifest.id, snapshot)
+        self._write_lifecycle(manifest.id, self._inherit_lifecycle(source, stage="infer"))
         return self.start_instance(manifest.id) if start else manifest
 
     def get_instance(self, instance_id: str) -> InstanceManifest:
@@ -914,6 +1107,95 @@ class InstanceManager:
             "summary": self.store.read_current_metrics(instance_id),
             "points": self.store.read_metric_points(instance_id),
         }
+
+    def get_available_actions(self, instance_id: str) -> list[dict[str, Any]]:
+        manifest = self.get_instance(instance_id)
+        if manifest.status != "completed":
+            return []
+        snapshot = self.store.load_config_snapshot(instance_id)
+        config = build_orchestration_config(snapshot, config_path=manifest.config_path)
+        actions: list[dict[str, Any]] = []
+
+        def add_action(
+            action: str,
+            label: str,
+            description: str,
+            *,
+            target_instance_type: str | None = None,
+            config_path: str | None = None,
+            deployment_target: str | None = None,
+        ) -> None:
+            actions.append(
+                {
+                    "action": action,
+                    "label": label,
+                    "description": description,
+                    "target_instance_type": target_instance_type,
+                    "config_path": config_path,
+                    "deployment_target": deployment_target,
+                }
+            )
+
+        eval_config_path = resolve_path_from_config(manifest.config_path, config.pipeline.default_eval_config) or config.pipeline.default_eval_config
+        inference_config_path = resolve_path_from_config(manifest.config_path, config.pipeline.default_inference_config) or config.pipeline.default_inference_config
+        deploy_config_path = resolve_path_from_config(manifest.config_path, config.pipeline.default_deploy_config) or config.pipeline.default_deploy_config
+
+        if manifest.type in {"train", "finetune"}:
+            add_action(
+                "evaluate",
+                "Evaluate",
+                "Run the managed benchmark suite and attach the results to this lifecycle branch.",
+                target_instance_type="evaluate",
+                config_path=eval_config_path,
+            )
+
+        if manifest.type in {"finetune", "evaluate"}:
+            add_action(
+                "open_inference",
+                "Start Inference",
+                "Launch an inference sandbox backed by this lifecycle branch.",
+                target_instance_type="inference",
+                config_path=inference_config_path,
+            )
+
+        if manifest.type == "evaluate":
+            targets: list[str] = []
+            targets.extend(manifest.lifecycle.deployment_targets)
+            targets.extend(
+                item.deployment_target
+                for item in manifest.recommendations
+                if item.deployment_target is not None
+            )
+            targets.extend(
+                str(hook.target)
+                for hook in config.publish_hooks
+                if getattr(hook, "target", None)
+            )
+            deduped_targets: list[str] = []
+            for target in targets:
+                if target not in deduped_targets:
+                    deduped_targets.append(target)
+            if not deduped_targets and manifest.decision and manifest.decision.action == "deploy":
+                deduped_targets.append("ollama")
+            for target in deduped_targets:
+                add_action(
+                    "deploy",
+                    f"Prepare Publish: {target.replace('_', ' ').title()}",
+                    "Create a managed publish/deploy child instance for this evaluated artifact.",
+                    target_instance_type="deploy",
+                    config_path=deploy_config_path,
+                    deployment_target=target,
+                )
+            if manifest.decision and manifest.decision.action == "re_evaluate":
+                add_action(
+                    "re_evaluate",
+                    "Re-run Evaluation",
+                    "Refresh the benchmark results before deciding on the next stage.",
+                    target_instance_type="evaluate",
+                    config_path=eval_config_path,
+                )
+
+        return actions
 
     def list_tasks(self, legacy_or_run_id: str | None = None) -> list[dict[str, Any]]:
         return [item.model_dump(mode="json") for item in self.orchestration.list_tasks(legacy_or_run_id)]

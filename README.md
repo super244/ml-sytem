@@ -139,6 +139,7 @@ Legacy `artifacts/instances/<instance-id>/...` directories are still materialize
 ## Documentation Map
 
 - `docs/architecture.md`
+- `docs/control-center.md`
 - `docs/data-system.md`
 - `docs/training-system.md`
 - `docs/inference-system.md`

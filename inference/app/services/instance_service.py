@@ -15,6 +15,7 @@ from inference.app.schemas import (
     InstanceDeployRequest,
     InstanceDetail,
     InstanceEvaluateRequest,
+    InstanceInferenceRequest,
     InstanceLogsResponse,
     InstanceMetricsResponse,
     OrchestrationEventListResponse,
@@ -60,6 +61,7 @@ class InstanceService:
         detail.metrics = metrics
         detail.children = self.manager.list_instances(parent_instance_id=manifest.id)
         detail.events = self.store.read_events(manifest.id)
+        detail.available_actions = self.manager.get_available_actions(manifest.id)
         return detail
 
     def list_instances(
@@ -91,6 +93,11 @@ class InstanceService:
             start=request.start,
             environment_override=request.environment,
             parent_instance_id=request.parent_instance_id,
+            name_override=request.name,
+            user_level_override=request.user_level,
+            lifecycle_override=request.lifecycle,
+            subsystem_updates=request.subsystem_overrides or None,
+            metadata_updates=request.metadata or None,
         )
         return self.get_instance(manifest.id)
 
@@ -112,6 +119,20 @@ class InstanceService:
         manifest = self.manager.create_deployment_instance(
             instance_id,
             target=request.target,
+            config_path=config_path,
+            start=request.start,
+        )
+        return self.get_instance(manifest.id)
+
+    def start_inference_instance(
+        self,
+        instance_id: str,
+        request: InstanceInferenceRequest | None = None,
+    ) -> InstanceDetail:
+        request = request or InstanceInferenceRequest()
+        config_path = self._ensure_config_path(request.config_path or "configs/inference.yaml")
+        manifest = self.manager.create_inference_instance(
+            instance_id,
             config_path=config_path,
             start=request.start,
         )

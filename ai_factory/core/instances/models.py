@@ -9,9 +9,23 @@ from pydantic import BaseModel, Field, model_validator
 InstanceType = Literal["prepare", "train", "finetune", "evaluate", "inference", "deploy", "report"]
 InstanceStatus = Literal["pending", "running", "completed", "failed"]
 EnvironmentKind = Literal["local", "cloud"]
-DecisionAction = Literal["retrain", "finetune", "deploy"]
+DecisionAction = Literal["retrain", "finetune", "deploy", "re_evaluate", "open_inference"]
 UserLevel = Literal["beginner", "hobbyist", "dev"]
 OrchestrationMode = Literal["single", "local_parallel", "cloud_parallel", "hybrid"]
+TrainingOrigin = Literal["existing_model", "from_scratch"]
+LearningMode = Literal[
+    "supervised",
+    "unsupervised",
+    "rlhf",
+    "dpo",
+    "orpo",
+    "ppo",
+    "lora",
+    "qlora",
+    "full_finetune",
+]
+DeploymentTarget = Literal["huggingface", "ollama", "lmstudio", "api", "openai_compatible_api", "custom_api"]
+LifecycleStage = Literal["prepare", "train", "evaluate", "decide", "finetune", "infer", "publish"]
 
 
 def utc_now_iso() -> str:
@@ -76,13 +90,43 @@ class DecisionResult(BaseModel):
     explanation: str
 
 
+class ArchitectureSpec(BaseModel):
+    family: str | None = None
+    hidden_size: int | None = None
+    num_layers: int | None = None
+    num_attention_heads: int | None = None
+    max_position_embeddings: int | None = None
+    vocab_size: int | None = None
+    notes: str | None = None
+
+
+class EvaluationSuiteSpec(BaseModel):
+    id: str | None = None
+    label: str | None = None
+    benchmark_config: str | None = None
+    compare_to_models: list[str] = Field(default_factory=list)
+    custom_dataset_paths: list[str] = Field(default_factory=list)
+    notes: str | None = None
+
+
+class LifecycleProfile(BaseModel):
+    stage: LifecycleStage | None = None
+    origin: TrainingOrigin | None = None
+    learning_mode: LearningMode | None = None
+    source_model: str | None = None
+    architecture: ArchitectureSpec = Field(default_factory=ArchitectureSpec)
+    evaluation_suite: EvaluationSuiteSpec | None = None
+    deployment_targets: list[DeploymentTarget] = Field(default_factory=list)
+    notes: list[str] = Field(default_factory=list)
+
+
 class FeedbackRecommendation(BaseModel):
     action: str
     reason: str
     priority: int = 1
     target_instance_type: InstanceType | None = None
     config_path: str | None = None
-    deployment_target: str | None = None
+    deployment_target: DeploymentTarget | None = None
     command: list[str] | None = None
     metadata: dict[str, Any] = Field(default_factory=dict)
 
@@ -111,6 +155,7 @@ class InstanceManifest(BaseModel):
     environment: EnvironmentSpec = Field(default_factory=EnvironmentSpec)
     user_level: UserLevel = "hobbyist"
     orchestration_mode: OrchestrationMode = "single"
+    lifecycle: LifecycleProfile = Field(default_factory=LifecycleProfile)
     name: str
     created_at: str = Field(default_factory=utc_now_iso)
     updated_at: str = Field(default_factory=utc_now_iso)

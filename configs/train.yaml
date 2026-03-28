@@ -6,6 +6,20 @@ instance:
 orchestration_mode: local_parallel
 experience:
   level: dev
+lifecycle:
+  stage: train
+  origin: existing_model
+  learning_mode: qlora
+  source_model: Qwen/Qwen2.5-Math-1.5B-Instruct
+  evaluation_suite:
+    id: base_vs_finetuned
+    label: Baseline Vs Finetuned
+    benchmark_config: evaluation/configs/base_vs_finetuned.yaml
+    compare_to_models:
+      - base
+  deployment_targets:
+    - ollama
+    - huggingface
 execution:
   backend: local
 subsystem:

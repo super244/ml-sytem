@@ -7,15 +7,19 @@ import {
   getInstances,
   getOrchestrationRuns,
   getOrchestrationSummary,
+  getWorkspaceOverview,
   type InstanceSummary,
   type OrchestrationRun,
   type OrchestrationSummary,
+  type WorkspaceOverview,
+  type WorkspaceOrchestrationTemplate,
 } from "@/lib/api";
 import { formatCount, formatFixed, formatPercent } from "@/lib/formatting";
 import { useLabMetadata } from "@/hooks/use-lab-metadata";
 import { ROUTES } from "@/lib/routes";
 
 import { AppShell } from "@/components/layout/app-shell";
+import { NewInstancePanel } from "@/components/new-instance-panel";
 import { MetricBadge } from "@/components/panels/metric-badge";
 import { PageHeader } from "@/components/ui/page-header";
 import { StatePanel } from "@/components/ui/state-panel";
@@ -67,16 +71,19 @@ function runningInstances(instances: InstanceSummary[]): number {
 export function RunsView() {
   const metadata = useLabMetadata();
   const [controlPlane, setControlPlane] = useState<ControlPlaneState>(INITIAL_CONTROL_PLANE_STATE);
+  const [templates, setTemplates] = useState<WorkspaceOrchestrationTemplate[]>([]);
+  const [createNotice, setCreateNotice] = useState<string | null>(null);
 
   useEffect(() => {
     let active = true;
 
     async function loadControlPlane() {
       setControlPlane((current) => ({ ...current, loading: true, error: null }));
-      const [instancesResult, runsResult, summaryResult] = await Promise.allSettled([
+      const [instancesResult, runsResult, summaryResult, workspaceResult] = await Promise.allSettled([
         getInstances(),
         getOrchestrationRuns(),
         getOrchestrationSummary(),
+        getWorkspaceOverview(),
       ]);
       if (!active) {
         return;
@@ -104,6 +111,12 @@ export function RunsView() {
         loading: false,
         error: errors.length ? errors.join(" | ") : null,
       });
+      const workspaceOverview = resolveResult<WorkspaceOverview | null>(
+        workspaceResult,
+        null,
+        "workspace overview",
+      );
+      setTemplates(workspaceOverview?.orchestration_templates ?? []);
     }
 
     void loadControlPlane();
@@ -126,13 +139,25 @@ export function RunsView() {
     ? controlPlane.summary?.open_circuits
     : [];
 
+  function lifecycleLabel(instance: InstanceSummary) {
+    return instance.lifecycle.stage ?? instance.progress?.stage ?? "queued";
+  }
+
+  function handleCreated(instance: InstanceSummary) {
+    setCreateNotice(`Launched ${instance.type} instance ${instance.name}.`);
+    setControlPlane((current) => ({
+      ...current,
+      instances: [instance, ...current.instances],
+    }));
+  }
+
   return (
     <AppShell>
       <section className="route-stack">
         <PageHeader
           eyebrow="Managed Runs"
-          title="Control-plane instances plus artifact history"
-          description="Monitor managed training, evaluation, deployment, and inference instances through the orchestration control plane while keeping the existing artifact registry close at hand."
+          title="AI Factory Control Center"
+          description="Launch managed lifecycle branches, monitor training and evaluation progress, and move cleanly from train to evaluate to inference and publish."
           metrics={[
             { label: "Instances", value: formatCount(instances.length) },
             {
@@ -161,6 +186,10 @@ export function RunsView() {
             </>
           }
         />
+
+        {createNotice ? (
+          <StatePanel eyebrow="Launch Flow" title="Managed branch created." description={createNotice} />
+        ) : null}
 
         {controlPlane.loading && !instances.length && !orchestrationRuns.length ? (
           <StatePanel
@@ -223,6 +252,8 @@ export function RunsView() {
           </article>
         ) : null}
 
+        <NewInstancePanel templates={templates} onCreated={handleCreated} />
+
         {instances.length ? (
           <>
             <div className="section-heading">
@@ -240,26 +271,21 @@ export function RunsView() {
                   <div className="badge-row">
                     <MetricBadge label="Env" value={instance.environment.kind} />
                     <MetricBadge
-                      label="Stage"
-                      value={instance.progress?.stage ?? "queued"}
+                      label="Lifecycle"
+                      value={lifecycleLabel(instance)}
                       tone="secondary"
                     />
                     <MetricBadge
-                      label="Attempts"
-                      value={formatCount(
-                        typeof instance.task_summary.current_attempt === "number"
-                          ? instance.task_summary.current_attempt
-                          : typeof instance.task_summary.attempts === "number"
-                            ? instance.task_summary.attempts
-                            : null,
-                      )}
+                      label="Mode"
+                      value={instance.lifecycle.learning_mode ?? "n/a"}
                       tone="accent"
                     />
                   </div>
                   <div className="preview-block subtle">
-                    <strong>Progress</strong>
+                    <strong>Lifecycle</strong>
                     <p>
-                      {instance.progress?.status_message ?? "Waiting for the next control-plane event."}
+                      {instance.lifecycle.origin ?? "origin pending"} •{" "}
+                      {instance.lifecycle.source_model ?? "profile-managed source"}
                     </p>
                     <p>
                       Updated {formatTimestamp(instance.updated_at)}
@@ -284,6 +310,11 @@ export function RunsView() {
                       label="Latency"
                       value={formatFixed(numericMetric(instance.metrics_summary, ["avg_latency_s"]), 2)}
                     />
+                  </div>
+                  <div className="workspace-actions">
+                    <Link className="secondary-button small" href={`/runs/${instance.id}`}>
+                      Inspect branch
+                    </Link>
                   </div>
                 </article>
               ))}

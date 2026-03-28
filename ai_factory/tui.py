@@ -205,6 +205,8 @@ def _render_detail(screen, top: int, left: int, width: int, height: int, control
     lines = [
         f"name: {instance.name}",
         f"type/status: {instance.type} / {instance.status}",
+        f"lifecycle: {(instance.lifecycle.stage if instance.lifecycle and instance.lifecycle.stage else 'n/a')}",
+        f"origin/mode: {((instance.lifecycle.origin or 'n/a') if instance.lifecycle else 'n/a')} / {((instance.lifecycle.learning_mode or 'n/a') if instance.lifecycle else 'n/a')}",
         f"environment: {instance.environment.kind}",
         f"orchestration run: {instance.orchestration_run_id or 'n/a'}",
         f"progress: {(instance.progress.stage if instance.progress else 'n/a')}",
@@ -222,6 +224,7 @@ def _render_detail(screen, top: int, left: int, width: int, height: int, control
         lines.append(f"decision: {instance.decision.action} ({instance.decision.rule})")
     if instance.recommendations:
         lines.append(f"recommendations: {len(instance.recommendations)}")
+        lines.append(f"next: {instance.recommendations[0].action}")
 
     log_top = top + len(lines) + 2
     max_detail_lines = max(height - top - 6, 1)

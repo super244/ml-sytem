@@ -9,7 +9,14 @@ from typing import Any
 
 from ai_factory.core.config.loader import load_orchestration_config, save_cloud_profile
 from ai_factory.core.instances.manager import InstanceManager
-from ai_factory.core.instances.models import EnvironmentSpec, InstanceManifest, PortForward
+from ai_factory.core.instances.models import (
+    ArchitectureSpec,
+    EnvironmentSpec,
+    EvaluationSuiteSpec,
+    InstanceManifest,
+    LifecycleProfile,
+    PortForward,
+)
 from ai_factory.core.platform.container import build_platform_container
 
 
@@ -114,6 +121,69 @@ def _environment_from_args(args: argparse.Namespace) -> EnvironmentSpec | None:
     return environment
 
 
+def _lifecycle_from_args(args: argparse.Namespace) -> LifecycleProfile | None:
+    interactive = _interactive_enabled(args)
+    origin = args.origin or (_prompt("Training origin (existing_model/from_scratch)", "existing_model") if interactive else None)
+    learning_mode = args.learning_mode or (_prompt("Learning mode", "qlora") if interactive else None)
+    architecture_family = args.architecture_family
+    if origin == "from_scratch" and not architecture_family and interactive:
+        architecture_family = _prompt("Architecture family", "transformer")
+    evaluation_suite = args.evaluation_suite or (_prompt("Evaluation suite", "") if interactive else "")
+
+    compare_to_models = list(getattr(args, "compare_models", []) or [])
+    if not compare_to_models and interactive:
+        compare_to = _prompt("Compare against model (optional)", "")
+        if compare_to:
+            compare_to_models = [compare_to]
+
+    deployment_targets = list(getattr(args, "deployment_targets", []) or [])
+    if not deployment_targets and interactive:
+        deployment_target = _prompt("Primary deployment target", "")
+        if deployment_target:
+            deployment_targets = [deployment_target]
+
+    if not any(
+        [
+            origin,
+            learning_mode,
+            architecture_family,
+            args.source_model,
+            evaluation_suite,
+            deployment_targets,
+            args.architecture_hidden_size,
+            args.architecture_layers,
+            args.architecture_heads,
+            args.architecture_context,
+        ]
+    ):
+        return None
+
+    architecture = ArchitectureSpec(
+        family=architecture_family or None,
+        hidden_size=args.architecture_hidden_size,
+        num_layers=args.architecture_layers,
+        num_attention_heads=args.architecture_heads,
+        max_position_embeddings=args.architecture_context,
+    )
+    suite = None
+    if evaluation_suite:
+        suite = EvaluationSuiteSpec(
+            id=evaluation_suite,
+            label=evaluation_suite.replace("_", " ").replace("-", " ").title(),
+            benchmark_config=evaluation_suite if evaluation_suite.endswith(".yaml") else None,
+            compare_to_models=compare_to_models,
+        )
+    lifecycle = LifecycleProfile(
+        origin=origin,
+        learning_mode=learning_mode,
+        source_model=args.source_model or None,
+        architecture=architecture,
+        evaluation_suite=suite,
+        deployment_targets=deployment_targets,
+    )
+    return lifecycle
+
+
 def _manifest_payload(manifest: InstanceManifest) -> dict[str, Any]:
     return manifest.model_dump(mode="json")
 
@@ -168,6 +238,27 @@ def parse_args() -> argparse.Namespace:
         action="append",
         help="Forward local_port:remote_port[:bind_host] for cloud instances. Repeatable.",
     )
+    new_parser.add_argument("--name")
+    new_parser.add_argument("--user-level", choices=["beginner", "hobbyist", "dev"])
+    new_parser.add_argument("--origin", choices=["existing_model", "from_scratch"])
+    new_parser.add_argument(
+        "--learning-mode",
+        choices=["supervised", "unsupervised", "rlhf", "dpo", "orpo", "ppo", "lora", "qlora", "full_finetune"],
+    )
+    new_parser.add_argument("--source-model")
+    new_parser.add_argument("--architecture-family")
+    new_parser.add_argument("--architecture-hidden-size", type=int)
+    new_parser.add_argument("--architecture-layers", type=int)
+    new_parser.add_argument("--architecture-heads", type=int)
+    new_parser.add_argument("--architecture-context", type=int)
+    new_parser.add_argument("--evaluation-suite")
+    new_parser.add_argument("--compare-model", dest="compare_models", action="append")
+    new_parser.add_argument(
+        "--deployment-target",
+        dest="deployment_targets",
+        action="append",
+        choices=["huggingface", "ollama", "lmstudio", "openai_compatible_api"],
+    )
     new_parser.add_argument("--no-start", action="store_true")
     new_parser.add_argument("--interactive", action="store_true", default=True)
 
@@ -215,9 +306,14 @@ def parse_args() -> argparse.Namespace:
 
     deploy_parser = subparsers.add_parser("deploy", parents=[common_json])
     deploy_parser.add_argument("instance_id")
-    deploy_parser.add_argument("--target", choices=["huggingface", "ollama", "lmstudio", "custom_api"])
+    deploy_parser.add_argument("--target", choices=["huggingface", "ollama", "lmstudio", "api", "custom_api", "openai_compatible_api"])
     deploy_parser.add_argument("--config", default="configs/deploy.yaml")
     deploy_parser.add_argument("--no-start", action="store_true")
+
+    inference_parser = subparsers.add_parser("inference", parents=[common_json])
+    inference_parser.add_argument("instance_id")
+    inference_parser.add_argument("--config", default="configs/inference.yaml")
+    inference_parser.add_argument("--no-start", action="store_true")
 
     tui_parser = subparsers.add_parser("tui")
     tui_parser.add_argument("--refresh-seconds", type=float, default=2.0)
@@ -240,10 +336,17 @@ def main() -> None:
 
     if args.command == "new":
         environment = _environment_from_args(args)
+        user_level_override = args.user_level or (
+            _prompt("Experience level (beginner/hobbyist/dev)", "hobbyist") if _interactive_enabled(args) else None
+        )
+        name_override = args.name or (_prompt("Instance name", "") if _interactive_enabled(args) else "")
         manifest = manager.create_instance(
             _new_config_path(args),
             start=not args.no_start,
             environment_override=environment,
+            name_override=name_override or None,
+            user_level_override=user_level_override,
+            lifecycle_override=_lifecycle_from_args(args),
         )
         _render_payload(_manifest_payload(manifest), as_json=args.json)
         return
@@ -343,6 +446,15 @@ def main() -> None:
         manifest = manager.create_deployment_instance(
             args.instance_id,
             target=_resolve_deploy_target(args),
+            config_path=args.config,
+            start=not args.no_start,
+        )
+        _render_payload(_manifest_payload(manifest), as_json=args.json)
+        return
+
+    if args.command == "inference":
+        manifest = manager.create_inference_instance(
+            args.instance_id,
             config_path=args.config,
             start=not args.no_start,
         )

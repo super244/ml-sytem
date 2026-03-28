@@ -6,6 +6,10 @@ instance:
 orchestration_mode: single
 experience:
   level: dev
+lifecycle:
+  stage: publish
+  deployment_targets:
+    - ollama
 execution:
   backend: local
 subsystem:

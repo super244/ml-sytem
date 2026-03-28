@@ -8,6 +8,7 @@ from inference.app.schemas import (
     InstanceDeployRequest,
     InstanceDetail,
     InstanceEvaluateRequest,
+    InstanceInferenceRequest,
     InstanceListResponse,
     InstanceLogsResponse,
     InstanceMetricsResponse,
@@ -55,6 +56,14 @@ def get_instance_metrics(instance_id: str) -> InstanceMetricsResponse:
 @router.post("/instances/{instance_id}/evaluate", response_model=InstanceDetail)
 def evaluate_instance(instance_id: str, request: InstanceEvaluateRequest | None = None) -> InstanceDetail:
     return get_instance_service().evaluate_instance(instance_id, request)
+
+
+@router.post("/instances/{instance_id}/inference", response_model=InstanceDetail)
+def start_inference_instance(
+    instance_id: str,
+    request: InstanceInferenceRequest | None = None,
+) -> InstanceDetail:
+    return get_instance_service().start_inference_instance(instance_id, request)
 
 
 @router.post("/instances/{instance_id}/deploy", response_model=InstanceDetail)

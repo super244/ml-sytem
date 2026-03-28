@@ -11,6 +11,17 @@ def decide_next_step(summary: dict, policy: DecisionPolicy) -> DecisionResult:
     no_answer = float(summary.get("no_answer_rate") or 1.0)
     latency = summary.get("avg_latency_s")
     latency_value = float(latency) if isinstance(latency, (int, float)) else None
+    required_metrics = {
+        "accuracy": summary.get("accuracy"),
+        "parse_rate": summary.get("parse_rate"),
+        "verifier_agreement_rate": summary.get("verifier_agreement_rate"),
+        "no_answer_rate": summary.get("no_answer_rate"),
+    }
+    missing_metrics = [
+        key
+        for key, value in required_metrics.items()
+        if not isinstance(value, (int, float))
+    ]
     thresholds = {
         "min_accuracy": policy.min_accuracy,
         "min_parse_rate": policy.min_parse_rate,
@@ -19,13 +30,35 @@ def decide_next_step(summary: dict, policy: DecisionPolicy) -> DecisionResult:
         "max_latency_s": policy.max_latency_s,
         "finetune_accuracy_floor": policy.finetune_accuracy_floor,
     }
+    if missing_metrics:
+        return DecisionResult(
+            action="re_evaluate",
+            rule="missing_evaluation_signals",
+            thresholds=thresholds,
+            summary=summary,
+            explanation=(
+                "The evaluation summary is missing the primary signals needed for a stable decision: "
+                + ", ".join(missing_metrics)
+                + "."
+            ),
+        )
     if (
         accuracy >= policy.min_accuracy
         and parse_rate >= policy.min_parse_rate
         and verifier >= policy.min_verifier_agreement
         and no_answer <= policy.max_no_answer_rate
-        and (latency_value is None or latency_value <= policy.max_latency_s)
     ):
+        if latency_value is None or latency_value > policy.max_latency_s:
+            return DecisionResult(
+                action="open_inference",
+                rule="needs_interactive_validation",
+                thresholds=thresholds,
+                summary=summary,
+                explanation=(
+                    "Quality metrics are strong, but the serving/latency picture is incomplete or above target. "
+                    "Open an inference sandbox before publishing."
+                ),
+            )
         return DecisionResult(
             action="deploy",
             rule="meets_deploy_thresholds",
@@ -58,6 +91,7 @@ def build_feedback_recommendations(
     default_train_config: str,
     default_finetune_config: str,
     default_eval_config: str,
+    default_inference_config: str,
     default_deploy_config: str,
     default_report_config: str,
     improvement_floor: float,
@@ -86,6 +120,30 @@ def build_feedback_recommendations(
                 metadata={"source": "decision", "rule": decision.rule},
             )
         )
+        recommendations.append(
+            FeedbackRecommendation(
+                action="open_inference",
+                reason="Open an inference sandbox for a final interactive quality pass before publishing broadly.",
+                priority=2,
+                target_instance_type="inference",
+                config_path=default_inference_config,
+                metadata={"source": "decision", "rule": decision.rule},
+            )
+        )
+    elif decision.action == "open_inference":
+        recommendations.append(
+            FeedbackRecommendation(
+                action="open_inference",
+                reason=(
+                    "The model looks promising enough to inspect interactively. Launch an inference sandbox to check "
+                    "prompt quality, latency, and edge-case behavior."
+                ),
+                priority=1,
+                target_instance_type="inference",
+                config_path=default_inference_config,
+                metadata={"source": "decision", "rule": decision.rule},
+            )
+        )
     elif decision.action == "finetune":
         accuracy_gap = max(policy.min_accuracy - accuracy, 0.0)
         parse_gap = max(policy.min_parse_rate - parse_rate, 0.0)
@@ -104,6 +162,20 @@ def build_feedback_recommendations(
                     "rule": decision.rule,
                     "improvement_floor": improvement_floor,
                 },
+            )
+        )
+    elif decision.action == "re_evaluate":
+        recommendations.append(
+            FeedbackRecommendation(
+                action="re_evaluate",
+                reason=(
+                    "The evaluation summary is incomplete. Re-run the benchmark suite so the next decision is based "
+                    "on a full quality and latency picture."
+                ),
+                priority=1,
+                target_instance_type="evaluate",
+                config_path=default_eval_config,
+                metadata={"source": "decision", "rule": decision.rule},
             )
         )
     else:

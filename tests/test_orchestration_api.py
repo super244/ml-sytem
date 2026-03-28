@@ -77,3 +77,99 @@ async def test_orchestration_routes_expose_runs_tasks_and_summary(tmp_path: Path
     assert len(tasks_response.json()["tasks"]) == 1
     assert summary_response.status_code == 200
     assert summary_response.json()["summary"]["runs"] == 1
+
+
+@pytest.mark.anyio
+async def test_instance_routes_support_control_center_creation_and_inference(tmp_path: Path, monkeypatch):
+    from inference.app.routers import instances as instances_router
+
+    _write(
+        tmp_path / "training" / "configs" / "profiles" / "baseline_qlora.yaml",
+        "run_name: baseline\ntraining:\n  artifacts_dir: artifacts\n",
+    )
+    _write(
+        tmp_path / "configs" / "finetune.yaml",
+        (
+            "instance:\n"
+            "  type: finetune\n"
+            "  environment: local\n"
+            "subsystem:\n"
+            "  config_ref: ../training/configs/profiles/baseline_qlora.yaml\n"
+        ),
+    )
+    _write(
+        tmp_path / "configs" / "inference.yaml",
+        (
+            "instance:\n"
+            "  type: inference\n"
+            "  environment: local\n"
+            "execution:\n"
+            "  env:\n"
+            f"    MODEL_REGISTRY_PATH: {tmp_path / 'inference' / 'configs' / 'model_registry.yaml'}\n"
+            "subsystem:\n"
+            "  model_variant: finetuned\n"
+        ),
+    )
+    _write(
+        tmp_path / "inference" / "configs" / "model_registry.yaml",
+        "models:\n  - name: base\n    base_model: Qwen/Qwen2.5-Math-1.5B-Instruct\n",
+    )
+
+    settings = AppSettings(
+        title="test",
+        version="0.0.0",
+        cors_origins=["*"],
+        model_registry_path=str(tmp_path / "inference" / "configs" / "model_registry.yaml"),
+        prompt_library_path=str(tmp_path / "inference" / "configs" / "prompt_presets.yaml"),
+        benchmark_registry_path=str(tmp_path / "evaluation" / "benchmarks" / "registry.yaml"),
+        artifacts_dir=str(tmp_path / "artifacts"),
+        cache_dir=str(tmp_path / "artifacts" / "cache"),
+        telemetry_path=str(tmp_path / "artifacts" / "telemetry.jsonl"),
+        cache_enabled=False,
+        telemetry_enabled=False,
+    )
+    service = InstanceService(settings)
+    monkeypatch.setattr(instances_router, "get_instance_service", lambda: service)
+
+    transport = httpx.ASGITransport(app=app)
+    async with httpx.AsyncClient(transport=transport, base_url="http://testserver") as client:
+        create_response = await client.post(
+            "/v1/instances",
+            json={
+                "config_path": str(tmp_path / "configs" / "finetune.yaml"),
+                "start": False,
+                "name": "scratch-branch",
+                "user_level": "dev",
+                "lifecycle": {
+                    "origin": "from_scratch",
+                    "learning_mode": "supervised",
+                    "architecture": {
+                        "family": "transformer",
+                        "hidden_size": 768,
+                        "num_layers": 12,
+                    },
+                    "deployment_targets": ["ollama"],
+                },
+            },
+        )
+
+        assert create_response.status_code == 200
+        created = create_response.json()
+        assert created["name"] == "scratch-branch"
+        assert created["lifecycle"]["origin"] == "from_scratch"
+        assert created["lifecycle"]["architecture"]["family"] == "transformer"
+
+        source_manifest = service.store.load(created["id"])
+        source_manifest.artifact_refs["published"] = {"final_adapter": "artifacts/models/demo"}
+        service.store.save(source_manifest)
+
+        inference_response = await client.post(
+            f"/v1/instances/{created['id']}/inference",
+            json={"config_path": str(tmp_path / "configs" / "inference.yaml"), "start": False},
+        )
+
+    assert inference_response.status_code == 200
+    child = inference_response.json()
+    assert child["type"] == "inference"
+    assert child["parent_instance_id"] == created["id"]
+    assert child["lifecycle"]["stage"] == "infer"

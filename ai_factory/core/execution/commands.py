@@ -151,7 +151,7 @@ def _build_deploy_command(config: OrchestrationConfig, manifest: InstanceManifes
     override = _command_override(config)
     if override is not None:
         return override
-    if provider in {"api", "custom_api"}:
+    if provider in {"api", "custom_api", "openai_compatible_api"}:
         endpoint = options.get("endpoint")
         method = str(options.get("method", "POST")).upper()
         if not endpoint or not source_artifact:

@@ -6,6 +6,18 @@ instance:
 orchestration_mode: local_parallel
 experience:
   level: hobbyist
+lifecycle:
+  stage: evaluate
+  evaluation_suite:
+    id: base_vs_finetuned
+    label: Baseline Vs Finetuned
+    benchmark_config: evaluation/configs/base_vs_finetuned.yaml
+    compare_to_models:
+      - base
+  deployment_targets:
+    - huggingface
+    - ollama
+    - lmstudio
 execution:
   backend: local
 subsystem:

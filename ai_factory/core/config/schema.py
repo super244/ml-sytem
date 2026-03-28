@@ -7,6 +7,7 @@ from pydantic import BaseModel, Field, model_validator
 from ai_factory.core.instances.models import (
     EnvironmentSpec,
     InstanceType,
+    LifecycleProfile,
     OrchestrationMode,
     PortForward,
     UserLevel,
@@ -114,7 +115,7 @@ class SubAgentConfig(BaseModel):
 
 
 class PublishHookConfig(BaseModel):
-    target: Literal["huggingface", "ollama", "lmstudio", "api", "custom_api"]
+    target: Literal["huggingface", "ollama", "lmstudio", "api", "custom_api", "openai_compatible_api"]
     enabled: bool = True
     when: Literal["manual", "on_success", "after_evaluation"] = "manual"
     config_path: str | None = None
@@ -164,6 +165,7 @@ class PipelineConfig(BaseModel):
     default_eval_config: str = "configs/eval.yaml"
     default_deploy_config: str = "configs/deploy.yaml"
     default_finetune_config: str = "configs/finetune.yaml"
+    default_inference_config: str = "configs/inference.yaml"
     default_report_config: str = "configs/report.yaml"
 
 
@@ -174,7 +176,7 @@ class SubsystemConfig(BaseModel):
     model_variant: str | None = None
     serve_host: str = "127.0.0.1"
     serve_port: int = 8000
-    provider: Literal["huggingface", "ollama", "lmstudio", "custom_api"] | None = None
+    provider: Literal["huggingface", "ollama", "lmstudio", "api", "custom_api", "openai_compatible_api"] | None = None
     provider_options: dict[str, Any] = Field(default_factory=dict)
     source_instance_id: str | None = None
     source_artifact_ref: str | None = None
@@ -188,6 +190,7 @@ class OrchestrationConfig(BaseModel):
     instance: InstanceConfig
     orchestration_mode: OrchestrationMode = "single"
     experience: UserExperienceConfig = Field(default_factory=UserExperienceConfig)
+    lifecycle: LifecycleProfile = Field(default_factory=LifecycleProfile)
     execution: ExecutionConfig = Field(default_factory=ExecutionConfig)
     subsystem: SubsystemConfig
     monitoring: MonitoringConfig = Field(default_factory=MonitoringConfig)

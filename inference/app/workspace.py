@@ -222,6 +222,13 @@ def build_workspace_overview(root: Path | None = None) -> dict[str, Any]:
             "ai-factory new --config configs/finetune.yaml --environment cloud --cloud-profile default",
             "control-plane",
         ),
+        _command_recipe(
+            "managed-inference",
+            "Managed inference sandbox",
+            "Launch a child inference instance from an evaluated or finetuned branch.",
+            "ai-factory inference <instance-id> --config configs/inference.yaml",
+            "control-plane",
+        ),
     ]
 
     orchestration_capabilities = [
@@ -244,6 +251,11 @@ def build_workspace_overview(root: Path | None = None) -> dict[str, Any]:
             "id": "publish-hooks",
             "title": "Publish hooks",
             "detail": "Deployment hooks can target HuggingFace, Ollama, LM Studio, or custom APIs through the shared deployment pipeline.",
+        },
+        {
+            "id": "control-center",
+            "title": "Lifecycle control center",
+            "detail": "The runs dashboard now acts as a control center: launch new branches, inspect lifecycle detail, open inference sandboxes, and prepare publish actions from the same surface.",
         },
     ]
 

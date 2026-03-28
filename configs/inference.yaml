@@ -3,6 +3,10 @@ instance:
   name: atlas-local-inference
   environment:
     kind: local
+lifecycle:
+  stage: infer
+  deployment_targets:
+    - openai_compatible_api
 execution:
   backend: local
   env:
