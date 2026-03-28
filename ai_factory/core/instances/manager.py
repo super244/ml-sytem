@@ -40,6 +40,8 @@ from ai_factory.core.monitoring.events import InstanceEvent
 from ai_factory.core.orchestration.service import OrchestrationService
 from ai_factory.core.orchestration.sqlite import SqliteControlPlane
 from ai_factory.core.platform.settings import PlatformSettings, get_platform_settings
+from ai_factory.core.plugins.registry import PluginRegistry, build_default_plugin_registry
+from ai_factory.core.state import LifecycleStateManager
 
 
 class _SafeTemplateDict(dict[str, Any]):
@@ -85,14 +87,17 @@ class InstanceManager:
         *,
         orchestration: OrchestrationService | None = None,
         platform_settings: PlatformSettings | None = None,
+        plugin_registry: PluginRegistry | None = None,
     ):
         self.store = store
         self.queries = InstanceQueryService(store)
         self.platform_settings = platform_settings or get_platform_settings(artifacts_dir=store.artifacts_dir)
+        self.plugin_registry = plugin_registry or build_default_plugin_registry(self.platform_settings.plugin_modules)
         self.orchestration = orchestration or OrchestrationService(
             control_plane=SqliteControlPlane(self.platform_settings.control_db_path),
             settings=self.platform_settings,
         )
+        self.state = LifecycleStateManager(self.store, self.orchestration)
 
     def _make_instance_id(self, instance_type: str) -> str:
         return (
@@ -119,7 +124,7 @@ class InstanceManager:
         write_json(self.store.config_snapshot_path(instance_id), snapshot)
 
     def _project_manifest(self, manifest: InstanceManifest) -> InstanceManifest:
-        return self.orchestration.project_manifest(manifest)
+        return self.state.project_manifest(manifest)
 
     def _checkpoint_hint_from_refs(self, refs: dict[str, Any]) -> str | None:
         run_dir = refs.get("run_dir")
@@ -407,7 +412,7 @@ class InstanceManager:
         self.orchestration.ensure_run_for_instance(manifest, snapshot)
         self.orchestration.recover_stalled_tasks()
         try:
-            command = build_command(config, manifest)
+            command = build_command(config, manifest, plugin_registry=self.plugin_registry)
             command = self._resume_command_if_available(manifest, config, command)
         except UnsupportedInstanceTypeError as exc:
             return self.mark_failed(
@@ -1005,6 +1010,10 @@ class InstanceManager:
         )
         snapshot = self._build_eval_snapshot(manifest, source)
         self._persist_snapshot(manifest.id, snapshot)
+        if _source_artifact_ref(source):
+            manifest.artifact_refs["source_artifact"] = _source_artifact_ref(source)
+            manifest.artifact_refs["source_instance_id"] = source.id
+            self.store.save(manifest)
         eval_payload = snapshot.get("resolved_subsystem_config") or {}
         models_payload = eval_payload.get("models") if isinstance(eval_payload.get("models"), dict) else {}
         self._write_lifecycle(
@@ -1050,6 +1059,10 @@ class InstanceManager:
         snapshot.setdefault("metadata", {})
         snapshot["metadata"]["source_instance_id"] = source.id
         self._persist_snapshot(manifest.id, snapshot)
+        if _source_artifact_ref(source):
+            manifest.artifact_refs["source_artifact"] = _source_artifact_ref(source)
+            manifest.artifact_refs["source_instance_id"] = source.id
+            self.store.save(manifest)
         lifecycle = self._inherit_lifecycle(source, stage="publish")
         if target not in lifecycle.deployment_targets:
             lifecycle.deployment_targets = [*lifecycle.deployment_targets, target]
@@ -1074,8 +1087,98 @@ class InstanceManager:
         )
         snapshot = self._build_inference_snapshot(manifest, source)
         self._persist_snapshot(manifest.id, snapshot)
+        if _source_artifact_ref(source):
+            manifest.artifact_refs["source_artifact"] = _source_artifact_ref(source)
+            manifest.artifact_refs["source_instance_id"] = source.id
+            self.store.save(manifest)
         self._write_lifecycle(manifest.id, self._inherit_lifecycle(source, stage="infer"))
         return self.start_instance(manifest.id) if start else manifest
+
+    def _default_config_path_for_action(self, source: InstanceManifest, action: str, config) -> str | None:
+        mapping = {
+            "prepare": config.pipeline.default_prepare_config,
+            "train": config.pipeline.default_train_config,
+            "retrain": config.pipeline.default_train_config,
+            "evaluate": config.pipeline.default_eval_config,
+            "re_evaluate": config.pipeline.default_eval_config,
+            "finetune": config.pipeline.default_finetune_config,
+            "open_inference": config.pipeline.default_inference_config,
+            "deploy": config.pipeline.default_deploy_config,
+            "report": config.pipeline.default_report_config,
+        }
+        template = mapping.get(action)
+        if template is None:
+            return None
+        return resolve_path_from_config(source.config_path, template) or template
+
+    def _default_deployment_target(self, manifest: InstanceManifest, config) -> str:
+        for recommendation in manifest.recommendations:
+            if recommendation.action == "deploy" and recommendation.deployment_target:
+                return recommendation.deployment_target
+        if manifest.lifecycle.deployment_targets:
+            return manifest.lifecycle.deployment_targets[0]
+        for hook in config.publish_hooks:
+            target = getattr(hook, "target", None)
+            if target:
+                return str(target)
+        return "ollama"
+
+    def execute_action(
+        self,
+        instance_id: str,
+        *,
+        action: str,
+        config_path: str | None = None,
+        deployment_target: str | None = None,
+        start: bool = True,
+    ) -> InstanceManifest:
+        source = self.get_instance(instance_id)
+        snapshot = self.store.load_config_snapshot(source.id)
+        config = build_orchestration_config(snapshot, config_path=source.config_path)
+        context = self._child_context(
+            source,
+            summary=source.metrics_summary,
+            refs=source.artifact_refs,
+            decision=source.decision,
+        )
+        metadata = self._child_metadata(source, reason=f"manual_action:{action}")
+
+        if action in {"evaluate", "re_evaluate"}:
+            child = self.create_evaluation_instance(
+                source.id,
+                config_path=config_path or self._default_config_path_for_action(source, action, config) or "configs/eval.yaml",
+                start=False,
+                metadata_updates=metadata,
+            )
+        elif action == "open_inference":
+            child = self.create_inference_instance(
+                source.id,
+                config_path=config_path or self._default_config_path_for_action(source, action, config) or "configs/inference.yaml",
+                start=False,
+                metadata_updates=metadata,
+            )
+        elif action == "deploy":
+            child = self.create_deployment_instance(
+                source.id,
+                target=deployment_target or self._default_deployment_target(source, config),
+                config_path=config_path or self._default_config_path_for_action(source, action, config) or "configs/deploy.yaml",
+                start=False,
+                metadata_updates=metadata,
+            )
+        else:
+            resolved_config_path = config_path or self._default_config_path_for_action(source, action, config)
+            if resolved_config_path is None:
+                raise ValueError(f"Unsupported action: {action}")
+            child = self.create_instance(
+                resolved_config_path,
+                start=False,
+                environment_override=source.environment,
+                parent_instance_id=source.id,
+                metadata_updates=metadata,
+            )
+
+        self._apply_snapshot_overrides(child.id, context=context)
+        return self.start_instance(child.id) if start else self.get_instance(child.id)
 
     def get_instance(self, instance_id: str) -> InstanceManifest:
         return self._project_manifest(self.store.load(instance_id))
@@ -1103,10 +1206,7 @@ class InstanceManager:
         return self.store.read_logs(instance_id)
 
     def get_metrics(self, instance_id: str) -> dict[str, Any]:
-        return {
-            "summary": self.store.read_current_metrics(instance_id),
-            "points": self.store.read_metric_points(instance_id),
-        }
+        return self.state.get_metrics(instance_id)
 
     def get_available_actions(self, instance_id: str) -> list[dict[str, Any]]:
         manifest = self.get_instance(instance_id)
@@ -1115,6 +1215,7 @@ class InstanceManager:
         snapshot = self.store.load_config_snapshot(instance_id)
         config = build_orchestration_config(snapshot, config_path=manifest.config_path)
         actions: list[dict[str, Any]] = []
+        seen: set[tuple[str, str | None, str | None, str | None]] = set()
 
         def add_action(
             action: str,
@@ -1125,6 +1226,10 @@ class InstanceManager:
             config_path: str | None = None,
             deployment_target: str | None = None,
         ) -> None:
+            key = (action, target_instance_type, config_path, deployment_target)
+            if key in seen:
+                return
+            seen.add(key)
             actions.append(
                 {
                     "action": action,
@@ -1148,8 +1253,16 @@ class InstanceManager:
                 target_instance_type="evaluate",
                 config_path=eval_config_path,
             )
+            if _source_artifact_ref(manifest):
+                add_action(
+                    "open_inference",
+                    "Start Inference",
+                    "Launch an inference sandbox backed by this trained artifact.",
+                    target_instance_type="inference",
+                    config_path=inference_config_path,
+                )
 
-        if manifest.type in {"finetune", "evaluate"}:
+        if manifest.type in {"train", "finetune", "evaluate"} and _source_artifact_ref(manifest):
             add_action(
                 "open_inference",
                 "Start Inference",
@@ -1194,6 +1307,39 @@ class InstanceManager:
                     target_instance_type="evaluate",
                     config_path=eval_config_path,
                 )
+            for recommendation in manifest.recommendations:
+                if recommendation.action == "deploy" and recommendation.deployment_target:
+                    add_action(
+                        "deploy",
+                        f"Prepare Publish: {recommendation.deployment_target.replace('_', ' ').title()}",
+                        recommendation.reason,
+                        target_instance_type="deploy",
+                        config_path=recommendation.config_path or deploy_config_path,
+                        deployment_target=recommendation.deployment_target,
+                    )
+                elif recommendation.action == "open_inference":
+                    add_action(
+                        "open_inference",
+                        "Start Inference",
+                        recommendation.reason,
+                        target_instance_type="inference",
+                        config_path=recommendation.config_path or inference_config_path,
+                    )
+                elif recommendation.action in {"finetune", "retrain", "report", "evaluate", "re_evaluate"}:
+                    label_map = {
+                        "finetune": "Start Finetune Iteration",
+                        "retrain": "Start Retraining Branch",
+                        "report": "Analyze Failures",
+                        "evaluate": "Evaluate",
+                        "re_evaluate": "Re-run Evaluation",
+                    }
+                    add_action(
+                        recommendation.action,
+                        label_map[recommendation.action],
+                        recommendation.reason,
+                        target_instance_type=recommendation.target_instance_type,
+                        config_path=recommendation.config_path,
+                    )
 
         return actions
 

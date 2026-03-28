@@ -17,6 +17,7 @@ class PlatformSettings:
     telemetry_sink: str
     local_execution_backend: str
     cloud_execution_backend: str
+    plugin_modules: tuple[str, ...]
 
 
 def _int_env(name: str, default: int) -> int:
@@ -27,6 +28,11 @@ def _int_env(name: str, default: int) -> int:
         return int(raw)
     except ValueError:
         return default
+
+
+def _split_env(name: str) -> tuple[str, ...]:
+    raw = os.getenv(name, "")
+    return tuple(part.strip() for part in raw.split(",") if part.strip())
 
 
 def get_platform_settings(
@@ -61,4 +67,5 @@ def get_platform_settings(
         telemetry_sink=telemetry_sink,
         local_execution_backend=os.getenv("AI_FACTORY_LOCAL_EXECUTION_BACKEND", "local"),
         cloud_execution_backend=os.getenv("AI_FACTORY_CLOUD_EXECUTION_BACKEND", "ssh"),
+        plugin_modules=_split_env("AI_FACTORY_PLUGIN_MODULES"),
     )

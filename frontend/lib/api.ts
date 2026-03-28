@@ -364,6 +364,36 @@ export type WorkspaceOrchestrationTemplate = {
   command: string;
 };
 
+export type WorkspaceInterfaceSurface = {
+  id: string;
+  label: string;
+  entrypoint: string;
+  backend_contract: string;
+  description: string;
+  status: string;
+};
+
+export type WorkspaceExperienceTier = {
+  id: string;
+  label: string;
+  description: string;
+  visible_controls: string[];
+  recommended_modes: string[];
+  safe_defaults: string[];
+};
+
+export type WorkspaceExtensionPoint = {
+  id: string;
+  kind: string;
+  label: string;
+  description: string;
+  supported_instance_types: string[];
+  source: string;
+  maturity: string;
+  config_hint?: string | null;
+  future_ready?: boolean;
+};
+
 export type WorkspaceOverview = {
   repo_root: string;
   summary: {
@@ -375,11 +405,17 @@ export type WorkspaceOverview = {
     training_profiles: number;
     evaluation_configs: number;
     orchestration_templates: number;
+    interfaces?: number;
+    experience_tiers?: number;
+    extension_points?: number;
     ready_checks: number;
     total_checks: number;
   };
   models: ModelInfo[];
   readiness_checks: WorkspaceCheck[];
+  interfaces?: WorkspaceInterfaceSurface[];
+  experience_tiers?: WorkspaceExperienceTier[];
+  extension_points?: WorkspaceExtensionPoint[];
   command_recipes: WorkspaceRecipe[];
   orchestration_capabilities: WorkspaceCapability[];
   orchestration_templates: WorkspaceOrchestrationTemplate[];
@@ -457,7 +493,10 @@ export type InstanceSummary = {
 export type OrchestrationSummary = {
   runs?: number;
   tasks?: number;
+  active_runs?: number;
+  run_status_counts?: Record<string, number>;
   task_status_counts?: Record<string, number>;
+  task_type_counts?: Record<string, number>;
   open_circuits?: string[];
 };
 
@@ -575,6 +614,19 @@ export async function createManagedInstance(
   payload: CreateManagedInstanceRequest,
 ): Promise<InstanceDetail> {
   return fetchJson<InstanceDetail>("/v1/instances", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(payload),
+  });
+}
+
+export async function runManagedInstanceAction(
+  instanceId: string,
+  payload: { action: string; config_path?: string | null; deployment_target?: DeploymentTarget | null; start?: boolean },
+): Promise<InstanceDetail> {
+  return fetchJson<InstanceDetail>(`/v1/instances/${instanceId}/actions`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",

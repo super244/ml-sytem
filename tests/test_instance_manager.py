@@ -22,12 +22,17 @@ MANAGER_MODULES = [
     "ai_factory.core.execution.commands",
     "ai_factory.core.execution.local",
     "ai_factory.core.execution.ssh",
+    "ai_factory.core.plugins",
+    "ai_factory.core.plugins.base",
+    "ai_factory.core.plugins.builtins",
+    "ai_factory.core.plugins.registry",
     "ai_factory.core.monitoring",
     "ai_factory.core.monitoring.events",
     "ai_factory.core.monitoring.metrics",
     "ai_factory.core.monitoring.collectors",
     "ai_factory.core.decisions",
     "ai_factory.core.decisions.rules",
+    "ai_factory.core.state",
 ]
 
 
@@ -46,6 +51,7 @@ def _prime_manager_packages(monkeypatch: pytest.MonkeyPatch) -> None:
         ("ai_factory.core.instances", "instances"),
         ("ai_factory.core.config", "config"),
         ("ai_factory.core.execution", "execution"),
+        ("ai_factory.core.plugins", "plugins"),
         ("ai_factory.core.monitoring", "monitoring"),
         ("ai_factory.core.decisions", "decisions"),
     ):
@@ -321,6 +327,113 @@ def test_manager_applies_lifecycle_overrides_to_created_instances(
     assert snapshot["lifecycle"]["origin"] == "from_scratch"
     assert snapshot["experience"]["level"] == "dev"
     assert snapshot["subsystem"]["labels"] == ["control_center"]
+
+
+def test_manager_projects_live_training_state_from_artifacts(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
+    _prime_manager_packages(monkeypatch)
+    store_mod = importlib.import_module("ai_factory.core.instances.store")
+    manager_mod = importlib.import_module("ai_factory.core.instances.manager")
+
+    profile_dir = tmp_path / "training" / "configs" / "profiles"
+    profile_dir.mkdir(parents=True)
+    artifacts_dir = tmp_path / "artifacts"
+    (profile_dir / "baseline_qlora.yaml").write_text(
+        f"run_name: live-run\ntraining:\n  artifacts_dir: {artifacts_dir}\n  max_steps: 10\n"
+    )
+    config_path = tmp_path / "configs" / "train.yaml"
+    config_path.parent.mkdir(parents=True, exist_ok=True)
+    config_path.write_text(
+        "\n".join(
+            [
+                "instance:",
+                "  type: train",
+                "  environment: local",
+                "subsystem:",
+                "  config_ref: ../training/configs/profiles/baseline_qlora.yaml",
+            ]
+        )
+    )
+
+    run_dir = artifacts_dir / "runs" / "live-run"
+    (run_dir / "manifests").mkdir(parents=True, exist_ok=True)
+    (run_dir / "logs").mkdir(parents=True, exist_ok=True)
+    (run_dir / "metrics").mkdir(parents=True, exist_ok=True)
+    (run_dir / "manifests" / "run_manifest.json").write_text(
+        '{"run_id":"train-20260328-000000","run_name":"live-run","base_model":"Qwen/Qwen2.5-Math-1.5B-Instruct"}'
+    )
+    (run_dir / "logs" / "training_metrics.jsonl").write_text(
+        '{"step": 2, "loss": 1.1, "lr": 0.0005}\n{"step": 3, "loss": 0.9, "lr": 0.0004}\n'
+    )
+    (run_dir / "metrics" / "metrics.json").write_text('{"train_loss": 0.9, "eval_loss": 0.6}')
+    (run_dir / "metrics" / "dataset_report.json").write_text('{"tokenized_train_rows": 24, "tokenized_eval_rows": 6}')
+    (run_dir / "metrics" / "model_report.json").write_text('{"trainable_ratio": 0.12}')
+
+    store = store_mod.FileInstanceStore(tmp_path)
+    manager = manager_mod.InstanceManager(store)
+    manifest = manager.create_instance(str(config_path), start=False)
+    manifest.status = "running"
+    store.save(manifest)
+
+    projected = manager.get_instance(manifest.id)
+    metrics = manager.get_metrics(manifest.id)
+
+    assert projected.progress is not None
+    assert projected.progress.stage == "training"
+    assert projected.progress.completed_steps == 3
+    assert projected.metrics_summary["latest_step"] == 3
+    assert metrics["summary"]["train_loss"] == 0.9
+    assert metrics["points"][0]["name"] == "loss"
+
+
+def test_manager_exposes_recommendation_backed_actions(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
+    _prime_manager_packages(monkeypatch)
+    models = importlib.import_module("ai_factory.core.instances.models")
+    store_mod = importlib.import_module("ai_factory.core.instances.store")
+    manager_mod = importlib.import_module("ai_factory.core.instances.manager")
+
+    store = store_mod.FileInstanceStore(tmp_path)
+    manager = manager_mod.InstanceManager(store)
+    manifest = models.InstanceManifest(
+        id="evaluate-001",
+        type="evaluate",
+        name="eval",
+        status="completed",
+        environment=models.EnvironmentSpec(kind="local"),
+        artifact_refs={"source_artifact": "artifacts/models/demo"},
+        recommendations=[
+            models.FeedbackRecommendation(
+                action="finetune",
+                reason="Try another adapter pass.",
+                target_instance_type="finetune",
+                config_path="configs/finetune.yaml",
+            ),
+            models.FeedbackRecommendation(
+                action="report",
+                reason="Inspect failure slices before the next iteration.",
+                target_instance_type="report",
+                config_path="configs/report.yaml",
+            ),
+        ],
+    )
+    store.create(
+        manifest,
+        {
+            "instance": {"type": "evaluate", "environment": {"kind": "local"}},
+            "subsystem": {"config_ref": "evaluation/configs/base_vs_finetuned.yaml"},
+            "pipeline": {
+                "default_eval_config": "configs/eval.yaml",
+                "default_inference_config": "configs/inference.yaml",
+                "default_deploy_config": "configs/deploy.yaml",
+            },
+        },
+    )
+
+    actions = manager.get_available_actions(manifest.id)
+    action_ids = {(item["action"], item.get("target_instance_type")) for item in actions}
+
+    assert ("open_inference", "inference") in action_ids
+    assert ("finetune", "finetune") in action_ids
+    assert ("report", "report") in action_ids
 
 
 def test_manager_can_create_inference_children(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):

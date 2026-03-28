@@ -57,6 +57,11 @@ def test_cli_parse_args_supports_tui_command(monkeypatch):
     assert args.command == "tui"
     assert args.refresh_seconds == 1.5
 
+    monkeypatch.setattr("sys.argv", ["ai-factory", "workspace", "--root", "/tmp/project"])
+    args = ai_factory_cli.parse_args()
+    assert args.command == "workspace"
+    assert args.root == "/tmp/project"
+
 
 def test_cli_parse_args_supports_control_center_new_and_inference(monkeypatch):
     monkeypatch.setattr(
@@ -97,3 +102,13 @@ def test_cli_parse_args_supports_control_center_new_and_inference(monkeypatch):
     args = ai_factory_cli.parse_args()
     assert args.command == "inference"
     assert args.instance_id == "instance-001"
+
+    monkeypatch.setattr(
+        "sys.argv",
+        ["ai-factory", "action", "instance-001", "finetune", "--config", "configs/finetune.yaml", "--no-start"],
+    )
+    args = ai_factory_cli.parse_args()
+    assert args.command == "action"
+    assert args.instance_id == "instance-001"
+    assert args.action == "finetune"
+    assert args.no_start is True

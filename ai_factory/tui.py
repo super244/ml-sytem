@@ -85,10 +85,10 @@ def _tail_lines(text: str, *, max_lines: int) -> list[str]:
 
 class TuiController:
     def __init__(self, *, repo_root: str | None, artifacts_dir: str | None, refresh_seconds: float):
-        self.manager = build_platform_container(
+        self.control = build_platform_container(
             repo_root=repo_root,
             artifacts_dir=artifacts_dir,
-        ).manager
+        ).control_service
         self.refresh_seconds = max(refresh_seconds, 0.5)
         self.selected_index = 0
         self.selected_stream = "stdout"
@@ -103,19 +103,20 @@ class TuiController:
 
     def refresh(self) -> None:
         try:
-            instances = self.manager.list_instances()
+            instances = self.control.list_instances()
             if instances:
                 self.selected_index = max(0, min(self.selected_index, len(instances) - 1))
                 selected = instances[self.selected_index]
-                logs = self.manager.get_logs(selected.id)
-                metrics = self.manager.get_metrics(selected.id)
+                live = self.control.get_live_instance_snapshot(selected.id)
+                logs = live.logs.model_dump(mode="json")
+                metrics = live.metrics.model_dump(mode="json")
             else:
                 self.selected_index = 0
                 logs = {"stdout": "", "stderr": ""}
                 metrics = {"summary": {}, "points": []}
             self.snapshot = DashboardSnapshot(
                 instances=instances,
-                summary=self.manager.monitoring_summary(),
+                summary=self.control.monitoring_summary(),
                 logs=logs,
                 metrics=metrics,
                 selected_stream=self.selected_stream,

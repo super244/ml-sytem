@@ -173,3 +173,122 @@ async def test_instance_routes_support_control_center_creation_and_inference(tmp
     assert child["type"] == "inference"
     assert child["parent_instance_id"] == created["id"]
     assert child["lifecycle"]["stage"] == "infer"
+
+
+@pytest.mark.anyio
+async def test_instance_live_stream_and_foundation_routes(tmp_path: Path, monkeypatch):
+    from inference.app.routers import instances as instances_router
+
+    _write(
+        tmp_path / "training" / "configs" / "profiles" / "baseline_qlora.yaml",
+        "run_name: baseline\ntraining:\n  artifacts_dir: artifacts\n",
+    )
+    _write(
+        tmp_path / "configs" / "finetune.yaml",
+        (
+            "instance:\n"
+            "  type: finetune\n"
+            "  environment: local\n"
+            "subsystem:\n"
+            "  config_ref: ../training/configs/profiles/baseline_qlora.yaml\n"
+        ),
+    )
+    settings = AppSettings(
+        title="test",
+        version="0.0.0",
+        cors_origins=["*"],
+        model_registry_path=str(tmp_path / "inference" / "configs" / "model_registry.yaml"),
+        prompt_library_path=str(tmp_path / "inference" / "configs" / "prompt_presets.yaml"),
+        benchmark_registry_path=str(tmp_path / "evaluation" / "benchmarks" / "registry.yaml"),
+        artifacts_dir=str(tmp_path / "artifacts"),
+        cache_dir=str(tmp_path / "artifacts" / "cache"),
+        telemetry_path=str(tmp_path / "artifacts" / "telemetry.jsonl"),
+        cache_enabled=False,
+        telemetry_enabled=False,
+    )
+    service = InstanceService(settings)
+    monkeypatch.setattr(instances_router, "get_instance_service", lambda: service)
+
+    created = service.create_instance(
+        instances_router.InstanceCreateRequest(
+            config_path=str(tmp_path / "configs" / "finetune.yaml"),
+            start=False,
+        )
+    )
+    manifest = service.store.load(created.id)
+    manifest.status = "completed"
+    service.store.save(manifest)
+
+    transport = httpx.ASGITransport(app=app)
+    async with httpx.AsyncClient(transport=transport, base_url="http://testserver") as client:
+        live_response = await client.get(f"/v1/instances/{created.id}/live")
+        foundation_response = await client.get("/v1/foundation")
+        stream_response = await client.get(f"/v1/instances/{created.id}/stream")
+
+    assert live_response.status_code == 200
+    assert live_response.json()["instance"]["id"] == created.id
+    assert foundation_response.status_code == 200
+    interfaces = {item["id"] for item in foundation_response.json()["interfaces"]}
+    assert {"cli", "tui", "web_api", "desktop"} <= interfaces
+    assert stream_response.status_code == 200
+    assert "event: snapshot" in stream_response.text
+    assert created.id in stream_response.text
+
+
+@pytest.mark.anyio
+async def test_instance_action_route_supports_generic_follow_up_actions(tmp_path: Path, monkeypatch):
+    from inference.app.routers import instances as instances_router
+
+    _write(
+        tmp_path / "training" / "configs" / "profiles" / "baseline_qlora.yaml",
+        "run_name: baseline\ntraining:\n  artifacts_dir: artifacts\n",
+    )
+    _write(
+        tmp_path / "configs" / "finetune.yaml",
+        (
+            "instance:\n"
+            "  type: finetune\n"
+            "  environment: local\n"
+            "subsystem:\n"
+            "  config_ref: ../training/configs/profiles/baseline_qlora.yaml\n"
+        ),
+    )
+
+    settings = AppSettings(
+        title="test",
+        version="0.0.0",
+        cors_origins=["*"],
+        model_registry_path=str(tmp_path / "inference" / "configs" / "model_registry.yaml"),
+        prompt_library_path=str(tmp_path / "inference" / "configs" / "prompt_presets.yaml"),
+        benchmark_registry_path=str(tmp_path / "evaluation" / "benchmarks" / "registry.yaml"),
+        artifacts_dir=str(tmp_path / "artifacts"),
+        cache_dir=str(tmp_path / "artifacts" / "cache"),
+        telemetry_path=str(tmp_path / "artifacts" / "telemetry.jsonl"),
+        cache_enabled=False,
+        telemetry_enabled=False,
+    )
+    service = InstanceService(settings)
+    monkeypatch.setattr(instances_router, "get_instance_service", lambda: service)
+
+    source = service.create_instance(
+        instances_router.InstanceCreateRequest(
+            config_path=str(tmp_path / "configs" / "finetune.yaml"),
+            start=False,
+        )
+    )
+
+    transport = httpx.ASGITransport(app=app)
+    async with httpx.AsyncClient(transport=transport, base_url="http://testserver") as client:
+        action_response = await client.post(
+            f"/v1/instances/{source.id}/actions",
+            json={
+                "action": "finetune",
+                "config_path": str(tmp_path / "configs" / "finetune.yaml"),
+                "start": False,
+            },
+        )
+
+    assert action_response.status_code == 200
+    child = action_response.json()
+    assert child["type"] == "finetune"
+    assert child["parent_instance_id"] == source.id

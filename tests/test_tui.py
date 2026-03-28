@@ -3,10 +3,11 @@ from __future__ import annotations
 from types import SimpleNamespace
 
 from ai_factory import tui
+from ai_factory.core.control.models import InstanceLogsView, InstanceMetricsView, LiveInstanceSnapshot
 from ai_factory.core.instances.models import EnvironmentSpec, InstanceManifest, ProgressSnapshot
 
 
-class _FakeManager:
+class _FakeControlService:
     def __init__(self, manifests, logs, metrics, summary):
         self._manifests = manifests
         self._logs = logs
@@ -16,11 +17,19 @@ class _FakeManager:
     def list_instances(self):
         return self._manifests
 
-    def get_logs(self, instance_id: str) -> dict[str, str]:
-        return self._logs.get(instance_id, {"stdout": "", "stderr": ""})
-
-    def get_metrics(self, instance_id: str) -> dict[str, object]:
-        return self._metrics.get(instance_id, {"summary": {}, "points": []})
+    def get_live_instance_snapshot(self, instance_id: str) -> LiveInstanceSnapshot:
+        manifest = next(item for item in self._manifests if item.id == instance_id)
+        logs = self._logs.get(instance_id, {"stdout": "", "stderr": ""})
+        metrics = self._metrics.get(instance_id, {"summary": {}, "points": []})
+        return LiveInstanceSnapshot(
+            instance=manifest,
+            logs=InstanceLogsView(**logs),
+            metrics=InstanceMetricsView(**metrics),
+            events=[],
+            tasks=[],
+            available_actions=[],
+            orchestration_summary=self._summary,
+        )
 
     def monitoring_summary(self) -> dict[str, object]:
         return self._summary
@@ -47,13 +56,13 @@ def test_controller_refresh_loads_instances_logs_metrics_and_summary(monkeypatch
         created_at="2026-01-01T00:00:00+00:00",
         updated_at="2026-01-01T00:00:00+00:00",
     )
-    manager = _FakeManager(
+    control = _FakeControlService(
         [manifest],
         {"train-002": {"stdout": "step 1\nstep 2\n", "stderr": "warn\n"}},
         {"train-002": {"summary": {"accuracy": 0.92, "avg_latency_s": 1.4}, "points": []}},
         {"runs": 2, "tasks": 4, "task_status_counts": {"running": 1, "retry_waiting": 1}},
     )
-    monkeypatch.setattr(tui, "build_platform_container", lambda **_: SimpleNamespace(manager=manager))
+    monkeypatch.setattr(tui, "build_platform_container", lambda **_: SimpleNamespace(control_service=control))
 
     controller = tui.TuiController(repo_root=None, artifacts_dir=None, refresh_seconds=2.0)
     controller.refresh()
@@ -72,13 +81,13 @@ def test_controller_move_and_toggle_stream(monkeypatch):
         status="pending",
         environment=EnvironmentSpec(kind="local"),
     )
-    manager = _FakeManager(
+    control = _FakeControlService(
         [manifest],
         {"deploy-001": {"stdout": "", "stderr": "warn"}},
         {"deploy-001": {"summary": {}, "points": []}},
         {"runs": 1, "tasks": 1, "task_status_counts": {}},
     )
-    monkeypatch.setattr(tui, "build_platform_container", lambda **_: SimpleNamespace(manager=manager))
+    monkeypatch.setattr(tui, "build_platform_container", lambda **_: SimpleNamespace(control_service=control))
 
     controller = tui.TuiController(repo_root=None, artifacts_dir=None, refresh_seconds=2.0)
     controller.refresh()
@@ -97,13 +106,13 @@ def test_run_tui_uses_curses_wrapper(monkeypatch):
         status="pending",
         environment=EnvironmentSpec(kind="local"),
     )
-    manager = _FakeManager(
+    control = _FakeControlService(
         [manifest],
         {"deploy-001": {"stdout": "", "stderr": ""}},
         {"deploy-001": {"summary": {}, "points": []}},
         {"runs": 1, "tasks": 1, "task_status_counts": {}},
     )
-    monkeypatch.setattr(tui, "build_platform_container", lambda **_: SimpleNamespace(manager=manager))
+    monkeypatch.setattr(tui, "build_platform_container", lambda **_: SimpleNamespace(control_service=control))
     captured: dict[str, object] = {}
 
     class _FakeCurses:

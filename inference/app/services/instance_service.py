@@ -5,12 +5,12 @@ from pathlib import Path
 from fastapi import HTTPException
 
 from ai_factory.core.config.loader import save_cloud_profile
-from ai_factory.core.instances.manager import InstanceManager
-from ai_factory.core.instances.models import InstanceManifest
-from ai_factory.core.instances.store import FileInstanceStore
+from ai_factory.core.control.service import FactoryControlService
 from ai_factory.core.platform.container import build_platform_container
 from inference.app.config import AppSettings
 from inference.app.schemas import (
+    FoundationOverviewResponse,
+    InstanceActionRequest,
     InstanceCreateRequest,
     InstanceDeployRequest,
     InstanceDetail,
@@ -18,6 +18,7 @@ from inference.app.schemas import (
     InstanceInferenceRequest,
     InstanceLogsResponse,
     InstanceMetricsResponse,
+    InstanceStreamResponse,
     OrchestrationEventListResponse,
     OrchestrationRunDetail,
     OrchestrationRunListResponse,
@@ -31,17 +32,12 @@ class InstanceService:
         self,
         settings: AppSettings,
         *,
-        store: FileInstanceStore | None = None,
-        manager: InstanceManager | None = None,
+        control_service: FactoryControlService | None = None,
     ):
         self.settings = settings
-        if store is not None and manager is not None:
-            self.store = store
-            self.manager = manager
-            return
-        container = build_platform_container(artifacts_dir=settings.artifacts_dir)
-        self.store = container.store
-        self.manager = container.manager
+        self.control = control_service or build_platform_container(artifacts_dir=settings.artifacts_dir).control_service
+        self.store = self.control.store
+        self.manager = self.control.manager
 
     def _ensure_config_path(self, config_path: str | None) -> str:
         if not config_path:
@@ -51,18 +47,10 @@ class InstanceService:
             raise HTTPException(status_code=404, detail=f"Config not found: {config_path}")
         return str(path)
 
-    def _manifest_to_detail(self, manifest: InstanceManifest) -> InstanceDetail:
-        snapshot = self.store.load_config_snapshot(manifest.id)
-        logs = self.get_logs(manifest.id)
-        metrics = self.get_metrics(manifest.id)
-        detail = InstanceDetail.model_validate(manifest.model_dump(mode="json"))
-        detail.config_snapshot = snapshot
-        detail.logs = logs
-        detail.metrics = metrics
-        detail.children = self.manager.list_instances(parent_instance_id=manifest.id)
-        detail.events = self.store.read_events(manifest.id)
-        detail.available_actions = self.manager.get_available_actions(manifest.id)
-        return detail
+    def _detail(self, instance_id: str) -> InstanceDetail:
+        return InstanceDetail.model_validate(
+            self.control.get_instance_detail(instance_id).model_dump(mode="json")
+        )
 
     def list_instances(
         self,
@@ -70,8 +58,8 @@ class InstanceService:
         instance_type: str | None = None,
         status: str | None = None,
         parent_instance_id: str | None = None,
-    ) -> list[InstanceManifest]:
-        return self.manager.list_instances(
+    ):
+        return self.control.list_instances(
             instance_type=instance_type,
             status=status,
             parent_instance_id=parent_instance_id,
@@ -79,16 +67,16 @@ class InstanceService:
 
     def get_instance(self, instance_id: str) -> InstanceDetail:
         try:
-            manifest = self.manager.get_instance(instance_id)
+            self.control.get_instance(instance_id)
         except FileNotFoundError as exc:
             raise HTTPException(status_code=404, detail=str(exc)) from exc
-        return self._manifest_to_detail(manifest)
+        return self._detail(instance_id)
 
     def create_instance(self, request: InstanceCreateRequest) -> InstanceDetail:
         config_path = self._ensure_config_path(request.config_path)
         if request.environment and request.environment.kind == "cloud" and request.environment.profile_name:
             save_cloud_profile(request.environment.profile_name, request.environment)
-        manifest = self.manager.create_instance(
+        manifest = self.control.create_instance(
             config_path,
             start=request.start,
             environment_override=request.environment,
@@ -99,7 +87,7 @@ class InstanceService:
             subsystem_updates=request.subsystem_overrides or None,
             metadata_updates=request.metadata or None,
         )
-        return self.get_instance(manifest.id)
+        return self._detail(manifest.id)
 
     def evaluate_instance(self, instance_id: str, request: InstanceEvaluateRequest | None = None) -> InstanceDetail:
         request = request or InstanceEvaluateRequest()
@@ -107,22 +95,22 @@ class InstanceService:
             config_path = self._ensure_config_path(request.config_path)
         else:
             config_path = "configs/eval.yaml"
-        manifest = self.manager.create_evaluation_instance(
+        manifest = self.control.create_evaluation_instance(
             instance_id,
             config_path=config_path,
             start=request.start,
         )
-        return self.get_instance(manifest.id)
+        return self._detail(manifest.id)
 
     def deploy_instance(self, instance_id: str, request: InstanceDeployRequest) -> InstanceDetail:
         config_path = self._ensure_config_path(request.config_path or "configs/deploy.yaml")
-        manifest = self.manager.create_deployment_instance(
+        manifest = self.control.create_deployment_instance(
             instance_id,
             target=request.target,
             config_path=config_path,
             start=request.start,
         )
-        return self.get_instance(manifest.id)
+        return self._detail(manifest.id)
 
     def start_inference_instance(
         self,
@@ -131,24 +119,35 @@ class InstanceService:
     ) -> InstanceDetail:
         request = request or InstanceInferenceRequest()
         config_path = self._ensure_config_path(request.config_path or "configs/inference.yaml")
-        manifest = self.manager.create_inference_instance(
+        manifest = self.control.create_inference_instance(
             instance_id,
             config_path=config_path,
             start=request.start,
         )
-        return self.get_instance(manifest.id)
+        return self._detail(manifest.id)
+
+    def run_instance_action(self, instance_id: str, request: InstanceActionRequest) -> InstanceDetail:
+        try:
+            manifest = self.control.execute_action(
+                instance_id,
+                action=request.action,
+                config_path=request.config_path,
+                deployment_target=request.deployment_target,
+                start=request.start,
+            )
+        except FileNotFoundError as exc:
+            raise HTTPException(status_code=404, detail=str(exc)) from exc
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
+        return self._detail(manifest.id)
 
     def get_logs(self, instance_id: str) -> InstanceLogsResponse:
         try:
             self.manager.get_instance(instance_id)
         except FileNotFoundError as exc:
             raise HTTPException(status_code=404, detail=str(exc)) from exc
-        logs = self.store.read_logs(instance_id)
-        return InstanceLogsResponse(
-            stdout=logs.get("stdout", ""),
-            stderr=logs.get("stderr", ""),
-            stdout_path=str(self.store.stdout_path(instance_id)),
-            stderr_path=str(self.store.stderr_path(instance_id)),
+        return InstanceLogsResponse.model_validate(
+            self.control.get_logs(instance_id).model_dump(mode="json")
         )
 
     def get_metrics(self, instance_id: str) -> InstanceMetricsResponse:
@@ -156,28 +155,33 @@ class InstanceService:
             self.manager.get_instance(instance_id)
         except FileNotFoundError as exc:
             raise HTTPException(status_code=404, detail=str(exc)) from exc
-        metrics = self.manager.get_metrics(instance_id)
-        return InstanceMetricsResponse(
-            summary=metrics.get("summary", {}),
-            points=metrics.get("points", []),
+        return InstanceMetricsResponse.model_validate(
+            self.control.get_metrics(instance_id).model_dump(mode="json")
         )
 
+    def get_live_snapshot(self, instance_id: str) -> InstanceStreamResponse:
+        try:
+            snapshot = self.control.get_live_instance_snapshot(instance_id)
+        except FileNotFoundError as exc:
+            raise HTTPException(status_code=404, detail=str(exc)) from exc
+        return InstanceStreamResponse.model_validate(snapshot.model_dump(mode="json"))
+
     def list_orchestration_runs(self) -> OrchestrationRunListResponse:
-        return OrchestrationRunListResponse(runs=self.manager.list_orchestration_runs())
+        return OrchestrationRunListResponse(runs=self.control.list_orchestration_runs())
 
     def get_orchestration_run(self, run_id: str) -> OrchestrationRunDetail:
         try:
-            payload = self.manager.get_orchestration_run(run_id)
+            payload = self.control.get_orchestration_run(run_id)
         except FileNotFoundError as exc:
             raise HTTPException(status_code=404, detail=str(exc)) from exc
         return OrchestrationRunDetail.model_validate(payload)
 
     def list_orchestration_tasks(self, run_id: str) -> OrchestrationTaskListResponse:
         try:
-            self.manager.get_orchestration_run(run_id)
+            self.control.get_orchestration_run(run_id)
         except FileNotFoundError as exc:
             raise HTTPException(status_code=404, detail=str(exc)) from exc
-        return OrchestrationTaskListResponse(tasks=self.manager.list_tasks(run_id))
+        return OrchestrationTaskListResponse(tasks=self.control.list_tasks(run_id))
 
     def list_orchestration_events(
         self,
@@ -186,24 +190,29 @@ class InstanceService:
         limit: int | None = None,
     ) -> OrchestrationEventListResponse:
         try:
-            self.manager.get_orchestration_run(run_id)
+            self.control.get_orchestration_run(run_id)
         except FileNotFoundError as exc:
             raise HTTPException(status_code=404, detail=str(exc)) from exc
-        return OrchestrationEventListResponse(events=self.manager.list_orchestration_events(run_id, limit=limit))
+        return OrchestrationEventListResponse(events=self.control.list_orchestration_events(run_id, limit=limit))
 
     def cancel_orchestration_run(self, run_id: str) -> OrchestrationRunDetail:
         try:
-            self.manager.cancel_instance(run_id)
+            self.control.cancel_instance(run_id)
         except FileNotFoundError as exc:
             raise HTTPException(status_code=404, detail=str(exc)) from exc
         return self.get_orchestration_run(run_id)
 
     def retry_orchestration_task(self, task_id: str) -> OrchestrationRunDetail:
         try:
-            self.manager.retry_instance(task_id)
+            self.control.retry_instance(task_id)
         except FileNotFoundError as exc:
             raise HTTPException(status_code=404, detail=str(exc)) from exc
         return self.get_orchestration_run(task_id)
 
     def get_orchestration_summary(self) -> OrchestrationSummaryResponse:
-        return OrchestrationSummaryResponse(summary=self.manager.monitoring_summary())
+        return OrchestrationSummaryResponse(summary=self.control.monitoring_summary())
+
+    def get_foundation_overview(self) -> FoundationOverviewResponse:
+        return FoundationOverviewResponse.model_validate(
+            self.control.describe_foundation().model_dump(mode="json")
+        )
