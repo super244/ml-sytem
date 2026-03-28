@@ -1,5 +1,0 @@
-ai_factory
-data
-evaluation
-inference
-training
