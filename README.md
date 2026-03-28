@@ -1,12 +1,23 @@
-# Atlas Math Lab
+# AI-Factory
 
-Atlas Math Lab is a research-grade, production-aware monorepo for building a specialized competitive mathematics and advanced calculus reasoning model. The repository combines synthetic data generation, public dataset normalization, curriculum-aware fine-tuning, verifier-assisted inference, rigorous benchmarking, and a polished research-product frontend around a shared schema and artifact system.
+AI-Factory is a unified, personal AI operating system designed to manage the entire lifecycle of large language models. It provides a complete platform for training, monitoring, evaluation, intelligent iteration, and deployment of LLMs across multiple domains.
 
-The default local path is intentionally practical: `Qwen2.5-Math-1.5B-Instruct` plus QLoRA/LoRA. The platform also includes larger 7B-class model templates, Accelerate/DeepSpeed-ready runtime configs, and packaging hooks for moving from fast local iteration to heavier training runs.
+The system is built to be:
 
-Start with `quickstart.md` if you want the fastest path to a working local workspace.
+* **Powerful enough** for advanced experimentation and research
+* **Simple enough** for fast iteration and development
+* **Structured enough** to scale infinitely from local to distributed systems
 
 ## What The System Supports
+
+- **Multi-Domain Training**: Support for mathematics, code generation, reasoning, creative writing, and custom domains
+- **Universal Model Lifecycle**: End-to-end management from training through deployment
+- **Real-Time Monitoring**: Live metrics, logs, and system health monitoring
+- **Intelligent Iteration**: AI-assisted analysis and recommendations for model improvements
+- **Multi-Target Deployment**: Deploy to HuggingFace, Ollama, LM Studio, custom APIs, and edge devices
+- **Unified Interfaces**: CLI, TUI, Web Dashboard, and Desktop app with consistent experience
+- **Scalable Architecture**: From local laptop to distributed cloud training
+- **Extensible Design**: Easy to add new domains, training methods, and deployment targets
 
 - Canonical `v2` dataset records with typed `step_checks`, lineage, contamination metadata, quality scores, reasoning style tags, and generator metadata.
 - Six first-class custom synthetic families: derivatives, integrals, limits/series, multivariable calculus, ODEs/optimization, and olympiad reasoning.

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, Literal
+from typing import Any, Literal, Optional, List, Dict, Union
 
 from pydantic import BaseModel, Field, field_validator, model_validator
 
@@ -67,15 +67,27 @@ class ContaminationStatus(BaseModel):
     notes: list[str] = Field(default_factory=list)
 
 
-class MathRecordV2(BaseModel):
+class ResourceSpec(BaseModel):
+    """Resource specification for training jobs."""
+    cpu_cores: int = 4
+    memory_gb: int = 16
+    gpu_count: int = 1
+    gpu_memory_gb: int = 8
+    disk_gb: int = 100
+    custom_requirements: Dict[str, Any] = Field(default_factory=dict)
+
+
+class DatasetRecordV2(BaseModel):
+    """Universal dataset record for any domain."""
     schema_version: Literal["v2"] = "v2"
     id: str | None = None
     question: str
     solution: str
     final_answer: str | None = None
-    difficulty: Difficulty = "hard"
+    difficulty: Difficulty = "medium"
+    domain: str = "general"  # NEW: Domain specification
+    subdomain: str | None = None  # NEW: Subdomain within domain
     topic: str = "general"
-    subtopic: str | None = None
     source: str = "unknown"
     dataset_split: DatasetSplit = "unspecified"
     step_checks: list[StepCheck] = Field(default_factory=list)
@@ -88,6 +100,11 @@ class MathRecordV2(BaseModel):
     lineage: SourceLineage = Field(default_factory=SourceLineage)
     generator: GeneratorMetadata | None = None
     metadata: dict[str, Any] = Field(default_factory=dict)
+
+
+class MathRecordV2(DatasetRecordV2):
+    """Mathematics-specific dataset record (backward compatibility)."""
+    domain: Literal["mathematics"] = "mathematics"
 
     @field_validator("step_checks", mode="before")
     @classmethod
@@ -217,6 +234,136 @@ class RunManifest(BaseModel):
     metadata: dict[str, Any] = Field(default_factory=dict)
 
 
+# Platform-level schemas for AI-Factory scaling and deployment
+
+
+class DatasetSpec(BaseModel):
+    """Dataset specification for domain registry."""
+    name: str
+    description: str
+    path: str
+    domain: str
+    subdomain: Optional[str] = None
+    difficulty_range: List[str] = Field(default_factory=list)
+    size: int = 0
+    format: str = "jsonl"
+    metadata: Dict[str, Any] = Field(default_factory=dict)
+
+
+class MetricSpec(BaseModel):
+    """Metric specification for domain evaluation."""
+    name: str
+    description: str
+    type: str  # accuracy, score, ranking, etc.
+    domain: str
+    subdomain: Optional[str] = None
+    range: Optional[List[float]] = None  # min/max for score metrics
+    metadata: Dict[str, Any] = Field(default_factory=dict)
+
+
+class EvaluationSpec(BaseModel):
+    """Evaluation specification for domain benchmarks."""
+    name: str
+    description: str
+    domain: str
+    subdomain: Optional[str] = None
+    datasets: List[str]
+    metrics: List[str]
+    splits: List[str] = Field(default_factory=["test"])
+    size: int = 0
+    metadata: Dict[str, Any] = Field(default_factory=dict)
+
+
+class TrainingProfileSpec(BaseModel):
+    """Training profile specification for domains."""
+    name: str
+    description: str
+    domain: str
+    subdomain: Optional[str] = None
+    training_method: str
+    datasets: List[str]
+    config_path: str
+    curriculum_order: Optional[List[str]] = None
+    model_requirements: Dict[str, Any] = Field(default_factory=dict)
+    metadata: Dict[str, Any] = Field(default_factory=dict)
+
+
+class ModelArtifact(BaseModel):
+    """Model artifact for deployment."""
+    name: str
+    version: str
+    path: str
+    domain: Optional[str] = None
+    architecture: str
+    parameters: int
+    format: str  # pytorch, safetensors, gguf, etc.
+    metadata: Dict[str, Any] = Field(default_factory=dict)
+
+
+class DeploymentTarget(BaseModel):
+    """Deployment target specification."""
+    name: str
+    type: str  # huggingface, ollama, etc.
+    description: str
+    config: Dict[str, Any] = Field(default_factory=dict)
+    capabilities: List[str] = Field(default_factory=list)
+
+
+class DeploymentSpec(BaseModel):
+    """Deployment specification."""
+    target: str
+    model_name: str
+    config: Dict[str, Any] = Field(default_factory=dict)
+    public: bool = False
+    metadata: Dict[str, Any] = Field(default_factory=dict)
+
+
+class ScalingConfig(BaseModel):
+    """Configuration for scaling manager."""
+    max_nodes: int = 10
+    default_resources: Dict[str, Any] = Field(default_factory=dict)
+    cluster_type: str = "local"  # local, slurm, kubernetes
+    metadata: Dict[str, Any] = Field(default_factory=dict)
+
+
+class MonitoringConfig(BaseModel):
+    """Configuration for monitoring manager."""
+    collection_interval_seconds: float = 5.0
+    storage_backend: str = "file"  # file, prometheus, influxdb
+    alert_channels: List[str] = Field(default_factory=list)
+    thresholds: Dict[str, Any] = Field(default_factory=dict)
+    metadata: Dict[str, Any] = Field(default_factory=dict)
+
+
+class TrainingJob(BaseModel):
+    """Training job specification for scaling."""
+    name: str
+    profile: str
+    resource_requirements: Dict[str, Any] = Field(default_factory=dict)
+    estimated_duration_hours: float = 0.0
+    priority: str = "normal"  # low, normal, high, critical
+    metadata: Dict[str, Any] = Field(default_factory=dict)
+
+
+class Alert(BaseModel):
+    """Alert specification for monitoring."""
+    id: str
+    severity: str  # info, warning, critical
+    message: str
+    source: str
+    timestamp: datetime
+    metadata: Dict[str, Any] = Field(default_factory=dict)
+
+
+class MetricPoint(BaseModel):
+    """Single metric data point."""
+    timestamp: datetime
+    name: str
+    value: float
+    labels: Dict[str, str] = Field(default_factory=dict)
+
+
+# Backward compatibility aliases
 MathRecord = MathRecordV2
 PackagedMathRecord = PackagedMathRecordV2
 
