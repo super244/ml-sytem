@@ -215,7 +215,7 @@ def _tail_file(path: Path, *, initial: str = "") -> None:
 
 
 def parse_args() -> argparse.Namespace:
-    parser = argparse.ArgumentParser(prog="ai-factory", description="Unified instance control plane for Atlas Math Lab.")
+    parser = argparse.ArgumentParser(prog="ai-factory", description="Unified instance control plane for AI-Factory.")
     parser.add_argument("--repo-root")
     parser.add_argument("--artifacts-dir")
     subparsers = parser.add_subparsers(dest="command", required=True)
@@ -328,6 +328,32 @@ def parse_args() -> argparse.Namespace:
 
     workspace_parser = subparsers.add_parser("workspace", parents=[common_json])
     workspace_parser.add_argument("--root")
+    
+    # NEW: Domain-related commands
+    domain_parser = subparsers.add_parser("domain", parents=[common_json])
+    domain_subparsers = domain_parser.add_subparsers(dest="domain_command", required=True)
+    
+    domain_list_parser = domain_subparsers.add_parser("list", parents=[common_json])
+    domain_list_parser.add_argument("--show-details", action="store_true")
+    
+    domain_info_parser = domain_subparsers.add_parser("info", parents=[common_json])
+    domain_info_parser.add_argument("domain_name")
+    
+    # NEW: Platform commands
+    platform_parser = subparsers.add_parser("platform", parents=[common_json])
+    platform_subparsers = platform_parser.add_subparsers(dest="platform_command", required=True)
+    
+    platform_status_parser = platform_subparsers.add_parser("status", parents=[common_json])
+    
+    platform_scale_parser = platform_subparsers.add_parser("scale", parents=[common_json])
+    platform_scale_parser.add_argument("target_nodes", type=int)
+    
+    # NEW: Multi-domain training
+    multi_train_parser = subparsers.add_parser("multi-train", parents=[common_json])
+    multi_train_parser.add_argument("--domains", nargs="+", required=True)
+    multi_train_parser.add_argument("--config", default="configs/multi_domain.yaml")
+    multi_train_parser.add_argument("--no-start", action="store_true")
+    
     return parser.parse_args()
 
 
@@ -486,6 +512,50 @@ def main() -> None:
     if args.command == "workspace":
         payload = build_workspace_overview(Path(args.root) if args.root else None)
         _render_payload(payload, as_json=args.json)
+        return
+    
+    # NEW: Domain command handlers
+    if args.command == "domain":
+        if args.domain_command == "list":
+            from ai_factory.domains import list_available_domains
+            domains = list_available_domains()
+            if args.show_details:
+                _render_payload([domain.model_dump() for domain in domains], as_json=args.json)
+            else:
+                _render_payload([domain.name for domain in domains], as_json=args.json)
+            return
+        
+        if args.domain_command == "info":
+            from ai_factory.domains import get_domain_info
+            domain_info = get_domain_info(args.domain_name)
+            _render_payload(domain_info.model_dump(), as_json=args.json)
+            return
+    
+    # NEW: Platform command handlers
+    if args.command == "platform":
+        if args.platform_command == "status":
+            from ai_factory.platform import get_platform_status
+            status = get_platform_status()
+            _render_payload(status, as_json=args.json)
+            return
+        
+        if args.platform_command == "scale":
+            from ai_factory.platform import scale_platform
+            result = scale_platform(args.target_nodes)
+            _render_payload(result, as_json=args.json)
+            return
+    
+    # NEW: Multi-domain training
+    if args.command == "multi-train":
+        from ai_factory.platform import create_multi_domain_training
+        manifest = create_multi_domain_training(
+            domains=args.domains,
+            config_path=args.config,
+            start=not args.no_start,
+            repo_root=args.repo_root,
+            artifacts_dir=args.artifacts_dir
+        )
+        _render_payload(_manifest_payload(manifest), as_json=args.json)
         return
 
 

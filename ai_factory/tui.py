@@ -28,7 +28,7 @@ class DashboardSnapshot:
 def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         prog="ai-factory tui",
-        description="Interactive terminal dashboard for ai-factory instances.",
+        description="Interactive terminal dashboard for AI-Factory instances.",
     )
     parser.add_argument("--repo-root")
     parser.add_argument("--artifacts-dir")

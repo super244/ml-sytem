@@ -1,7 +1,7 @@
 [project]
-name = "atlas-math-lab"
+name = "ai-factory"
 version = "0.2.0"
-description = "Research-grade full-stack platform for specialized competitive mathematics and advanced calculus reasoning."
+description = "Unified AI operating system for managing the complete LLM lifecycle from training to deployment."
 requires-python = ">=3.10"
 dependencies = [
   "accelerate>=1.2.1",
@@ -57,6 +57,17 @@ packages = [
   "ai_factory.core.orchestration",
   "ai_factory.core.platform",
   "ai_factory.core.plugins",
+  "ai_factory.domains",
+  "ai_factory.domains.mathematics",
+  "ai_factory.interfaces",
+  "ai_factory.interfaces.cli",
+  "ai_factory.interfaces.tui",
+  "ai_factory.interfaces.web",
+  "ai_factory.interfaces.desktop",
+  "ai_factory.platform",
+  "ai_factory.platform.scaling",
+  "ai_factory.platform.monitoring",
+  "ai_factory.platform.deployment",
   "training",
   "training.src",
   "inference",
