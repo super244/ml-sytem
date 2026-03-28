@@ -15,6 +15,7 @@ Atlas Math Lab ships with lightweight deployment scaffolding for a demo or pre-p
 2. Set `NEXT_PUBLIC_API_BASE_URL` for the frontend.
 3. Point the API at the intended model registry and artifact directories.
 4. Keep telemetry and cache directories on writable storage.
+5. Keep `artifacts/control_plane/` on durable writable storage so SQLite task state, heartbeats, and events survive restarts.
 
 ## Compose Flow
 
@@ -26,4 +27,5 @@ docker compose up --build
 
 - Model weights are not bundled in the repo.
 - The API is currently single-operator and unauthenticated.
-- Background job orchestration is intentionally out of scope for this MVP+, but the artifact and manifest conventions are ready for later queue-based orchestration.
+- The control plane is SQLite local-first and broker-ready: durable enough for single-node production-style operation, with interfaces shaped for later Redis/Postgres adapters.
+- Multiple worker processes are future-ready, but this pass only ships local and SSH/cloud executors.

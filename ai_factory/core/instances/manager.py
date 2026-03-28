@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+import asyncio
 from copy import deepcopy
+from datetime import datetime, timezone
 from pathlib import Path
 import uuid
 from typing import Any
@@ -33,6 +35,9 @@ from ai_factory.core.instances.store import FileInstanceStore
 from ai_factory.core.io import write_json
 from ai_factory.core.monitoring.collectors import collect_metrics_for_instance
 from ai_factory.core.monitoring.events import InstanceEvent
+from ai_factory.core.orchestration.service import OrchestrationService
+from ai_factory.core.orchestration.sqlite import SqliteControlPlane
+from ai_factory.core.platform.settings import PlatformSettings, get_platform_settings
 
 
 class _SafeTemplateDict(dict[str, Any]):
@@ -59,9 +64,20 @@ def _source_artifact_ref(manifest: InstanceManifest) -> str | None:
 
 
 class InstanceManager:
-    def __init__(self, store: FileInstanceStore):
+    def __init__(
+        self,
+        store: FileInstanceStore,
+        *,
+        orchestration: OrchestrationService | None = None,
+        platform_settings: PlatformSettings | None = None,
+    ):
         self.store = store
         self.queries = InstanceQueryService(store)
+        self.platform_settings = platform_settings or get_platform_settings(artifacts_dir=store.artifacts_dir)
+        self.orchestration = orchestration or OrchestrationService(
+            control_plane=SqliteControlPlane(self.platform_settings.control_db_path),
+            settings=self.platform_settings,
+        )
 
     def _make_instance_id(self, instance_type: str) -> str:
         return (
@@ -86,6 +102,46 @@ class InstanceManager:
 
     def _persist_snapshot(self, instance_id: str, snapshot: dict[str, Any]) -> None:
         write_json(self.store.config_snapshot_path(instance_id), snapshot)
+
+    def _project_manifest(self, manifest: InstanceManifest) -> InstanceManifest:
+        return self.orchestration.project_manifest(manifest)
+
+    def _checkpoint_hint_from_refs(self, refs: dict[str, Any]) -> str | None:
+        run_dir = refs.get("run_dir")
+        if not run_dir:
+            return None
+        checkpoints_dir = Path(str(run_dir)) / "checkpoints"
+        if not checkpoints_dir.exists():
+            return None
+        candidates = [path for path in checkpoints_dir.iterdir() if path.is_dir()]
+        if not candidates:
+            return None
+        candidates.sort(key=lambda path: path.stat().st_mtime)
+        return str(candidates[-1])
+
+    def _resume_command_if_available(self, manifest: InstanceManifest, config, command):
+        if manifest.type not in {"train", "finetune"}:
+            return command
+        if not config.resilience.enable_checkpoint_resume:
+            return command
+        if "--resume-from-checkpoint" in command.argv:
+            return command
+        checkpoint_hint = self.orchestration.latest_checkpoint(manifest.id)
+        if checkpoint_hint:
+            command.argv = [*command.argv, "--resume-from-checkpoint", checkpoint_hint]
+        return command
+
+    def _legacy_instance_id(self, target: str) -> str:
+        try:
+            self.store.load(target)
+            return target
+        except FileNotFoundError:
+            run = self.orchestration.control_plane.get_run(target) or self.orchestration.control_plane.get_run_by_legacy_instance(
+                target
+            )
+            if run is None or not run.legacy_instance_id:
+                raise FileNotFoundError(f"Unknown instance or orchestration run: {target}")
+            return run.legacy_instance_id
 
     def _progress(
         self,
@@ -192,6 +248,8 @@ class InstanceManager:
     ) -> None:
         snapshot = self.store.load_config_snapshot(instance_id)
         snapshot.setdefault("subsystem", {})
+        if context:
+            snapshot["subsystem"] = self._render_templates(snapshot["subsystem"], context)
         if subsystem_updates:
             updates = self._render_templates(subsystem_updates, context or {})
             snapshot["subsystem"] = _deep_merge(snapshot["subsystem"], updates)
@@ -245,7 +303,11 @@ class InstanceManager:
             parent_instance_id=parent_instance_id,
             metadata_updates=metadata_updates,
         )
-        self.store.create(manifest, config.model_dump(mode="json"))
+        snapshot = config.model_dump(mode="json")
+        self.store.create(manifest, snapshot)
+        self.orchestration.ensure_run_for_instance(manifest, snapshot)
+        manifest = self._project_manifest(manifest)
+        self.store.save(manifest)
 
         if (
             self._workload_enabled(config, "preprocess")
@@ -267,8 +329,11 @@ class InstanceManager:
         manifest = self.store.load(instance_id)
         snapshot = self.store.load_config_snapshot(instance_id)
         config = build_orchestration_config(snapshot, config_path=manifest.config_path)
+        self.orchestration.ensure_run_for_instance(manifest, snapshot)
+        self.orchestration.recover_stalled_tasks()
         try:
             command = build_command(config, manifest)
+            command = self._resume_command_if_available(manifest, config, command)
         except UnsupportedInstanceTypeError as exc:
             return self.mark_failed(
                 instance_id,
@@ -286,13 +351,26 @@ class InstanceManager:
 
         use_ssh = config.execution.backend == "ssh" or manifest.environment.kind == "cloud"
         executor = SshExecutor() if use_ssh else LocalExecutor()
+        run, task, attempt = self.orchestration.begin_attempt(
+            legacy_instance_id=instance_id,
+            stdout_path=str(self.store.stdout_path(instance_id)),
+            stderr_path=str(self.store.stderr_path(instance_id)),
+            lease_owner=executor.backend_name,
+            metadata={"argv": command.argv},
+        )
         manifest.execution = ExecutionHandle(
             backend=executor.backend_name,
             stdout_path=str(self.store.stdout_path(instance_id)),
             stderr_path=str(self.store.stderr_path(instance_id)),
+            metadata={
+                "orchestration_run_id": run.id,
+                "orchestration_task_id": task.id,
+                "attempt_id": attempt.id,
+                "argv": command.argv,
+            },
         )
         manifest.progress = self._progress(stage="queued", message="Execution requested.", percent=0.0)
-        self.store.save(manifest)
+        self.store.save(self._project_manifest(manifest))
         handle = executor.start(
             manifest,
             command,
@@ -306,16 +384,19 @@ class InstanceManager:
         else:
             refreshed.execution.pid = handle.pid
             refreshed.execution.metadata.update(handle.metadata)
-        self.store.save(refreshed)
+            refreshed.execution.metadata.setdefault("attempt_id", attempt.id)
+            refreshed.execution.metadata.setdefault("orchestration_run_id", run.id)
+            refreshed.execution.metadata.setdefault("orchestration_task_id", task.id)
+        self.store.save(self._project_manifest(refreshed))
         self.store.append_event(
             instance_id,
             InstanceEvent(
                 type="instance.start_requested",
                 message=f"Queued {manifest.type} instance for {handle.backend} execution.",
-                payload={"backend": handle.backend, "pid": handle.pid},
+                payload={"backend": handle.backend, "pid": handle.pid, "attempt_id": attempt.id},
             ),
         )
-        return refreshed
+        return self._project_manifest(refreshed)
 
     def mark_running(self, instance_id: str) -> InstanceManifest:
         manifest = self.store.load(instance_id)
@@ -328,7 +409,13 @@ class InstanceManager:
         execution.started_at = utc_now_iso()
         manifest.execution = execution
         manifest.progress = self._progress(stage="running", message=f"{manifest.type} instance is running.")
-        self.store.save(manifest)
+        attempt_id = (execution.metadata or {}).get("attempt_id")
+        if isinstance(attempt_id, str):
+            try:
+                self.orchestration.heartbeat(attempt_id)
+            except FileNotFoundError:
+                pass
+        self.store.save(self._project_manifest(manifest))
         self.store.append_event(
             instance_id,
             InstanceEvent(
@@ -337,27 +424,22 @@ class InstanceManager:
                 payload={"backend": execution.backend},
             ),
         )
-        return manifest
+        return self._project_manifest(manifest)
 
     def _retry_failed_instance(self, manifest: InstanceManifest, config) -> bool:
         retry_limit = max(int(config.execution.retry_limit or 0), int(config.sub_agents.retry_limit or 0))
-        if retry_limit <= 0 or not self._can_spawn_children(manifest, config):
+        if retry_limit <= 0:
             return False
-        current_attempt = int(manifest.metadata.get("retry_attempt", 0))
+        task_summary = manifest.task_summary or {}
+        current_attempt = int(task_summary.get("current_attempt") or 0)
         if current_attempt >= retry_limit:
             return False
-        self.create_instance(
-            manifest.config_path or "",
-            start=True,
-            environment_override=manifest.environment,
-            parent_instance_id=manifest.parent_instance_id or manifest.id,
-            metadata_updates=self._child_metadata(
-                manifest,
-                reason="retry",
-                extra={"retry_attempt": current_attempt + 1, "retry_source_instance_id": manifest.id},
-            ),
-        )
-        return True
+        retry_task = self.orchestration.retry_task(manifest.id)
+        available_at = datetime.fromisoformat(retry_task.available_at.replace("Z", "+00:00"))
+        if available_at <= datetime.now(timezone.utc):
+            self.start_instance(manifest.id)
+            return True
+        return False
 
     def mark_failed(
         self,
@@ -376,13 +458,13 @@ class InstanceManager:
         if manifest.execution is not None:
             manifest.execution.ended_at = utc_now_iso()
             manifest.execution.exit_code = manifest.execution.exit_code if manifest.execution.exit_code is not None else 1
-        self.store.save(manifest)
+        self.store.save(self._project_manifest(manifest))
         self.store.append_event(
             instance_id,
             InstanceEvent(type="instance.failed", message=message, payload={"code": code, **details}),
         )
         self._retry_failed_instance(manifest, config)
-        return manifest
+        return self._project_manifest(manifest)
 
     def _schedule_report_instance(
         self,
@@ -641,7 +723,22 @@ class InstanceManager:
                     [item.model_dump(mode="json") for item in manifest.recommendations],
                 )
 
-        self.store.save(manifest)
+        checkpoint_hint = self._checkpoint_hint_from_refs(refs)
+        attempt_id = ((manifest.execution or ExecutionHandle(backend="local")).metadata or {}).get("attempt_id")
+        if isinstance(attempt_id, str):
+            self.orchestration.finalize_attempt(
+                legacy_instance_id=instance_id,
+                attempt_id=attempt_id,
+                exit_code=exit_code,
+                summary=summary,
+                metrics={key: value for key, value in summary.items() if isinstance(value, (int, float, bool))},
+                artifacts=refs,
+                recommendations=[item.model_dump(mode="json") for item in manifest.recommendations],
+                checkpoint_hint=checkpoint_hint,
+                error_code=manifest.error.code if manifest.error else None,
+                error_message=manifest.error.message if manifest.error else None,
+            )
+        self.store.save(self._project_manifest(manifest))
         self.store.append_event(
             instance_id,
             InstanceEvent(
@@ -655,7 +752,7 @@ class InstanceManager:
             self._post_success_automation(manifest, config, summary=summary, refs=refs)
         else:
             self._retry_failed_instance(manifest, config)
-        return manifest
+        return self._project_manifest(manifest)
 
     def _auto_continue(self, manifest: InstanceManifest, config, action: str) -> None:
         if not self._can_spawn_children(manifest, config):
@@ -774,7 +871,7 @@ class InstanceManager:
         manifest = self.create_instance(
             config_path,
             start=False,
-            environment_override=EnvironmentSpec(kind="local"),
+            environment_override=source.environment,
             parent_instance_id=source.id,
             metadata_updates=metadata_updates,
         )
@@ -788,7 +885,7 @@ class InstanceManager:
         return self.start_instance(manifest.id) if start else manifest
 
     def get_instance(self, instance_id: str) -> InstanceManifest:
-        return self.store.load(instance_id)
+        return self._project_manifest(self.store.load(instance_id))
 
     def list_instances(
         self,
@@ -797,14 +894,17 @@ class InstanceManager:
         status: str | None = None,
         parent_instance_id: str | None = None,
     ) -> list[InstanceManifest]:
-        return self.queries.list_instances(
-            instance_type=instance_type,
-            status=status,
-            parent_instance_id=parent_instance_id,
-        )
+        return [
+            self._project_manifest(item)
+            for item in self.queries.list_instances(
+                instance_type=instance_type,
+                status=status,
+                parent_instance_id=parent_instance_id,
+            )
+        ]
 
     def get_children(self, instance_id: str) -> list[InstanceManifest]:
-        return self.queries.get_children(instance_id)
+        return [self._project_manifest(item) for item in self.queries.get_children(instance_id)]
 
     def get_logs(self, instance_id: str) -> dict[str, str]:
         return self.store.read_logs(instance_id)
@@ -814,3 +914,63 @@ class InstanceManager:
             "summary": self.store.read_current_metrics(instance_id),
             "points": self.store.read_metric_points(instance_id),
         }
+
+    def list_tasks(self, legacy_or_run_id: str | None = None) -> list[dict[str, Any]]:
+        return [item.model_dump(mode="json") for item in self.orchestration.list_tasks(legacy_or_run_id)]
+
+    def list_orchestration_runs(self) -> list[dict[str, Any]]:
+        return [item.model_dump(mode="json") for item in self.orchestration.list_runs()]
+
+    def get_orchestration_run(self, legacy_or_run_id: str) -> dict[str, Any]:
+        run = self.orchestration.control_plane.get_run(legacy_or_run_id) or self.orchestration.control_plane.get_run_by_legacy_instance(
+            legacy_or_run_id
+        )
+        if run is None:
+            raise FileNotFoundError(f"Unknown orchestration run: {legacy_or_run_id}")
+        tasks = self.list_tasks(run.id)
+        events = self.list_orchestration_events(run.id)
+        return {
+            "run": run.model_dump(mode="json"),
+            "tasks": tasks,
+            "events": events,
+            "summary": self.orchestration.monitoring_summary(),
+        }
+
+    def list_orchestration_events(self, legacy_or_run_id: str, *, limit: int | None = None) -> list[dict[str, Any]]:
+        return [item.model_dump(mode="json") for item in self.orchestration.list_events(legacy_or_run_id, limit=limit)]
+
+    def cancel_instance(self, instance_id: str) -> InstanceManifest:
+        legacy_instance_id = self._legacy_instance_id(instance_id)
+        self.orchestration.cancel_run(legacy_instance_id)
+        manifest = self.store.load(legacy_instance_id)
+        manifest.status = "failed"
+        manifest.progress = self._progress(stage="cancelled", message="Instance was cancelled.")
+        self.store.save(self._project_manifest(manifest))
+        return self._project_manifest(manifest)
+
+    def retry_instance(self, instance_id: str) -> InstanceManifest:
+        legacy_instance_id = self._legacy_instance_id(instance_id)
+        self.orchestration.retry_task(legacy_instance_id)
+        return self.start_instance(legacy_instance_id)
+
+    def watch_instance(self, instance_id: str, *, timeout_s: float = 30.0) -> dict[str, Any]:
+        legacy_instance_id = self._legacy_instance_id(instance_id)
+        return asyncio.run(self.orchestration.watch_run(legacy_instance_id, timeout_s=timeout_s))
+
+    def dispatch_ready_tasks(self) -> list[str]:
+        started: list[str] = []
+        for task in self.orchestration.ready_tasks():
+            legacy_instance_id = task.legacy_instance_id
+            if not legacy_instance_id:
+                continue
+            self.start_instance(legacy_instance_id)
+            started.append(legacy_instance_id)
+        return started
+
+    def monitoring_summary(self) -> dict[str, Any]:
+        return self.orchestration.monitoring_summary()
+
+    def heartbeat_instance_attempt(self, instance_id: str, attempt_id: str) -> None:
+        self.orchestration.heartbeat(attempt_id)
+        manifest = self.store.load(instance_id)
+        self.store.save(self._project_manifest(manifest))

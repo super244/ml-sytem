@@ -1,0 +1,17 @@
+instance:
+  type: prepare
+  name: atlas-dataset-prepare
+  environment:
+    kind: local
+orchestration_mode: single
+experience:
+  level: hobbyist
+execution:
+  backend: local
+subsystem:
+  config_ref: data/configs/processing.yaml
+monitoring:
+  collect_gpu: false
+  write_timeseries: true
+pipeline:
+  auto_continue: false

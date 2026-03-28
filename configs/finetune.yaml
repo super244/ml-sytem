@@ -37,6 +37,12 @@ decision_policy:
 feedback_loop:
   enabled: true
   queue_follow_up_evaluation: true
+resilience:
+  circuit_breaker_threshold: 3
+  base_delay_s: 10
+  max_delay_s: 180
+alerting:
+  enabled: false
 publish_hooks:
   - target: huggingface
     enabled: false

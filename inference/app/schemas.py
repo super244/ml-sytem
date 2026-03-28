@@ -9,6 +9,7 @@ from ai_factory.core.instances.models import (
     InstanceManifest,
     MetricPoint,
 )
+from ai_factory.core.orchestration.models import OrchestrationEvent, OrchestrationRun, OrchestrationTask
 
 ModelVariant = str
 Difficulty = Literal["easy", "medium", "hard", "olympiad"]
@@ -176,3 +177,26 @@ class InstanceDetail(InstanceManifest):
 
 class InstanceListResponse(BaseModel):
     instances: list[InstanceManifest]
+
+
+class OrchestrationRunListResponse(BaseModel):
+    runs: list[OrchestrationRun]
+
+
+class OrchestrationTaskListResponse(BaseModel):
+    tasks: list[OrchestrationTask | dict[str, Any]]
+
+
+class OrchestrationEventListResponse(BaseModel):
+    events: list[OrchestrationEvent | dict[str, Any]]
+
+
+class OrchestrationRunDetail(BaseModel):
+    run: OrchestrationRun | dict[str, Any]
+    tasks: list[OrchestrationTask | dict[str, Any]] = Field(default_factory=list)
+    events: list[OrchestrationEvent | dict[str, Any]] = Field(default_factory=list)
+    summary: dict[str, Any] = Field(default_factory=dict)
+
+
+class OrchestrationSummaryResponse(BaseModel):
+    summary: dict[str, Any] = Field(default_factory=dict)

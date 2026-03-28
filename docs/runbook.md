@@ -98,11 +98,14 @@ Managed control-plane alternative:
 ai-factory new --config configs/finetune.yaml
 ai-factory list
 ai-factory status <instance-id> --json
+ai-factory tasks <instance-id> --json
+ai-factory events <instance-id> --json
+ai-factory watch <instance-id> --timeout 30 --json
 ai-factory recommendations <instance-id> --json
 ai-factory children <instance-id> --json
 ```
 
-The managed path tracks progress, metrics summaries, recommendations, and parent/child follow-up instances under `artifacts/instances/<instance-id>/`.
+The managed path tracks progress, metrics summaries, recommendations, retries, heartbeats, and parent/child follow-up instances under `artifacts/instances/<instance-id>/`, with durable run/task/attempt state in `artifacts/control_plane/control_plane.db`.
 
 ## 7. Serve The API
 
@@ -172,6 +175,8 @@ python3 evaluation/analysis/analyze_failures.py \
   --output evaluation/results/latest/failure_analysis.json
 ```
 
+The managed report template at `configs/report.yaml` is also used by the orchestration feedback loop when an evaluation run queues failure analysis automatically.
+
 ## 10. Replay Failures Into The Next Cycle
 
 ```bash
@@ -205,6 +210,18 @@ ai-factory new --config configs/finetune.yaml --environment cloud --cloud-profil
 ```
 
 Cloud manifests store the resolved SSH profile, key path, and any configured port forwards so the same instance can be inspected through the CLI or API later.
+
+## 14. Inspect Orchestration State
+
+The additive orchestration API surface preserves the existing instance routes and adds:
+
+- `GET /v1/orchestration/runs`
+- `GET /v1/orchestration/runs/{run_id}`
+- `GET /v1/orchestration/runs/{run_id}/tasks`
+- `GET /v1/orchestration/runs/{run_id}/events`
+- `POST /v1/orchestration/runs/{run_id}/cancel`
+- `POST /v1/orchestration/tasks/{task_id}/retry`
+- `GET /v1/orchestration/summary`
 
 You can attach port forwards directly from the CLI when creating the instance:
 

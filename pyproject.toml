@@ -51,6 +51,8 @@ packages = [
   "ai_factory.core.execution",
   "ai_factory.core.instances",
   "ai_factory.core.monitoring",
+  "ai_factory.core.orchestration",
+  "ai_factory.core.platform",
   "training",
   "training.src",
   "inference",

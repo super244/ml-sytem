@@ -168,6 +168,11 @@ class MathGenerator:
             "prompt_preset": preset.id,
             "candidate_agreement": candidate_agreement(candidates),
         }
+        prompt_tokens = winner.get("prompt_tokens")
+        completion_tokens = winner.get("completion_tokens")
+        tokens_per_s = None
+        if isinstance(completion_tokens, int) and latency_s > 0:
+            tokens_per_s = completion_tokens / latency_s
         if self.cache is not None and params.use_cache:
             self.cache.set(cache_key, result)
         if self.telemetry is not None:
@@ -179,6 +184,11 @@ class MathGenerator:
                     "cache_key": cache_key,
                     "latency_s": latency_s,
                     "final_answer": result["final_answer"],
+                    "prompt_tokens": prompt_tokens,
+                    "completion_tokens": completion_tokens,
+                    "tokens_per_s": tokens_per_s,
+                    "candidate_agreement": result["candidate_agreement"],
+                    "candidate_count": len(candidates),
                 },
             )
         return result

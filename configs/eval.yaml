@@ -29,6 +29,12 @@ feedback_loop:
   enabled: true
   auto_queue_finetune: false
   auto_queue_retrain: false
+resilience:
+  circuit_breaker_threshold: 3
+  base_delay_s: 5
+  max_delay_s: 120
+alerting:
+  enabled: false
 publish_hooks:
   - target: huggingface
     enabled: false

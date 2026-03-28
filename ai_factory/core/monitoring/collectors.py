@@ -10,6 +10,61 @@ from ai_factory.core.instances.models import InstanceManifest, MetricPoint, Prog
 from ai_factory.core.monitoring.metrics import metric_points_from_summary
 
 
+def _prepare_output_dir(snapshot: dict[str, Any]) -> Path:
+    raw = snapshot.get("resolved_subsystem_config") or {}
+    return Path(str(raw.get("output_dir") or "data/processed"))
+
+
+def _prepare_metrics(snapshot: dict[str, Any]) -> tuple[dict[str, Any], list[MetricPoint], dict[str, Any]]:
+    output_dir = _prepare_output_dir(snapshot)
+    manifest = load_json(output_dir / "manifest.json", default={}) or {}
+    stats = load_json(output_dir / "stats.json", default={}) or {}
+    pack_summary = load_json(output_dir / "pack_summary.json", default={}) or {}
+    manifest_stats = manifest.get("stats") if isinstance(manifest.get("stats"), dict) else {}
+    summary = {
+        "records": (
+            manifest_stats.get("num_records")
+            or stats.get("num_records")
+            or stats.get("records_total")
+        ),
+        "train_rows": stats.get("train_rows"),
+        "eval_rows": stats.get("eval_rows"),
+        "test_rows": stats.get("test_rows"),
+        "packs": len(pack_summary.get("packs") or []),
+        "output_ready": output_dir.exists(),
+    }
+    refs = {
+        "output_dir": str(output_dir),
+        "manifest_json": str(output_dir / "manifest.json"),
+        "stats_json": str(output_dir / "stats.json"),
+        "pack_summary_json": str(output_dir / "pack_summary.json"),
+        "card_markdown": str(output_dir / "card.md"),
+    }
+    return summary, metric_points_from_summary(summary, stage="prepare"), refs
+
+
+def _prepare_progress(snapshot: dict[str, Any]) -> ProgressSnapshot:
+    output_dir = _prepare_output_dir(snapshot)
+    manifest = load_json(output_dir / "manifest.json", default={}) or {}
+    stats = load_json(output_dir / "stats.json", default={}) or {}
+    completed = manifest.get("stats", {}).get("num_records") or stats.get("num_records")
+    ready = output_dir.exists() and (output_dir / "manifest.json").exists()
+    return ProgressSnapshot(
+        stage="prepared" if ready else "preparing",
+        status_message=(
+            "Dataset preparation artifacts have been written."
+            if ready
+            else "Waiting for processed dataset artifacts."
+        ),
+        completed_steps=completed if isinstance(completed, int) else None,
+        percent=1.0 if ready else 0.0,
+        metrics={
+            "records": completed if isinstance(completed, int) else None,
+            "output_ready": ready,
+        },
+    )
+
+
 def _training_run_for_manifest(manifest: InstanceManifest, snapshot: dict[str, Any]) -> dict[str, Any] | None:
     raw = snapshot.get("resolved_subsystem_config") or {}
     run_name = raw.get("run_name")
@@ -157,11 +212,29 @@ def _inference_metrics(snapshot: dict[str, Any]) -> tuple[dict[str, Any], list[M
     )
     rows = read_jsonl(telemetry_path)
     latencies = [row.get("latency_s") for row in rows if isinstance(row.get("latency_s"), (int, float))]
+    prompt_tokens = [
+        row.get("prompt_tokens") for row in rows if isinstance(row.get("prompt_tokens"), (int, float))
+    ]
+    completion_tokens = [
+        row.get("completion_tokens") for row in rows if isinstance(row.get("completion_tokens"), (int, float))
+    ]
+    ttft_values = [row.get("ttft_s") for row in rows if isinstance(row.get("ttft_s"), (int, float))]
     cache_hits = sum(1 for row in rows if row.get("cache_hit"))
+    total_prompt_tokens = sum(prompt_tokens)
+    total_completion_tokens = sum(completion_tokens)
+    total_latency_s = sum(latencies) if latencies else None
     summary = {
         "requests": len(rows),
         "cache_hits": cache_hits,
         "avg_latency_s": (sum(latencies) / len(latencies)) if latencies else None,
+        "total_prompt_tokens": total_prompt_tokens or None,
+        "total_completion_tokens": total_completion_tokens or None,
+        "avg_tokens_per_second": (
+            total_completion_tokens / total_latency_s
+            if total_completion_tokens and total_latency_s
+            else None
+        ),
+        "avg_time_to_first_token_s": (sum(ttft_values) / len(ttft_values)) if ttft_values else None,
     }
     refs = {"telemetry": telemetry_path}
     return summary, metric_points_from_summary(summary, stage="inference"), refs
@@ -173,9 +246,20 @@ def _inference_progress(snapshot: dict[str, Any]) -> ProgressSnapshot | None:
         or "artifacts/inference/telemetry/requests.jsonl"
     )
     rows = read_jsonl(telemetry_path)
+    latencies = [row.get("latency_s") for row in rows if isinstance(row.get("latency_s"), (int, float))]
+    completion_tokens = [
+        row.get("completion_tokens") for row in rows if isinstance(row.get("completion_tokens"), (int, float))
+    ]
+    total_latency_s = sum(latencies) if latencies else None
+    total_completion_tokens = sum(completion_tokens)
     summary = {
         "requests": len(rows),
         "cache_hits": sum(1 for row in rows if row.get("cache_hit")),
+        "avg_tokens_per_second": (
+            total_completion_tokens / total_latency_s
+            if total_completion_tokens and total_latency_s
+            else None
+        ),
     }
     return ProgressSnapshot(
         stage="serving",
@@ -190,6 +274,18 @@ def _deploy_metrics(manifest: InstanceManifest) -> tuple[dict[str, Any], list[Me
     return summary, metric_points_from_summary(summary, stage="deploy"), {}
 
 
+def _report_metrics(snapshot: dict[str, Any]) -> tuple[dict[str, Any], list[MetricPoint], dict[str, Any]]:
+    raw = snapshot.get("subsystem") or {}
+    output_path = Path(str(raw.get("output_dir_override") or "evaluation/results/failure_analysis.json"))
+    payload = load_json(output_path, default={}) or {}
+    summary = {
+        "report_exists": output_path.exists(),
+        "taxonomy_buckets": len(payload) if isinstance(payload, dict) else 0,
+    }
+    refs = {"report_json": str(output_path)}
+    return summary, metric_points_from_summary(summary, stage="report"), refs
+
+
 def _deploy_progress(manifest: InstanceManifest) -> ProgressSnapshot:
     status_map = {
         "pending": ("queued", 0.0, "Deployment is queued."),
@@ -199,6 +295,16 @@ def _deploy_progress(manifest: InstanceManifest) -> ProgressSnapshot:
     }
     stage, percent, message = status_map.get(manifest.status, ("deploying", None, None))
     return ProgressSnapshot(stage=stage, percent=percent, status_message=message)
+
+
+def _report_progress(snapshot: dict[str, Any]) -> ProgressSnapshot:
+    raw = snapshot.get("subsystem") or {}
+    output_path = Path(str(raw.get("output_dir_override") or "evaluation/results/failure_analysis.json"))
+    return ProgressSnapshot(
+        stage="reporting",
+        status_message="Failure analysis report has been written." if output_path.exists() else "Waiting for failure analysis artifacts.",
+        percent=1.0 if output_path.exists() else 0.0,
+    )
 
 
 def _gpu_snapshot() -> dict[str, Any] | None:
@@ -239,12 +345,16 @@ def collect_metrics_for_instance(
     *,
     collect_gpu: bool = True,
 ) -> tuple[dict[str, Any], list[MetricPoint], dict[str, Any]]:
-    if manifest.type in {"finetune", "train"}:
+    if manifest.type == "prepare":
+        summary, points, refs = _prepare_metrics(snapshot)
+    elif manifest.type in {"finetune", "train"}:
         summary, points, refs = _training_metrics(manifest, snapshot)
     elif manifest.type == "evaluate":
         summary, points, refs = _evaluation_metrics(snapshot)
     elif manifest.type == "inference":
         summary, points, refs = _inference_metrics(snapshot)
+    elif manifest.type == "report":
+        summary, points, refs = _report_metrics(snapshot)
     else:
         summary, points, refs = _deploy_metrics(manifest)
     if collect_gpu:
@@ -258,12 +368,16 @@ def collect_progress_for_instance(
     manifest: InstanceManifest,
     snapshot: dict[str, Any],
 ) -> ProgressSnapshot | None:
+    if manifest.type == "prepare":
+        return _prepare_progress(snapshot)
     if manifest.type in {"finetune", "train"}:
         return _training_progress(manifest, snapshot)
     if manifest.type == "evaluate":
         return _evaluation_progress(snapshot)
     if manifest.type == "inference":
         return _inference_progress(snapshot)
+    if manifest.type == "report":
+        return _report_progress(snapshot)
     if manifest.type == "deploy":
         return _deploy_progress(manifest)
     return None
