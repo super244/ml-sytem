@@ -5,10 +5,8 @@ import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 
 import {
-  deployManagedInstance,
-  evaluateManagedInstance,
   getInstanceDetail,
-  startManagedInference,
+  runManagedInstanceAction,
   type InstanceActionDescriptor,
   type InstanceDetail,
 } from "@/lib/api";
@@ -94,26 +92,12 @@ export function InstanceDetailView({ instanceId }: { instanceId: string }) {
     setNotice(null);
     setError(null);
     try {
-      let nextDetail: InstanceDetail;
-      if (action.action === "evaluate" || action.action === "re_evaluate") {
-        nextDetail = await evaluateManagedInstance(detail.id, {
-          config_path: action.config_path ?? undefined,
-          start: true,
-        });
-      } else if (action.action === "open_inference") {
-        nextDetail = await startManagedInference(detail.id, {
-          config_path: action.config_path ?? undefined,
-          start: true,
-        });
-      } else if (action.action === "deploy" && action.deployment_target) {
-        nextDetail = await deployManagedInstance(detail.id, {
-          target: action.deployment_target,
-          config_path: action.config_path ?? undefined,
-          start: true,
-        });
-      } else {
-        throw new Error(`Unsupported action: ${action.action}`);
-      }
+      const nextDetail = await runManagedInstanceAction(detail.id, {
+        action: action.action,
+        config_path: action.config_path ?? undefined,
+        deployment_target: action.deployment_target ?? undefined,
+        start: true,
+      });
       setNotice(`Created ${nextDetail.type} instance ${nextDetail.name}.`);
       router.push(`/runs/${nextDetail.id}`);
     } catch (nextError) {

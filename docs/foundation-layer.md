@@ -8,13 +8,17 @@ This repository already had strong subsystem implementations for data preparatio
 ai_factory/
 ├── cli.py                         primary CLI entrypoint
 └── core/
+    ├── control/                   shared control-center projections and live snapshots
     ├── config/                    orchestration config schema + loader
     ├── decisions/                 rule-based post-eval next-step agent
     ├── execution/                 local and SSH execution backends
+    ├── foundation.py              interface, experience-tier, and extension-point catalog
     ├── instances/                 instance manifest, store, queries, manager
     ├── monitoring/                progress + metrics collection hooks
     ├── orchestration/             SQLite control plane, runs, tasks, attempts, events
-    └── platform/                  shared container + runtime settings
+    ├── plugins/                   instance-handler and deployment-provider plugin registry
+    ├── platform/                  shared container + runtime settings
+    └── state.py                   live state projection across manifests, metrics, and progress
 
 configs/
 ├── prepare.yaml                   data preparation instance template
@@ -29,6 +33,7 @@ training/                          existing model training stack
 evaluation/                        existing benchmark + scoring stack
 inference/                         existing FastAPI inference stack
 frontend/                          existing monitoring/control dashboard surface
+desktop/                           Electron shell stub over the same backend contracts
 artifacts/
 ├── control_plane/                 SQLite orchestration state
 └── instances/                     compatibility projection per managed instance
@@ -56,6 +61,12 @@ The instance manager projects that manifest onto the durable control plane:
 - one orchestration run
 - one primary orchestration task
 - zero or more retries, child tasks, and child instances
+
+The live state path is now explicit:
+
+- `LifecycleStateManager` merges orchestration metadata with live progress and metric collectors.
+- `FactoryControlService` exposes detailed instance snapshots for API, TUI, web, and desktop surfaces.
+- `foundation.py` advertises interface surfaces, user tiers, and supported extension points from one place.
 
 ## Example Config Flow
 
@@ -98,6 +109,8 @@ ai-factory watch <instance-id-or-run-id> --timeout 30
 ai-factory retry <instance-id-or-run-id>
 ai-factory cancel <instance-id-or-run-id>
 ai-factory recommendations <instance-id>
+ai-factory action <instance-id> <action>
+ai-factory workspace --json
 ```
 
 Read-only terminal UI over the same backend:
@@ -125,5 +138,6 @@ Current V1 boundaries:
 
 - `train` and `finetune` instances currently share the same supervised pretrained-model adaptation pipeline.
 - Training from scratch, RLHF-class loops, and transformer-topology construction are not yet implemented in the underlying training stack.
+- The plugin registry is foundation-grade, but most concrete plugins are still built-in handlers rather than third-party packages.
 
 The contract is intentionally backend-first so the TUI, the existing web app, and a future desktop wrapper can all read the same data.

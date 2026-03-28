@@ -8,7 +8,7 @@ from pathlib import Path
 from typing import Any
 
 from ai_factory.core.config.loader import load_orchestration_config, save_cloud_profile
-from ai_factory.core.instances.manager import InstanceManager
+from ai_factory.core.control.service import FactoryControlService
 from ai_factory.core.instances.models import (
     ArchitectureSpec,
     EnvironmentSpec,
@@ -18,13 +18,14 @@ from ai_factory.core.instances.models import (
     PortForward,
 )
 from ai_factory.core.platform.container import build_platform_container
+from inference.app.workspace import build_workspace_overview
 
 
-def _build_manager(args: argparse.Namespace) -> InstanceManager:
+def _build_control_service(args: argparse.Namespace) -> FactoryControlService:
     return build_platform_container(
         repo_root=args.repo_root,
         artifacts_dir=args.artifacts_dir,
-    ).manager
+    ).control_service
 
 
 def _render_payload(payload: Any, *, as_json: bool) -> None:
@@ -294,6 +295,13 @@ def parse_args() -> argparse.Namespace:
     recommendations_parser = subparsers.add_parser("recommendations", parents=[common_json])
     recommendations_parser.add_argument("instance_id")
 
+    action_parser = subparsers.add_parser("action", parents=[common_json])
+    action_parser.add_argument("instance_id")
+    action_parser.add_argument("action")
+    action_parser.add_argument("--config")
+    action_parser.add_argument("--target", choices=["huggingface", "ollama", "lmstudio", "api", "custom_api", "openai_compatible_api"])
+    action_parser.add_argument("--no-start", action="store_true")
+
     logs_parser = subparsers.add_parser("logs", parents=[common_json])
     logs_parser.add_argument("instance_id")
     logs_parser.add_argument("--follow", action="store_true")
@@ -317,6 +325,9 @@ def parse_args() -> argparse.Namespace:
 
     tui_parser = subparsers.add_parser("tui")
     tui_parser.add_argument("--refresh-seconds", type=float, default=2.0)
+
+    workspace_parser = subparsers.add_parser("workspace", parents=[common_json])
+    workspace_parser.add_argument("--root")
     return parser.parse_args()
 
 
@@ -332,7 +343,7 @@ def main() -> None:
         )
         return
 
-    manager = _build_manager(args)
+    control = _build_control_service(args)
 
     if args.command == "new":
         environment = _environment_from_args(args)
@@ -340,7 +351,7 @@ def main() -> None:
             _prompt("Experience level (beginner/hobbyist/dev)", "hobbyist") if _interactive_enabled(args) else None
         )
         name_override = args.name or (_prompt("Instance name", "") if _interactive_enabled(args) else "")
-        manifest = manager.create_instance(
+        manifest = control.create_instance(
             _new_config_path(args),
             start=not args.no_start,
             environment_override=environment,
@@ -352,7 +363,7 @@ def main() -> None:
         return
 
     if args.command == "list":
-        manifests = manager.list_instances(
+        manifests = control.list_instances(
             instance_type=args.instance_type,
             status=args.status,
             parent_instance_id=args.parent_instance_id,
@@ -371,48 +382,59 @@ def main() -> None:
         return
 
     if args.command == "status":
-        manifest = manager.get_instance(args.instance_id)
+        manifest = control.get_instance(args.instance_id)
         _render_payload(_manifest_payload(manifest), as_json=args.json)
         return
 
     if args.command == "children":
-        manifests = manager.get_children(args.instance_id)
+        manifests = control.get_children(args.instance_id)
         _render_payload([_manifest_payload(item) for item in manifests], as_json=args.json)
         return
 
     if args.command == "tasks":
-        payload = manager.list_tasks(args.target)
+        payload = control.list_tasks(args.target)
         _render_payload(payload, as_json=args.json)
         return
 
     if args.command == "events":
-        payload = manager.list_orchestration_events(args.target, limit=args.limit)
+        payload = control.list_orchestration_events(args.target, limit=args.limit)
         _render_payload(payload, as_json=args.json)
         return
 
     if args.command == "retry":
-        manifest = manager.retry_instance(args.target)
+        manifest = control.retry_instance(args.target)
         _render_payload(_manifest_payload(manifest), as_json=args.json)
         return
 
     if args.command == "cancel":
-        manifest = manager.cancel_instance(args.target)
+        manifest = control.cancel_instance(args.target)
         _render_payload(_manifest_payload(manifest), as_json=args.json)
         return
 
     if args.command == "watch":
-        payload = manager.watch_instance(args.target, timeout_s=args.timeout)
+        payload = control.watch_instance(args.target, timeout_s=args.timeout)
         _render_payload(payload, as_json=True if args.json else False)
         return
 
     if args.command == "recommendations":
-        manifest = manager.get_instance(args.instance_id)
+        manifest = control.get_instance(args.instance_id)
         payload = [item.model_dump(mode="json") for item in manifest.recommendations]
         _render_payload(payload, as_json=args.json)
         return
 
+    if args.command == "action":
+        manifest = control.execute_action(
+            args.instance_id,
+            action=args.action,
+            config_path=args.config,
+            deployment_target=args.target,
+            start=not args.no_start,
+        )
+        _render_payload(_manifest_payload(manifest), as_json=args.json)
+        return
+
     if args.command == "logs":
-        logs = manager.get_logs(args.instance_id)
+        logs = control.get_logs(args.instance_id).model_dump(mode="json")
         if args.json:
             _render_payload(logs, as_json=True)
             return
@@ -424,7 +446,7 @@ def main() -> None:
                 print("\n== stderr ==")
             print(logs["stderr"], end="")
         if args.follow:
-            store = manager.store
+            store = control.store
             path = (
                 store.stdout_path(args.instance_id)
                 if args.stream in {"stdout", "both"}
@@ -434,7 +456,7 @@ def main() -> None:
         return
 
     if args.command == "evaluate":
-        manifest = manager.create_evaluation_instance(
+        manifest = control.create_evaluation_instance(
             args.instance_id,
             config_path=args.config,
             start=not args.no_start,
@@ -443,7 +465,7 @@ def main() -> None:
         return
 
     if args.command == "deploy":
-        manifest = manager.create_deployment_instance(
+        manifest = control.create_deployment_instance(
             args.instance_id,
             target=_resolve_deploy_target(args),
             config_path=args.config,
@@ -453,12 +475,17 @@ def main() -> None:
         return
 
     if args.command == "inference":
-        manifest = manager.create_inference_instance(
+        manifest = control.create_inference_instance(
             args.instance_id,
             config_path=args.config,
             start=not args.no_start,
         )
         _render_payload(_manifest_payload(manifest), as_json=args.json)
+        return
+
+    if args.command == "workspace":
+        payload = build_workspace_overview(Path(args.root) if args.root else None)
+        _render_payload(payload, as_json=args.json)
         return
 
 

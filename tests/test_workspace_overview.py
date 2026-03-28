@@ -51,3 +51,8 @@ def test_build_workspace_overview_discovers_profiles_and_commands(tmp_path: Path
     assert any(recipe["id"] == "refresh-lab" for recipe in overview["command_recipes"])
     assert any(capability["id"] == "feedback-loop" for capability in overview["orchestration_capabilities"])
     assert overview["orchestration_templates"][0]["orchestration_mode"] == "hybrid"
+    assert overview["summary"]["interfaces"] == 4
+    assert any(surface["id"] == "desktop" for surface in overview["interfaces"])
+    assert any(tier["id"] == "beginner" for tier in overview["experience_tiers"])
+    assert any(extension["id"] == "qlora" for extension in overview["extension_points"])
+    assert any(extension["id"] == "benchmark:benchmark_holdout" for extension in overview["extension_points"])

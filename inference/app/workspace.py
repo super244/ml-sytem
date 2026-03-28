@@ -7,6 +7,7 @@ from typing import Any
 import yaml
 
 from ai_factory.core.discovery import list_training_runs, load_benchmark_registry
+from ai_factory.core.foundation import build_foundation_catalog
 from data.catalog import load_catalog, load_pack_summary
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
@@ -78,6 +79,7 @@ def build_workspace_overview(root: Path | None = None) -> dict[str, Any]:
     )
     models = _load_model_catalog(repo_root)
     orchestration_templates = _load_orchestration_templates(repo_root)
+    foundation = build_foundation_catalog(repo_root)
 
     training_profiles = []
     for path in sorted((repo_root / "training" / "configs" / "profiles").glob("*.yaml")):
@@ -257,6 +259,16 @@ def build_workspace_overview(root: Path | None = None) -> dict[str, Any]:
             "title": "Lifecycle control center",
             "detail": "The runs dashboard now acts as a control center: launch new branches, inspect lifecycle detail, open inference sandboxes, and prepare publish actions from the same surface.",
         },
+        {
+            "id": "plugin-registry",
+            "title": "Extension-point registry",
+            "detail": "Training methods, evaluation suites, and deployment targets are exposed as explicit extension points so every interface can discover the same backend capabilities.",
+        },
+        {
+            "id": "live-state-manager",
+            "title": "Live state manager",
+            "detail": "The shared state layer projects orchestration metadata together with live progress and metric views, so CLI, TUI, API, and desktop surfaces stay aligned while jobs are running.",
+        },
     ]
 
     return {
@@ -270,11 +282,17 @@ def build_workspace_overview(root: Path | None = None) -> dict[str, Any]:
             "training_profiles": len(training_profiles),
             "evaluation_configs": len(evaluation_configs),
             "orchestration_templates": len(orchestration_templates),
+            "interfaces": len(foundation.interfaces),
+            "experience_tiers": len(foundation.experience_tiers),
+            "extension_points": len(foundation.extension_points),
             "ready_checks": ready_count,
             "total_checks": len(readiness_checks),
         },
         "models": models,
         "readiness_checks": readiness_checks,
+        "interfaces": [item.model_dump(mode="json") for item in foundation.interfaces],
+        "experience_tiers": [item.model_dump(mode="json") for item in foundation.experience_tiers],
+        "extension_points": [item.model_dump(mode="json") for item in foundation.extension_points],
         "command_recipes": command_recipes,
         "orchestration_capabilities": orchestration_capabilities,
         "orchestration_templates": orchestration_templates,

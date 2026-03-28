@@ -23,6 +23,10 @@ ORCHESTRATION_MODULES = [
     "ai_factory.core.execution.commands",
     "ai_factory.core.execution.local",
     "ai_factory.core.execution.ssh",
+    "ai_factory.core.plugins",
+    "ai_factory.core.plugins.base",
+    "ai_factory.core.plugins.builtins",
+    "ai_factory.core.plugins.registry",
     "ai_factory.core.monitoring",
     "ai_factory.core.monitoring.events",
     "ai_factory.core.monitoring.metrics",
@@ -52,6 +56,7 @@ def _prime_orchestration_packages(monkeypatch: pytest.MonkeyPatch) -> None:
     _stub_package(monkeypatch, "ai_factory.core.instances", repo_root / "ai_factory" / "core" / "instances")
     _stub_package(monkeypatch, "ai_factory.core.config", repo_root / "ai_factory" / "core" / "config")
     _stub_package(monkeypatch, "ai_factory.core.execution", repo_root / "ai_factory" / "core" / "execution")
+    _stub_package(monkeypatch, "ai_factory.core.plugins", repo_root / "ai_factory" / "core" / "plugins")
     _stub_package(monkeypatch, "ai_factory.core.monitoring", repo_root / "ai_factory" / "core" / "monitoring")
     _stub_package(monkeypatch, "ai_factory.core.decisions", repo_root / "ai_factory" / "core" / "decisions")
 
@@ -198,7 +203,13 @@ def test_decision_rules_cover_deploy_finetune_and_retrain(monkeypatch: pytest.Mo
     policy = schema.DecisionPolicy(min_accuracy=0.8, min_parse_rate=0.7, min_verifier_agreement=0.6)
 
     deploy = rules.decide_next_step(
-        {"accuracy": 0.9, "parse_rate": 0.8, "verifier_agreement_rate": 0.7, "no_answer_rate": 0.05},
+        {
+            "accuracy": 0.9,
+            "parse_rate": 0.8,
+            "verifier_agreement_rate": 0.7,
+            "no_answer_rate": 0.05,
+            "avg_latency_s": 1.2,
+        },
         policy,
     )
     finetune = rules.decide_next_step(

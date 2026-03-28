@@ -1,9 +1,12 @@
 from __future__ import annotations
 
 from fastapi import APIRouter, Query
+from fastapi.responses import StreamingResponse
 
 from inference.app.dependencies import get_instance_service
 from inference.app.schemas import (
+    FoundationOverviewResponse,
+    InstanceActionRequest,
     InstanceCreateRequest,
     InstanceDeployRequest,
     InstanceDetail,
@@ -12,6 +15,7 @@ from inference.app.schemas import (
     InstanceListResponse,
     InstanceLogsResponse,
     InstanceMetricsResponse,
+    InstanceStreamResponse,
 )
 
 router = APIRouter(tags=["instances"])
@@ -53,6 +57,37 @@ def get_instance_metrics(instance_id: str) -> InstanceMetricsResponse:
     return get_instance_service().get_metrics(instance_id)
 
 
+@router.get("/instances/{instance_id}/live", response_model=InstanceStreamResponse)
+def get_instance_live(instance_id: str) -> InstanceStreamResponse:
+    return get_instance_service().get_live_snapshot(instance_id)
+
+
+@router.get("/instances/{instance_id}/stream")
+async def stream_instance(
+    instance_id: str,
+    poll_interval_s: float = Query(default=1.0, ge=0.25, le=30.0),
+    log_tail_chars: int = Query(default=4000, ge=256, le=20000),
+    metric_tail_points: int = Query(default=200, ge=10, le=2000),
+    event_limit: int = Query(default=50, ge=1, le=500),
+    task_limit: int = Query(default=20, ge=1, le=200),
+) -> StreamingResponse:
+    service = get_instance_service()
+    service.get_live_snapshot(instance_id)
+
+    async def event_stream():
+        async for frame in service.control.stream_instance(
+            instance_id,
+            poll_interval_s=poll_interval_s,
+            log_tail_chars=log_tail_chars,
+            metric_tail_points=metric_tail_points,
+            event_limit=event_limit,
+            task_limit=task_limit,
+        ):
+            yield f"event: snapshot\ndata: {frame.model_dump_json()}\n\n"
+
+    return StreamingResponse(event_stream(), media_type="text/event-stream")
+
+
 @router.post("/instances/{instance_id}/evaluate", response_model=InstanceDetail)
 def evaluate_instance(instance_id: str, request: InstanceEvaluateRequest | None = None) -> InstanceDetail:
     return get_instance_service().evaluate_instance(instance_id, request)
@@ -69,3 +104,13 @@ def start_inference_instance(
 @router.post("/instances/{instance_id}/deploy", response_model=InstanceDetail)
 def deploy_instance(instance_id: str, request: InstanceDeployRequest) -> InstanceDetail:
     return get_instance_service().deploy_instance(instance_id, request)
+
+
+@router.post("/instances/{instance_id}/actions", response_model=InstanceDetail)
+def run_instance_action(instance_id: str, request: InstanceActionRequest) -> InstanceDetail:
+    return get_instance_service().run_instance_action(instance_id, request)
+
+
+@router.get("/foundation", response_model=FoundationOverviewResponse)
+def get_foundation() -> FoundationOverviewResponse:
+    return get_instance_service().get_foundation_overview()

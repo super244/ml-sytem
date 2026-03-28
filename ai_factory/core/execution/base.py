@@ -37,6 +37,10 @@ def decode_payload(value: str) -> RunnerPayload:
     return RunnerPayload.model_validate_json(body)
 
 
+class UnsupportedInstanceTypeError(RuntimeError):
+    pass
+
+
 class BaseExecutor(ABC):
     backend_name: str
 

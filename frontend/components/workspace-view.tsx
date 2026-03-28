@@ -5,7 +5,10 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 
 import {
+  type WorkspaceExtensionPoint,
+  type WorkspaceExperienceTier,
   type WorkspaceCapability,
+  type WorkspaceInterfaceSurface,
   getWorkspaceOverview,
   type WorkspaceCheck,
   type WorkspaceEvaluationConfig,
@@ -120,6 +123,9 @@ export function WorkspaceView() {
   const readinessChecks = overview?.readiness_checks ?? [];
   const trainingProfiles = overview?.training_profiles ?? [];
   const evaluationConfigs = overview?.evaluation_configs ?? [];
+  const interfaces = overview?.interfaces ?? [];
+  const experienceTiers = overview?.experience_tiers ?? [];
+  const extensionPoints = overview?.extension_points ?? [];
 
   return (
     <AppShell>
@@ -252,6 +258,60 @@ export function WorkspaceView() {
               <section className="panel workspace-section">
                 <div className="section-heading">
                   <div>
+                    <div className="eyebrow">Interfaces</div>
+                    <h2 className="workspace-title">Shared control surfaces</h2>
+                  </div>
+                </div>
+                <div className="workspace-card-grid compact">
+                  {interfaces.map((surface: WorkspaceInterfaceSurface) => (
+                    <article key={surface.id} className="workspace-card">
+                      <div className="message-meta">
+                        <span>{surface.id}</span>
+                        <span className="status-pill">{surface.status}</span>
+                      </div>
+                      <h2>{surface.label}</h2>
+                      <p className="hero-copy">{surface.description}</p>
+                      <div className="preview-block subtle">
+                        <strong>Entrypoint</strong>
+                        <p>{surface.entrypoint}</p>
+                        <p>{surface.backend_contract}</p>
+                      </div>
+                    </article>
+                  ))}
+                </div>
+              </section>
+
+              <section className="panel workspace-section">
+                <div className="section-heading">
+                  <div>
+                    <div className="eyebrow">User tiers</div>
+                    <h2 className="workspace-title">Experience profiles</h2>
+                  </div>
+                </div>
+                <div className="workspace-card-grid compact">
+                  {experienceTiers.map((tier: WorkspaceExperienceTier) => (
+                    <article key={tier.id} className="workspace-card">
+                      <div className="message-meta">
+                        <span>{tier.id}</span>
+                        <span className="status-pill">Adaptive</span>
+                      </div>
+                      <h2>{tier.label}</h2>
+                      <p className="hero-copy">{tier.description}</p>
+                      <div className="preview-block subtle">
+                        <strong>Visible controls</strong>
+                        <p>{tier.visible_controls.join(" • ")}</p>
+                        <p>Modes: {tier.recommended_modes.join(" • ")}</p>
+                      </div>
+                    </article>
+                  ))}
+                </div>
+              </section>
+            </section>
+
+            <section className="workspace-section-grid">
+              <section className="panel workspace-section">
+                <div className="section-heading">
+                  <div>
                     <div className="eyebrow">Control plane</div>
                     <h2 className="workspace-title">Orchestration capabilities</h2>
                   </div>
@@ -270,6 +330,34 @@ export function WorkspaceView() {
                 </div>
               </section>
 
+              <section className="panel workspace-section">
+                <div className="section-heading">
+                  <div>
+                    <div className="eyebrow">Extension points</div>
+                    <h2 className="workspace-title">Lifecycle plugins and targets</h2>
+                  </div>
+                </div>
+                <div className="workspace-card-grid">
+                  {extensionPoints.map((extension: WorkspaceExtensionPoint) => (
+                    <article key={extension.id} className="workspace-card">
+                      <div className="message-meta">
+                        <span>{extension.kind}</span>
+                        <span className="status-pill">{extension.maturity}</span>
+                      </div>
+                      <h2>{extension.label}</h2>
+                      <p className="hero-copy">{extension.description}</p>
+                      <div className="preview-block subtle">
+                        <strong>Instance types</strong>
+                        <p>{extension.supported_instance_types.join(" • ")}</p>
+                        {extension.config_hint ? <p>Hint: {extension.config_hint}</p> : null}
+                      </div>
+                    </article>
+                  ))}
+                </div>
+              </section>
+            </section>
+
+            <section className="workspace-section-grid">
               <section className="panel workspace-section">
                 <div className="section-heading">
                   <div>
