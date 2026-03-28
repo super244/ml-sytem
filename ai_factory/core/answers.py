@@ -2,18 +2,19 @@ from __future__ import annotations
 
 import ast
 from collections import Counter
+from collections.abc import Iterable
 from dataclasses import dataclass
 import math
 import operator
 import re
-from typing import Any, Iterable
+from typing import Any, Callable, cast
 
 from sympy import simplify, sympify
 
 from ai_factory.core.hashing import normalize_text
 
 
-SAFE_OPERATORS: dict[type[ast.AST], Any] = {
+SAFE_OPERATORS: dict[type[ast.AST], Callable[..., float]] = {
     ast.Add: operator.add,
     ast.Sub: operator.sub,
     ast.Mult: operator.mul,
@@ -56,9 +57,11 @@ def safe_eval(expression: str) -> float:
         if isinstance(node, ast.Name) and node.id in SAFE_NAMES:
             return float(SAFE_NAMES[node.id])
         if isinstance(node, ast.BinOp) and type(node.op) in SAFE_OPERATORS:
-            return SAFE_OPERATORS[type(node.op)](_eval(node.left), _eval(node.right))
+            fn = SAFE_OPERATORS[type(node.op)]
+            return float(fn(_eval(node.left), _eval(node.right)))
         if isinstance(node, ast.UnaryOp) and type(node.op) in SAFE_OPERATORS:
-            return SAFE_OPERATORS[type(node.op)](_eval(node.operand))
+            fn = SAFE_OPERATORS[type(node.op)]
+            return float(fn(_eval(node.operand)))
         raise ValueError(f"Unsafe expression: {expression}")
 
     parsed = ast.parse(expression, mode="eval")
@@ -134,7 +137,8 @@ def answers_equivalent(left: str | None, right: str | None) -> bool:
     if answer_key(left) == answer_key(right):
         return True
     try:
-        return simplify(sympify(left) - sympify(right)) == 0
+        equivalent = simplify(sympify(left) - sympify(right)) == 0
+        return cast(bool, equivalent)
     except Exception:
         return False
 
