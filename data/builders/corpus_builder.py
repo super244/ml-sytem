@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from collections.abc import Iterable
 import csv
 from dataclasses import dataclass, field
 import glob
@@ -9,7 +10,7 @@ import math
 from pathlib import Path
 import random
 import re
-from typing import Any, Iterable
+from typing import Any
 from urllib.parse import urlparse
 from urllib.request import Request, urlopen
 
