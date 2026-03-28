@@ -1,12 +1,17 @@
 from __future__ import annotations
 
 import csv
-from dataclasses import dataclass
+from dataclasses import dataclass, field
+import glob
+import io
 import json
+import math
 from pathlib import Path
 import random
 import re
 from typing import Any, Iterable
+from urllib.parse import urlparse
+from urllib.request import Request, urlopen
 
 import yaml
 
@@ -33,10 +38,13 @@ class ProcessingConfig:
     seed: int = 42
     eval_ratio: float = 0.15
     test_ratio: float = 0.05
+    dataset_version: str = "v2"
+    processing_version: str = "v1"
+    source_spec_version: str = "v1"
     min_difficulty: str = "hard"
     max_samples: int | None = None
     hard_only: bool = False
-    sources: list[str] | None = None
+    sources: list[Any] | None = None
     failure_logs: list[str] | None = None
     topic_allowlist: list[str] | None = None
     source_allowlist: list[str] | None = None
@@ -52,6 +60,20 @@ class ProcessingConfig:
     derived_packs: list[str] | None = None
 
 
+@dataclass
+class SourceSpec:
+    id: str
+    kind: str = "local"
+    path: str | None = None
+    split: str = "train"
+    revision: str | None = None
+    cache_dir: str | None = None
+    sample_ratio: float | None = None
+    version: str | None = None
+    optional: bool = False
+    metadata: dict[str, Any] = field(default_factory=dict)
+
+
 def load_processing_config(path: str | Path) -> ProcessingConfig:
     raw = yaml.safe_load(Path(path).read_text()) or {}
     return ProcessingConfig(**raw)
@@ -64,7 +86,7 @@ def resolve_source_paths(paths: list[str] | None) -> list[Path]:
     for path_str in paths:
         path = Path(path_str)
         if any(char in path_str for char in "*?[]"):
-            resolved.extend(sorted(Path().glob(path_str)))
+            resolved.extend(sorted(Path(match) for match in glob.glob(path_str, recursive=True)))
             continue
         if path.is_dir():
             resolved.extend(sorted(child for child in path.iterdir() if child.is_file()))
@@ -98,6 +120,299 @@ def read_records(path: Path) -> Iterable[dict[str, Any]]:
             yield from reader
         return
     raise ValueError(f"Unsupported file type: {path}")
+
+
+def _slug_source_id(value: str | None, index: int) -> str:
+    cleaned = re.sub(r"[^a-zA-Z0-9]+", "_", str(value or "")).strip("_").lower()
+    return cleaned or f"source_{index}"
+
+
+def _coerce_ratio(value: Any) -> float | None:
+    if value is None:
+        return None
+    ratio = float(value)
+    if ratio < 0:
+        return 0.0
+    return min(ratio, 1.0)
+
+
+def _source_kind_from_value(value: str | None) -> str:
+    cleaned = str(value or "").strip().lower()
+    if cleaned.startswith("s3://"):
+        return "s3"
+    if cleaned.startswith("http://") or cleaned.startswith("https://"):
+        return "web"
+    if cleaned in {"huggingface", "hf", "dataset"}:
+        return "huggingface"
+    if cleaned in {"local", "composite", "mix", "group", "s3", "web"}:
+        return cleaned
+    return "local"
+
+
+def _parse_source_entry(entry: Any, index: int) -> list[SourceSpec]:
+    if isinstance(entry, str):
+        return [
+            SourceSpec(
+                id=_slug_source_id(Path(entry).stem or entry, index),
+                kind=_source_kind_from_value(entry),
+                path=entry,
+            )
+        ]
+    if not isinstance(entry, dict):
+        raise TypeError(f"Unsupported source spec: {entry!r}")
+
+    kind = _source_kind_from_value(entry.get("kind") or entry.get("loader") or entry.get("path") or entry.get("url") or entry.get("uri"))
+    if kind in {"composite", "mix", "group"}:
+        child_specs: list[SourceSpec] = []
+        for child_index, child in enumerate(entry.get("sources") or []):
+            child_specs.extend(_parse_source_entry(child, child_index))
+        parent_ratio = _coerce_ratio(entry.get("sample_ratio") or entry.get("ratio") or entry.get("mix_ratio"))
+        inherited_version = entry.get("version")
+        inherited_optional = bool(entry.get("optional", False))
+        inherited_metadata = {k: v for k, v in entry.items() if k not in {"kind", "loader", "sources", "sample_ratio", "ratio", "mix_ratio"}}
+        for child_spec in child_specs:
+            if parent_ratio is not None:
+                child_spec.sample_ratio = _coerce_ratio((child_spec.sample_ratio or 1.0) * parent_ratio)
+            if inherited_version and not child_spec.version:
+                child_spec.version = str(inherited_version)
+            child_spec.optional = child_spec.optional or inherited_optional
+            child_spec.metadata = {**inherited_metadata, **child_spec.metadata}
+        return child_specs
+
+    path = entry.get("path") or entry.get("url") or entry.get("uri")
+    source_id = entry.get("id") or _slug_source_id(path or f"source_{index}", index)
+    metadata = dict(entry.get("metadata") or {})
+    for key in ("filters", "loader_kwargs", "headers", "query_params"):
+        if key in entry and entry[key] is not None:
+            metadata[key] = entry[key]
+    return [
+        SourceSpec(
+            id=str(source_id),
+            kind=kind,
+            path=path,
+            split=str(entry.get("split", "train")),
+            revision=entry.get("revision"),
+            cache_dir=entry.get("cache_dir"),
+            sample_ratio=_coerce_ratio(entry.get("sample_ratio") or entry.get("ratio") or entry.get("mix_ratio")),
+            version=str(entry["version"]) if entry.get("version") is not None else None,
+            optional=bool(entry.get("optional", False)),
+            metadata=metadata,
+        )
+    ]
+
+
+def coerce_source_specs(raw_sources: list[Any] | None) -> list[SourceSpec]:
+    specs: list[SourceSpec] = []
+    for index, entry in enumerate(raw_sources or []):
+        specs.extend(_parse_source_entry(entry, index))
+    return specs
+
+
+def _read_records_from_text(text: str, *, suffix: str = "", content_type: str = "") -> list[dict[str, Any]]:
+    body = text.strip()
+    if not body:
+        return []
+    suffix = suffix.lower()
+    content_type = content_type.lower()
+    if suffix == ".csv" or "csv" in content_type:
+        return list(csv.DictReader(io.StringIO(text)))
+    if suffix == ".json":
+        payload = json.loads(text)
+        if isinstance(payload, list):
+            return [dict(item) for item in payload]
+        if isinstance(payload, dict):
+            if isinstance(payload.get("data"), list):
+                return [dict(item) for item in payload["data"]]
+            return [payload]
+    if suffix == ".jsonl" or "jsonl" in content_type:
+        return [json.loads(line) for line in body.splitlines() if line.strip()]
+    try:
+        payload = json.loads(text)
+    except json.JSONDecodeError:
+        return [json.loads(line) for line in body.splitlines() if line.strip()]
+    if isinstance(payload, list):
+        return [dict(item) for item in payload]
+    if isinstance(payload, dict):
+        if isinstance(payload.get("data"), list):
+            return [dict(item) for item in payload["data"]]
+        return [payload]
+    return []
+
+
+def _load_local_source_rows(spec: SourceSpec) -> list[dict[str, Any]]:
+    if not spec.path:
+        return []
+    paths = resolve_source_paths([spec.path])
+    rows: list[dict[str, Any]] = []
+    for path in paths:
+        rows.extend(dict(row) for row in read_records(path))
+    return rows
+
+
+def _load_huggingface_source_rows(spec: SourceSpec) -> list[dict[str, Any]]:
+    try:
+        from datasets import load_dataset
+    except ModuleNotFoundError as exc:  # pragma: no cover - depends on optional install
+        raise RuntimeError(
+            f"Source '{spec.id}' requires the optional 'datasets' dependency. Install it or mark the source optional."
+        ) from exc
+    dataset = load_dataset(spec.path, split=spec.split, cache_dir=spec.cache_dir, revision=spec.revision)
+    return [dict(row) for row in dataset]
+
+
+def _load_web_source_rows(spec: SourceSpec) -> list[dict[str, Any]]:
+    if not spec.path:
+        return []
+    request = Request(spec.path, headers={"User-Agent": "ai-factory-data-loader/1.0"})
+    with urlopen(request) as response:  # nosec B310 - controlled loader utility
+        body = response.read().decode(response.headers.get_content_charset() or "utf-8")
+        content_type = response.headers.get("Content-Type", "")
+    suffix = Path(urlparse(spec.path).path).suffix
+    return _read_records_from_text(body, suffix=suffix, content_type=content_type)
+
+
+def _load_s3_source_rows(spec: SourceSpec) -> list[dict[str, Any]]:
+    if not spec.path:
+        return []
+    try:
+        import boto3
+    except ModuleNotFoundError as exc:  # pragma: no cover - depends on optional install
+        raise RuntimeError(
+            f"Source '{spec.id}' requires the optional 'boto3' dependency. Install it or mark the source optional."
+        ) from exc
+    parsed = urlparse(spec.path)
+    bucket = parsed.netloc
+    key = parsed.path.lstrip("/")
+    if not bucket or not key:
+        raise ValueError(f"Invalid S3 URI: {spec.path}")
+    client = boto3.client("s3")
+    response = client.get_object(Bucket=bucket, Key=key)
+    body = response["Body"].read().decode("utf-8")
+    content_type = response.get("ContentType", "")
+    suffix = Path(key).suffix
+    return _read_records_from_text(body, suffix=suffix, content_type=content_type)
+
+
+def load_source_rows(spec: SourceSpec) -> list[dict[str, Any]]:
+    kind = spec.kind.lower()
+    if kind == "local":
+        return _load_local_source_rows(spec)
+    if kind == "huggingface":
+        return _load_huggingface_source_rows(spec)
+    if kind == "web":
+        return _load_web_source_rows(spec)
+    if kind == "s3":
+        return _load_s3_source_rows(spec)
+    raise ValueError(f"Unsupported source kind: {spec.kind}")
+
+
+def _sample_source_rows(rows: list[dict[str, Any]], spec: SourceSpec, seed: int) -> list[dict[str, Any]]:
+    if not rows:
+        return []
+    ratio = spec.sample_ratio
+    if ratio is None or ratio >= 1.0:
+        return rows
+    if ratio <= 0:
+        return []
+    sample_size = min(len(rows), max(1, math.ceil(len(rows) * ratio)))
+    rng = random.Random(f"{seed}:{spec.id}")
+    chosen_indexes = sorted(rng.sample(range(len(rows)), sample_size))
+    return [rows[index] for index in chosen_indexes]
+
+
+def load_source_records(
+    specs: list[SourceSpec],
+    *,
+    seed: int,
+) -> tuple[list[tuple[SourceSpec, dict[str, Any]]], list[dict[str, Any]], list[str]]:
+    loaded_rows: list[tuple[SourceSpec, dict[str, Any]]] = []
+    summaries: list[dict[str, Any]] = []
+    warnings: list[str] = []
+    for spec in specs:
+        try:
+            raw_rows = load_source_rows(spec)
+            selected_rows = _sample_source_rows(raw_rows, spec, seed)
+        except Exception as exc:  # noqa: BLE001
+            if spec.optional:
+                warnings.append(f"Skipped optional source '{spec.id}': {exc}")
+                summaries.append(
+                    {
+                        "id": spec.id,
+                        "kind": spec.kind,
+                        "path": spec.path,
+                        "version": spec.version,
+                        "sample_ratio": spec.sample_ratio,
+                        "optional": True,
+                        "status": "skipped",
+                        "rows_loaded": 0,
+                        "rows_selected": 0,
+                        "error": str(exc),
+                    }
+                )
+                continue
+            raise
+        summaries.append(
+            {
+                "id": spec.id,
+                "kind": spec.kind,
+                "path": spec.path,
+                "version": spec.version,
+                "sample_ratio": spec.sample_ratio,
+                "optional": spec.optional,
+                "status": "loaded",
+                "rows_loaded": len(raw_rows),
+                "rows_selected": len(selected_rows),
+            }
+        )
+        loaded_rows.extend((spec, row) for row in selected_rows)
+    return loaded_rows, summaries, warnings
+
+
+def _source_lineage_notes(spec: SourceSpec) -> list[str]:
+    notes = [f"kind={spec.kind}"]
+    if spec.version:
+        notes.append(f"version={spec.version}")
+    if spec.sample_ratio is not None:
+        notes.append(f"sample_ratio={spec.sample_ratio}")
+    return notes
+
+
+def _source_metadata(spec: SourceSpec, summary: dict[str, Any]) -> dict[str, Any]:
+    metadata = {
+        "source_spec_id": spec.id,
+        "source_kind": spec.kind,
+        "source_path": spec.path,
+        "source_split": spec.split,
+        "source_version": spec.version,
+        "source_sample_ratio": spec.sample_ratio,
+    }
+    metadata.update(summary)
+    metadata.update(spec.metadata)
+    return {key: value for key, value in metadata.items() if value is not None}
+
+
+def _build_source_input_infos(specs: list[SourceSpec], summaries: list[dict[str, Any]]) -> list[DatasetFileInfo]:
+    summary_lookup = {
+        (summary["id"], summary.get("path"), summary.get("version")): summary for summary in summaries
+    }
+    inputs: list[DatasetFileInfo] = []
+    for spec in specs:
+        if spec.kind == "local" and spec.path:
+            local_paths = resolve_source_paths([spec.path])
+            if local_paths:
+                inputs.extend(_build_file_info(path) for path in local_paths)
+                continue
+        summary = summary_lookup.get((spec.id, spec.path, spec.version))
+        selected_rows = summary.get("rows_selected", 0) if summary else 0
+        inputs.append(
+            DatasetFileInfo(
+                path=spec.path or spec.id,
+                sha256="",
+                size_bytes=0,
+                num_rows=selected_rows,
+            )
+        )
+    return inputs
 
 
 def first_text(record: dict[str, Any], keys: tuple[str, ...]) -> str | None:
@@ -139,7 +454,11 @@ def _coerce_step_checks(step_checks: Any) -> list[dict[str, Any]]:
     return normalized
 
 
-def normalize_record(record: dict[str, Any], default_source: str) -> dict[str, Any] | None:
+def normalize_record(
+    record: dict[str, Any],
+    default_source: str,
+    source_meta: dict[str, Any] | None = None,
+) -> dict[str, Any] | None:
     question = first_text(record, QUESTION_KEYS)
     solution = first_text(record, SOLUTION_KEYS)
     if not question or not solution:
@@ -149,12 +468,33 @@ def normalize_record(record: dict[str, Any], default_source: str) -> dict[str, A
     final_answer = first_text(record, FINAL_ANSWER_KEYS)
     difficulty = normalize_difficulty(record.get("difficulty") or first_text(record, ("level", "competition_level")))
     reasoning_style = str(record.get("reasoning_style") or ("verification" if record.get("failure_case") else "mixed"))
+    loader_kind = str((source_meta or {}).get("source_kind") or "local")
+    origin_path = str((source_meta or {}).get("source_path") or record.get("origin_path") or default_source)
     lineage = record.get("lineage") or SourceLineage(
         dataset_id=source,
         dataset_family=source,
-        origin_path=str(record.get("origin_path") or default_source),
-        loader="local",
+        origin_path=origin_path,
+        loader=loader_kind,
+        source_url=(source_meta or {}).get("source_path") if loader_kind in {"web", "s3"} else None,
     ).model_dump()
+    if not isinstance(lineage, dict):
+        lineage = SourceLineage.model_validate(lineage).model_dump()
+    if source_meta:
+        notes = list(lineage.get("notes", []))
+        notes.extend(
+            _source_lineage_notes(
+                SourceSpec(
+                    id=default_source,
+                    kind=loader_kind,
+                    path=origin_path,
+                    sample_ratio=source_meta.get("source_sample_ratio"),
+                    version=source_meta.get("source_version"),
+                )
+            )
+        )
+        lineage["notes"] = list(dict.fromkeys(notes))
+        lineage["loader"] = loader_kind
+        lineage.setdefault("origin_path", origin_path)
     normalized = {
         "schema_version": "v2",
         "id": record.get("id") or stable_question_fingerprint(question),
@@ -183,6 +523,7 @@ def normalize_record(record: dict[str, Any], default_source: str) -> dict[str, A
         "generator": record.get("generator"),
         "metadata": {
             "original_source": source,
+            **({key: value for key, value in (source_meta or {}).items() if value is not None}),
             **(record.get("metadata") or {}),
         },
     }
@@ -297,12 +638,24 @@ def _build_file_info(path: Path) -> DatasetFileInfo:
 
 def build_corpus(config: ProcessingConfig, config_path: str | Path) -> dict[str, Any]:
     all_records: list[dict[str, Any]] = []
-    for path in resolve_source_paths(config.sources):
-        default_source = path.stem
-        for raw in read_records(path):
-            normalized = normalize_record(raw, default_source=default_source)
-            if normalized:
-                all_records.append(normalized)
+    source_specs = coerce_source_specs(config.sources)
+    source_rows, source_summaries, source_warnings = load_source_records(source_specs, seed=config.seed)
+    summary_lookup = {
+        (summary["id"], summary.get("path"), summary.get("version")): summary for summary in source_summaries
+    }
+    for spec, raw in source_rows:
+        source_meta = _source_metadata(
+            spec,
+            {
+                **summary_lookup.get((spec.id, spec.path, spec.version), {}),
+                "dataset_version": config.dataset_version,
+                "processing_version": config.processing_version,
+                "source_spec_version": config.source_spec_version,
+            },
+        )
+        normalized = normalize_record(raw, default_source=spec.id, source_meta=source_meta)
+        if normalized:
+            all_records.append(normalized)
     for path in resolve_source_paths(config.failure_logs):
         for raw in read_records(path):
             normalized = normalize_record(dict(raw, failure_case=True), default_source=f"failure_log::{path.stem}")
@@ -372,18 +725,28 @@ def build_corpus(config: ProcessingConfig, config_path: str | Path) -> dict[str,
         config_path=str(config_path),
         config_sha256=sha256_text(config_text),
         seed=config.seed,
-        notes=["atlas_math_lab_v2"],
+        notes=["atlas_math_lab_v2", f"processing_version={config.processing_version}", f"dataset_version={config.dataset_version}"],
     )
     manifest = DatasetManifest(
         manifest_type="dataset",
         build=build,
         pack_id="core_train_mix",
         description="Canonical processed mixture for Atlas Math Lab.",
-        inputs=[_build_file_info(path) for path in resolve_source_paths(config.sources) + resolve_source_paths(config.failure_logs)],
+        inputs=[
+            *_build_source_input_infos(source_specs, source_summaries),
+            *[_build_file_info(path) for path in resolve_source_paths(config.failure_logs)],
+        ],
         outputs=[_build_file_info(path) for path in [normalized_path, train_path, eval_path, test_path, stats_path]],
         source_lineage=[SourceLineage.model_validate(record["lineage"]) for record in normalized_all[:1000]],
         stats=stats,
-        metadata={"system_prompt": config.system_prompt},
+        metadata={
+            "system_prompt": config.system_prompt,
+            "dataset_version": config.dataset_version,
+            "processing_version": config.processing_version,
+            "source_spec_version": config.source_spec_version,
+            "source_summaries": source_summaries,
+            "source_warnings": source_warnings,
+        },
     )
     manifest_path = output_dir / "manifest.json"
     write_json(manifest_path, manifest.model_dump())
@@ -417,4 +780,6 @@ def build_corpus(config: ProcessingConfig, config_path: str | Path) -> dict[str,
         "stats": stats,
         "manifest_path": str(manifest_path),
         "derived_packs": derived_pack_summaries,
+        "source_summaries": source_summaries,
+        "source_warnings": source_warnings,
     }

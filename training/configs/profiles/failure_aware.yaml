@@ -7,6 +7,7 @@ refs:
   data: ../components/data/failure_aware.yaml
   runtime: ../components/runtime/hybrid_local.yaml
   logging: ../components/logging/default.yaml
+  tracking: ../components/tracking/default.yaml
   packaging: ../components/packaging/default.yaml
 training:
   num_train_epochs: 2.0

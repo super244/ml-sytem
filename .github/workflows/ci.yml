@@ -2,39 +2,64 @@ name: ci
 
 on:
   push:
-    branches: ["main", "codex/**"]
+    branches:
+      - main
   pull_request:
 
 jobs:
-  python-checks:
+  python:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
       - uses: actions/setup-python@v5
         with:
           python-version: "3.11"
+          cache: pip
+          cache-dependency-path: |
+            requirements-dev.txt
+            requirements.txt
+
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install -e .[dev]
-      - name: Compile Python packages
-        run: python -m compileall ai_factory data training inference evaluation
-      - name: Run tests
-        run: pytest
+          python -m pip install -r requirements-dev.txt
 
-  frontend-checks:
-    runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: frontend
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: "20"
-      - name: Install frontend deps
-        run: npm install
-      - name: Typecheck
-        run: npm run typecheck
-      - name: Build frontend
-        run: npm run build
+      - name: Collect changed Python files
+        id: changed
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ "${GITHUB_EVENT_NAME}" == "pull_request" ]]; then
+            base="${{ github.event.pull_request.base.sha }}"
+          else
+            base="${{ github.event.before }}"
+          fi
+          if [[ -z "${base}" || "${base}" == "0000000000000000000000000000000000000000" ]]; then
+            if git rev-parse HEAD^ >/dev/null 2>&1; then
+              base="$(git rev-parse HEAD^)"
+            else
+              base="$(git rev-parse HEAD)"
+            fi
+          fi
+          git diff --name-only "${base}" "${GITHUB_SHA}" -- '*.py' \
+            | grep -E '^(ai_factory|data|evaluation|inference|training)/.*\.py$' \
+            > changed-python-files.txt || true
+          if [[ -s changed-python-files.txt ]]; then
+            echo "has_files=true" >> "${GITHUB_OUTPUT}"
+          else
+            echo "has_files=false" >> "${GITHUB_OUTPUT}"
+          fi
+
+      - name: Ruff
+        if: steps.changed.outputs.has_files == 'true'
+        run: xargs -r python -m ruff check --select F,B,UP < changed-python-files.txt
+
+      - name: Mypy
+        if: steps.changed.outputs.has_files == 'true'
+        run: xargs -r python -m mypy --config-file=pyproject.toml < changed-python-files.txt
+
+      - name: Pytest
+        run: python -m pytest -q

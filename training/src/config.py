@@ -122,6 +122,25 @@ class LoggingConfig:
 
 
 @dataclass
+class TrackingConfig:
+    provider: str = "none"
+    project: str = "ai-factory"
+    experiment_name: str = "default"
+    run_name: str | None = None
+    tags: list[str] = field(default_factory=list)
+    metadata: dict[str, Any] = field(default_factory=dict)
+    mlflow_tracking_uri: str | None = None
+    wandb_entity: str | None = None
+    wandb_mode: str = "offline"
+    capture_environment: bool = True
+    capture_installed_packages: bool = True
+    log_config_artifact: bool = True
+    log_dataset_artifacts: bool = True
+    log_model_artifacts: bool = True
+    log_summary_artifact: bool = True
+
+
+@dataclass
 class PackagingConfig:
     publish_model_name: str = "atlas-math-failure-aware"
     export_merged_model: bool = False
@@ -142,6 +161,7 @@ class ExperimentConfig:
     adapter: AdapterConfig
     runtime: RuntimeConfig
     logging: LoggingConfig
+    tracking: TrackingConfig
     packaging: PackagingConfig
     config_path: str | None = None
 
@@ -186,7 +206,7 @@ def _apply_refs(config_path: Path, raw: dict[str, Any]) -> dict[str, Any]:
         merged[section] = _load_yaml(resolved)
     if "lora" in raw and "adapter" not in raw:
         raw["adapter"] = raw["lora"]
-    for section in ("model", "data", "training", "adapter", "runtime", "logging", "packaging"):
+    for section in ("model", "data", "training", "adapter", "runtime", "logging", "tracking", "packaging"):
         if section in raw:
             merged[section] = _deep_merge(merged.get(section, {}), raw[section])
     if raw.get("overrides"):
@@ -212,6 +232,7 @@ def load_experiment_config(path: str) -> ExperimentConfig:
         adapter=_construct(AdapterConfig, merged.get("adapter")),
         runtime=_construct(RuntimeConfig, merged.get("runtime")),
         logging=_construct(LoggingConfig, merged.get("logging")),
+        tracking=_construct(TrackingConfig, merged.get("tracking")),
         packaging=_construct(PackagingConfig, merged.get("packaging")),
         config_path=str(config_path),
     )

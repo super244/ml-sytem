@@ -3,7 +3,7 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any
 
-from ai_factory.core.artifacts import ArtifactLayout, ensure_latest_pointer, write_json
+from ai_factory.core.artifacts import ArtifactLayout, current_git_sha, ensure_latest_pointer, write_json
 from ai_factory.core.schemas import RunManifest
 from training.src.analysis import write_run_summary
 from training.src.config import ExperimentConfig
@@ -18,6 +18,7 @@ def write_run_manifest(
     report_files: list[str],
     metadata: dict[str, Any],
 ) -> RunManifest:
+    repo_root = Path(__file__).resolve().parents[2]
     manifest = RunManifest(
         run_id=layout.run_id,
         run_name=config.run_name,
@@ -26,6 +27,7 @@ def write_run_manifest(
         model_name=config.packaging.publish_model_name,
         base_model=config.model.base_model_name,
         config_path=config.config_path,
+        git_sha=current_git_sha(repo_root),
         data_files=data_files,
         metrics_files=metrics_files,
         report_files=report_files,

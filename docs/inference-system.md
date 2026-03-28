@@ -32,6 +32,7 @@ The inference layer is designed to support both product interaction and benchmar
 - health and status
 - models, prompts, datasets, benchmarks, runs
 - generate, batch-generate, compare, verify
+- OpenAI-compatible chat completions and usage tracking
 
 Versioned `/v1/*` routes are the primary interface.
 
@@ -49,3 +50,4 @@ Responses can include:
 - latency
 - cache status
 - structured JSON payload
+- usage totals for OpenAI-compatible requests

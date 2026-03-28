@@ -52,12 +52,17 @@ def load_tokenizer(config: ExperimentConfig) -> Any:
 def load_model_for_training(config: ExperimentConfig) -> Any:
     quantization_config = build_quantization_config(config)
     dtype = resolve_dtype(config.model.bnb_compute_dtype)
+    method = (config.lora.method or "qlora").lower()
+    if method in {"full", "sft"} and quantization_config is not None:
+        raise ValueError("Full/SFT training requires use_4bit=false and use_8bit=false.")
+
     model = AutoModelForCausalLM.from_pretrained(
         config.model.base_model_name,
         trust_remote_code=config.model.trust_remote_code,
         quantization_config=quantization_config,
         device_map="auto",
         torch_dtype=dtype,
+        low_cpu_mem_usage=config.runtime.low_cpu_mem_usage,
     )
     model.config.use_cache = False
     if config.model.gradient_checkpointing:
@@ -67,6 +72,11 @@ def load_model_for_training(config: ExperimentConfig) -> Any:
             model,
             use_gradient_checkpointing=config.model.gradient_checkpointing,
         )
+
+    if method in {"full", "sft"}:
+        return model
+    if method not in {"lora", "qlora"}:
+        raise ValueError(f"Unsupported adapter method: {config.lora.method}")
 
     lora_config = LoraConfig(
         r=config.lora.r,

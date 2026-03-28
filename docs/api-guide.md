@@ -5,6 +5,7 @@
 - `GET /v1/health`
 - `GET /v1/status`
 - `GET /v1/models`
+- `GET /v1/models/{model_id}`
 - `GET /v1/prompts`
 - `GET /v1/datasets`
 - `GET /v1/benchmarks`
@@ -16,6 +17,13 @@
 - `POST /v1/generate/batch`
 - `POST /v1/compare`
 - `POST /v1/verify`
+
+## OpenAI-Compatible Endpoints
+
+- `POST /v1/chat/completions`
+- `GET /v1/usage`
+
+`GET /v1/models` now includes both the legacy `models` key and an OpenAI-style `data` list so existing clients keep working while OpenAI clients can discover models.
 
 ## Example Generate Payload
 

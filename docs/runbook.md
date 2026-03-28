@@ -64,6 +64,12 @@ Outputs in `data/processed/`:
 - `packs/<pack_id>/manifest.json`
 - `packs/<pack_id>/card.md`
 
+If you want a tokenization-aware quick look at the corpus, run:
+
+```bash
+python3 data/tools/preview_dataset.py --input data/processed/train.jsonl --tokenizer Qwen/Qwen2.5-Math-1.5B-Instruct
+```
+
 ## 5. Validate Training Configuration
 
 Use dry-run mode before loading weights or starting a longer training job:
@@ -118,6 +124,7 @@ Primary metadata routes:
 - `GET /v1/health`
 - `GET /v1/status`
 - `GET /v1/models`
+- `GET /v1/models/{model_id}`
 - `GET /v1/prompts`
 - `GET /v1/datasets`
 - `GET /v1/benchmarks`
@@ -129,6 +136,8 @@ Primary generation routes:
 - `POST /v1/generate/batch`
 - `POST /v1/compare`
 - `POST /v1/verify`
+- `POST /v1/chat/completions`
+- `GET /v1/usage`
 
 Legacy aliases such as `/generate` and `/verify` remain available.
 
