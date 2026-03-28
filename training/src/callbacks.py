@@ -6,6 +6,8 @@ from typing import Any
 
 from transformers import TrainerCallback
 
+from training.src.tracking import CompositeTracker
+
 
 class JsonlMetricsCallback(TrainerCallback):
     def __init__(self, output_dir: str):
@@ -22,3 +24,13 @@ class JsonlMetricsCallback(TrainerCallback):
         }
         with self.output_path.open("a") as handle:
             handle.write(json.dumps(payload) + "\n")
+
+
+class TrackerCallback(TrainerCallback):
+    def __init__(self, tracker: CompositeTracker):
+        self.tracker = tracker
+
+    def on_log(self, args, state, control, logs: dict[str, Any] | None = None, **kwargs):
+        if not logs:
+            return
+        self.tracker.log_metrics(logs, step=state.global_step)

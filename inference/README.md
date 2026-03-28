@@ -26,6 +26,8 @@ The inference layer is a product and research backend for math-specialist servin
 - reasoning visibility toggles
 - structured JSON output
 - answer verification endpoint
+- OpenAI-compatible chat completions with optional API-key auth and in-memory rate limiting
+- request usage tracking and streaming responses
 - dataset, benchmark, run, and status metadata
 
 ## Primary Routes
@@ -33,6 +35,7 @@ The inference layer is a product and research backend for math-specialist servin
 - `GET /v1/health`
 - `GET /v1/status`
 - `GET /v1/models`
+- `GET /v1/models/{model_id}`
 - `GET /v1/datasets`
 - `GET /v1/prompts`
 - `GET /v1/benchmarks`
@@ -48,6 +51,14 @@ The inference layer is a product and research backend for math-specialist servin
 - `POST /v1/generate/batch`
 - `POST /v1/compare`
 - `POST /v1/verify`
+- `POST /v1/chat/completions`
+- `GET /v1/usage`
+
+## OpenAI-Compatible Settings
+
+- `OPENAI_API_KEYS`: optional comma-separated bearer tokens for `/v1/chat/completions` and `/v1/usage`
+- `OPENAI_RATE_LIMIT_REQUESTS_PER_MINUTE`: optional in-memory limit per API key or client IP
+- `OPENAI_RATE_LIMIT_WINDOW_SECONDS`: rate-limit window, default `60`
 
 ## Example Command
 

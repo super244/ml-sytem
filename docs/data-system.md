@@ -36,6 +36,10 @@ The public registry currently tracks five calculus-oriented dataset families thr
 - default weighting
 - benchmark tags
 
+## Processed Corpus Inputs
+
+`data/prepare_dataset.py` accepts composable source specs in `data/configs/processing.yaml`. In addition to legacy local file paths and globs, sources can be declared as `local`, `huggingface`, `s3`, or `web`, and nested under `composite` groups with per-source `sample_ratio` and `version` metadata.
+
 ## Derived Packs
 
 The corpus builder emits these fixed pack ids:
@@ -57,6 +61,7 @@ The corpus builder emits these fixed pack ids:
 - `size_report.md`
 - `pack_summary.json`
 - per-pack manifests and cards under `data/processed/packs/`
+- source summaries, version metadata, and optional source warnings in the manifest metadata
 
 ## Key Commands
 

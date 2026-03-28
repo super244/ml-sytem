@@ -61,6 +61,19 @@ async def test_generate_endpoint(monkeypatch):
                 "output_format": "text",
                 "use_cache": True,
             },
-        )
+    )
     assert response.status_code == 200
     assert response.json()["final_answer"] == "2"
+
+
+@pytest.mark.anyio
+async def test_models_endpoint_still_exposes_legacy_models_key(monkeypatch):
+    transport = httpx.ASGITransport(app=app)
+    async with httpx.AsyncClient(transport=transport, base_url="http://testserver") as client:
+        response = await client.get("/v1/models")
+
+    assert response.status_code == 200
+    body = response.json()
+    assert "models" in body
+    assert body["object"] == "list"
+    assert isinstance(body["data"], list)

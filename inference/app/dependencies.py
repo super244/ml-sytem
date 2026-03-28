@@ -10,6 +10,7 @@ from inference.app.telemetry import JsonlTelemetryLogger
 
 if TYPE_CHECKING:
     from inference.app.services.generation_service import GenerationService
+    from inference.app.services.openai_service import OpenAIService
     from inference.app.services.instance_service import InstanceService
 
 
@@ -55,3 +56,11 @@ def get_instance_service() -> InstanceService:
     from inference.app.services.instance_service import InstanceService
 
     return InstanceService(settings)
+
+
+@lru_cache(maxsize=1)
+def get_openai_service() -> OpenAIService:
+    settings = get_settings()
+    from inference.app.services.openai_service import OpenAIService
+
+    return OpenAIService(get_generation_service(), settings)

@@ -14,6 +14,8 @@ The training layer is a composed experiment engine for math-specialist adaptatio
 - `src/analysis.py`: parameter reports, dataset diagnostics, run summaries.
 - `src/packaging.py`: manifest writing, publication, and serving-oriented packaging.
 - `src/comparison.py`: run-vs-run comparison helpers.
+- `src/environment.py`: reproducibility snapshots for Python, platform, packages, files, and runtime context.
+- `src/tracking.py`: optional tracker adapters plus always-on local tracking artifacts.
 
 ## Config Layout
 
@@ -22,6 +24,7 @@ The training layer is a composed experiment engine for math-specialist adaptatio
 - `configs/components/data/`
 - `configs/components/runtime/`
 - `configs/components/logging/`
+- `configs/components/tracking/`
 - `configs/components/packaging/`
 - `configs/profiles/`
 
@@ -45,3 +48,11 @@ python3 -m training.train --config training/configs/profiles/calculus_specialist
 python3 training/scripts/export_merged_model.py --run-dir artifacts/runs/<run_id>
 python3 training/scripts/compare_runs.py --run-a artifacts/runs/<run_a> --run-b artifacts/runs/<run_b>
 ```
+
+Every run now writes:
+
+- `manifests/config_snapshot.json`
+- `manifests/environment_snapshot.json`
+- `manifests/tracking_context.json`
+- `logs/tracking_events.jsonl`
+- `metrics/tracking_summary.json`

@@ -1,0 +1,15 @@
+provider: none
+project: ai-factory
+experiment_name: local-training
+run_name: null
+tags: []
+metadata: {}
+mlflow_tracking_uri: null
+wandb_entity: null
+wandb_mode: offline
+capture_environment: true
+capture_installed_packages: true
+log_config_artifact: true
+log_dataset_artifacts: true
+log_model_artifacts: true
+log_summary_artifact: true

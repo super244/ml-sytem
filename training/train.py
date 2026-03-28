@@ -13,12 +13,14 @@ if str(REPO_ROOT) not in sys.path:
 
 from ai_factory.core.artifacts import prepare_run_layout, write_json
 from training.src.analysis import dataset_summary
-from training.src.callbacks import JsonlMetricsCallback
+from training.src.callbacks import JsonlMetricsCallback, TrackerCallback
 from training.src.collators import WeightedDataCollator
 from training.src.config import ExperimentConfig, load_experiment_config
 from training.src.data import build_dataset
+from training.src.environment import collect_environment_snapshot
 from training.src.modeling import load_model_for_training, load_tokenizer, trainable_parameter_report
 from training.src.packaging import publish_model_artifacts, write_run_manifest, write_training_summary
+from training.src.tracking import build_tracker
 from training.src.trainer import MathTrainer
 from training.src.validation import run_dry_validation
 
@@ -66,11 +68,15 @@ def build_training_arguments(config: ExperimentConfig, layout) -> TrainingArgume
         group_by_length=training.group_by_length,
         save_safetensors=training.save_safetensors,
         seed=config.seed,
+        deepspeed=config.runtime.deepspeed_config,
+        torch_compile=config.runtime.torch_compile,
     )
 
 
-def save_config_snapshot(config: ExperimentConfig, layout) -> None:
-    write_json(layout.manifests_dir / "config_snapshot.json", config.to_dict())
+def save_config_snapshot(config: ExperimentConfig, layout) -> Path:
+    path = layout.manifests_dir / "config_snapshot.json"
+    write_json(path, config.to_dict())
+    return path
 
 
 def build_dataset_artifacts(config: ExperimentConfig, tokenizer, layout):
@@ -104,100 +110,211 @@ def main() -> None:
     set_seed(config.seed)
 
     layout = prepare_run_layout(config.training.artifacts_dir, config.run_name)
-    save_config_snapshot(config, layout)
+    config_snapshot_path = save_config_snapshot(config, layout)
+    tracker = build_tracker(layout, config)
+    tracker_summary: dict[str, float | int] = {}
+    status = "failed"
+
+    environment_snapshot_path: Path | None = None
+    if config.tracking.capture_environment:
+        environment_snapshot_path, environment_snapshot = collect_environment_snapshot(config, layout)
+        tracker.log_params(
+            {
+                "environment": {
+                    "git_sha": environment_snapshot.get("git_sha"),
+                    "python_executable": environment_snapshot["python"]["executable"],
+                    "python_version": environment_snapshot["python"]["version"],
+                    "platform": environment_snapshot["platform"]["platform"],
+                    "cuda_available": environment_snapshot["torch"]["cuda_available"],
+                    "cuda_device_count": environment_snapshot["torch"]["cuda_device_count"],
+                }
+            }
+        )
+        tracker.log_artifact(environment_snapshot_path, name="manifests")
+
+    tracker.log_params(
+        {
+            "run": {
+                "run_name": config.run_name,
+                "profile_name": config.profile_name,
+                "seed": config.seed,
+                "artifacts_dir": config.training.artifacts_dir,
+            },
+            "model": config.model.__dict__,
+            "data": {
+                "train_file": config.data.train_file,
+                "eval_file": config.data.eval_file,
+                "pack_manifest": config.data.pack_manifest,
+                "max_length": config.data.max_length,
+            },
+            "training": config.training.__dict__,
+            "runtime": config.runtime.__dict__,
+            "tracking": config.tracking.__dict__,
+        }
+    )
+    if config.tracking.log_config_artifact:
+        tracker.log_artifact(config_snapshot_path, name="manifests")
 
     validate_model_load = args.validate_model_load or config.runtime.validate_model_load
     tokenizer = load_tokenizer(config) if (not args.dry_run or validate_model_load) else None
     dry_validation = run_dry_validation(config, tokenizer)
     write_json(layout.metrics_dir / "dry_run_validation.json", dry_validation)
+    tracker.log_metrics(
+        {
+            "dry_validation_train_rows": dry_validation["train_dataset"]["num_rows"],
+            "dry_validation_eval_rows": (
+                dry_validation["eval_dataset"]["num_rows"] if dry_validation.get("eval_dataset") else 0
+            ),
+            "dry_validation_max_length": config.data.max_length,
+        }
+    )
 
-    if args.dry_run:
-        if validate_model_load:
-            tokenizer = tokenizer or load_tokenizer(config)
-            model = load_model_for_training(config)
-            parameter_report = trainable_parameter_report(model)
-            write_json(layout.metrics_dir / "model_report.json", parameter_report)
-        manifest = write_run_manifest(
-            layout,
-            config,
-            data_files=[config.data.train_file, config.data.eval_file or ""],
-            metrics_files=[str(layout.metrics_dir / "dry_run_validation.json")],
-            report_files=[],
-            metadata={"mode": "dry_run"},
+    try:
+        if args.dry_run:
+            if validate_model_load:
+                tokenizer = tokenizer or load_tokenizer(config)
+                model = load_model_for_training(config)
+                parameter_report = trainable_parameter_report(model)
+                write_json(layout.metrics_dir / "model_report.json", parameter_report)
+                tracker.log_metrics({"trainable_ratio": parameter_report["trainable_ratio"]})
+                if config.tracking.log_model_artifacts:
+                    tracker.log_artifact(layout.metrics_dir / "model_report.json", name="metrics")
+            manifest = write_run_manifest(
+                layout,
+                config,
+                data_files=[config.data.train_file, config.data.eval_file or ""],
+                metrics_files=[str(layout.metrics_dir / "dry_run_validation.json")],
+                report_files=[],
+                metadata={
+                    "mode": "dry_run",
+                    "environment_snapshot": str(environment_snapshot_path) if environment_snapshot_path else None,
+                },
+            )
+            summary = {
+                "run_name": config.run_name,
+                "profile_name": config.profile_name,
+                "base_model": config.model.base_model_name,
+                "train_rows": dry_validation["train_dataset"]["num_rows"],
+                "eval_rows": dry_validation["eval_dataset"]["num_rows"] if dry_validation.get("eval_dataset") else 0,
+                "parameter_report": load_json_if_exists(layout.metrics_dir / "model_report.json"),
+                "metrics": {
+                    "status": "dry_run_complete",
+                    "tokenizer_mode": dry_validation["train_dataset"].get("tokenizer_mode"),
+                },
+            }
+            summary_path = write_training_summary(layout, summary, config.logging.summary_markdown_filename)
+            tracker_summary = {
+                "train_rows": summary["train_rows"],
+                "eval_rows": summary["eval_rows"],
+            }
+            if config.tracking.log_summary_artifact:
+                tracker.log_artifact(summary_path, name="reports")
+            write_run_manifest(
+                layout,
+                config,
+                data_files=manifest.data_files,
+                metrics_files=manifest.metrics_files,
+                report_files=[str(summary_path)],
+                metadata={
+                    "mode": "dry_run",
+                    "validation": dry_validation,
+                    "environment_snapshot": str(environment_snapshot_path) if environment_snapshot_path else None,
+                },
+            )
+            status = "completed"
+            print(json.dumps({"status": "dry_run_complete", "run_dir": str(layout.root)}, indent=2))
+            return
+
+        tokenizer = tokenizer or load_tokenizer(config)
+        model = load_model_for_training(config)
+        parameter_report = trainable_parameter_report(model)
+        write_json(layout.metrics_dir / "model_report.json", parameter_report)
+        tracker.log_metrics({"trainable_ratio": parameter_report["trainable_ratio"]})
+        if config.tracking.log_model_artifacts:
+            tracker.log_artifact(layout.metrics_dir / "model_report.json", name="metrics")
+
+        train_dataset, eval_dataset, dataset_report = build_dataset_artifacts(config, tokenizer, layout)
+        tracker.log_metrics(
+            {
+                "tokenized_train_rows": dataset_report["tokenized_train_rows"],
+                "tokenized_eval_rows": dataset_report["tokenized_eval_rows"],
+            }
         )
+        if config.tracking.log_dataset_artifacts:
+            tracker.log_artifact(layout.metrics_dir / "dataset_report.json", name="metrics")
+        data_collator = WeightedDataCollator(tokenizer=tokenizer, label_pad_token_id=-100, pad_to_multiple_of=8)
+
+        trainer = MathTrainer(
+            model=model,
+            args=build_training_arguments(config, layout),
+            train_dataset=train_dataset,
+            eval_dataset=eval_dataset,
+            data_collator=data_collator,
+            tokenizer=tokenizer,
+            sequential_training=(config.data.curriculum_learning and config.data.sequential_curriculum),
+            callbacks=[
+                JsonlMetricsCallback(layout.logs_dir / config.logging.jsonl_metrics_filename),
+                TrackerCallback(tracker),
+            ],
+        )
+
+        trainer.train(resume_from_checkpoint=args.resume_from_checkpoint)
+        metrics = trainer.evaluate() if eval_dataset is not None else {}
+        write_json(layout.metrics_dir / "metrics.json", metrics)
+        tracker.log_metrics(metrics)
+        tracker.log_artifact(layout.metrics_dir / "metrics.json", name="metrics")
+
+        published = publish_model_artifacts(layout, config, trainer, tokenizer)
+        trainer.save_state()
         summary = {
             "run_name": config.run_name,
             "profile_name": config.profile_name,
             "base_model": config.model.base_model_name,
-            "train_rows": dry_validation["train_dataset"]["num_rows"],
-            "eval_rows": dry_validation["eval_dataset"]["num_rows"] if dry_validation.get("eval_dataset") else 0,
-            "parameter_report": load_json_if_exists(layout.metrics_dir / "model_report.json"),
-            "metrics": {
-                "status": "dry_run_complete",
-                "tokenizer_mode": dry_validation["train_dataset"].get("tokenizer_mode"),
-            },
+            "train_rows": dataset_report["tokenized_train_rows"],
+            "eval_rows": dataset_report["tokenized_eval_rows"],
+            "parameter_report": parameter_report,
+            "metrics": metrics,
         }
         summary_path = write_training_summary(layout, summary, config.logging.summary_markdown_filename)
+        tracker_summary = {
+            "train_rows": summary["train_rows"],
+            "eval_rows": summary["eval_rows"],
+            **{
+                key: value
+                for key, value in metrics.items()
+                if isinstance(value, (int, float))
+            },
+        }
+        if config.tracking.log_summary_artifact:
+            tracker.log_artifact(summary_path, name="reports")
         write_run_manifest(
             layout,
             config,
-            data_files=manifest.data_files,
-            metrics_files=manifest.metrics_files,
+            data_files=[config.data.train_file, config.data.eval_file or "", config.data.pack_manifest or ""],
+            metrics_files=[
+                str(layout.metrics_dir / "dataset_report.json"),
+                str(layout.metrics_dir / "model_report.json"),
+                str(layout.metrics_dir / "metrics.json"),
+            ],
             report_files=[str(summary_path)],
-            metadata={"mode": "dry_run", "validation": dry_validation},
+            metadata={
+                "published": published,
+                "tracking": {
+                    "provider": config.tracking.provider,
+                    "project": config.tracking.project,
+                    "experiment_name": config.tracking.experiment_name,
+                },
+                "environment_snapshot": str(environment_snapshot_path) if environment_snapshot_path else None,
+            },
         )
-        print(json.dumps({"status": "dry_run_complete", "run_dir": str(layout.root)}, indent=2))
-        return
 
-    tokenizer = tokenizer or load_tokenizer(config)
-    model = load_model_for_training(config)
-    parameter_report = trainable_parameter_report(model)
-    write_json(layout.metrics_dir / "model_report.json", parameter_report)
-
-    train_dataset, eval_dataset, dataset_report = build_dataset_artifacts(config, tokenizer, layout)
-    data_collator = WeightedDataCollator(tokenizer=tokenizer, label_pad_token_id=-100, pad_to_multiple_of=8)
-
-    trainer = MathTrainer(
-        model=model,
-        args=build_training_arguments(config, layout),
-        train_dataset=train_dataset,
-        eval_dataset=eval_dataset,
-        data_collator=data_collator,
-        tokenizer=tokenizer,
-        sequential_training=(config.data.curriculum_learning and config.data.sequential_curriculum),
-        callbacks=[JsonlMetricsCallback(layout.logs_dir / config.logging.jsonl_metrics_filename)],
-    )
-
-    trainer.train(resume_from_checkpoint=args.resume_from_checkpoint)
-    metrics = trainer.evaluate() if eval_dataset is not None else {}
-    write_json(layout.metrics_dir / "metrics.json", metrics)
-
-    published = publish_model_artifacts(layout, config, trainer, tokenizer)
-    trainer.save_state()
-    summary = {
-        "run_name": config.run_name,
-        "profile_name": config.profile_name,
-        "base_model": config.model.base_model_name,
-        "train_rows": dataset_report["tokenized_train_rows"],
-        "eval_rows": dataset_report["tokenized_eval_rows"],
-        "parameter_report": parameter_report,
-        "metrics": metrics,
-    }
-    summary_path = write_training_summary(layout, summary, config.logging.summary_markdown_filename)
-    write_run_manifest(
-        layout,
-        config,
-        data_files=[config.data.train_file, config.data.eval_file or "", config.data.pack_manifest or ""],
-        metrics_files=[
-            str(layout.metrics_dir / "dataset_report.json"),
-            str(layout.metrics_dir / "model_report.json"),
-            str(layout.metrics_dir / "metrics.json"),
-        ],
-        report_files=[str(summary_path)],
-        metadata={"published": published},
-    )
-
-    print(json.dumps({"metrics": metrics, "published": published, "run_dir": str(layout.root)}, indent=2))
+        status = "completed"
+        print(json.dumps({"metrics": metrics, "published": published, "run_dir": str(layout.root)}, indent=2))
+    except Exception as exc:
+        tracker.log_params({"error": {"type": type(exc).__name__, "message": str(exc)}})
+        raise
+    finally:
+        tracker.finalize(status=status, summary=tracker_summary)
 
 
 def load_json_if_exists(path: Path) -> dict:

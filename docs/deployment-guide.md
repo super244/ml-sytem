@@ -26,6 +26,6 @@ docker compose up --build
 ## Production Notes
 
 - Model weights are not bundled in the repo.
-- The API is currently single-operator and unauthenticated.
+- The API is single-operator by default, but OpenAI-compatible routes can be protected with `OPENAI_API_KEYS`.
 - The control plane is SQLite local-first and broker-ready: durable enough for single-node production-style operation, with interfaces shaped for later Redis/Postgres adapters.
 - Multiple worker processes are future-ready, but this pass only ships local and SSH/cloud executors.
