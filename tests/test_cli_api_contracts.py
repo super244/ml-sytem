@@ -56,3 +56,44 @@ def test_cli_parse_args_supports_tui_command(monkeypatch):
     args = ai_factory_cli.parse_args()
     assert args.command == "tui"
     assert args.refresh_seconds == 1.5
+
+
+def test_cli_parse_args_supports_control_center_new_and_inference(monkeypatch):
+    monkeypatch.setattr(
+        "sys.argv",
+        [
+            "ai-factory",
+            "new",
+            "--config",
+            "configs/train.yaml",
+            "--name",
+            "scratch-branch",
+            "--user-level",
+            "dev",
+            "--origin",
+            "from_scratch",
+            "--learning-mode",
+            "supervised",
+            "--architecture-family",
+            "transformer",
+            "--architecture-hidden-size",
+            "768",
+            "--deployment-target",
+            "ollama",
+        ],
+    )
+    args = ai_factory_cli.parse_args()
+    assert args.command == "new"
+    assert args.name == "scratch-branch"
+    assert args.user_level == "dev"
+    assert args.origin == "from_scratch"
+    assert args.architecture_hidden_size == 768
+    assert args.deployment_targets == ["ollama"]
+
+    monkeypatch.setattr(
+        "sys.argv",
+        ["ai-factory", "inference", "instance-001", "--config", "configs/inference.yaml"],
+    )
+    args = ai_factory_cli.parse_args()
+    assert args.command == "inference"
+    assert args.instance_id == "instance-001"

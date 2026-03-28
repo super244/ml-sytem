@@ -257,3 +257,169 @@ def test_manager_finalize_evaluation_schedules_reports_and_publish_hooks(
     assert finalized.decision.action == "deploy"
     assert any(item["config_path"] == "configs/report.yaml" for item in scheduled["instances"])
     assert scheduled["deployments"][0]["target"] == "ollama"
+
+
+def test_manager_applies_lifecycle_overrides_to_created_instances(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+):
+    _prime_manager_packages(monkeypatch)
+    models = importlib.import_module("ai_factory.core.instances.models")
+    store_mod = importlib.import_module("ai_factory.core.instances.store")
+    manager_mod = importlib.import_module("ai_factory.core.instances.manager")
+
+    profile_dir = tmp_path / "training" / "configs" / "profiles"
+    profile_dir.mkdir(parents=True)
+    (profile_dir / "baseline_qlora.yaml").write_text("run_name: demo-run\ntraining:\n  artifacts_dir: artifacts\n")
+    config_path = tmp_path / "configs" / "train.yaml"
+    config_path.parent.mkdir(parents=True, exist_ok=True)
+    config_path.write_text(
+        "\n".join(
+            [
+                "instance:",
+                "  type: train",
+                "  environment: local",
+                "experience:",
+                "  level: hobbyist",
+                "subsystem:",
+                "  config_ref: ../training/configs/profiles/baseline_qlora.yaml",
+            ]
+        )
+    )
+
+    store = store_mod.FileInstanceStore(tmp_path)
+    manager = manager_mod.InstanceManager(store)
+
+    manifest = manager.create_instance(
+        str(config_path),
+        start=False,
+        name_override="scratch-branch",
+        user_level_override="dev",
+        lifecycle_override=models.LifecycleProfile(
+            origin="from_scratch",
+            learning_mode="supervised",
+            architecture=models.ArchitectureSpec(
+                family="transformer",
+                hidden_size=1024,
+                num_layers=24,
+                num_attention_heads=16,
+            ),
+            deployment_targets=["ollama"],
+        ),
+        subsystem_updates={"labels": ["control_center"]},
+        metadata_updates={"source": "test"},
+    )
+
+    loaded = store.load(manifest.id)
+    snapshot = store.load_config_snapshot(manifest.id)
+
+    assert loaded.name == "scratch-branch"
+    assert loaded.user_level == "dev"
+    assert loaded.lifecycle.origin == "from_scratch"
+    assert loaded.lifecycle.architecture.family == "transformer"
+    assert loaded.lifecycle.deployment_targets == ["ollama"]
+    assert snapshot["lifecycle"]["origin"] == "from_scratch"
+    assert snapshot["experience"]["level"] == "dev"
+    assert snapshot["subsystem"]["labels"] == ["control_center"]
+
+
+def test_manager_can_create_inference_children(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
+    _prime_manager_packages(monkeypatch)
+    models = importlib.import_module("ai_factory.core.instances.models")
+    store_mod = importlib.import_module("ai_factory.core.instances.store")
+    manager_mod = importlib.import_module("ai_factory.core.instances.manager")
+
+    model_registry = tmp_path / "inference" / "configs" / "model_registry.yaml"
+    model_registry.parent.mkdir(parents=True, exist_ok=True)
+    model_registry.write_text("models:\n  - name: base\n    base_model: Qwen/Qwen2.5-Math-1.5B-Instruct\n")
+    config_path = tmp_path / "configs" / "inference.yaml"
+    config_path.parent.mkdir(parents=True, exist_ok=True)
+    config_path.write_text(
+        "\n".join(
+            [
+                "instance:",
+                "  type: inference",
+                "  environment: local",
+                "execution:",
+                "  env:",
+                f"    MODEL_REGISTRY_PATH: {model_registry}",
+                "subsystem:",
+                "  model_variant: finetuned",
+            ]
+        )
+    )
+
+    store = store_mod.FileInstanceStore(tmp_path)
+    manager = manager_mod.InstanceManager(store)
+    source = models.InstanceManifest(
+        id="finetune-001",
+        type="finetune",
+        name="source-finetune",
+        environment=models.EnvironmentSpec(kind="local"),
+        lifecycle=models.LifecycleProfile(origin="existing_model", learning_mode="qlora"),
+        artifact_refs={"published": {"final_adapter": "artifacts/models/demo"}},
+    )
+    store.create(source, {"instance": {"type": "finetune"}})
+
+    child = manager.create_inference_instance(source.id, config_path=str(config_path), start=False)
+    snapshot = store.load_config_snapshot(child.id)
+
+    assert child.parent_instance_id == source.id
+    assert child.type == "inference"
+    assert child.lifecycle.stage == "infer"
+    assert snapshot["subsystem"]["model_variant"].startswith("instance_")
+    assert "generated_model_registry.yaml" in snapshot["execution"]["env"]["MODEL_REGISTRY_PATH"]
+
+
+def test_manager_finalize_evaluation_can_recommend_inference(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+):
+    _prime_manager_packages(monkeypatch)
+    models = importlib.import_module("ai_factory.core.instances.models")
+    store_mod = importlib.import_module("ai_factory.core.instances.store")
+    manager_mod = importlib.import_module("ai_factory.core.instances.manager")
+
+    store = store_mod.FileInstanceStore(tmp_path)
+    manager = manager_mod.InstanceManager(store)
+
+    eval_manifest = models.InstanceManifest(
+        id="evaluate-002",
+        type="evaluate",
+        name="eval-latency-missing",
+        environment=models.EnvironmentSpec(kind="local"),
+        lifecycle=models.LifecycleProfile(stage="evaluate", deployment_targets=["ollama"]),
+        artifact_refs={"source_artifact": "artifacts/models/demo"},
+    )
+    store.create(
+        eval_manifest,
+        {
+            "instance": {"type": "evaluate", "environment": {"kind": "local"}},
+            "subsystem": {"config_ref": "evaluation/configs/base_vs_finetuned.yaml"},
+            "lifecycle": {"stage": "evaluate", "deployment_targets": ["ollama"]},
+            "feedback_loop": {"enabled": True, "suggest_failure_analysis": True},
+        },
+    )
+
+    monkeypatch.setattr(
+        manager_mod,
+        "collect_metrics_for_instance",
+        lambda manifest, snapshot, collect_gpu=True: (
+            {
+                "accuracy": 0.9,
+                "parse_rate": 0.85,
+                "verifier_agreement_rate": 0.72,
+                "no_answer_rate": 0.03,
+            },
+            [models.MetricPoint(name="accuracy", value=0.9)],
+            {"evaluation_dir": str(tmp_path / "evaluation" / "results" / "demo")},
+        ),
+    )
+
+    finalized = manager.finalize_instance(eval_manifest.id, 0)
+    actions = manager.get_available_actions(eval_manifest.id)
+
+    assert finalized.decision is not None
+    assert finalized.decision.action == "open_inference"
+    assert any(item.action == "open_inference" for item in finalized.recommendations)
+    assert any(item["action"] == "open_inference" for item in actions)

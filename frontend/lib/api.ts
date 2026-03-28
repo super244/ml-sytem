@@ -2,6 +2,117 @@ export type ModelVariant = string;
 export type Difficulty = "easy" | "medium" | "hard" | "olympiad";
 export type SolverMode = "rigorous" | "exam" | "concise" | "verification";
 export type OutputFormat = "text" | "json";
+export type TrainingOrigin = "existing_model" | "from_scratch";
+export type LearningMode =
+  | "supervised"
+  | "unsupervised"
+  | "rlhf"
+  | "dpo"
+  | "orpo"
+  | "ppo"
+  | "lora"
+  | "qlora"
+  | "full_finetune";
+export type DeploymentTarget =
+  | "huggingface"
+  | "ollama"
+  | "lmstudio"
+  | "api"
+  | "openai_compatible_api"
+  | "custom_api";
+export type LifecycleStage =
+  | "prepare"
+  | "train"
+  | "evaluate"
+  | "decide"
+  | "finetune"
+  | "infer"
+  | "publish";
+
+export type ArchitectureSpec = {
+  family?: string | null;
+  hidden_size?: number | null;
+  num_layers?: number | null;
+  num_attention_heads?: number | null;
+  max_position_embeddings?: number | null;
+  vocab_size?: number | null;
+  notes?: string | null;
+};
+
+export type EvaluationSuiteSpec = {
+  id?: string | null;
+  label?: string | null;
+  benchmark_config?: string | null;
+  compare_to_models?: string[];
+  custom_dataset_paths?: string[];
+  notes?: string | null;
+};
+
+export type LifecycleProfile = {
+  stage?: LifecycleStage | null;
+  origin?: TrainingOrigin | null;
+  learning_mode?: LearningMode | null;
+  source_model?: string | null;
+  architecture?: ArchitectureSpec;
+  evaluation_suite?: EvaluationSuiteSpec | null;
+  deployment_targets?: DeploymentTarget[];
+  notes?: string[];
+};
+
+export type MetricPoint = {
+  timestamp: string;
+  name: string;
+  value: number | boolean | null;
+  unit?: string | null;
+  tags?: Record<string, string>;
+  metadata?: Record<string, unknown>;
+};
+
+export type DecisionResult = {
+  action: string;
+  rule: string;
+  thresholds: Record<string, number | null>;
+  summary: Record<string, unknown>;
+  explanation: string;
+};
+
+export type FeedbackRecommendation = {
+  action: string;
+  reason: string;
+  priority: number;
+  target_instance_type?: string | null;
+  config_path?: string | null;
+  deployment_target?: DeploymentTarget | null;
+  command?: string[] | null;
+  metadata?: Record<string, unknown>;
+};
+
+export type InstanceActionDescriptor = {
+  action: string;
+  label: string;
+  description: string;
+  target_instance_type?: string | null;
+  config_path?: string | null;
+  deployment_target?: DeploymentTarget | null;
+};
+
+export type EnvironmentSpec = {
+  kind: string;
+  profile_name?: string | null;
+  host?: string | null;
+  user?: string | null;
+  port?: number;
+  key_path?: string | null;
+  remote_repo_root?: string | null;
+  python_bin?: string | null;
+  env?: Record<string, string>;
+  port_forwards?: Array<{
+    local_port: number;
+    remote_port: number;
+    bind_host?: string;
+    description?: string | null;
+  }>;
+};
 
 export type CandidateVerification = {
   final_answer?: string | null;
@@ -330,11 +441,12 @@ export type InstanceSummary = {
   updated_at: string;
   parent_instance_id?: string | null;
   orchestration_run_id?: string | null;
-  environment: {
-    kind: string;
-  };
+  environment: EnvironmentSpec;
+  lifecycle: LifecycleProfile;
   metrics_summary: Record<string, unknown>;
   task_summary: Record<string, unknown>;
+  recommendations?: FeedbackRecommendation[];
+  decision?: DecisionResult | null;
   progress?: {
     stage: string;
     status_message?: string | null;
@@ -347,6 +459,35 @@ export type OrchestrationSummary = {
   tasks?: number;
   task_status_counts?: Record<string, number>;
   open_circuits?: string[];
+};
+
+export type InstanceDetail = InstanceSummary & {
+  config_snapshot: Record<string, unknown>;
+  logs?: {
+    stdout: string;
+    stderr: string;
+    stdout_path?: string | null;
+    stderr_path?: string | null;
+  } | null;
+  metrics: {
+    summary: Record<string, unknown>;
+    points: MetricPoint[];
+  };
+  children: InstanceSummary[];
+  events: Array<Record<string, unknown>>;
+  available_actions: InstanceActionDescriptor[];
+};
+
+export type CreateManagedInstanceRequest = {
+  config_path: string;
+  start?: boolean;
+  environment?: EnvironmentSpec | null;
+  parent_instance_id?: string | null;
+  name?: string | null;
+  user_level?: "beginner" | "hobbyist" | "dev" | null;
+  lifecycle?: LifecycleProfile | null;
+  subsystem_overrides?: Record<string, unknown>;
+  metadata?: Record<string, unknown>;
 };
 
 async function fetchJson<T>(path: string, options?: RequestInit): Promise<T> {
@@ -424,6 +565,61 @@ export async function getOrchestrationRun(runId: string): Promise<OrchestrationR
 export async function getInstances(): Promise<InstanceSummary[]> {
   const payload = await fetchJson<{ instances: InstanceSummary[] }>("/v1/instances");
   return payload.instances;
+}
+
+export async function getInstanceDetail(instanceId: string): Promise<InstanceDetail> {
+  return fetchJson<InstanceDetail>(`/v1/instances/${instanceId}`);
+}
+
+export async function createManagedInstance(
+  payload: CreateManagedInstanceRequest,
+): Promise<InstanceDetail> {
+  return fetchJson<InstanceDetail>("/v1/instances", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(payload),
+  });
+}
+
+export async function evaluateManagedInstance(
+  instanceId: string,
+  payload?: { config_path?: string | null; start?: boolean },
+): Promise<InstanceDetail> {
+  return fetchJson<InstanceDetail>(`/v1/instances/${instanceId}/evaluate`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(payload ?? {}),
+  });
+}
+
+export async function startManagedInference(
+  instanceId: string,
+  payload?: { config_path?: string | null; start?: boolean },
+): Promise<InstanceDetail> {
+  return fetchJson<InstanceDetail>(`/v1/instances/${instanceId}/inference`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(payload ?? {}),
+  });
+}
+
+export async function deployManagedInstance(
+  instanceId: string,
+  payload: { target: DeploymentTarget; config_path?: string | null; start?: boolean },
+): Promise<InstanceDetail> {
+  return fetchJson<InstanceDetail>(`/v1/instances/${instanceId}/deploy`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(payload),
+  });
 }
 
 export async function getOrchestrationSummary(): Promise<OrchestrationSummary> {

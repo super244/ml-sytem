@@ -5,9 +5,12 @@ from typing import Any, Literal
 from pydantic import BaseModel, Field
 
 from ai_factory.core.instances.models import (
+    DeploymentTarget,
     EnvironmentSpec,
     InstanceManifest,
+    LifecycleProfile,
     MetricPoint,
+    UserLevel,
 )
 from ai_factory.core.orchestration.models import OrchestrationEvent, OrchestrationRun, OrchestrationTask
 
@@ -142,6 +145,11 @@ class InstanceCreateRequest(BaseModel):
     start: bool = True
     environment: EnvironmentSpec | None = None
     parent_instance_id: str | None = None
+    name: str | None = None
+    user_level: UserLevel | None = None
+    lifecycle: LifecycleProfile | None = None
+    subsystem_overrides: dict[str, Any] = Field(default_factory=dict)
+    metadata: dict[str, Any] = Field(default_factory=dict)
 
 
 class InstanceEvaluateRequest(BaseModel):
@@ -149,8 +157,13 @@ class InstanceEvaluateRequest(BaseModel):
     start: bool = True
 
 
+class InstanceInferenceRequest(BaseModel):
+    config_path: str | None = None
+    start: bool = True
+
+
 class InstanceDeployRequest(BaseModel):
-    target: Literal["huggingface", "ollama", "lmstudio", "custom_api"]
+    target: Literal["huggingface", "ollama", "lmstudio", "api", "custom_api", "openai_compatible_api"]
     config_path: str | None = None
     start: bool = True
 
@@ -167,12 +180,22 @@ class InstanceMetricsResponse(BaseModel):
     points: list[MetricPoint] = Field(default_factory=list)
 
 
+class InstanceActionDescriptor(BaseModel):
+    action: str
+    label: str
+    description: str
+    target_instance_type: str | None = None
+    config_path: str | None = None
+    deployment_target: DeploymentTarget | None = None
+
+
 class InstanceDetail(InstanceManifest):
     config_snapshot: dict[str, Any] = Field(default_factory=dict)
     logs: InstanceLogsResponse | None = None
     metrics: InstanceMetricsResponse = Field(default_factory=InstanceMetricsResponse)
     children: list[InstanceManifest] = Field(default_factory=list)
     events: list[dict[str, Any]] = Field(default_factory=list)
+    available_actions: list[InstanceActionDescriptor] = Field(default_factory=list)
 
 
 class InstanceListResponse(BaseModel):
