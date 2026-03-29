@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 
 from ai_factory.core.artifacts import prepare_run_layout
+from training.src.checkpoints import find_latest_checkpoint
 from training.src.config import load_experiment_config
 from training.src.environment import collect_environment_snapshot
 from training.src.tracking import build_tracker
@@ -52,3 +53,14 @@ def test_json_tracker_writes_context_events_and_summary(tmp_path):
     summary = json.loads(summary_path.read_text())
     assert summary["status"] == "completed"
     assert summary["summary"]["eval_loss"] == 0.2
+
+
+def test_find_latest_checkpoint_prefers_highest_step(tmp_path):
+    base = tmp_path / "checkpoints"
+    (base / "checkpoint-4").mkdir(parents=True)
+    (base / "checkpoint-10").mkdir()
+
+    latest = find_latest_checkpoint(base)
+
+    assert latest is not None
+    assert latest.name == "checkpoint-10"

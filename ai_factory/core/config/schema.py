@@ -91,9 +91,7 @@ class RemoteAccessConfig(BaseModel):
 class SubAgentConfig(BaseModel):
     enabled: bool = False
     max_parallelism: int = 1
-    workloads: list[Literal["preprocess", "metrics", "evaluation", "finetune", "publish"]] = Field(
-        default_factory=list
-    )
+    workloads: list[Literal["preprocess", "metrics", "evaluation", "finetune", "publish"]] = Field(default_factory=list)
     agent_roles: list[AgentType] = Field(default_factory=list)
     allow_nested: bool = True
     retry_limit: int = 1

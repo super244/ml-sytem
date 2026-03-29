@@ -16,8 +16,8 @@ from ai_factory.core.config.schema import (
     PublishHookConfig,
     RemoteAccessConfig,
     ResilienceConfig,
-    SubsystemConfig,
     SubAgentConfig,
+    SubsystemConfig,
     UserExperienceConfig,
 )
 

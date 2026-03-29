@@ -252,11 +252,84 @@ a:focus-visible {
   transform: none;
 }
 
+.primary-button.active,
+.secondary-button.active,
+.ghost-button.active {
+  border-color: rgba(15, 122, 97, 0.24);
+  background: rgba(15, 122, 97, 0.14);
+  color: var(--ink);
+}
+
 .page-stage,
 .route-stack {
   display: flex;
   flex-direction: column;
   gap: 20px;
+}
+
+.app-frame[data-density="compact"] {
+  width: min(1460px, calc(100vw - 20px));
+}
+
+.app-frame[data-density="compact"] .page-hero,
+.app-frame[data-density="compact"] .control-bay,
+.app-frame[data-density="compact"] .conversation-panel {
+  padding: 18px;
+}
+
+.app-frame[data-density="compact"] .message-card {
+  padding: 16px 18px;
+}
+
+.app-frame[data-density="expanded"] {
+  width: min(1680px, calc(100vw - 20px));
+}
+
+.app-frame[data-surface-mode="focus"] .app-nav {
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.96), rgba(248, 250, 249, 0.82)),
+    radial-gradient(circle at top left, rgba(15, 122, 97, 0.11), transparent 42%);
+}
+
+.app-frame[data-surface-mode="verification"] .app-nav {
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.96), rgba(248, 250, 249, 0.82)),
+    radial-gradient(circle at top left, rgba(37, 95, 155, 0.12), transparent 42%);
+}
+
+.app-frame[data-surface-mode="verification"] .primary-button {
+  background: linear-gradient(135deg, #1f5a97, #163d68);
+  box-shadow: 0 16px 32px rgba(31, 90, 151, 0.22);
+}
+
+.control-bay {
+  display: grid;
+  grid-template-columns: minmax(0, 1.3fr) minmax(0, 0.9fr);
+  gap: 18px;
+  align-items: center;
+  background:
+    linear-gradient(135deg, rgba(15, 122, 97, 0.07), rgba(255, 255, 255, 0.92)),
+    radial-gradient(circle at top right, rgba(37, 95, 155, 0.08), transparent 35%);
+}
+
+.control-bay-copy {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.control-bay-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  align-items: flex-end;
+}
+
+.control-chip-group {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: flex-end;
 }
 
 .page-hero,
@@ -1101,6 +1174,7 @@ a:focus-visible {
   .card-grid.compact,
   .comparison-grid,
   .comparison-grid.wide,
+  .control-bay,
   .control-row,
   .compare-controls,
   .starter-grid,
@@ -1114,6 +1188,14 @@ a:focus-visible {
 
   .control-form-span-2 {
     grid-column: span 1;
+  }
+
+  .control-bay-actions {
+    align-items: stretch;
+  }
+
+  .control-chip-group {
+    justify-content: flex-start;
   }
 }
 

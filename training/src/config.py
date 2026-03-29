@@ -7,6 +7,10 @@ from typing import Any
 import yaml
 
 
+class ConfigValidationError(ValueError):
+    pass
+
+
 @dataclass
 class ModelConfig:
     name: str = "qwen25_math_1p5b"
@@ -173,6 +177,12 @@ class ExperimentConfig:
         return asdict(self)
 
 
+SUPPORTED_ADAPTER_METHODS = {"qlora", "lora", "full", "sft"}
+SUPPORTED_DTYPE_NAMES = {"bf16", "bfloat16", "fp16", "float16", "fp32", "float32"}
+SUPPORTED_TRACKING_PROVIDERS = {"none", "jsonl", "mlflow", "wandb"}
+SUPPORTED_STRATEGIES = {"no", "steps", "epoch"}
+
+
 def _deep_merge(left: dict[str, Any], right: dict[str, Any]) -> dict[str, Any]:
     merged = dict(left)
     for key, value in right.items():
@@ -218,11 +228,258 @@ def _apply_refs(config_path: Path, raw: dict[str, Any]) -> dict[str, Any]:
     return merged
 
 
+def _require(condition: bool, message: str, errors: list[str]) -> None:
+    if not condition:
+        errors.append(message)
+
+
+def _path_exists(path_like: str | None) -> bool:
+    return not path_like or Path(path_like).exists()
+
+
+def validate_experiment_config(config: ExperimentConfig) -> list[str]:
+    errors: list[str] = []
+    warnings: list[str] = []
+
+    _require(bool(config.run_name.strip()), "run_name must be non-empty.", errors)
+    _require(bool(config.profile_name.strip()), "profile_name must be non-empty.", errors)
+    _require(bool(config.training.artifacts_dir.strip()), "training.artifacts_dir must be non-empty.", errors)
+    _require(config.data.max_length > 0, "data.max_length must be positive.", errors)
+    _require(
+        config.training.per_device_train_batch_size > 0,
+        "training.per_device_train_batch_size must be positive.",
+        errors,
+    )
+    _require(
+        config.training.per_device_eval_batch_size > 0,
+        "training.per_device_eval_batch_size must be positive.",
+        errors,
+    )
+    _require(
+        config.training.gradient_accumulation_steps > 0,
+        "training.gradient_accumulation_steps must be positive.",
+        errors,
+    )
+    _require(config.training.max_grad_norm > 0, "training.max_grad_norm must be positive.", errors)
+    _require(config.training.logging_steps > 0, "training.logging_steps must be positive.", errors)
+    _require(config.training.eval_steps > 0, "training.eval_steps must be positive.", errors)
+    _require(config.training.save_steps > 0, "training.save_steps must be positive.", errors)
+    _require(config.training.save_total_limit >= 1, "training.save_total_limit must be at least 1.", errors)
+    _require(
+        config.training.max_validation_train_rows > 0,
+        "training.max_validation_train_rows must be positive.",
+        errors,
+    )
+    _require(
+        config.training.max_validation_eval_rows > 0,
+        "training.max_validation_eval_rows must be positive.",
+        errors,
+    )
+    _require(0.0 <= config.training.warmup_ratio <= 1.0, "training.warmup_ratio must be between 0 and 1.", errors)
+    _require(config.training.learning_rate > 0, "training.learning_rate must be positive.", errors)
+    _require(config.training.weight_decay >= 0, "training.weight_decay must be non-negative.", errors)
+    _require(
+        config.training.num_train_epochs > 0 or config.training.max_steps > 0,
+        "training requires positive num_train_epochs or max_steps.",
+        errors,
+    )
+    _require(
+        config.training.max_steps == -1 or config.training.max_steps > 0,
+        "training.max_steps must be -1 or a positive integer.",
+        errors,
+    )
+    _require(
+        not (config.model.use_4bit and config.model.use_8bit),
+        "model.use_4bit and model.use_8bit cannot both be enabled.",
+        errors,
+    )
+    _require(
+        not (config.model.use_full_precision and (config.model.use_4bit or config.model.use_8bit)),
+        "model.use_full_precision cannot be combined with quantized loading.",
+        errors,
+    )
+    _require(
+        config.model.bnb_compute_dtype.lower() in SUPPORTED_DTYPE_NAMES,
+        "model.bnb_compute_dtype must be one of bf16, fp16, or fp32.",
+        errors,
+    )
+    _require(
+        config.adapter.method.lower() in SUPPORTED_ADAPTER_METHODS,
+        f"adapter.method must be one of {sorted(SUPPORTED_ADAPTER_METHODS)}.",
+        errors,
+    )
+    _require(
+        config.runtime.profile_name.strip() == config.runtime.profile_name,
+        "runtime.profile_name must not contain leading or trailing whitespace.",
+        errors,
+    )
+    _require(
+        config.runtime.validate_tokenization_samples >= 0,
+        "runtime.validate_tokenization_samples must be non-negative.",
+        errors,
+    )
+    _require(config.runtime.low_cpu_mem_usage in {True, False}, "runtime.low_cpu_mem_usage must be boolean.", errors)
+    _require(
+        config.tracking.provider.lower() in SUPPORTED_TRACKING_PROVIDERS,
+        f"tracking.provider must be one of {sorted(SUPPORTED_TRACKING_PROVIDERS)}.",
+        errors,
+    )
+    _require(config.training.logging_steps >= 1, "training.logging_steps must be at least 1.", errors)
+    _require(config.training.eval_steps >= 1, "training.eval_steps must be at least 1.", errors)
+    _require(config.training.save_steps >= 1, "training.save_steps must be at least 1.", errors)
+    _require(
+        config.training.evaluation_strategy in SUPPORTED_STRATEGIES,
+        f"training.evaluation_strategy must be one of {sorted(SUPPORTED_STRATEGIES)}.",
+        errors,
+    )
+    _require(
+        config.training.save_strategy in SUPPORTED_STRATEGIES,
+        f"training.save_strategy must be one of {sorted(SUPPORTED_STRATEGIES)}.",
+        errors,
+    )
+    _require(
+        not (config.training.bf16 and config.training.fp16),
+        "training.bf16 and training.fp16 cannot both be enabled.",
+        errors,
+    )
+    _require(
+        not (config.data.sequential_curriculum and not config.data.curriculum_learning),
+        "data.sequential_curriculum requires data.curriculum_learning.",
+        errors,
+    )
+    _require(
+        _path_exists(config.data.train_file),
+        f"training data file not found: {config.data.train_file}",
+        errors,
+    )
+    _require(
+        _path_exists(config.data.eval_file),
+        f"eval data file not found: {config.data.eval_file}",
+        errors,
+    )
+    _require(
+        _path_exists(config.data.test_file),
+        f"test data file not found: {config.data.test_file}",
+        errors,
+    )
+    _require(
+        _path_exists(config.data.pack_manifest),
+        f"pack manifest not found: {config.data.pack_manifest}",
+        errors,
+    )
+    _require(
+        _path_exists(config.runtime.accelerate_config),
+        f"accelerate config not found: {config.runtime.accelerate_config}",
+        errors,
+    )
+    _require(
+        _path_exists(config.runtime.deepspeed_config),
+        f"deepspeed config not found: {config.runtime.deepspeed_config}",
+        errors,
+    )
+    if config.training.load_best_model_at_end:
+        _require(bool(config.data.eval_file), "load_best_model_at_end requires an evaluation file.", errors)
+        _require(
+            config.training.evaluation_strategy != "no",
+            "load_best_model_at_end requires a non-'no' evaluation strategy.",
+            errors,
+        )
+        _require(
+            config.training.save_strategy == config.training.evaluation_strategy,
+            "load_best_model_at_end works best when save_strategy matches evaluation_strategy.",
+            errors,
+        )
+        if config.training.evaluation_strategy == "steps":
+            _require(
+                config.training.save_steps % config.training.eval_steps == 0,
+                "save_steps should be a multiple of eval_steps when load_best_model_at_end is enabled.",
+                errors,
+            )
+    if config.runtime.torch_compile and config.model.use_4bit:
+        warnings.append("torch_compile with 4-bit quantization can be brittle; validate on a small run first.")
+    if config.runtime.torch_compile and config.runtime.deepspeed_config:
+        warnings.append("torch_compile with DeepSpeed should be validated carefully for your exact backend.")
+
+    if errors:
+        raise ConfigValidationError("\n".join(f"- {item}" for item in errors))
+    return warnings
+
+
+def describe_experiment_config(config: ExperimentConfig, *, warnings: list[str] | None = None) -> dict[str, Any]:
+    model_mode = "full_precision"
+    if config.model.use_4bit:
+        model_mode = "4bit"
+    elif config.model.use_8bit:
+        model_mode = "8bit"
+    elif config.model.use_full_precision:
+        model_mode = "full_precision"
+    return {
+        "run": {
+            "run_name": config.run_name,
+            "profile_name": config.profile_name,
+            "seed": config.seed,
+            "config_path": config.config_path,
+        },
+        "model": {
+            "name": config.model.name,
+            "base_model_name": config.model.base_model_name,
+            "tokenizer_name": config.model.tokenizer_name,
+            "mode": model_mode,
+            "adapter_method": config.adapter.method,
+        },
+        "data": {
+            "train_file": config.data.train_file,
+            "eval_file": config.data.eval_file,
+            "test_file": config.data.test_file,
+            "pack_manifest": config.data.pack_manifest,
+            "max_length": config.data.max_length,
+            "curriculum_learning": config.data.curriculum_learning,
+            "sequential_curriculum": config.data.sequential_curriculum,
+        },
+        "training": {
+            "artifacts_dir": config.training.artifacts_dir,
+            "num_train_epochs": config.training.num_train_epochs,
+            "max_steps": config.training.max_steps,
+            "learning_rate": config.training.learning_rate,
+            "batch_size": {
+                "train": config.training.per_device_train_batch_size,
+                "eval": config.training.per_device_eval_batch_size,
+            },
+            "gradient_accumulation_steps": config.training.gradient_accumulation_steps,
+            "evaluation_strategy": config.training.evaluation_strategy,
+            "save_strategy": config.training.save_strategy,
+            "load_best_model_at_end": config.training.load_best_model_at_end,
+        },
+        "runtime": {
+            "profile_name": config.runtime.profile_name,
+            "accelerate_config": config.runtime.accelerate_config,
+            "deepspeed_config": config.runtime.deepspeed_config,
+            "validate_tokenization_samples": config.runtime.validate_tokenization_samples,
+            "validate_model_load": config.runtime.validate_model_load,
+            "torch_compile": config.runtime.torch_compile,
+            "low_cpu_mem_usage": config.runtime.low_cpu_mem_usage,
+        },
+        "tracking": {
+            "provider": config.tracking.provider,
+            "project": config.tracking.project,
+            "experiment_name": config.tracking.experiment_name,
+            "tags": list(config.tracking.tags),
+        },
+        "packaging": {
+            "publish_model_name": config.packaging.publish_model_name,
+            "export_merged_model": config.packaging.export_merged_model,
+            "publish_latest": config.packaging.publish_latest,
+            "save_tokenizer": config.packaging.save_tokenizer,
+        },
+        "warnings": list(warnings or []),
+    }
+
+
 def load_experiment_config(path: str) -> ExperimentConfig:
     config_path = Path(path).resolve()
     raw = _load_yaml(config_path)
     merged = _apply_refs(config_path, raw)
-    return ExperimentConfig(
+    config = ExperimentConfig(
         run_name=merged["run_name"],
         seed=merged["seed"],
         profile_name=merged.get("profile_name", config_path.stem),
@@ -236,3 +493,5 @@ def load_experiment_config(path: str) -> ExperimentConfig:
         packaging=_construct(PackagingConfig, merged.get("packaging")),
         config_path=str(config_path),
     )
+    validate_experiment_config(config)
+    return config

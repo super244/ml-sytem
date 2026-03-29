@@ -4,6 +4,10 @@ This folder contains documentation of all fixes and improvements made during the
 
 ## 📚 **Documentation Files**
 
+### **🧾 Archived Project Summaries**
+- **`PROJECT_ENHANCEMENTS_COMPLETE.md`** - Historical summary of the broader cleanup and polish pass
+- **`MYPY_FIXES_COMPLETE.md`** - Historical summary of the type-checking cleanup pass
+
 ### **🔧 GitHub & Deployment Fixes**
 - **`GITHUB_FIXES_COMPLETE.md`** - Complete resolution of GitHub Actions errors and deployment issues
   - Fixed requirements.txt missing error

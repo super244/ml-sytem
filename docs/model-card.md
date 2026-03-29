@@ -2,7 +2,7 @@
 
 ## Model Family
 
-Atlas Math Lab is a specialist adaptation stack for competitive mathematics and advanced calculus reasoning built on top of math-capable base LLMs.
+AI-Factory is a specialist adaptation stack for competitive mathematics and advanced calculus reasoning built on top of math-capable base LLMs.
 
 ## Intended Use
 

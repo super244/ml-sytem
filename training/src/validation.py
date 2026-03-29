@@ -26,14 +26,22 @@ def build_validation_data_config(config: ExperimentConfig) -> DataConfig:
 def run_dry_validation(config: ExperimentConfig, tokenizer: Any) -> dict[str, Any]:
     validation_config = build_validation_data_config(config)
     train_records = _load_validation_records(config.data.train_file, validation_config, split="train")
-    eval_records = _load_validation_records(config.data.eval_file, validation_config, split="eval") if config.data.eval_file else []
+    eval_records = (
+        _load_validation_records(config.data.eval_file, validation_config, split="eval")
+        if config.data.eval_file
+        else []
+    )
 
-    train_dataset = build_dataset(
-        file_path=config.data.train_file,
-        tokenizer=tokenizer,
-        data_config=validation_config,
-        split="train",
-    ) if tokenizer is not None else None
+    train_dataset = (
+        build_dataset(
+            file_path=config.data.train_file,
+            tokenizer=tokenizer,
+            data_config=validation_config,
+            split="train",
+        )
+        if tokenizer is not None
+        else None
+    )
     eval_dataset = (
         build_dataset(
             file_path=config.data.eval_file,

@@ -1,6 +1,6 @@
 # Runbook
 
-This runbook describes the default local workflow for Atlas Math Lab. It assumes local development with optional public-dataset access and a runnable math model such as `Qwen2.5-Math-1.5B-Instruct`.
+This runbook describes the default local workflow for AI-Factory. It assumes local development with optional public-dataset access and a runnable math model such as `Qwen2.5-Math-1.5B-Instruct`.
 
 ## 1. Install Dependencies
 

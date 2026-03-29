@@ -1,8 +1,8 @@
-# Atlas Math Lab Quickstart
+# AI-Factory Quickstart
 
-This guide is the fastest way to get Atlas Math Lab running for development, training, inference, and evaluation, whether you are working on a laptop, a single GPU workstation, or a cloud VM.
+This guide is the fastest way to get AI-Factory running for development, training, inference, and evaluation, whether you are working on a laptop, a single GPU workstation, or a cloud VM.
 
-Atlas is designed to scale down to local iteration and scale up to cloud training without changing the repo layout or the main commands.
+AI-Factory is designed to scale down to local iteration and scale up to cloud training without changing the repo layout or the main commands.
 
 ## What You Can Do From This Guide
 
@@ -51,8 +51,8 @@ Recommended:
 ## 2. Clone And Enter The Repo
 
 ```bash
-git clone <your-repo-url> atlas-math-lab
-cd atlas-math-lab
+git clone <your-repo-url> ai-factory
+cd ai-factory
 ```
 
 If you are on a cloud VM, do this after attaching storage and activating your GPU environment.
@@ -71,8 +71,8 @@ pip install -e .[dev]
 ### Conda flow
 
 ```bash
-conda create -n atlas python=3.11 -y
-conda activate atlas
+conda create -n ai-factory python=3.11 -y
+conda activate ai-factory
 pip install -U pip
 pip install -e .[dev]
 ```
@@ -99,7 +99,7 @@ Important variables:
 - `NEXT_PUBLIC_API_BASE_URL`
 - `CORS_ORIGINS`
 
-Typical local values already match the defaults in [.env.example](/Users/raofu/ai-factory/.env.example).
+Typical local values already match the defaults in [.env.example](.env.example).
 
 Typical cloud adjustments:
 

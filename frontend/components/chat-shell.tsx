@@ -2,7 +2,7 @@
 
 import clsx from "clsx";
 import Link from "next/link";
-import { useState, useTransition } from "react";
+import { useEffect, useState, useTransition } from "react";
 
 import {
   generateAnswer,
@@ -33,12 +33,15 @@ type ChatMessage = {
   result?: GenerateResponse;
 };
 
+type WorkspaceMode = "focus" | "research" | "verification";
+type WorkspaceDensity = "compact" | "balanced" | "expanded";
+
 const INITIAL_MESSAGES: ChatMessage[] = [
   {
     id: "intro",
     role: "system",
     content:
-      "Atlas Math Lab specializes in competitive mathematics, advanced calculus, and verifier-aware reasoning. Use the control rail to switch presets, compare models, and inspect reranked candidates.",
+      "AI-Factory specializes in verifier-aware reasoning, controlled sampling, and model comparison. Use the control rail to switch presets, compare models, and inspect reranked candidates.",
   },
 ];
 
@@ -66,8 +69,34 @@ export function ChatShell() {
   const [promptPreset, setPromptPreset] = useState("atlas_rigorous");
   const [outputFormat, setOutputFormat] = useState<OutputFormat>("text");
   const [selectedCandidateIndex, setSelectedCandidateIndex] = useState(0);
+  const [workspaceMode, setWorkspaceMode] = useState<WorkspaceMode>("research");
+  const [density, setDensity] = useState<WorkspaceDensity>("balanced");
   const [isPending, startTransition] = useTransition();
   const canSubmit = question.trim().length > 0;
+
+  useEffect(() => {
+    try {
+      const storedMode = window.localStorage.getItem("ai-factory-workspace-mode");
+      const storedDensity = window.localStorage.getItem("ai-factory-workspace-density");
+      if (storedMode === "focus" || storedMode === "research" || storedMode === "verification") {
+        setWorkspaceMode(storedMode);
+      }
+      if (storedDensity === "compact" || storedDensity === "balanced" || storedDensity === "expanded") {
+        setDensity(storedDensity);
+      }
+    } catch {
+      // LocalStorage can be disabled in privacy-focused environments.
+    }
+  }, []);
+
+  useEffect(() => {
+    try {
+      window.localStorage.setItem("ai-factory-workspace-mode", workspaceMode);
+      window.localStorage.setItem("ai-factory-workspace-density", density);
+    } catch {
+      // Ignore persistence failures and keep the session interactive.
+    }
+  }, [density, workspaceMode]);
 
   const latestResult = [...messages]
     .reverse()
@@ -77,6 +106,40 @@ export function ChatShell() {
     setMessages(INITIAL_MESSAGES);
     setQuestion("");
     setSelectedCandidateIndex(0);
+  }
+
+  function applyWorkspacePreset(mode: WorkspaceMode) {
+    setWorkspaceMode(mode);
+    if (mode === "focus") {
+      setPromptPreset("atlas_exam");
+      setDifficultyTarget("medium");
+      setSolverMode("exam");
+      setShowReasoning(false);
+      setUseCalculator(true);
+      setNumSamples(1);
+      setTemperature(0.0);
+      setOutputFormat("text");
+      return;
+    }
+    if (mode === "verification") {
+      setPromptPreset("atlas_verifier");
+      setDifficultyTarget("hard");
+      setSolverMode("verification");
+      setShowReasoning(true);
+      setUseCalculator(true);
+      setNumSamples(4);
+      setTemperature(0.1);
+      setOutputFormat("json");
+      return;
+    }
+    setPromptPreset("atlas_rigorous");
+    setDifficultyTarget("olympiad");
+    setSolverMode("rigorous");
+    setShowReasoning(true);
+    setUseCalculator(true);
+    setNumSamples(3);
+    setTemperature(0.2);
+    setOutputFormat("text");
   }
 
   async function submitQuestion(submittedQuestion: string) {
@@ -133,12 +196,12 @@ export function ChatShell() {
   }
 
   return (
-    <AppShell>
+    <AppShell density={density} surfaceMode={workspaceMode}>
       <section className="route-stack">
         <PageHeader
           eyebrow="Assistant Workspace"
-          title="Atlas Assistant Console"
-          description="A polished interface for the same verifier-aware inference system used in offline evaluation. Tune model routing, sampling, and reasoning visibility while inspecting candidates and benchmark metadata in one place."
+          title="AI-Factory Assistant Console"
+          description="A polished interface for the same verifier-aware inference system used in offline evaluation. Tune model routing, sampling, and reasoning visibility while inspecting candidates, workspace metadata, and benchmark signals in one place."
           metrics={[
             { label: "Models", value: formatCount(metadata.models.length || availableModels.length) },
             {
@@ -167,6 +230,51 @@ export function ChatShell() {
             </>
           }
         />
+
+        <section className="panel control-bay">
+          <div className="control-bay-copy">
+            <div className="eyebrow">Command surface</div>
+            <h2 className="workspace-title">Tune the workspace without leaving the page.</h2>
+            <p className="hero-copy">
+              Switch the session between focused answering, rigorous research, and verification
+              mode. The same controls stay available across the CLI, TUI, web, and desktop shells.
+            </p>
+          </div>
+
+          <div className="control-bay-actions">
+            <div className="control-chip-group">
+              {(["focus", "research", "verification"] as WorkspaceMode[]).map((mode) => (
+                <button
+                  key={mode}
+                  className={clsx("ghost-button small", { active: workspaceMode === mode })}
+                  type="button"
+                  aria-pressed={workspaceMode === mode}
+                  onClick={() => applyWorkspacePreset(mode)}
+                >
+                  {mode}
+                </button>
+              ))}
+            </div>
+            <div className="control-chip-group">
+              {(["compact", "balanced", "expanded"] as WorkspaceDensity[]).map((nextDensity) => (
+                <button
+                  key={nextDensity}
+                  className={clsx("secondary-button small", { active: density === nextDensity })}
+                  type="button"
+                  aria-pressed={density === nextDensity}
+                  onClick={() => setDensity(nextDensity)}
+                >
+                  {nextDensity}
+                </button>
+              ))}
+            </div>
+            <div className="badge-row">
+              <MetricBadge label="Mode" value={workspaceMode} tone="accent" />
+              <MetricBadge label="Density" value={density} tone="secondary" />
+              <MetricBadge label="Signals" value={showReasoning ? "full" : "minimal"} />
+            </div>
+          </div>
+        </section>
 
         {metadata.error ? (
           <StatePanel
@@ -463,7 +571,7 @@ export function ChatShell() {
                       {message.role === "user"
                         ? "You"
                         : message.role === "assistant"
-                          ? "Atlas"
+                          ? "AI-Factory"
                           : "Session guide"}
                     </span>
                     <div className="pill-row">

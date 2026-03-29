@@ -1,6 +1,6 @@
 # Reproducibility
 
-Atlas Math Lab uses manifests and config snapshots to make runs easier to replay and compare.
+AI-Factory uses manifests and config snapshots to make runs easier to replay and compare.
 
 ## Reproducibility Anchors
 

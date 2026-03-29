@@ -1,15 +1,21 @@
 from __future__ import annotations
 
 import json
+import re
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
+
+_RUN_ID_TIMESTAMP_RE = re.compile(r"(?P<date>\d{8})-(?P<time>\d{6})")
 
 
 def _load_json_if_exists(path: Path) -> dict[str, Any]:
     if not path.exists():
         return {}
-    data = json.loads(path.read_text())
+    try:
+        data = json.loads(path.read_text())
+    except json.JSONDecodeError:
+        return {}
     return data if isinstance(data, dict) else {}
 
 
@@ -29,9 +35,11 @@ def _parse_created_at(value: Any) -> datetime | None:
 def _parse_run_id_timestamp(value: Any) -> datetime | None:
     if not value:
         return None
+    match = _RUN_ID_TIMESTAMP_RE.search(str(value))
+    if match is None:
+        return None
     try:
-        suffix = str(value).rsplit("-", 2)[-2:]
-        timestamp = "-".join(suffix)
+        timestamp = f"{match.group('date')}-{match.group('time')}"
         return datetime.strptime(timestamp, "%Y%m%d-%H%M%S").replace(tzinfo=timezone.utc)
     except ValueError:
         return None
@@ -65,7 +73,12 @@ def list_training_runs(artifacts_dir: str = "artifacts") -> list[dict[str, Any]]
         manifest_path = child / "manifests" / "run_manifest.json"
         if not manifest_path.exists():
             continue
-        run_payload = json.loads(manifest_path.read_text())
+        try:
+            run_payload = json.loads(manifest_path.read_text())
+        except json.JSONDecodeError:
+            continue
+        if not isinstance(run_payload, dict):
+            continue
         metrics_path = child / "metrics" / "metrics.json"
         model_report_path = child / "metrics" / "model_report.json"
         dataset_report_path = child / "metrics" / "dataset_report.json"

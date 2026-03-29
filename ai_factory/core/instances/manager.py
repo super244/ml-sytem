@@ -1,10 +1,10 @@
 from __future__ import annotations
 
 import asyncio
+import uuid
 from copy import deepcopy
 from datetime import datetime, timezone
 from pathlib import Path
-import uuid
 from typing import Any
 
 import yaml
@@ -156,9 +156,9 @@ class InstanceManager:
             self.store.load(target)
             return target
         except FileNotFoundError:
-            run = self.orchestration.control_plane.get_run(target) or self.orchestration.control_plane.get_run_by_legacy_instance(
+            run = self.orchestration.control_plane.get_run(
                 target
-            )
+            ) or self.orchestration.control_plane.get_run_by_legacy_instance(target)
             if run is None or not run.legacy_instance_id:
                 raise FileNotFoundError(f"Unknown instance or orchestration run: {target}") from None
             return run.legacy_instance_id
@@ -330,7 +330,9 @@ class InstanceManager:
         manifest.metadata = _deep_merge(manifest.metadata, metadata_updates)
         self.store.save(manifest)
 
-    def _child_metadata(self, parent: InstanceManifest, *, reason: str, extra: dict[str, Any] | None = None) -> dict[str, Any]:
+    def _child_metadata(
+        self, parent: InstanceManifest, *, reason: str, extra: dict[str, Any] | None = None
+    ) -> dict[str, Any]:
         metadata = {
             "automation_reason": reason,
             "automation_parent_instance_id": parent.id,
@@ -537,7 +539,9 @@ class InstanceManager:
         manifest.progress = self._progress(stage="failed", message=message, percent=100.0)
         if manifest.execution is not None:
             manifest.execution.ended_at = utc_now_iso()
-            manifest.execution.exit_code = manifest.execution.exit_code if manifest.execution.exit_code is not None else 1
+            manifest.execution.exit_code = (
+                manifest.execution.exit_code if manifest.execution.exit_code is not None else 1
+            )
         self.store.save(self._project_manifest(manifest))
         self.store.append_event(
             instance_id,
@@ -611,9 +615,8 @@ class InstanceManager:
             return False
         scheduled = False
         for recommendation in manifest.recommendations[: config.feedback_loop.max_recommendations]:
-            should_queue = (
-                (recommendation.action == "finetune" and config.feedback_loop.auto_queue_finetune)
-                or (recommendation.action == "retrain" and config.feedback_loop.auto_queue_retrain)
+            should_queue = (recommendation.action == "finetune" and config.feedback_loop.auto_queue_finetune) or (
+                recommendation.action == "retrain" and config.feedback_loop.auto_queue_retrain
             )
             if not should_queue or not recommendation.target_instance_type or not recommendation.config_path:
                 continue
@@ -700,7 +703,11 @@ class InstanceManager:
                     scheduled = True
             if self._queue_recommendations(manifest, config, context=context):
                 scheduled = True
-            if (config.pipeline.auto_continue or config.decision_policy.auto_continue) and manifest.decision and not scheduled:
+            if (
+                (config.pipeline.auto_continue or config.decision_policy.auto_continue)
+                and manifest.decision
+                and not scheduled
+            ):
                 self._auto_continue(manifest, config, manifest.decision.action)
 
     def finalize_instance(
@@ -756,9 +763,13 @@ class InstanceManager:
             manifest.recommendations = build_feedback_recommendations(
                 summary,
                 config.decision_policy,
-                default_prepare_config=resolve_path_from_config(manifest.config_path, config.pipeline.default_prepare_config)
+                default_prepare_config=resolve_path_from_config(
+                    manifest.config_path, config.pipeline.default_prepare_config
+                )
                 or config.pipeline.default_prepare_config,
-                default_train_config=resolve_path_from_config(manifest.config_path, config.pipeline.default_train_config)
+                default_train_config=resolve_path_from_config(
+                    manifest.config_path, config.pipeline.default_train_config
+                )
                 or config.pipeline.default_train_config,
                 default_finetune_config=resolve_path_from_config(
                     manifest.config_path,
@@ -795,7 +806,10 @@ class InstanceManager:
                 manifest.recommendations = [
                     FeedbackRecommendation(
                         action="evaluate",
-                        reason="A follow-up evaluation is recommended so training metrics can feed the next orchestration step.",
+                        reason=(
+                            "A follow-up evaluation is recommended so training metrics "
+                            "can feed the next orchestration step."
+                        ),
                         priority=2,
                         target_instance_type="evaluate",
                         config_path=resolve_path_from_config(manifest.config_path, config.pipeline.default_eval_config)
@@ -901,9 +915,7 @@ class InstanceManager:
         registry_payload = yaml.safe_load(Path(registry_path).read_text()) or {}
         generated_name = f"instance_{source.id.replace('-', '_')}"
         registry_payload.setdefault("models", [])
-        registry_payload["models"] = [
-            item for item in registry_payload["models"] if item.get("name") != generated_name
-        ]
+        registry_payload["models"] = [item for item in registry_payload["models"] if item.get("name") != generated_name]
         registry_payload["models"].append(
             {
                 "name": generated_name,
@@ -941,7 +953,9 @@ class InstanceManager:
             return snapshot
 
         eval_payload = yaml.safe_load(Path(eval_config_path).read_text()) or {}
-        registry_path = Path(eval_payload.get("models", {}).get("registry_path", "inference/configs/model_registry.yaml"))
+        registry_path = Path(
+            eval_payload.get("models", {}).get("registry_path", "inference/configs/model_registry.yaml")
+        )
         generated_name, generated_registry_path = self._write_generated_model_registry(
             manifest,
             source,
@@ -1025,9 +1039,7 @@ class InstanceManager:
                     "id": Path(str(snapshot.get("resolved_subsystem_config_path") or config_path)).stem,
                     "label": source.name,
                     "benchmark_config": str(snapshot.get("resolved_subsystem_config_path") or config_path),
-                    "compare_to_models": [
-                        str(models_payload.get("primary_model"))
-                    ]
+                    "compare_to_models": [str(models_payload.get("primary_model"))]
                     if models_payload.get("primary_model")
                     else [],
                 },
@@ -1146,14 +1158,18 @@ class InstanceManager:
         if action in {"evaluate", "re_evaluate"}:
             child = self.create_evaluation_instance(
                 source.id,
-                config_path=config_path or self._default_config_path_for_action(source, action, config) or "configs/eval.yaml",
+                config_path=config_path
+                or self._default_config_path_for_action(source, action, config)
+                or "configs/eval.yaml",
                 start=False,
                 metadata_updates=metadata,
             )
         elif action == "open_inference":
             child = self.create_inference_instance(
                 source.id,
-                config_path=config_path or self._default_config_path_for_action(source, action, config) or "configs/inference.yaml",
+                config_path=config_path
+                or self._default_config_path_for_action(source, action, config)
+                or "configs/inference.yaml",
                 start=False,
                 metadata_updates=metadata,
             )
@@ -1161,7 +1177,9 @@ class InstanceManager:
             child = self.create_deployment_instance(
                 source.id,
                 target=deployment_target or self._default_deployment_target(source, config),
-                config_path=config_path or self._default_config_path_for_action(source, action, config) or "configs/deploy.yaml",
+                config_path=config_path
+                or self._default_config_path_for_action(source, action, config)
+                or "configs/deploy.yaml",
                 start=False,
                 metadata_updates=metadata,
             )
@@ -1241,9 +1259,18 @@ class InstanceManager:
                 }
             )
 
-        eval_config_path = resolve_path_from_config(manifest.config_path, config.pipeline.default_eval_config) or config.pipeline.default_eval_config
-        inference_config_path = resolve_path_from_config(manifest.config_path, config.pipeline.default_inference_config) or config.pipeline.default_inference_config
-        deploy_config_path = resolve_path_from_config(manifest.config_path, config.pipeline.default_deploy_config) or config.pipeline.default_deploy_config
+        eval_config_path = (
+            resolve_path_from_config(manifest.config_path, config.pipeline.default_eval_config)
+            or config.pipeline.default_eval_config
+        )
+        inference_config_path = (
+            resolve_path_from_config(manifest.config_path, config.pipeline.default_inference_config)
+            or config.pipeline.default_inference_config
+        )
+        deploy_config_path = (
+            resolve_path_from_config(manifest.config_path, config.pipeline.default_deploy_config)
+            or config.pipeline.default_deploy_config
+        )
 
         if manifest.type in {"train", "finetune"}:
             add_action(
@@ -1275,15 +1302,9 @@ class InstanceManager:
             targets: list[str] = []
             targets.extend(manifest.lifecycle.deployment_targets)
             targets.extend(
-                item.deployment_target
-                for item in manifest.recommendations
-                if item.deployment_target is not None
+                item.deployment_target for item in manifest.recommendations if item.deployment_target is not None
             )
-            targets.extend(
-                str(hook.target)
-                for hook in config.publish_hooks
-                if getattr(hook, "target", None)
-            )
+            targets.extend(str(hook.target) for hook in config.publish_hooks if getattr(hook, "target", None))
             deduped_targets: list[str] = []
             for target in targets:
                 if target not in deduped_targets:
@@ -1350,9 +1371,9 @@ class InstanceManager:
         return [item.model_dump(mode="json") for item in self.orchestration.list_runs()]
 
     def get_orchestration_run(self, legacy_or_run_id: str) -> dict[str, Any]:
-        run = self.orchestration.control_plane.get_run(legacy_or_run_id) or self.orchestration.control_plane.get_run_by_legacy_instance(
+        run = self.orchestration.control_plane.get_run(
             legacy_or_run_id
-        )
+        ) or self.orchestration.control_plane.get_run_by_legacy_instance(legacy_or_run_id)
         if run is None:
             raise FileNotFoundError(f"Unknown orchestration run: {legacy_or_run_id}")
         tasks = self.list_tasks(run.id)

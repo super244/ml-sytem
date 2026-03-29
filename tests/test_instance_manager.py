@@ -7,7 +7,6 @@ from pathlib import Path
 
 import pytest
 
-
 MANAGER_MODULES = [
     "ai_factory.core.instances",
     "ai_factory.core.instances.models",
@@ -184,7 +183,9 @@ def test_manager_can_create_evaluation_children(tmp_path: Path, monkeypatch: pyt
     )
     store.create(source, {"instance": {"type": "finetune"}})
 
-    child = manager.create_evaluation_instance(source.id, config_path=str(eval_dir / "base_vs_finetuned.yaml"), start=False)
+    child = manager.create_evaluation_instance(
+        source.id, config_path=str(eval_dir / "base_vs_finetuned.yaml"), start=False
+    )
 
     assert child.parent_instance_id == source.id
     assert child.type == "evaluate"
@@ -217,7 +218,10 @@ def test_manager_finalize_evaluation_schedules_reports_and_publish_hooks(
             "subsystem": {"config_ref": "evaluation/configs/base_vs_finetuned.yaml"},
             "feedback_loop": {"enabled": True, "suggest_failure_analysis": True},
             "publish_hooks": [{"target": "ollama", "enabled": True, "when": "after_evaluation"}],
-            "pipeline": {"default_report_config": "configs/report.yaml", "default_deploy_config": "configs/deploy.yaml"},
+            "pipeline": {
+                "default_report_config": "configs/report.yaml",
+                "default_deploy_config": "configs/deploy.yaml",
+            },
         },
     )
 
@@ -250,10 +254,16 @@ def test_manager_finalize_evaluation_schedules_reports_and_publish_hooks(
     monkeypatch.setattr(
         manager,
         "create_deployment_instance",
-        lambda source_instance_id, **kwargs: scheduled["deployments"].append(
-            {"source_instance_id": source_instance_id, "target": kwargs["target"], "config_path": kwargs["config_path"]}
-        )
-        or eval_manifest,
+        lambda source_instance_id, **kwargs: (
+            scheduled["deployments"].append(
+                {
+                    "source_instance_id": source_instance_id,
+                    "target": kwargs["target"],
+                    "config_path": kwargs["config_path"],
+                }
+            )
+            or eval_manifest
+        ),
     )
     monkeypatch.setattr(manager, "start_instance", lambda instance_id: eval_manifest)
 

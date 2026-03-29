@@ -19,6 +19,9 @@ def write_run_manifest(
     metadata: dict[str, Any],
 ) -> RunManifest:
     repo_root = Path(__file__).resolve().parents[2]
+    data_files = [item for item in data_files if item]
+    metrics_files = [item for item in metrics_files if item]
+    report_files = [item for item in report_files if item]
     manifest = RunManifest(
         run_id=layout.run_id,
         run_name=config.run_name,

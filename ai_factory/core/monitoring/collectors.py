@@ -5,8 +5,8 @@ from pathlib import Path
 from typing import Any
 
 from ai_factory.core.discovery import latest_training_run, list_training_runs
-from ai_factory.core.io import load_json, read_jsonl
 from ai_factory.core.instances.models import InstanceManifest, MetricPoint, ProgressSnapshot
+from ai_factory.core.io import load_json, read_jsonl
 from ai_factory.core.monitoring.metrics import metric_points_from_summary
 
 
@@ -22,11 +22,7 @@ def _prepare_metrics(snapshot: dict[str, Any]) -> tuple[dict[str, Any], list[Met
     pack_summary = load_json(output_dir / "pack_summary.json", default={}) or {}
     manifest_stats = manifest.get("stats") if isinstance(manifest.get("stats"), dict) else {}
     summary = {
-        "records": (
-            manifest_stats.get("num_records")
-            or stats.get("num_records")
-            or stats.get("records_total")
-        ),
+        "records": (manifest_stats.get("num_records") or stats.get("num_records") or stats.get("records_total")),
         "train_rows": stats.get("train_rows"),
         "eval_rows": stats.get("eval_rows"),
         "test_rows": stats.get("test_rows"),
@@ -52,9 +48,7 @@ def _prepare_progress(snapshot: dict[str, Any]) -> ProgressSnapshot:
     return ProgressSnapshot(
         stage="prepared" if ready else "preparing",
         status_message=(
-            "Dataset preparation artifacts have been written."
-            if ready
-            else "Waiting for processed dataset artifacts."
+            "Dataset preparation artifacts have been written." if ready else "Waiting for processed dataset artifacts."
         ),
         completed_steps=completed if isinstance(completed, int) else None,
         percent=1.0 if ready else 0.0,
@@ -76,7 +70,9 @@ def _training_run_for_manifest(manifest: InstanceManifest, snapshot: dict[str, A
     return latest_training_run(matching)
 
 
-def _training_metrics(manifest: InstanceManifest, snapshot: dict[str, Any]) -> tuple[dict[str, Any], list[MetricPoint], dict[str, Any]]:
+def _training_metrics(
+    manifest: InstanceManifest, snapshot: dict[str, Any]
+) -> tuple[dict[str, Any], list[MetricPoint], dict[str, Any]]:
     run = _training_run_for_manifest(manifest, snapshot)
     if run is None:
         return {}, [], {}
@@ -124,7 +120,9 @@ def _training_progress(manifest: InstanceManifest, snapshot: dict[str, Any]) -> 
     if run is None:
         if manifest.status == "pending":
             return ProgressSnapshot(stage="queued", status_message="Waiting for training resources.")
-        return ProgressSnapshot(stage="training", status_message="Training run has started but no metrics are available yet.")
+        return ProgressSnapshot(
+            stage="training", status_message="Training run has started but no metrics are available yet."
+        )
     run_dir = Path(str(run["output_dir"]))
     series_rows = read_jsonl(run_dir / "logs" / "training_metrics.jsonl")
     if not series_rows:
@@ -143,9 +141,7 @@ def _training_progress(manifest: InstanceManifest, snapshot: dict[str, Any]) -> 
     if isinstance(step, int) and isinstance(total_steps, int) and total_steps > 0:
         percent = min(step / total_steps, 1.0)
     metrics = {
-        key: value
-        for key, value in latest.items()
-        if isinstance(value, (int, float)) and key not in {"step", "epoch"}
+        key: value for key, value in latest.items() if isinstance(value, (int, float)) and key not in {"step", "epoch"}
     }
     return ProgressSnapshot(
         stage="training",
@@ -197,7 +193,9 @@ def _evaluation_progress(snapshot: dict[str, Any]) -> ProgressSnapshot | None:
         percent = 1.0
     return ProgressSnapshot(
         stage="evaluation",
-        status_message="Benchmark evaluation has produced artifacts." if summary else "Evaluation is collecting example outputs.",
+        status_message="Benchmark evaluation has produced artifacts."
+        if summary
+        else "Evaluation is collecting example outputs.",
         completed_steps=completed or None,
         total_steps=total,
         percent=percent,
@@ -206,15 +204,12 @@ def _evaluation_progress(snapshot: dict[str, Any]) -> ProgressSnapshot | None:
 
 
 def _inference_metrics(snapshot: dict[str, Any]) -> tuple[dict[str, Any], list[MetricPoint], dict[str, Any]]:
-    telemetry_path = (
-        ((snapshot.get("execution") or {}).get("env") or {}).get("INFERENCE_TELEMETRY_PATH")
-        or "artifacts/inference/telemetry/requests.jsonl"
-    )
+    telemetry_path = ((snapshot.get("execution") or {}).get("env") or {}).get(
+        "INFERENCE_TELEMETRY_PATH"
+    ) or "artifacts/inference/telemetry/requests.jsonl"
     rows = read_jsonl(telemetry_path)
     latencies = [row.get("latency_s") for row in rows if isinstance(row.get("latency_s"), (int, float))]
-    prompt_tokens = [
-        row.get("prompt_tokens") for row in rows if isinstance(row.get("prompt_tokens"), (int, float))
-    ]
+    prompt_tokens = [row.get("prompt_tokens") for row in rows if isinstance(row.get("prompt_tokens"), (int, float))]
     completion_tokens = [
         row.get("completion_tokens") for row in rows if isinstance(row.get("completion_tokens"), (int, float))
     ]
@@ -230,9 +225,7 @@ def _inference_metrics(snapshot: dict[str, Any]) -> tuple[dict[str, Any], list[M
         "total_prompt_tokens": total_prompt_tokens or None,
         "total_completion_tokens": total_completion_tokens or None,
         "avg_tokens_per_second": (
-            total_completion_tokens / total_latency_s
-            if total_completion_tokens and total_latency_s
-            else None
+            total_completion_tokens / total_latency_s if total_completion_tokens and total_latency_s else None
         ),
         "avg_time_to_first_token_s": (sum(ttft_values) / len(ttft_values)) if ttft_values else None,
     }
@@ -241,10 +234,9 @@ def _inference_metrics(snapshot: dict[str, Any]) -> tuple[dict[str, Any], list[M
 
 
 def _inference_progress(snapshot: dict[str, Any]) -> ProgressSnapshot | None:
-    telemetry_path = (
-        ((snapshot.get("execution") or {}).get("env") or {}).get("INFERENCE_TELEMETRY_PATH")
-        or "artifacts/inference/telemetry/requests.jsonl"
-    )
+    telemetry_path = ((snapshot.get("execution") or {}).get("env") or {}).get(
+        "INFERENCE_TELEMETRY_PATH"
+    ) or "artifacts/inference/telemetry/requests.jsonl"
     rows = read_jsonl(telemetry_path)
     latencies = [row.get("latency_s") for row in rows if isinstance(row.get("latency_s"), (int, float))]
     completion_tokens = [
@@ -256,9 +248,7 @@ def _inference_progress(snapshot: dict[str, Any]) -> ProgressSnapshot | None:
         "requests": len(rows),
         "cache_hits": sum(1 for row in rows if row.get("cache_hit")),
         "avg_tokens_per_second": (
-            total_completion_tokens / total_latency_s
-            if total_completion_tokens and total_latency_s
-            else None
+            total_completion_tokens / total_latency_s if total_completion_tokens and total_latency_s else None
         ),
     }
     return ProgressSnapshot(
@@ -302,7 +292,9 @@ def _report_progress(snapshot: dict[str, Any]) -> ProgressSnapshot:
     output_path = Path(str(raw.get("output_dir_override") or "evaluation/results/failure_analysis.json"))
     return ProgressSnapshot(
         stage="reporting",
-        status_message="Failure analysis report has been written." if output_path.exists() else "Waiting for failure analysis artifacts.",
+        status_message="Failure analysis report has been written."
+        if output_path.exists()
+        else "Waiting for failure analysis artifacts.",
         percent=1.0 if output_path.exists() else 0.0,
     )
 

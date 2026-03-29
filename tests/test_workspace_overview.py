@@ -33,7 +33,15 @@ def test_build_workspace_overview_discovers_profiles_and_commands(tmp_path: Path
     _write(tmp_path / "evaluation" / "configs" / "base_vs_finetuned.yaml", "models: {}\n")
     _write(
         tmp_path / "configs" / "finetune.yaml",
-        "instance:\n  type: finetune\nexperience:\n  level: hobbyist\norchestration_mode: hybrid\nsubsystem:\n  config_ref: training/configs/profiles/baseline_qlora.yaml\n",
+        (
+            "instance:\n"
+            "  type: finetune\n"
+            "experience:\n"
+            "  level: hobbyist\n"
+            "orchestration_mode: hybrid\n"
+            "subsystem:\n"
+            "  config_ref: training/configs/profiles/baseline_qlora.yaml\n"
+        ),
     )
     _write(
         tmp_path / "inference" / "configs" / "model_registry.yaml",

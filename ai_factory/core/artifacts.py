@@ -1,10 +1,10 @@
 from __future__ import annotations
 
+import os
+import subprocess
 from dataclasses import dataclass
 from datetime import datetime, timezone
-import os
 from pathlib import Path
-import subprocess
 from typing import Any
 
 from ai_factory.core.hashing import sha256_file, sha256_text
@@ -72,7 +72,9 @@ def prepare_run_layout(base_dir: str | Path, run_name: str, explicit_run_id: str
     return layout
 
 
-def ensure_latest_pointer(pointer_path: str | Path, target_dir: str | Path, metadata: dict[str, Any] | None = None) -> None:
+def ensure_latest_pointer(
+    pointer_path: str | Path, target_dir: str | Path, metadata: dict[str, Any] | None = None
+) -> None:
     payload = {
         "target_dir": str(Path(target_dir)),
         **(metadata or {}),

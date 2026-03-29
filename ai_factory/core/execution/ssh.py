@@ -21,8 +21,7 @@ def _ssh_target(environment) -> str:
 def _build_remote_command(payload: RunnerPayload) -> str:
     cwd = payload.command.cwd or payload.environment.remote_repo_root or "."
     env_prefix = " ".join(
-        f"{key}={shlex.quote(value)}"
-        for key, value in {**payload.environment.env, **payload.command.env}.items()
+        f"{key}={shlex.quote(value)}" for key, value in {**payload.environment.env, **payload.command.env}.items()
     )
     command = shlex.join(payload.command.argv)
     if env_prefix:

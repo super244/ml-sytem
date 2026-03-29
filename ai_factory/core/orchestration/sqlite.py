@@ -2,10 +2,10 @@ from __future__ import annotations
 
 import json
 import sqlite3
+from collections.abc import Iterator
 from contextlib import contextmanager
 from pathlib import Path
 from typing import Any
-from collections.abc import Iterator
 
 from ai_factory.core.orchestration.models import (
     CircuitState,
@@ -302,9 +302,7 @@ class SqliteControlPlane:
                     (run_id,),
                 ).fetchall()
             else:
-                rows = connection.execute(
-                    "SELECT * FROM orchestration_tasks ORDER BY created_at, priority"
-                ).fetchall()
+                rows = connection.execute("SELECT * FROM orchestration_tasks ORDER BY created_at, priority").fetchall()
         return [self._task_from_row(row) for row in rows]
 
     def create_dependency(self, dependency: TaskDependency) -> TaskDependency:
@@ -416,7 +414,9 @@ class SqliteControlPlane:
         with self.connection() as connection:
             connection.execute(
                 """
-                INSERT INTO orchestration_leases (task_id, attempt_id, lease_owner, acquired_at, heartbeat_at, expires_at)
+                INSERT INTO orchestration_leases (
+                    task_id, attempt_id, lease_owner, acquired_at, heartbeat_at, expires_at
+                )
                 VALUES (?, ?, ?, ?, ?, ?)
                 ON CONFLICT(task_id) DO UPDATE SET
                     attempt_id=excluded.attempt_id,

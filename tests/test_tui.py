@@ -36,9 +36,7 @@ class _FakeControlService:
 
 
 def test_parse_args_supports_shared_backend_overrides():
-    args = tui.parse_args(
-        ["--repo-root", "/workspace", "--artifacts-dir", "/tmp/artifacts", "--refresh-seconds", "5"]
-    )
+    args = tui.parse_args(["--repo-root", "/workspace", "--artifacts-dir", "/tmp/artifacts", "--refresh-seconds", "5"])
 
     assert args.repo_root == "/workspace"
     assert args.artifacts_dir == "/tmp/artifacts"

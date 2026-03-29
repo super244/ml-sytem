@@ -8,7 +8,7 @@ from peft import PeftModel
 from transformers import AutoModelForCausalLM
 
 from training.src.config import load_experiment_config
-from training.src.modeling import build_quantization_config, load_tokenizer, resolve_dtype
+from training.src.modeling import load_tokenizer, resolve_dtype
 
 
 def parse_args() -> argparse.Namespace:
@@ -28,7 +28,7 @@ def main() -> None:
         trust_remote_code=config.model.trust_remote_code,
         device_map="cpu",
         torch_dtype=resolve_dtype(config.model.bnb_compute_dtype),
-        quantization_config=build_quantization_config(config),
+        low_cpu_mem_usage=True,
     )
     model = PeftModel.from_pretrained(model, args.adapter_path)
     merged = model.merge_and_unload()

@@ -2,20 +2,21 @@ from __future__ import annotations
 
 import argparse
 import json
-import sys
 from pathlib import Path
 
 from transformers import TrainingArguments, set_seed
 
-REPO_ROOT = Path(__file__).resolve().parents[1]
-if str(REPO_ROOT) not in sys.path:
-    sys.path.insert(0, str(REPO_ROOT))
-
 from ai_factory.core.artifacts import prepare_run_layout, write_json
 from training.src.analysis import dataset_summary
 from training.src.callbacks import JsonlMetricsCallback, TrackerCallback
+from training.src.checkpoints import resolve_resume_checkpoint
 from training.src.collators import WeightedDataCollator
-from training.src.config import ExperimentConfig, load_experiment_config
+from training.src.config import (
+    ExperimentConfig,
+    describe_experiment_config,
+    load_experiment_config,
+    validate_experiment_config,
+)
 from training.src.data import build_dataset
 from training.src.environment import collect_environment_snapshot
 from training.src.modeling import load_model_for_training, load_tokenizer, trainable_parameter_report
@@ -29,8 +30,21 @@ def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Fine-tune a math model with QLoRA and research-grade artifacts.")
     parser.add_argument("--config", required=True, help="Path to the YAML config file.")
     parser.add_argument("--resume-from-checkpoint", default=None)
-    parser.add_argument("--dry-run", action="store_true", help="Validate configs, tokenizer, datasets, and artifacts without training.")
-    parser.add_argument("--validate-model-load", action="store_true", help="Load the model after dry validation and exit.")
+    parser.add_argument(
+        "--resume-from-latest-checkpoint",
+        action="store_true",
+        help="Resume from the newest checkpoint in the run directory when no explicit checkpoint is provided.",
+    )
+    parser.add_argument(
+        "--dry-run",
+        action="store_true",
+        help="Validate configs, tokenizer, datasets, and artifacts without training.",
+    )
+    parser.add_argument(
+        "--validate-model-load",
+        action="store_true",
+        help="Load the model after dry validation and exit.",
+    )
     return parser.parse_args()
 
 
@@ -79,6 +93,33 @@ def save_config_snapshot(config: ExperimentConfig, layout) -> Path:
     return path
 
 
+def write_config_report(
+    config: ExperimentConfig,
+    layout,
+    *,
+    warnings: list[str],
+    resume_from_checkpoint: str | None,
+) -> tuple[Path, dict[str, object]]:
+    report = describe_experiment_config(config, warnings=warnings)
+    report["resume_from_checkpoint"] = resume_from_checkpoint
+    path = layout.manifests_dir / "config_report.json"
+    write_json(path, report)
+    return path, report
+
+
+def summarize_environment(snapshot: dict[str, object]) -> dict[str, object]:
+    python_info = snapshot.get("python") if isinstance(snapshot.get("python"), dict) else {}
+    platform_info = snapshot.get("platform") if isinstance(snapshot.get("platform"), dict) else {}
+    torch_info = snapshot.get("torch") if isinstance(snapshot.get("torch"), dict) else {}
+    return {
+        "git_sha": snapshot.get("git_sha"),
+        "python_version": python_info.get("version"),
+        "platform": platform_info.get("platform"),
+        "cuda_available": torch_info.get("cuda_available"),
+        "cuda_device_count": torch_info.get("cuda_device_count"),
+    }
+
+
 def build_dataset_artifacts(config: ExperimentConfig, tokenizer, layout):
     train_dataset = build_dataset(
         file_path=config.data.train_file,
@@ -107,27 +148,34 @@ def build_dataset_artifacts(config: ExperimentConfig, tokenizer, layout):
 def main() -> None:
     args = parse_args()
     config = load_experiment_config(args.config)
+    validation_warnings = validate_experiment_config(config)
     set_seed(config.seed)
 
     layout = prepare_run_layout(config.training.artifacts_dir, config.run_name)
+    resume_from_checkpoint = resolve_resume_checkpoint(
+        layout.checkpoints_dir,
+        explicit_checkpoint=args.resume_from_checkpoint,
+        resume_from_latest=args.resume_from_latest_checkpoint,
+    )
     config_snapshot_path = save_config_snapshot(config, layout)
+    config_report_path, config_report = write_config_report(
+        config,
+        layout,
+        warnings=validation_warnings,
+        resume_from_checkpoint=resume_from_checkpoint,
+    )
     tracker = build_tracker(layout, config)
     tracker_summary: dict[str, float | int] = {}
     status = "failed"
 
     environment_snapshot_path: Path | None = None
+    environment_summary: dict[str, object] | None = None
     if config.tracking.capture_environment:
         environment_snapshot_path, environment_snapshot = collect_environment_snapshot(config, layout)
+        environment_summary = summarize_environment(environment_snapshot)
         tracker.log_params(
             {
-                "environment": {
-                    "git_sha": environment_snapshot.get("git_sha"),
-                    "python_executable": environment_snapshot["python"]["executable"],
-                    "python_version": environment_snapshot["python"]["version"],
-                    "platform": environment_snapshot["platform"]["platform"],
-                    "cuda_available": environment_snapshot["torch"]["cuda_available"],
-                    "cuda_device_count": environment_snapshot["torch"]["cuda_device_count"],
-                }
+                "environment": environment_summary,
             }
         )
         tracker.log_artifact(environment_snapshot_path, name="manifests")
@@ -139,6 +187,7 @@ def main() -> None:
                 "profile_name": config.profile_name,
                 "seed": config.seed,
                 "artifacts_dir": config.training.artifacts_dir,
+                "resume_from_checkpoint": resume_from_checkpoint,
             },
             "model": config.model.__dict__,
             "data": {
@@ -150,10 +199,23 @@ def main() -> None:
             "training": config.training.__dict__,
             "runtime": config.runtime.__dict__,
             "tracking": config.tracking.__dict__,
+            "config_report": config_report,
         }
     )
     if config.tracking.log_config_artifact:
         tracker.log_artifact(config_snapshot_path, name="manifests")
+        tracker.log_artifact(config_report_path, name="manifests")
+
+    validation_report = {
+        "warnings": validation_warnings,
+        "resume_from_checkpoint": resume_from_checkpoint,
+        "config_report_path": str(config_report_path),
+        "config_snapshot_path": str(config_snapshot_path),
+    }
+    validation_report_path = layout.manifests_dir / "validation_report.json"
+    write_json(validation_report_path, validation_report)
+    if config.tracking.log_config_artifact:
+        tracker.log_artifact(validation_report_path, name="manifests")
 
     validate_model_load = args.validate_model_load or config.runtime.validate_model_load
     tokenizer = load_tokenizer(config) if (not args.dry_run or validate_model_load) else None
@@ -187,6 +249,9 @@ def main() -> None:
                 report_files=[],
                 metadata={
                     "mode": "dry_run",
+                    "resume_from_checkpoint": resume_from_checkpoint,
+                    "config_report_path": str(config_report_path),
+                    "validation_report_path": str(validation_report_path),
                     "environment_snapshot": str(environment_snapshot_path) if environment_snapshot_path else None,
                 },
             )
@@ -194,13 +259,31 @@ def main() -> None:
                 "run_name": config.run_name,
                 "profile_name": config.profile_name,
                 "base_model": config.model.base_model_name,
+                "status": "dry_run_complete",
+                "run_dir": str(layout.root),
+                "validation": validation_report,
+                "config": config_report,
                 "train_rows": dry_validation["train_dataset"]["num_rows"],
                 "eval_rows": dry_validation["eval_dataset"]["num_rows"] if dry_validation.get("eval_dataset") else 0,
                 "parameter_report": load_json_if_exists(layout.metrics_dir / "model_report.json"),
+                "dataset_report": dry_validation,
                 "metrics": {
                     "status": "dry_run_complete",
                     "tokenizer_mode": dry_validation["train_dataset"].get("tokenizer_mode"),
                 },
+                "artifacts": {
+                    "manifest": str(layout.manifests_dir / config.logging.manifest_filename),
+                    "config_snapshot": str(config_snapshot_path),
+                    "config_report": str(config_report_path),
+                    "validation_report": str(validation_report_path),
+                },
+                "environment": environment_summary or {},
+                "tracking": {
+                    "provider": config.tracking.provider,
+                    "project": config.tracking.project,
+                    "experiment_name": config.tracking.experiment_name,
+                },
+                "resume_from_checkpoint": resume_from_checkpoint,
             }
             summary_path = write_training_summary(layout, summary, config.logging.summary_markdown_filename)
             tracker_summary = {
@@ -217,6 +300,7 @@ def main() -> None:
                 report_files=[str(summary_path)],
                 metadata={
                     "mode": "dry_run",
+                    "resume_from_checkpoint": resume_from_checkpoint,
                     "validation": dry_validation,
                     "environment_snapshot": str(environment_snapshot_path) if environment_snapshot_path else None,
                 },
@@ -270,10 +354,33 @@ def main() -> None:
             "run_name": config.run_name,
             "profile_name": config.profile_name,
             "base_model": config.model.base_model_name,
+            "status": "completed",
+            "run_dir": str(layout.root),
+            "validation": validation_report,
+            "config": config_report,
             "train_rows": dataset_report["tokenized_train_rows"],
             "eval_rows": dataset_report["tokenized_eval_rows"],
             "parameter_report": parameter_report,
+            "dataset_report": dataset_report,
             "metrics": metrics,
+            "artifacts": {
+                "manifest": str(layout.manifests_dir / config.logging.manifest_filename),
+                "config_snapshot": str(config_snapshot_path),
+                "config_report": str(config_report_path),
+                "validation_report": str(validation_report_path),
+                "dataset_report": str(layout.metrics_dir / "dataset_report.json"),
+                "model_report": str(layout.metrics_dir / "model_report.json"),
+                "metrics": str(layout.metrics_dir / "metrics.json"),
+                "summary": str(layout.reports_dir / config.logging.summary_markdown_filename),
+            },
+            "environment": environment_summary or {},
+            "tracking": {
+                "provider": config.tracking.provider,
+                "project": config.tracking.project,
+                "experiment_name": config.tracking.experiment_name,
+            },
+            "resume_from_checkpoint": resume_from_checkpoint,
+            "published": published,
         }
         summary_path = write_training_summary(layout, summary, config.logging.summary_markdown_filename)
         tracker_summary = {
@@ -299,6 +406,7 @@ def main() -> None:
             report_files=[str(summary_path)],
             metadata={
                 "published": published,
+                "resume_from_checkpoint": resume_from_checkpoint,
                 "tracking": {
                     "provider": config.tracking.provider,
                     "project": config.tracking.project,

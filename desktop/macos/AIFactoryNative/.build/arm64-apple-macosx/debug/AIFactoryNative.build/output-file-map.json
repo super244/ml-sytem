@@ -1,0 +1,26 @@
+{
+  "": {
+    "swift-dependencies": "/Users/luca/Projects/ai-factory/desktop/macos/AIFactoryNative/.build/arm64-apple-macosx/debug/AIFactoryNative.build/primary.swiftdeps"
+  },
+  "/Users/luca/Projects/ai-factory/desktop/macos/AIFactoryNative/Sources/AIFactoryNative/AIFactoryNativeApp.swift": {
+    "dependencies": "/Users/luca/Projects/ai-factory/desktop/macos/AIFactoryNative/.build/arm64-apple-macosx/debug/AIFactoryNative.build/AIFactoryNativeApp.d",
+    "object": "/Users/luca/Projects/ai-factory/desktop/macos/AIFactoryNative/.build/arm64-apple-macosx/debug/AIFactoryNative.build/AIFactoryNativeApp.swift.o",
+    "swiftmodule": "/Users/luca/Projects/ai-factory/desktop/macos/AIFactoryNative/.build/arm64-apple-macosx/debug/AIFactoryNative.build/AIFactoryNativeApp~partial.swiftmodule",
+    "swift-dependencies": "/Users/luca/Projects/ai-factory/desktop/macos/AIFactoryNative/.build/arm64-apple-macosx/debug/AIFactoryNative.build/AIFactoryNativeApp.swiftdeps",
+    "diagnostics": "/Users/luca/Projects/ai-factory/desktop/macos/AIFactoryNative/.build/arm64-apple-macosx/debug/AIFactoryNative.build/AIFactoryNativeApp.dia"
+  },
+  "/Users/luca/Projects/ai-factory/desktop/macos/AIFactoryNative/Sources/AIFactoryNative/ControlCenterView.swift": {
+    "dependencies": "/Users/luca/Projects/ai-factory/desktop/macos/AIFactoryNative/.build/arm64-apple-macosx/debug/AIFactoryNative.build/ControlCenterView.d",
+    "object": "/Users/luca/Projects/ai-factory/desktop/macos/AIFactoryNative/.build/arm64-apple-macosx/debug/AIFactoryNative.build/ControlCenterView.swift.o",
+    "swiftmodule": "/Users/luca/Projects/ai-factory/desktop/macos/AIFactoryNative/.build/arm64-apple-macosx/debug/AIFactoryNative.build/ControlCenterView~partial.swiftmodule",
+    "swift-dependencies": "/Users/luca/Projects/ai-factory/desktop/macos/AIFactoryNative/.build/arm64-apple-macosx/debug/AIFactoryNative.build/ControlCenterView.swiftdeps",
+    "diagnostics": "/Users/luca/Projects/ai-factory/desktop/macos/AIFactoryNative/.build/arm64-apple-macosx/debug/AIFactoryNative.build/ControlCenterView.dia"
+  },
+  "/Users/luca/Projects/ai-factory/desktop/macos/AIFactoryNative/Sources/AIFactoryNative/DesktopBridge.swift": {
+    "dependencies": "/Users/luca/Projects/ai-factory/desktop/macos/AIFactoryNative/.build/arm64-apple-macosx/debug/AIFactoryNative.build/DesktopBridge.d",
+    "object": "/Users/luca/Projects/ai-factory/desktop/macos/AIFactoryNative/.build/arm64-apple-macosx/debug/AIFactoryNative.build/DesktopBridge.swift.o",
+    "swiftmodule": "/Users/luca/Projects/ai-factory/desktop/macos/AIFactoryNative/.build/arm64-apple-macosx/debug/AIFactoryNative.build/DesktopBridge~partial.swiftmodule",
+    "swift-dependencies": "/Users/luca/Projects/ai-factory/desktop/macos/AIFactoryNative/.build/arm64-apple-macosx/debug/AIFactoryNative.build/DesktopBridge.swiftdeps",
+    "diagnostics": "/Users/luca/Projects/ai-factory/desktop/macos/AIFactoryNative/.build/arm64-apple-macosx/debug/AIFactoryNative.build/DesktopBridge.dia"
+  }
+}

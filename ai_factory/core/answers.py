@@ -1,19 +1,17 @@
 from __future__ import annotations
 
 import ast
-from collections import Counter
-from collections.abc import Iterable
-from dataclasses import dataclass
 import math
 import operator
 import re
+from collections import Counter
+from collections.abc import Callable, Iterable
+from dataclasses import dataclass
 from typing import Any, cast
-from collections.abc import Callable
 
 from sympy import simplify, sympify
 
 from ai_factory.core.hashing import normalize_text
-
 
 SAFE_OPERATORS: dict[type[ast.AST], Callable[..., float]] = {
     ast.Add: operator.add,

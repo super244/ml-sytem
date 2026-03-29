@@ -1,18 +1,26 @@
 # Desktop Shell
 
-This folder is the starter shell for the AI-FACTORY desktop app.
+This folder contains the desktop surfaces for AI-Factory.
 
 ## Why it exists
 
 - The desktop surface is intentionally thin.
 - It should reuse the same backend contracts as the CLI, TUI, and web dashboard.
-- The Electron shell simply hosts the existing control center UI and API instead of introducing a second orchestration stack.
+- The Electron shell hosts the existing control center UI and API instead of introducing a second orchestration stack.
+- The native macOS scaffold lives alongside it so we can move toward a SwiftUI-first shell without breaking the current path.
 
 ## Current behavior
 
 - `main.js` opens the workspace route from `AI_FACTORY_DESKTOP_URL` or `http://127.0.0.1:3000/workspace`.
 - `preload.js` exposes a minimal desktop capability object for future renderer-side feature checks.
 - No desktop-specific orchestration logic lives here. All lifecycle actions still flow through the shared backend.
+
+## Native macOS scaffold
+
+- `macos/AIFactoryNative` is a standalone Swift package containing a SwiftUI control center.
+- `swift run` inside that package launches the native shell on macOS.
+- Set `AI_FACTORY_DESKTOP_NATIVE=1` before starting `ai_factory.interfaces.desktop.DesktopInterface.run()` to prefer the SwiftUI shell when the native package is present.
+- `desktop/package.json` exposes `native:build` and `native:run` shortcuts for the Swift package.
 
 ## Intended next steps
 

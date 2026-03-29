@@ -1,12 +1,12 @@
 from __future__ import annotations
 
-from dataclasses import asdict
-from datetime import datetime, timezone
 import importlib.metadata
 import os
-from pathlib import Path
 import platform
 import sys
+from dataclasses import asdict
+from datetime import datetime, timezone
+from pathlib import Path
 from typing import Any
 
 import torch
@@ -15,7 +15,6 @@ from ai_factory.core.artifacts import ArtifactLayout, current_git_sha, detect_ru
 from ai_factory.core.hashing import sha256_file
 from ai_factory.core.io import write_json
 from training.src.config import ExperimentConfig
-
 
 IMPORTANT_ENV_VARS = (
     "AI_FACTORY_REPO_ROOT",

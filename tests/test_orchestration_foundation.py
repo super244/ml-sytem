@@ -8,7 +8,6 @@ from pathlib import Path
 
 import pytest
 
-
 ORCHESTRATION_MODULES = [
     "ai_factory.core.instances",
     "ai_factory.core.instances.models",

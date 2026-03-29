@@ -61,7 +61,7 @@ async def test_generate_endpoint(monkeypatch):
                 "output_format": "text",
                 "use_cache": True,
             },
-    )
+        )
     assert response.status_code == 200
     assert response.json()["final_answer"] == "2"
 

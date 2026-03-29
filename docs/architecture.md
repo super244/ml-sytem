@@ -1,6 +1,6 @@
 # System Architecture
 
-Atlas Math Lab is organized as a shared-core platform rather than a loose stack of scripts. The same canonical schema, answer utilities, artifact layout, and metadata conventions are reused by data preparation, training, inference, evaluation, notebooks, and the frontend.
+AI-Factory is organized as a shared-core platform rather than a loose stack of scripts. The same canonical schema, answer utilities, artifact layout, and metadata conventions are reused by data preparation, training, inference, evaluation, notebooks, and the frontend.
 
 ## Design Principles
 
