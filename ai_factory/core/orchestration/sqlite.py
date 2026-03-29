@@ -24,7 +24,7 @@ def _dump(value: Any) -> str:
 def _load(value: str | None, default: Any) -> Any:
     if value in {None, ""}:
         return default
-    return json.loads(value)
+    return json.loads(value) if value is not None else {}
 
 
 class SqliteControlPlane:

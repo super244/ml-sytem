@@ -1,0 +1,191 @@
+# 🎯 Multi-Domain Training Example Configuration
+# This file demonstrates how to configure AI-Factory for multi-domain training
+
+# Training Configuration
+training:
+  name: "multi_domain_specialist"
+  description: "Multi-domain model trained on mathematics, code, and reasoning"
+  
+  # Domain Configuration
+  domains:
+    - name: "mathematics"
+      weight: 0.5
+      subdomains:
+        - "calculus"
+        - "algebra"
+        - "olympiad"
+      datasets:
+        - "data/processed/packs/calculus_hard_pack"
+        - "data/processed/packs/olympiad_reasoning_pack"
+      difficulty_range: ["medium", "hard"]
+      
+    - name: "code"
+      weight: 0.3
+      subdomains:
+        - "python"
+        - "javascript"
+      datasets:
+        - "data/processed/packs/python_algorithms_pack"
+      difficulty_range: ["easy", "medium", "hard"]
+      
+    - name: "reasoning"
+      weight: 0.2
+      subdomains:
+        - "logic"
+        - "pattern_recognition"
+      datasets:
+        - "data/processed/packs/logic_reasoning_pack"
+      difficulty_range: ["medium", "hard"]
+
+  # Model Configuration
+  model:
+    base_model: "Qwen/Qwen2.5-Math-1.5B-Instruct"
+    type: "qlora"
+    
+    # LoRA Parameters
+    lora:
+      r: 16
+      lora_alpha: 32
+      target_modules: ["q_proj", "v_proj", "k_proj", "o_proj"]
+      lora_dropout: 0.1
+      bias: "none"
+      task_type: "CAUSAL_LM"
+
+  # Training Parameters
+  training:
+    batch_size: 4
+    gradient_accumulation_steps: 4
+    learning_rate: 2e-4
+    num_epochs: 3
+    warmup_steps: 100
+    save_steps: 500
+    eval_steps: 500
+    logging_steps: 10
+    
+    # Curriculum Learning
+    curriculum:
+      enabled: true
+      strategy: "difficulty_progression"
+      schedule:
+        - epoch: 0
+          domains: ["mathematics"]
+          difficulty: "easy"
+        - epoch: 1
+          domains: ["mathematics", "code"]
+          difficulty: "medium"
+        - epoch: 2
+          domains: ["mathematics", "code", "reasoning"]
+          difficulty: "hard"
+
+  # Evaluation Configuration
+  evaluation:
+    enabled: true
+    strategy: "domain_specific"
+    benchmarks:
+      - name: "mathematics_benchmark"
+        domains: ["mathematics"]
+        metrics: ["accuracy", "reasoning_quality"]
+      - name: "code_benchmark"
+        domains: ["code"]
+        metrics: ["code_accuracy", "efficiency"]
+      - name: "reasoning_benchmark"
+        domains: ["reasoning"]
+        metrics: ["logical_consistency", "pattern_accuracy"]
+    
+    evaluation_frequency: "epoch"
+    save_best_model: true
+    early_stopping:
+      enabled: true
+      patience: 3
+      metric: "weighted_accuracy"
+
+  # Platform Configuration
+  platform:
+    scaling:
+      enabled: false  # Set to true for distributed training
+      max_nodes: 1
+      resources_per_node:
+        cpu: 8
+        memory: "32GB"
+        gpu: 1
+        gpu_memory: "16GB"
+    
+    monitoring:
+      enabled: true
+      metrics_collection_interval: 30  # seconds
+      alert_thresholds:
+        loss_increase: 0.1
+        gpu_utilization_low: 20
+        memory_usage_high: 90
+    
+    deployment:
+      targets:
+        - type: "huggingface"
+          enabled: false
+        - type: "ollama"
+          enabled: true
+          quantization: "q4_k_m"
+
+  # Data Configuration
+  data:
+    preprocessing:
+      max_length: 2048
+      truncation: true
+      padding: "max_length"
+    
+    augmentation:
+      enabled: true
+      techniques:
+        - "paraphrasing"
+        - "difficulty_adjustment"
+        - "domain_transfer"
+    
+    quality_filtering:
+      min_quality_score: 0.7
+      remove_duplicates: true
+      contamination_check: true
+
+  # Logging and Tracking
+  logging:
+    level: "INFO"
+    format: "detailed"
+    
+    tracking:
+      backend: "tensorboard"
+      log_dir: "artifacts/logs/tensorboard"
+      
+    experiment_tracking:
+      enabled: true
+      project: "ai-factory-multi-domain"
+      tags: ["multi-domain", "mathematics", "code", "reasoning"]
+
+  # Output Configuration
+  output:
+    base_dir: "artifacts"
+    model_dir: "artifacts/models/multi_domain_specialist"
+    checkpoint_dir: "artifacts/checkpoints/multi_domain_specialist"
+    
+    save:
+      best_model: true
+      last_checkpoint: true
+      all_checkpoints: false
+      
+    export:
+      formats: ["pytorch", "safetensors"]
+      quantization: ["q4_k_m", "q8_0"]
+
+# Metadata
+metadata:
+  version: "1.0.0"
+  author: "AI-Factory Team"
+  created_at: "2024-01-01"
+  tags: ["multi-domain", "mathematics", "code", "reasoning", "qlora"]
+  description: "Comprehensive multi-domain training configuration for AI-Factory"
+
+# Notes
+notes:
+  - "This configuration demonstrates the full capabilities of AI-Factory's multi-domain training"
+  - "Adjust domain weights based on your specific requirements"
+  - "Enable distributed training by setting platform.scaling.enabled to true"
+  - "Monitor training progress through the web interface or TUI"
+  - "Use the evaluation benchmarks to measure domain-specific performance"

@@ -5,7 +5,7 @@ from typing import Any
 
 
 def cluster_failures(results: list[dict[str, Any]], key: str) -> dict[str, int]:
-    counter = Counter()
+    counter: Counter[str] = Counter()
     for result in results:
         entry = result.get(key) or {}
         if entry.get("correct"):

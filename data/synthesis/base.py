@@ -32,7 +32,7 @@ def choose_weighted(rng: random.Random, weights: dict[str, float]) -> str:
         running += prob
         if cursor <= running:
             return level
-    return levels[-1]
+    return str(levels[-1])
 
 
 def nz(rng: random.Random, low: int = -6, high: int = 6, exclude: set[int] | None = None) -> int:

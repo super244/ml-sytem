@@ -9,7 +9,8 @@ from typing import Any
 def _load_json_if_exists(path: Path) -> dict[str, Any]:
     if not path.exists():
         return {}
-    return json.loads(path.read_text())
+    data = json.loads(path.read_text())
+    return data if isinstance(data, dict) else {}
 
 
 def _parse_created_at(value: Any) -> datetime | None:
@@ -98,6 +99,7 @@ def load_benchmark_registry(path: str | Path) -> list[dict[str, Any]]:
         import yaml
 
         payload = yaml.safe_load(registry_path.read_text()) or {}
-        return payload.get("benchmarks", [])
+        benchmarks = payload.get("benchmarks", [])
+        return benchmarks if isinstance(benchmarks, list) else []
     except Exception:
         return []
