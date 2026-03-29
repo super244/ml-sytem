@@ -58,24 +58,23 @@ def _interactive_enabled(args: argparse.Namespace) -> bool:
     return bool(getattr(args, "interactive", False) and sys.stdin.isatty())
 
 
-def _new_config_path(args: argparse.Namespace) -> str:
-    if args.config:
-        return args.config
-    if _interactive_enabled(args):
-        return _prompt("Config path", "configs/finetune.yaml")
-    raise SystemExit("ai-factory new requires --config outside interactive mode")
+def _new_config_path(args: argparse.Namespace) -> str | None:
+    config = args.config
+    return config or "configs/finetune.yaml"
 
 
 def _deploy_target_from_config(config_path: str) -> str | None:
     try:
-        return load_orchestration_config(config_path).subsystem.provider
+        config = load_orchestration_config(config_path)
+        return config.subsystem.provider
     except Exception:
         return None
 
 
 def _resolve_deploy_target(args: argparse.Namespace) -> str:
     if args.target:
-        return args.target
+        target = args.target
+        return target
     config_target = _deploy_target_from_config(args.config)
     if config_target:
         return config_target
@@ -343,7 +342,7 @@ def parse_args() -> argparse.Namespace:
     platform_parser = subparsers.add_parser("platform", parents=[common_json])
     platform_subparsers = platform_parser.add_subparsers(dest="platform_command", required=True)
     
-    platform_status_parser = platform_subparsers.add_parser("status", parents=[common_json])
+    platform_subparsers.add_parser("status", parents=[common_json])
     
     platform_scale_parser = platform_subparsers.add_parser("scale", parents=[common_json])
     platform_scale_parser.add_argument("target_nodes", type=int)
@@ -528,7 +527,7 @@ def main() -> None:
         if args.domain_command == "info":
             from ai_factory.domains import get_domain_info
             domain_info = get_domain_info(args.domain_name)
-            _render_payload(domain_info.model_dump(), as_json=args.json)
+            _render_payload(domain_info, as_json=args.json)
             return
     
     # NEW: Platform command handlers

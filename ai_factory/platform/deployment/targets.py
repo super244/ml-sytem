@@ -1,7 +1,7 @@
 """Deployment targets for AI-Factory models."""
 
 from abc import ABC, abstractmethod
-from typing import Dict, List, Any, Optional
+from typing import Any
 import asyncio
 import logging
 
@@ -25,12 +25,12 @@ class DeploymentTarget(ABC):
         pass
     
     @abstractmethod
-    async def deploy(self, model: ModelArtifact, spec: DeploymentSpec) -> Dict[str, Any]:
+    async def deploy(self, model: ModelArtifact, spec: DeploymentSpec) -> dict[str, Any]:
         """Deploy model to target."""
         pass
     
     @abstractmethod
-    async def get_deployment_status(self, deployment_id: str) -> Dict[str, Any]:
+    async def get_deployment_status(self, deployment_id: str) -> dict[str, Any]:
         """Get deployment status."""
         pass
     
@@ -40,11 +40,11 @@ class DeploymentTarget(ABC):
         pass
     
     @abstractmethod
-    async def validate_spec(self, spec: DeploymentSpec) -> List[str]:
+    async def validate_spec(self, spec: DeploymentSpec) -> list[str]:
         """Validate deployment specification."""
         pass
     
-    async def get_target_status(self) -> Dict[str, Any]:
+    async def get_target_status(self) -> dict[str, Any]:
         """Get target status."""
         return {
             "name": self.name,
@@ -67,7 +67,7 @@ class HuggingFaceTarget(DeploymentTarget):
         logger.info(f"Preparing {model.name} for HuggingFace deployment")
         return model
     
-    async def deploy(self, model: ModelArtifact, spec: DeploymentSpec) -> Dict[str, Any]:
+    async def deploy(self, model: ModelArtifact, spec: DeploymentSpec) -> dict[str, Any]:
         """Deploy model to HuggingFace Hub."""
         logger.info(f"Deploying {model.name} to HuggingFace Hub")
         return {
@@ -76,7 +76,7 @@ class HuggingFaceTarget(DeploymentTarget):
             "status": "deployed"
         }
     
-    async def get_deployment_status(self, deployment_id: str) -> Dict[str, Any]:
+    async def get_deployment_status(self, deployment_id: str) -> dict[str, Any]:
         """Get HuggingFace deployment status."""
         return {
             "deployment_id": deployment_id,
@@ -89,7 +89,7 @@ class HuggingFaceTarget(DeploymentTarget):
         logger.info(f"Cancelling HuggingFace deployment {deployment_id}")
         return True
     
-    async def validate_spec(self, spec: DeploymentSpec) -> List[str]:
+    async def validate_spec(self, spec: DeploymentSpec) -> list[str]:
         """Validate HuggingFace deployment spec."""
         errors = []
         if not spec.config.get("repository"):
@@ -112,7 +112,7 @@ class OllamaTarget(DeploymentTarget):
         # Convert to GGUF format if needed
         return model
     
-    async def deploy(self, model: ModelArtifact, spec: DeploymentSpec) -> Dict[str, Any]:
+    async def deploy(self, model: ModelArtifact, spec: DeploymentSpec) -> dict[str, Any]:
         """Deploy model to Ollama."""
         logger.info(f"Deploying {model.name} to Ollama")
         return {
@@ -121,7 +121,7 @@ class OllamaTarget(DeploymentTarget):
             "status": "deployed"
         }
     
-    async def get_deployment_status(self, deployment_id: str) -> Dict[str, Any]:
+    async def get_deployment_status(self, deployment_id: str) -> dict[str, Any]:
         """Get Ollama deployment status."""
         return {
             "deployment_id": deployment_id,
@@ -134,7 +134,7 @@ class OllamaTarget(DeploymentTarget):
         logger.info(f"Cancelling Ollama deployment {deployment_id}")
         return True
     
-    async def validate_spec(self, spec: DeploymentSpec) -> List[str]:
+    async def validate_spec(self, spec: DeploymentSpec) -> list[str]:
         """Validate Ollama deployment spec."""
         return []  # Ollama has minimal requirements
 
@@ -153,7 +153,7 @@ class LMStudioTarget(DeploymentTarget):
         logger.info(f"Preparing {model.name} for LM Studio")
         return model
     
-    async def deploy(self, model: ModelArtifact, spec: DeploymentSpec) -> Dict[str, Any]:
+    async def deploy(self, model: ModelArtifact, spec: DeploymentSpec) -> dict[str, Any]:
         """Export model for LM Studio."""
         logger.info(f"Exporting {model.name} for LM Studio")
         return {
@@ -162,7 +162,7 @@ class LMStudioTarget(DeploymentTarget):
             "status": "exported"
         }
     
-    async def get_deployment_status(self, deployment_id: str) -> Dict[str, Any]:
+    async def get_deployment_status(self, deployment_id: str) -> dict[str, Any]:
         """Get LM Studio deployment status."""
         return {
             "deployment_id": deployment_id,
@@ -174,7 +174,7 @@ class LMStudioTarget(DeploymentTarget):
         logger.info(f"Cancelling LM Studio deployment {deployment_id}")
         return True
     
-    async def validate_spec(self, spec: DeploymentSpec) -> List[str]:
+    async def validate_spec(self, spec: DeploymentSpec) -> list[str]:
         """Validate LM Studio deployment spec."""
         return []
 
@@ -193,7 +193,7 @@ class CustomAPITarget(DeploymentTarget):
         logger.info(f"Preparing {model.name} for custom API deployment")
         return model
     
-    async def deploy(self, model: ModelArtifact, spec: DeploymentSpec) -> Dict[str, Any]:
+    async def deploy(self, model: ModelArtifact, spec: DeploymentSpec) -> dict[str, Any]:
         """Deploy model to custom API."""
         logger.info(f"Deploying {model.name} to custom API")
         return {
@@ -202,7 +202,7 @@ class CustomAPITarget(DeploymentTarget):
             "status": "deployed"
         }
     
-    async def get_deployment_status(self, deployment_id: str) -> Dict[str, Any]:
+    async def get_deployment_status(self, deployment_id: str) -> dict[str, Any]:
         """Get custom API deployment status."""
         return {
             "deployment_id": deployment_id,
@@ -215,7 +215,7 @@ class CustomAPITarget(DeploymentTarget):
         logger.info(f"Cancelling custom API deployment {deployment_id}")
         return True
     
-    async def validate_spec(self, spec: DeploymentSpec) -> List[str]:
+    async def validate_spec(self, spec: DeploymentSpec) -> list[str]:
         """Validate custom API deployment spec."""
         errors = []
         if not spec.config.get("endpoint"):
@@ -238,7 +238,7 @@ class EdgeDeviceTarget(DeploymentTarget):
         # Quantize and optimize for edge
         return model
     
-    async def deploy(self, model: ModelArtifact, spec: DeploymentSpec) -> Dict[str, Any]:
+    async def deploy(self, model: ModelArtifact, spec: DeploymentSpec) -> dict[str, Any]:
         """Deploy model to edge device."""
         logger.info(f"Deploying {model.name} to edge device")
         return {
@@ -247,7 +247,7 @@ class EdgeDeviceTarget(DeploymentTarget):
             "status": "deployed"
         }
     
-    async def get_deployment_status(self, deployment_id: str) -> Dict[str, Any]:
+    async def get_deployment_status(self, deployment_id: str) -> dict[str, Any]:
         """Get edge deployment status."""
         return {
             "deployment_id": deployment_id,
@@ -260,7 +260,7 @@ class EdgeDeviceTarget(DeploymentTarget):
         logger.info(f"Cancelling edge deployment {deployment_id}")
         return True
     
-    async def validate_spec(self, spec: DeploymentSpec) -> List[str]:
+    async def validate_spec(self, spec: DeploymentSpec) -> list[str]:
         """Validate edge deployment spec."""
         errors = []
         if not spec.config.get("device_id"):

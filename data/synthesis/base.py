@@ -24,7 +24,7 @@ class DatasetSpec:
 
 def choose_weighted(rng: random.Random, weights: dict[str, float]) -> str:
     items = list(weights.items())
-    levels, probs = zip(*items)
+    levels, probs = zip(*items, strict=True)
     total = sum(probs)
     cursor = rng.random() * total
     running = 0.0

@@ -1,9 +1,9 @@
 """Monitoring manager for real-time metrics and alerting."""
 
-from typing import Dict, List, Any, Optional, AsyncIterator
+from typing import Any
+from collections.abc import AsyncIterator
 from pathlib import Path
 import asyncio
-import json
 import logging
 from datetime import datetime
 
@@ -24,7 +24,7 @@ class MonitoringManager:
         self.metrics_collector = MetricsCollector(config)
         self.alert_manager = AlertManager(config)
         self._running = False
-        self._monitoring_task: Optional[asyncio.Task] = None
+        self._monitoring_task: asyncio.Task | None = None
     
     async def start_monitoring(self) -> None:
         """Start the monitoring service."""
@@ -70,11 +70,11 @@ class MonitoringManager:
                 logger.error(f"Error in monitoring loop: {e}")
                 await asyncio.sleep(5)  # Brief pause on error
     
-    async def get_realtime_metrics(self, instance_id: Optional[str] = None) -> Dict[str, Any]:
+    async def get_realtime_metrics(self, instance_id: str | None = None) -> dict[str, Any]:
         """Get current metrics for all instances or specific instance."""
         return await self.metrics_collector.get_current_metrics(instance_id)
     
-    async def stream_metrics(self, instance_id: Optional[str] = None) -> AsyncIterator[Dict[str, Any]]:
+    async def stream_metrics(self, instance_id: str | None = None) -> AsyncIterator[dict[str, Any]]:
         """Stream real-time metrics."""
         while self._running:
             metrics = await self.get_realtime_metrics(instance_id)
@@ -84,7 +84,7 @@ class MonitoringManager:
             }
             await asyncio.sleep(1)  # 1-second updates
     
-    async def get_system_health(self) -> Dict[str, Any]:
+    async def get_system_health(self) -> dict[str, Any]:
         """Get overall system health status."""
         metrics = await self.metrics_collector.get_system_metrics()
         alerts = await self.alert_manager.get_active_alerts()
@@ -104,11 +104,11 @@ class MonitoringManager:
         instance_id: str, 
         start_time: datetime, 
         end_time: datetime
-    ) -> List[MetricPoint]:
+    ) -> list[MetricPoint]:
         """Get historical metrics for an instance."""
         return await self.metrics_collector.get_historical_metrics(instance_id, start_time, end_time)
     
-    def _calculate_health_score(self, metrics: Dict[str, Any], alerts: List[Alert]) -> float:
+    def _calculate_health_score(self, metrics: dict[str, Any], alerts: list[Alert]) -> float:
         """Calculate overall system health score."""
         base_score = 1.0
         
@@ -132,7 +132,7 @@ class MonitoringManager:
         
         return max(0.0, base_score)
     
-    async def _store_metrics(self, metrics: Dict[str, Any]) -> None:
+    async def _store_metrics(self, metrics: dict[str, Any]) -> None:
         """Store metrics in time-series database."""
         # Implementation would depend on chosen storage backend
         # For now, just log metrics

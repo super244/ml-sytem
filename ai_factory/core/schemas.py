@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, Literal, Optional, List, Dict, Union
+from typing import Any, Literal
 
 from pydantic import BaseModel, Field, field_validator, model_validator
 
@@ -74,7 +74,7 @@ class ResourceSpec(BaseModel):
     gpu_count: int = 1
     gpu_memory_gb: int = 8
     disk_gb: int = 100
-    custom_requirements: Dict[str, Any] = Field(default_factory=dict)
+    custom_requirements: dict[str, Any] = Field(default_factory=dict)
 
 
 class DatasetRecordV2(BaseModel):
@@ -151,7 +151,7 @@ class MathRecordV2(DatasetRecordV2):
         return max(0.0, min(1.0, float(v)))
 
     @model_validator(mode="after")
-    def _fill_defaults(self) -> "MathRecordV2":
+    def _fill_defaults(self) -> MathRecordV2:
         if not self.id:
             object.__setattr__(self, "id", stable_question_fingerprint(self.question))
         if not self.lineage.dataset_id:
@@ -243,11 +243,11 @@ class DatasetSpec(BaseModel):
     description: str
     path: str
     domain: str
-    subdomain: Optional[str] = None
-    difficulty_range: List[str] = Field(default_factory=list)
+    subdomain: str | None = None
+    difficulty_range: list[str] = Field(default_factory=list)
     size: int = 0
     format: str = "jsonl"
-    metadata: Dict[str, Any] = Field(default_factory=dict)
+    metadata: dict[str, Any] = Field(default_factory=dict)
 
 
 class MetricSpec(BaseModel):
@@ -256,9 +256,9 @@ class MetricSpec(BaseModel):
     description: str
     type: str  # accuracy, score, ranking, etc.
     domain: str
-    subdomain: Optional[str] = None
-    range: Optional[List[float]] = None  # min/max for score metrics
-    metadata: Dict[str, Any] = Field(default_factory=dict)
+    subdomain: str | None = None
+    range: list[float] | None = None  # min/max for score metrics
+    metadata: dict[str, Any] = Field(default_factory=dict)
 
 
 class EvaluationSpec(BaseModel):
@@ -266,12 +266,12 @@ class EvaluationSpec(BaseModel):
     name: str
     description: str
     domain: str
-    subdomain: Optional[str] = None
-    datasets: List[str]
-    metrics: List[str]
-    splits: List[str] = Field(default_factory=["test"])
+    subdomain: str | None = None
+    datasets: list[str]
+    metrics: list[str]
+    splits: list[str] = Field(default_factory=["test"])
     size: int = 0
-    metadata: Dict[str, Any] = Field(default_factory=dict)
+    metadata: dict[str, Any] = Field(default_factory=dict)
 
 
 class TrainingProfileSpec(BaseModel):
@@ -279,13 +279,13 @@ class TrainingProfileSpec(BaseModel):
     name: str
     description: str
     domain: str
-    subdomain: Optional[str] = None
+    subdomain: str | None = None
     training_method: str
-    datasets: List[str]
+    datasets: list[str]
     config_path: str
-    curriculum_order: Optional[List[str]] = None
-    model_requirements: Dict[str, Any] = Field(default_factory=dict)
-    metadata: Dict[str, Any] = Field(default_factory=dict)
+    curriculum_order: list[str] | None = None
+    model_requirements: dict[str, Any] = Field(default_factory=dict)
+    metadata: dict[str, Any] = Field(default_factory=dict)
 
 
 class ModelArtifact(BaseModel):
@@ -293,11 +293,11 @@ class ModelArtifact(BaseModel):
     name: str
     version: str
     path: str
-    domain: Optional[str] = None
+    domain: str | None = None
     architecture: str
     parameters: int
     format: str  # pytorch, safetensors, gguf, etc.
-    metadata: Dict[str, Any] = Field(default_factory=dict)
+    metadata: dict[str, Any] = Field(default_factory=dict)
 
 
 class DeploymentTarget(BaseModel):
@@ -305,44 +305,44 @@ class DeploymentTarget(BaseModel):
     name: str
     type: str  # huggingface, ollama, etc.
     description: str
-    config: Dict[str, Any] = Field(default_factory=dict)
-    capabilities: List[str] = Field(default_factory=list)
+    config: dict[str, Any] = Field(default_factory=dict)
+    capabilities: list[str] = Field(default_factory=list)
 
 
 class DeploymentSpec(BaseModel):
     """Deployment specification."""
     target: str
     model_name: str
-    config: Dict[str, Any] = Field(default_factory=dict)
+    config: dict[str, Any] = Field(default_factory=dict)
     public: bool = False
-    metadata: Dict[str, Any] = Field(default_factory=dict)
+    metadata: dict[str, Any] = Field(default_factory=dict)
 
 
 class ScalingConfig(BaseModel):
     """Configuration for scaling manager."""
     max_nodes: int = 10
-    default_resources: Dict[str, Any] = Field(default_factory=dict)
+    default_resources: dict[str, Any] = Field(default_factory=dict)
     cluster_type: str = "local"  # local, slurm, kubernetes
-    metadata: Dict[str, Any] = Field(default_factory=dict)
+    metadata: dict[str, Any] = Field(default_factory=dict)
 
 
 class MonitoringConfig(BaseModel):
     """Configuration for monitoring manager."""
     collection_interval_seconds: float = 5.0
     storage_backend: str = "file"  # file, prometheus, influxdb
-    alert_channels: List[str] = Field(default_factory=list)
-    thresholds: Dict[str, Any] = Field(default_factory=dict)
-    metadata: Dict[str, Any] = Field(default_factory=dict)
+    alert_channels: list[str] = Field(default_factory=list)
+    thresholds: dict[str, Any] = Field(default_factory=dict)
+    metadata: dict[str, Any] = Field(default_factory=dict)
 
 
 class TrainingJob(BaseModel):
     """Training job specification for scaling."""
     name: str
     profile: str
-    resource_requirements: Dict[str, Any] = Field(default_factory=dict)
+    resource_requirements: dict[str, Any] = Field(default_factory=dict)
     estimated_duration_hours: float = 0.0
     priority: str = "normal"  # low, normal, high, critical
-    metadata: Dict[str, Any] = Field(default_factory=dict)
+    metadata: dict[str, Any] = Field(default_factory=dict)
 
 
 class Alert(BaseModel):
@@ -352,7 +352,7 @@ class Alert(BaseModel):
     message: str
     source: str
     timestamp: datetime
-    metadata: Dict[str, Any] = Field(default_factory=dict)
+    metadata: dict[str, Any] = Field(default_factory=dict)
 
 
 class MetricPoint(BaseModel):
@@ -360,7 +360,7 @@ class MetricPoint(BaseModel):
     timestamp: datetime
     name: str
     value: float
-    labels: Dict[str, str] = Field(default_factory=dict)
+    labels: dict[str, str] = Field(default_factory=dict)
 
 
 # Backward compatibility aliases

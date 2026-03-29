@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import torch
 from torch.nn import CrossEntropyLoss
 from torch.utils.data import DataLoader, SequentialSampler
 from transformers import Trainer

@@ -1,12 +1,12 @@
 """Deployment manager for multi-target model deployment."""
 
-from typing import Dict, List, Any, Optional
+from typing import Any
 from pathlib import Path
 import asyncio
 import logging
 from enum import Enum
 
-from ai_factory.core.schemas import DeploymentSpec, DeploymentTarget, ModelArtifact
+from ai_factory.core.schemas import DeploymentSpec, ModelArtifact
 from .targets import (
     HuggingFaceTarget,
     OllamaTarget,
@@ -40,7 +40,7 @@ class DeploymentManager:
             "custom_api": CustomAPITarget(),
             "edge_device": EdgeDeviceTarget()
         }
-        self._active_deployments: Dict[str, Dict[str, Any]] = {}
+        self._active_deployments: dict[str, dict[str, Any]] = {}
     
     async def deploy_model(
         self, 
@@ -92,7 +92,7 @@ class DeploymentManager:
             logger.error(f"Failed to deploy {model_artifact.name} to {deployment_spec.target}: {e}")
             raise
     
-    async def get_deployment_status(self, deployment_id: str) -> Dict[str, Any]:
+    async def get_deployment_status(self, deployment_id: str) -> dict[str, Any]:
         """Get status of a deployment."""
         if deployment_id not in self._active_deployments:
             raise ValueError(f"Deployment {deployment_id} not found")
@@ -129,9 +129,9 @@ class DeploymentManager:
     
     async def list_deployments(
         self, 
-        target: Optional[str] = None, 
-        status: Optional[DeploymentStatus] = None
-    ) -> List[Dict[str, Any]]:
+        target: str | None = None, 
+        status: DeploymentStatus | None = None
+    ) -> list[dict[str, Any]]:
         """List deployments with optional filtering."""
         deployments = []
         
@@ -148,7 +148,7 @@ class DeploymentManager:
         
         return deployments
     
-    async def get_available_targets(self) -> List[Dict[str, Any]]:
+    async def get_available_targets(self) -> list[dict[str, Any]]:
         """Get list of available deployment targets."""
         targets = []
         
@@ -164,7 +164,7 @@ class DeploymentManager:
         
         return targets
     
-    async def validate_deployment_spec(self, deployment_spec: DeploymentSpec) -> List[str]:
+    async def validate_deployment_spec(self, deployment_spec: DeploymentSpec) -> list[str]:
         """Validate a deployment specification."""
         target_handler = self.targets.get(deployment_spec.target)
         if not target_handler:

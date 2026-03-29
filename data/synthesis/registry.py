@@ -3,7 +3,8 @@ from __future__ import annotations
 import json
 from pathlib import Path
 import random
-from typing import Any, Callable
+from typing import Any
+from collections.abc import Callable
 
 from data.reports.cards import dataset_card_text
 from data.synthesis.base import DatasetSpec, choose_weighted

@@ -1,7 +1,8 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Any, Callable
+from typing import Any
+from collections.abc import Callable
 
 from ai_factory.core.hashing import normalize_text
 from ai_factory.core.io import write_json, write_jsonl, write_markdown

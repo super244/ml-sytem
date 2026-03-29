@@ -1,9 +1,9 @@
 """Mathematics domain configuration."""
 
-from typing import List, Literal
+from typing import Literal
 from pydantic import BaseModel, Field
 
-from ai_factory.core.schemas import DatasetSpec, MetricSpec
+from ai_factory.core.schemas import MetricSpec
 
 
 class MathDomainConfig(BaseModel):
@@ -14,7 +14,7 @@ class MathDomainConfig(BaseModel):
     description: str = "Mathematical reasoning and calculus domain"
     
     # Sub-domains within mathematics
-    subdomains: List[str] = Field(
+    subdomains: list[str] = Field(
         default_factory=lambda: [
             "calculus",
             "algebra", 
@@ -26,7 +26,7 @@ class MathDomainConfig(BaseModel):
     )
     
     # Supported dataset families
-    dataset_families: List[str] = Field(
+    dataset_families: list[str] = Field(
         default_factory=lambda: [
             "derivatives",
             "integrals", 
@@ -38,10 +38,10 @@ class MathDomainConfig(BaseModel):
     )
     
     # Domain-specific metrics
-    metrics: List[MetricSpec] = Field(default_factory=list)
+    metrics: list[MetricSpec] = Field(default_factory=list)
     
     # Default models for this domain
-    default_models: List[str] = Field(
+    default_models: list[str] = Field(
         default_factory=lambda: [
             "Qwen2.5-Math-1.5B-Instruct",
             "Qwen2.5-Math-7B-Instruct"
@@ -49,7 +49,7 @@ class MathDomainConfig(BaseModel):
     )
     
     # Specialized evaluation benchmarks
-    benchmarks: List[str] = Field(
+    benchmarks: list[str] = Field(
         default_factory=lambda: [
             "mathematics_benchmark",
             "calculus_specialist",

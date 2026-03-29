@@ -160,7 +160,7 @@ class InstanceManager:
                 target
             )
             if run is None or not run.legacy_instance_id:
-                raise FileNotFoundError(f"Unknown instance or orchestration run: {target}")
+                raise FileNotFoundError(f"Unknown instance or orchestration run: {target}") from None
             return run.legacy_instance_id
 
     def _progress(

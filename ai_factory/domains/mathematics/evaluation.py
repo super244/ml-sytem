@@ -1,6 +1,5 @@
 """Mathematics domain evaluation suite."""
 
-from typing import Dict, List, Any
 from pathlib import Path
 
 from ai_factory.core.schemas import EvaluationSpec, MetricSpec
@@ -14,7 +13,7 @@ class MathEvaluationSuite:
         self._metrics = self._load_math_metrics()
         self._benchmarks = self._load_math_benchmarks()
     
-    def _load_math_metrics(self) -> Dict[str, MetricSpec]:
+    def _load_math_metrics(self) -> dict[str, MetricSpec]:
         """Load mathematics-specific evaluation metrics."""
         return {
             "mathematical_accuracy": MetricSpec(
@@ -54,7 +53,7 @@ class MathEvaluationSuite:
             )
         }
     
-    def _load_math_benchmarks(self) -> Dict[str, EvaluationSpec]:
+    def _load_math_benchmarks(self) -> dict[str, EvaluationSpec]:
         """Load mathematics benchmark specifications."""
         return {
             "mathematics_benchmark": EvaluationSpec(
@@ -88,11 +87,11 @@ class MathEvaluationSuite:
             )
         }
     
-    def list_metrics(self) -> List[str]:
+    def list_metrics(self) -> list[str]:
         """List all available mathematics metrics."""
         return list(self._metrics.keys())
     
-    def list_benchmarks(self) -> List[str]:
+    def list_benchmarks(self) -> list[str]:
         """List all available mathematics benchmarks."""
         return list(self._benchmarks.keys())
     

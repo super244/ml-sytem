@@ -3,7 +3,8 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from pathlib import Path
 import re
-from typing import Any, Iterable
+from typing import Any
+from collections.abc import Iterable
 
 import yaml
 

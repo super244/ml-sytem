@@ -53,7 +53,7 @@ class EnvironmentSpec(BaseModel):
     port_forwards: list[PortForward] = Field(default_factory=list)
 
     @model_validator(mode="after")
-    def _validate_cloud_fields(self) -> "EnvironmentSpec":
+    def _validate_cloud_fields(self) -> EnvironmentSpec:
         if self.kind == "cloud" and not (self.profile_name or self.host):
             raise ValueError("cloud environments require either a profile_name or host")
         return self

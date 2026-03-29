@@ -48,7 +48,7 @@ class UserExperienceConfig(BaseModel):
     max_parallel_sub_agents: int | None = None
 
     @model_validator(mode="after")
-    def _apply_level_defaults(self) -> "UserExperienceConfig":
+    def _apply_level_defaults(self) -> UserExperienceConfig:
         presets = {
             "beginner": {
                 "allow_command_override": False,
@@ -100,7 +100,7 @@ class SubAgentConfig(BaseModel):
     failure_budget: int = 1
 
     @model_validator(mode="after")
-    def _translate_workloads(self) -> "SubAgentConfig":
+    def _translate_workloads(self) -> SubAgentConfig:
         if self.agent_roles:
             return self
         mapping = {

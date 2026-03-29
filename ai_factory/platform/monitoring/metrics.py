@@ -1,8 +1,6 @@
 """Metrics collection for AI-Factory monitoring."""
 
-from typing import Dict, List, Any, Optional
-from pathlib import Path
-import asyncio
+from typing import Any
 import logging
 from datetime import datetime
 
@@ -19,7 +17,7 @@ class MetricsCollector:
         self.config = config
         self._metrics_store = {}
     
-    async def collect_all_metrics(self) -> Dict[str, Any]:
+    async def collect_all_metrics(self) -> dict[str, Any]:
         """Collect metrics from all sources."""
         system_metrics = await self.get_system_metrics()
         training_metrics = await self.get_training_metrics()
@@ -32,13 +30,13 @@ class MetricsCollector:
             "inference": inference_metrics
         }
     
-    async def get_current_metrics(self, instance_id: Optional[str] = None) -> Dict[str, Any]:
+    async def get_current_metrics(self, instance_id: str | None = None) -> dict[str, Any]:
         """Get current metrics for specific instance or all instances."""
         if instance_id:
             return await self.get_instance_metrics(instance_id)
         return await self.collect_all_metrics()
     
-    async def get_system_metrics(self) -> Dict[str, Any]:
+    async def get_system_metrics(self) -> dict[str, Any]:
         """Collect system-level metrics."""
         return {
             "cpu_usage": 0.65,
@@ -49,7 +47,7 @@ class MetricsCollector:
             "gpu_usage": [0.89, 0.76, 0.92, 0.68]
         }
     
-    async def get_training_metrics(self) -> Dict[str, Any]:
+    async def get_training_metrics(self) -> dict[str, Any]:
         """Collect training-related metrics."""
         return {
             "active_jobs": 3,
@@ -59,7 +57,7 @@ class MetricsCollector:
             "average_accuracy": 0.876
         }
     
-    async def get_inference_metrics(self) -> Dict[str, Any]:
+    async def get_inference_metrics(self) -> dict[str, Any]:
         """Collect inference-related metrics."""
         return {
             "active_models": 5,
@@ -68,7 +66,7 @@ class MetricsCollector:
             "success_rate": 0.987
         }
     
-    async def get_instance_metrics(self, instance_id: str) -> Dict[str, Any]:
+    async def get_instance_metrics(self, instance_id: str) -> dict[str, Any]:
         """Get metrics for a specific instance."""
         return {
             "instance_id": instance_id,
@@ -85,7 +83,7 @@ class MetricsCollector:
         instance_id: str, 
         start_time: datetime, 
         end_time: datetime
-    ) -> List[MetricPoint]:
+    ) -> list[MetricPoint]:
         """Get historical metrics for an instance."""
         # Mock implementation - would query time-series database
         metrics = []
@@ -107,7 +105,7 @@ class MetricsCollector:
             self._metrics_store[metric.name] = []
         self._metrics_store[metric.name].append(metric)
     
-    async def query_metrics(self, query: str) -> List[MetricPoint]:
+    async def query_metrics(self, query: str) -> list[MetricPoint]:
         """Query metrics with a simple query language."""
         # Simplified implementation - would use real query language
         name = query.split("=")[1].strip('"') if "=" in query else "loss"
