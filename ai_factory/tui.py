@@ -442,7 +442,7 @@ def _render_recommendations(screen: Any, top: int, left: int, width: int, height
     if instance and instance.recommendations:
         _safe_addstr(screen, row, left, "recommended:", curses.A_DIM)
         row += 1
-        for idx, rec in enumerate(instance.recommendations[:5]):
+        for _idx, rec in enumerate(instance.recommendations[:5]):
             if row >= height - 2:
                 break
             priority_str = "*" * min(rec.priority, 3)

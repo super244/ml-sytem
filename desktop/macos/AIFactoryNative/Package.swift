@@ -5,7 +5,7 @@ import PackageDescription
 let package = Package(
     name: "AIFactoryNative",
     platforms: [
-        .macOS(.v13)
+        .macOS(.v14)
     ],
     products: [
         .executable(name: "AIFactoryNative", targets: ["AIFactoryNative"])
@@ -13,7 +13,10 @@ let package = Package(
     targets: [
         .executableTarget(
             name: "AIFactoryNative",
-            path: "Sources/AIFactoryNative"
+            path: "Sources/AIFactoryNative",
+            swiftSettings: [
+                .enableExperimentalFeature("StrictConcurrency")
+            ]
         )
     ]
 )

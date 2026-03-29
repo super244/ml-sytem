@@ -145,7 +145,7 @@ struct ControlCenterView: View {
                             if let url = URL(string: action.command), action.command.hasPrefix("http") {
                                 bridge.open(url)
                             } else if action.command.hasPrefix("python") || action.command.hasPrefix("swift") {
-                                bridge.runShellCommand(action.command)
+                                bridge.runShellCommandInTerminal(action.command)
                             } else {
                                 bridge.reveal(URL(fileURLWithPath: action.command))
                             }
@@ -156,6 +156,16 @@ struct ControlCenterView: View {
                             bridge.copy(action.command)
                         }
                         .buttonStyle(.bordered)
+
+                        if action.command.hasPrefix("python") || action.command.hasPrefix("swift") {
+                            Button {
+                                bridge.runShellCommand(action.command)
+                            } label: {
+                                Image(systemName: "terminal")
+                            }
+                            .buttonStyle(.bordered)
+                            .help("Run silently in background")
+                        }
                     }
                 }
                 .padding(18)

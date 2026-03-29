@@ -21,6 +21,27 @@ final class DesktopBridge {
         task.arguments = ["-c", command]
         try? task.run()
     }
+
+    func runShellCommandInTerminal(_ command: String) {
+        let escaped = command.replacingOccurrences(of: "\"", with: "\\\"")
+        let script = """
+        tell application "Terminal"
+            activate
+            do script "\(escaped)"
+        end tell
+        """
+        var error: NSDictionary?
+        if let appleScript = NSAppleScript(source: script) {
+            appleScript.executeAndReturnError(&error)
+        }
+    }
+
+    func sendNotification(title: String, body: String) {
+        let notification = NSUserNotification()
+        notification.title = title
+        notification.informativeText = body
+        NSUserNotificationCenter.default.deliver(notification)
+    }
 }
 
 struct NativeAction: Identifiable {
@@ -56,9 +77,16 @@ final class NativeWorkspaceStore: ObservableObject {
 
     init(processInfo: ProcessInfo = .processInfo) {
         let environment = processInfo.environment
-        self.dashboardURL = URL(string: environment["AI_FACTORY_DESKTOP_URL"] ?? "http://127.0.0.1:3000/workspace")!
-        self.apiURL = URL(string: environment["AI_FACTORY_API_URL"] ?? "http://127.0.0.1:8000")!
-        self.artifactsURL = URL(fileURLWithPath: environment["AI_FACTORY_ARTIFACTS_DIR"] ?? FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent("ai-factory/artifacts").path)
+        let storedDashboard = UserDefaults.standard.string(forKey: "ai_factory_dashboard_url")
+        let storedAPI = UserDefaults.standard.string(forKey: "ai_factory_api_url")
+        let storedArtifacts = UserDefaults.standard.string(forKey: "ai_factory_artifacts_dir")
+
+        self.dashboardURL = URL(string: storedDashboard ?? environment["AI_FACTORY_DESKTOP_URL"] ?? "http://127.0.0.1:3000/workspace")!
+        self.apiURL = URL(string: storedAPI ?? environment["AI_FACTORY_API_URL"] ?? "http://127.0.0.1:8000")!
+        let artifactsPath = storedArtifacts?.isEmpty == false
+            ? storedArtifacts!
+            : (environment["AI_FACTORY_ARTIFACTS_DIR"] ?? FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent("ai-factory/artifacts").path)
+        self.artifactsURL = URL(fileURLWithPath: artifactsPath)
         self.shellSummary = environment["AI_FACTORY_DESKTOP_SUMMARY"] ?? "Native SwiftUI shell with direct access to the shared control center."
         startPolling()
     }
@@ -69,7 +97,8 @@ final class NativeWorkspaceStore: ObservableObject {
 
     func startPolling() {
         fetchStatusBackground()
-        pollTimer = Timer.scheduledTimer(withTimeInterval: 8.0, repeats: true) { [weak self] _ in
+        let interval = UserDefaults.standard.double(forKey: "ai_factory_poll_interval")
+        pollTimer = Timer.scheduledTimer(withTimeInterval: interval > 0 ? interval : 8.0, repeats: true) { [weak self] _ in
             self?.fetchStatusBackground()
         }
     }
@@ -133,6 +162,18 @@ final class NativeWorkspaceStore: ObservableObject {
                 detail: "Open the terminal-based mission console.",
                 command: "python -m ai_factory.tui",
                 icon: "terminal"
+            ),
+            NativeAction(
+                title: "Run training",
+                detail: "Start a training job via the CLI.",
+                command: "python -m ai_factory train",
+                icon: "play.circle"
+            ),
+            NativeAction(
+                title: "Run evaluation",
+                detail: "Evaluate the latest checkpoint.",
+                command: "python -m ai_factory evaluate",
+                icon: "checkmark.seal"
             ),
         ]
     }
