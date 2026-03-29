@@ -20,7 +20,6 @@ from ai_factory.core.instances.models import (
 from ai_factory.core.platform.container import build_platform_container
 from inference.app.workspace import build_workspace_overview
 
-
 _STATUS_ICONS = {
     "running": "*",
     "completed": "+",

@@ -169,7 +169,10 @@ class TuiController:
                 live = self.control.get_live_instance_snapshot(selected.id)
                 logs = live.logs.model_dump(mode="json")
                 metrics = live.metrics.model_dump(mode="json")
-                available_actions = list(live.available_actions or [])
+                available_actions = [
+                    action.get("label", action.get("action", ""))
+                    for action in (live.available_actions or [])
+                ]
             else:
                 self.selected_index = 0
                 logs = {"stdout": "", "stderr": ""}
@@ -250,7 +253,8 @@ def _render_header(screen: Any, snapshot: DashboardSnapshot, width: int) -> int:
     _safe_addstr(screen, 0, 0, (left + " " * pad + right).ljust(width), curses.A_REVERSE | curses.A_BOLD)
 
     if snapshot.error:
-        _safe_addstr(screen, 1, 1, f"ERROR: {snapshot.error}", curses.color_pair(4) if curses.has_colors() else curses.A_BOLD)
+        error_color = curses.color_pair(4) if curses.has_colors() else curses.A_BOLD
+        _safe_addstr(screen, 1, 1, f"ERROR: {snapshot.error}", error_color)
         return 3
     return 1
 
@@ -364,7 +368,11 @@ def _render_detail(screen: Any, top: int, left: int, width: int, height: int, co
         _safe_addstr(screen, row, left, "PROGRESS", curses.A_BOLD)
         row += 1
         bar = _progress_bar(instance.progress.percent, width=20)
-        pct = f"{instance.progress.percent * 100:.0f}%" if isinstance(instance.progress.percent, (int, float)) else "n/a"
+        pct = (
+            f"{instance.progress.percent * 100:.0f}%"
+            if isinstance(instance.progress.percent, (int, float))
+            else "n/a"
+        )
         _safe_addstr(screen, row, left, f"  {bar} {pct}  {instance.progress.stage}")
         row += 1
         if instance.progress.status_message:
@@ -422,7 +430,14 @@ def _render_logs(screen: Any, top: int, left: int, width: int, height: int, cont
         _safe_addstr(screen, top + offset, left, line[:dw], curses.A_DIM)
 
 
-def _render_recommendations(screen: Any, top: int, left: int, width: int, height: int, controller: TuiController) -> None:
+def _render_recommendations(
+    screen: Any,
+    top: int,
+    left: int,
+    width: int,
+    height: int,
+    controller: TuiController,
+) -> None:
     _safe_addstr(screen, top, left, "ACTIONS & NEXT STEPS", curses.A_BOLD)
     row = top + 1
     dw = max(width - 1, 1)

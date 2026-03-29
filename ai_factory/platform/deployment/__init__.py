@@ -5,13 +5,7 @@ and deployment scenarios.
 """
 
 from .manager import DeploymentManager
-from .targets import (
-    HuggingFaceTarget,
-    OllamaTarget, 
-    LMStudioTarget,
-    CustomAPITarget,
-    EdgeDeviceTarget
-)
+from .targets import CustomAPITarget, EdgeDeviceTarget, HuggingFaceTarget, LMStudioTarget, OllamaTarget
 
 __all__ = [
     "DeploymentManager",

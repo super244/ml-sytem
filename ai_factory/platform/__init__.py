@@ -9,10 +9,10 @@ Key components:
 - deployment: Multi-target model deployment pipeline
 """
 
-from .scaling import ScalingManager
-from .monitoring import MonitoringManager
 from .deployment import DeploymentManager
-from .utils import get_platform_status, scale_platform, create_multi_domain_training
+from .monitoring import MonitoringManager
+from .scaling import ScalingManager
+from .utils import create_multi_domain_training, get_platform_status, scale_platform
 
 __all__ = [
     "ScalingManager",

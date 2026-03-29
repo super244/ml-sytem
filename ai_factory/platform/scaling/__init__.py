@@ -3,8 +3,8 @@
 Distributed training, resource management, and cluster orchestration.
 """
 
-from .manager import ScalingManager
 from .cluster import ClusterManager
+from .manager import ScalingManager
 from .resources import ResourceManager
 
 __all__ = [
