@@ -17,7 +17,8 @@ class FileResponseCache:
         path = self._path(key)
         if not path.exists():
             return None
-        return json.loads(path.read_text())
+        data = json.loads(path.read_text())
+        return data if isinstance(data, dict) else None
 
     def set(self, key: str, payload: dict[str, Any]) -> None:
         path = self._path(key)

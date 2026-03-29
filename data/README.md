@@ -1,45 +1,202 @@
-# Data Layer
+# 📊 AI-Factory Data Layer
 
-The data layer turns heterogeneous math corpora into a single research-grade schema and a set of reproducible packs. It is built around canonical `v2` records, lineage tracking, dedupe, contamination checks, quality scoring, and derived benchmark/training slices.
+The data layer transforms heterogeneous AI corpora into a unified research-grade schema with reproducible packs. Built around canonical `v2` records, lineage tracking, deduplication, contamination checks, quality scoring, and domain-specific slices.
 
-## Main Packages
+## 🏗️ **Architecture Overview**
 
-- `adapters/`: public dataset registry and normalization logic
-- `builders/`: processed corpus assembly and derived-pack construction
-- `quality/`: difficulty estimation, scoring, contamination, and mining
-- `reports/`: dataset cards and size reports
-- `synthesis/`: synthetic families and generator registry
-- `tools/`: preview, export, validate, audit, and benchmark-pack utilities
-
-## Processing Configs
-
-`data/configs/processing.yaml` now accepts a richer `sources` list. Entries can still be plain local paths or globs, and they can also be structured source specs with `kind: local`, `kind: huggingface`, `kind: s3`, `kind: web`, or nested `kind: composite` groups.
-
-Common spec fields include:
-
-- `path`
-- `split`
-- `sample_ratio`
-- `version`
-- `optional`
-
-## Supported Dataset Families
-
-- `custom_derivative_mastery`
-- `custom_integral_arena`
-- `custom_limits_series_lab`
-- `custom_multivariable_studio`
-- `custom_odes_optimization_lab`
-- `custom_olympiad_reasoning_studio`
-
-## Core Commands
-
-```bash
-python3 data/generator/generate_calculus_datasets.py --config data/configs/generation.yaml
-python3 data/public/normalize_public_datasets.py --registry data/public/registry.yaml
-python3 data/prepare_dataset.py --config data/configs/processing.yaml
-python3 data/tools/preview_dataset.py --input data/processed/train.jsonl --tokenizer Qwen/Qwen2.5-Math-1.5B-Instruct
-python3 data/tools/audit_dataset.py --input data/processed/normalized_all.jsonl
-python3 data/tools/export_subset.py --input data/processed/train.jsonl --output /tmp/train_subset.jsonl --limit 128
-python3 data/mine_failure_cases.py --input evaluation/results/latest/per_example.jsonl --output data/raw/failure_cases.jsonl
 ```
+data/
+├── adapters/          # Dataset registry & normalization
+├── builders/           # Corpus assembly & pack construction
+├── configs/           # Processing & generation configurations
+├── custom/            # Custom dataset families & manifests
+├── processed/         # Normalized datasets & packs
+├── quality/           # Quality scoring & analysis
+├── reports/           # Dataset cards & analytics
+├── synthesis/         # Synthetic data generation
+└── tools/            # CLI utilities & validation
+```
+
+## 📦 **Main Packages**
+
+### **🔌 Adapters** (`adapters/`)
+- **Registry**: Central dataset catalog with metadata
+- **Normalization**: Convert heterogeneous formats to v2 schema
+- **Loaders**: Support for local, HuggingFace, S3, and web sources
+
+### **🏗️ Builders** (`builders/`)
+- **Corpus Builder**: Assemble multi-source datasets
+- **Pack Registry**: Create reproducible training/evaluation packs
+- **Version Control**: Track dataset lineage and versions
+
+### **⭐ Quality** (`quality/`)
+- **Difficulty Estimation**: Automatic complexity scoring
+- **Contamination Detection**: Cross-dataset overlap analysis
+- **Quality Metrics**: Content quality and coverage assessment
+- **Failure Mining**: Extract and analyze error cases
+
+### **🔧 Tools** (`tools/`)
+- **Preview**: Quick dataset inspection
+- **Validation**: Schema and format verification
+- **Export**: Subset extraction and format conversion
+- **Audit**: Comprehensive quality reports
+
+## 🎯 **Multi-Domain Support**
+
+### **Mathematics Domain**
+- **Calculus**: Derivatives, integrals, limits
+- **Algebra**: Linear, abstract, computational algebra
+- **Olympiad**: Competition mathematics and proofs
+- **Statistics**: Probability, statistical analysis
+
+### **Code Domain** (Extensible)
+- **Python**: Algorithm implementation and debugging
+- **JavaScript**: Web development and DOM manipulation
+- **System Design**: Architecture and optimization
+
+### **Reasoning Domain** (Extensible)
+- **Logic**: Formal logic and syllogisms
+- **Pattern Recognition**: Sequence and pattern analysis
+- **Causal Reasoning**: Cause-effect relationships
+
+## ⚙️ **Configuration System**
+
+### **Processing Config** (`data/configs/processing.yaml`)
+```yaml
+sources:
+  - kind: local
+    path: "data/custom/*.jsonl"
+    sample_ratio: 1.0
+  - kind: huggingface
+    dataset: "openai/gsm8k"
+    split: "train"
+    sample_ratio: 0.5
+  - kind: composite
+    name: "mathematics_mix"
+    sources: ["derivatives", "integrals"]
+    ratios: [0.6, 0.4]
+```
+
+### **Generation Config** (`data/configs/generation.yaml`)
+```yaml
+generator_family: "derivatives"
+parameters:
+  difficulty_range: ["medium", "hard"]
+  topics: ["polynomials", "trigonometry"]
+  output_format: "v2"
+  count: 1000
+```
+
+## 📋 **Dataset Families**
+
+### **Mathematics**
+- `custom_derivative_mastery` - Calculus derivatives
+- `custom_integral_arena` - Integration problems
+- `custom_limits_series_lab` - Limits and series
+- `custom_olympiad_reasoning_studio` - Competition math
+
+### **Synthetic Generation**
+- **Template-based**: Parameterized problem generation
+- **Curriculum-based**: Progressive difficulty sequences
+- **Domain-specific**: Tailored to mathematical subdomains
+
+## 🚀 **Core Commands**
+
+### **Data Processing**
+```bash
+# Generate synthetic datasets
+python data/generator/generate_calculus_datasets.py --config data/configs/generation.yaml
+
+# Normalize and process datasets
+python data/prepare_dataset.py --config data/configs/processing.yaml
+
+# Validate processed datasets
+python data/tools/validate_dataset.py --input data/processed/*.jsonl
+```
+
+### **Quality Analysis**
+```bash
+# Preview dataset statistics
+python data/tools/preview_dataset.py --input data/processed/train.jsonl
+
+# Audit dataset quality
+python data/tools/audit_dataset.py --input data/processed/normalized_all.jsonl
+
+# Mine failure cases from evaluations
+python data/mine_failure_cases.py --input evaluation/results/latest/per_example.jsonl
+```
+
+### **Export & Utilities**
+```bash
+# Export subset for testing
+python data/tools/export_subset.py --input data/processed/train.jsonl --output test_subset.jsonl --limit 100
+
+# Build benchmark packs
+python data/tools/build_benchmark_pack.py --input data/processed/normalized_all.jsonl
+
+# Deduplicate near-duplicates
+python data/tools/deduplicate_simhash.py --input data/processed/train.jsonl
+```
+
+## 📈 **Quality Metrics**
+
+### **Automated Scoring**
+- **Difficulty**: Algorithmic complexity estimation
+- **Quality**: Content coherence and completeness
+- **Diversity**: Topic and format variety
+- **Contamination**: Cross-dataset overlap detection
+
+### **Human Validation**
+- **Expert Review**: Domain expert validation
+- **Inter-annotator Agreement**: Consistency scoring
+- **Error Analysis**: Systematic error identification
+
+## 🔍 **Schema (v2)**
+
+### **Universal Record**
+```json
+{
+  "schema_version": "v2",
+  "id": "unique_identifier",
+  "domain": "mathematics",
+  "subdomain": "calculus",
+  "question": "What is the derivative of x²?",
+  "solution": "Using the power rule, d/dx(x²) = 2x",
+  "final_answer": "2x",
+  "difficulty": "medium",
+  "metadata": {
+    "generator": "synthetic",
+    "quality_score": 0.95
+  }
+}
+```
+
+## 🎯 **Best Practices**
+
+### **Data Quality**
+1. **Validation**: Always validate after processing
+2. **Deduplication**: Remove near-duplicates to prevent overfitting
+3. **Balance**: Maintain difficulty and topic distribution
+4. **Documentation**: Include clear lineage and metadata
+
+### **Processing Pipeline**
+1. **Source Integration**: Combine multiple data sources
+2. **Normalization**: Convert to unified v2 schema
+3. **Quality Control**: Apply quality filters and scoring
+4. **Pack Creation**: Build training/evaluation packs
+5. **Validation**: Final verification and testing
+
+## 📚 **Examples & Tutorials**
+
+See the `notebooks/` directory for:
+- `00_dataset_landscape.ipynb` - Dataset overview
+- `01_calculus_generator_lab.ipynb` - Synthetic generation
+- `07_dataset_quality_audit.ipynb` - Quality analysis
+
+## 🔗 **Integration**
+
+The data layer integrates seamlessly with:
+- **Training**: Automatic pack loading for training pipelines
+- **Evaluation**: Benchmark pack creation for testing
+- **Inference**: Real-time data validation and formatting
+- **Monitoring**: Data quality metrics and alerts

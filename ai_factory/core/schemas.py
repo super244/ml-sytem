@@ -269,7 +269,7 @@ class EvaluationSpec(BaseModel):
     subdomain: str | None = None
     datasets: list[str]
     metrics: list[str]
-    splits: list[str] = Field(default_factory=["test"])
+    splits: list[str] = Field(default_factory=lambda: ["test"])
     size: int = 0
     metadata: dict[str, Any] = Field(default_factory=dict)
 

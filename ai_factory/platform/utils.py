@@ -71,5 +71,4 @@ def create_multi_domain_training(
     # Convert to InstanceManifest-like object
     from types import SimpleNamespace
     manifest = SimpleNamespace(**manifest_dict)
-    
-    return manifest
+    return manifest.__dict__

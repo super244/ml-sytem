@@ -15,7 +15,7 @@ class MetricsCollector:
     
     def __init__(self, config: MonitoringConfig):
         self.config = config
-        self._metrics_store = {}
+        self._metrics_store: dict[str, list[MetricPoint]] = {}
     
     async def collect_all_metrics(self) -> dict[str, Any]:
         """Collect metrics from all sources."""
@@ -109,4 +109,5 @@ class MetricsCollector:
         """Query metrics with a simple query language."""
         # Simplified implementation - would use real query language
         name = query.split("=")[1].strip('"') if "=" in query else "loss"
-        return self._metrics_store.get(name, [])
+        metrics = self._metrics_store.get(name, [])
+        return metrics if isinstance(metrics, list) else []

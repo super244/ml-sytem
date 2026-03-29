@@ -1,193 +1,229 @@
-# AI-Factory
+# 🏭 AI-Factory
 
-AI-Factory is a unified, personal AI operating system designed to manage the entire lifecycle of large language models. It provides a complete platform for training, monitoring, evaluation, intelligent iteration, and deployment of LLMs across multiple domains.
+> **Unified AI Operating System for Complete LLM Lifecycle Management**
 
-The system is built to be:
+AI-Factory is a comprehensive platform designed to manage the entire lifecycle of large language models. From training to deployment, monitoring to iteration, AI-Factory provides a unified ecosystem for AI development across multiple domains.
 
-* **Powerful enough** for advanced experimentation and research
-* **Simple enough** for fast iteration and development
-* **Structured enough** to scale infinitely from local to distributed systems
+## 🌟 **What Makes AI-Factory Special**
 
-## What The System Supports
+### **🎯 Multi-Domain Architecture**
+- **Mathematics**: Calculus, algebra, olympiad reasoning, statistics
+- **Code Generation**: Python, JavaScript, system design, debugging
+- **Reasoning**: Logic, pattern recognition, causal reasoning
+- **Creative**: Writing, content generation, creative problem-solving
+- **Custom Domains**: Extensible framework for specialized domains
 
-- **Multi-Domain Training**: Support for mathematics, code generation, reasoning, creative writing, and custom domains
-- **Universal Model Lifecycle**: End-to-end management from training through deployment
-- **Real-Time Monitoring**: Live metrics, logs, and system health monitoring
-- **Intelligent Iteration**: AI-assisted analysis and recommendations for model improvements
-- **Multi-Target Deployment**: Deploy to HuggingFace, Ollama, LM Studio, custom APIs, and edge devices
-- **Unified Interfaces**: CLI, TUI, Web Dashboard, and Desktop app with consistent experience
-- **Scalable Architecture**: From local laptop to distributed cloud training
-- **Extensible Design**: Easy to add new domains, training methods, and deployment targets
+### **🔄 Complete Lifecycle Management**
+- **Training**: From data preparation to model training
+- **Monitoring**: Real-time metrics, logs, and health monitoring
+- **Evaluation**: Comprehensive benchmarking and analysis
+- **Iteration**: AI-assisted improvement recommendations
+- **Deployment**: Multi-target deployment with one click
 
-- Canonical `v2` dataset records with typed `step_checks`, lineage, contamination metadata, quality scores, reasoning style tags, and generator metadata.
-- Six first-class custom synthetic families: derivatives, integrals, limits/series, multivariable calculus, ODEs/optimization, and olympiad reasoning.
-- Public dataset registry and adapters for calculus-heavy competition and instruction corpora.
-- Derived pack construction for `core_train_mix`, `calculus_hard_pack`, `olympiad_reasoning_pack`, `failure_replay_pack`, `verification_pack`, and `benchmark_holdout_pack`.
-- Composed training profiles for `baseline_qlora`, `calculus_specialist`, `curriculum_specialist`, `failure_aware`, `verifier_augmented`, `long_context`, and `fast_iteration_small_model`.
-- A SQLite-backed orchestration control plane for managed `prepare`, `train`, `finetune`, `evaluate`, `report`, `inference`, and `deploy` instances with async task attempts, heartbeats, retries/backoff, child-task lineage, publish hooks, and follow-up recommendations.
-- Config-driven instance templates under `configs/` for `prepare`, `train`, `finetune`, `eval`, `inference`, `deploy`, and `report`, all routed through the same orchestration backend.
-- FastAPI inference with prompt presets, lazy model loading, best-of-N candidate selection, self-consistency, answer extraction, safe calculator hooks, structured output, and compare-two-models mode.
-- Benchmark-oriented evaluation with per-topic, per-difficulty, per-source, and per-pack reporting plus failure taxonomy and win-case extraction.
-- A multi-route Next.js frontend for solving, comparing, browsing datasets, exploring benchmarks, and inspecting training/evaluation runs, including the shared runs/control-plane view.
+### **🎨 Unified Interface Experience**
+- **CLI**: Powerful command-line interface for automation
+- **TUI**: Interactive terminal dashboard
+- **Web**: Modern web-based management interface
+- **Desktop**: Native desktop application
 
-## Repo Spine
+### **⚡ Scalable & Extensible**
+- **Local to Cloud**: Scale from laptop to distributed systems
+- **Platform Capabilities**: Distributed training, real-time monitoring
+- **Plugin Architecture**: Easy to extend with new domains and features
 
-```text
-.
-├── ai_factory/core/          shared schemas, artifact IO, hashing, answers, reports, token helpers
-├── data/                     registries, adapters, synthesis, quality, pack building, audit/export tools
-├── training/                 composed configs, trainer extensions, packaging, comparisons, run scripts
-├── inference/                FastAPI app, model registry, prompts, generation services, metadata services
-├── evaluation/               benchmark registry, metrics, reporting, failure analysis, eval configs
-├── frontend/                 Next.js research product UI with solve/compare/datasets/benchmarks/runs views and control-plane surface
-├── notebooks/                generated notebook lab for data, training, inference, and evaluation exploration
-├── docs/                     architecture, subsystem guides, API/deployment/contributor documentation
-├── tests/                    unit and contract coverage across shared-core, data, training, inference, evaluation
-└── artifacts/                standardized run and model outputs written during training/eval/inference
-```
+## 🚀 **Key Features**
 
-## Quickstart
+### **📊 Data Management**
+- **Universal Schema**: Canonical v2 dataset records with rich metadata
+- **Multi-Source Integration**: Local, HuggingFace, S3, web sources
+- **Quality Control**: Automated scoring, deduplication, contamination detection
+- **Synthetic Generation**: Template-based and curriculum-driven data synthesis
 
-1. Install Python dependencies.
+### **🎓 Training System**
+- **Flexible Profiles**: QLoRA, full fine-tuning, curriculum learning
+- **Distributed Training**: Multi-node scaling with resource management
+- **Experiment Tracking**: Comprehensive run manifests and metadata
+- **Model Comparison**: Side-by-side performance analysis
 
-   ```bash
-   python -m venv .venv
-   source .venv/bin/activate
-   pip install -U pip
-   pip install -e .[dev]
-   ```
+### **🔍 Evaluation & Monitoring**
+- **Benchmark Registry**: Standardized evaluation benchmarks
+- **Real-time Metrics**: Live performance and system health monitoring
+- **Failure Analysis**: Automated error taxonomy and mining
+- **Performance Reports**: Detailed analytics and insights
 
-2. Generate local synthetic datasets and normalize any downloaded public datasets.
+### **🌐 Deployment & Inference**
+- **Multi-Target**: HuggingFace, Ollama, LM Studio, custom APIs, edge devices
+- **FastAPI Backend**: High-performance inference server
+- **Prompt Management**: Configurable prompt presets and templates
+- **Model Registry**: Centralized model versioning and management
 
-   ```bash
-   python3 data/generator/generate_calculus_datasets.py --config data/configs/generation.yaml
-   python3 data/public/normalize_public_datasets.py --registry data/public/registry.yaml
-   python3 data/prepare_dataset.py --config data/configs/processing.yaml
-   ```
-
-3. Validate or launch training.
-
-   ```bash
-   python3 -m training.train --config training/configs/profiles/baseline_qlora.yaml --dry-run
-   python3 -m training.train --config training/configs/profiles/calculus_specialist.yaml
-   ```
-
-4. Serve the inference API and the frontend.
-
-   ```bash
-   uvicorn inference.app.main:app --reload
-   cd frontend
-   npm install
-   NEXT_PUBLIC_API_BASE_URL=http://localhost:8000 npm run dev
-   ```
-
-5. Run evaluation and refresh the notebook lab.
-
-   ```bash
-   python3 -m evaluation.evaluate --config evaluation/configs/base_vs_finetuned.yaml
-   python3 notebooks/build_notebooks.py
-   ```
-
-6. Optional: use the managed control plane instead of raw subsystem commands.
-
-   ```bash
-   ai-factory new --config configs/finetune.yaml
-   ai-factory list
-   ai-factory status <instance-id> --json
-   ai-factory tasks <instance-id> --json
-   ai-factory events <instance-id> --json
-   ai-factory watch <instance-id> --timeout 30 --json
-   ai-factory recommendations <instance-id> --json
-   ai-factory children <instance-id> --json
-   ai-factory --artifacts-dir /tmp/ai-factory-artifacts new --config configs/train.yaml --no-start
-   ai-factory tui --refresh-seconds 2
-   ```
-
-## Artifact Layout
-
-Run outputs are standardized around:
+## 🏗️ **Architecture Overview**
 
 ```text
-artifacts/
-├── runs/<run_id>/
-│   ├── checkpoints/
-│   ├── logs/
-│   ├── manifests/
-│   │   ├── config_snapshot.json
-│   │   └── run_manifest.json
-│   ├── metrics/
-│   └── reports/
-│       └── run_summary.md
-└── models/<model_name>/
-    ├── latest
-    ├── adapter/
-    ├── merged/
-    └── serving/
+AI-Factory/
+├── 🎯 ai_factory/
+│   ├── core/           # Shared foundation (schemas, artifacts, hashing)
+│   ├── domains/        # Multi-domain support (math, code, reasoning)
+│   ├── interfaces/     # Unified interfaces (CLI, TUI, Web, Desktop)
+│   └── platform/       # Platform capabilities (scaling, monitoring, deployment)
+├── 📊 data/            # Data layer (adapters, synthesis, quality, tools)
+├── 🎓 training/        # Training system (configs, scripts, extensions)
+├── 🔍 evaluation/      # Evaluation framework (benchmarks, metrics, analysis)
+├── 🌐 inference/       # Inference server (FastAPI, models, prompts)
+├── 🎨 frontend/        # Web interface (Next.js dashboard and tools)
+├── 📱 desktop/        # Desktop application (Electron)
+├── 📓 notebooks/       # Research notebooks and tutorials
+├── 📚 docs/           # Documentation and guides
+├── 🧪 tests/          # Comprehensive test suite
+└── ⚙️ configs/        # Configuration files and profiles
 ```
 
-The data system emits matching manifests and cards under `data/processed/`, `data/custom/`, `data/public/normalized/`, and `data/processed/packs/`.
+## 🚀 **Quick Start**
 
-The orchestration runtime stores durable control-plane state under:
-
-```text
-artifacts/control_plane/
-├── control_plane.db
-└── events.jsonl
-```
-
-Legacy `artifacts/instances/<instance-id>/...` directories are still materialized as compatibility projections for the CLI, API, and frontend.
-
-## Training Profiles
-
-- `baseline_qlora`: default local specialist baseline.
-- `calculus_specialist`: heavier calculus weighting and hard-example emphasis.
-- `curriculum_specialist`: curriculum-aware mixture ordering.
-- `failure_aware`: replay-focused training against mined failure cases.
-- `verifier_augmented`: prioritizes examples with explicit checks and verification anchors.
-- `long_context`: long-context profile for extended derivations.
-- `fast_iteration_small_model`: lower-cost rapid iteration profile.
-
-## Documentation Map
-
-- `docs/architecture.md`
-- `docs/control-center.md`
-- `docs/data-system.md`
-- `docs/training-system.md`
-- `docs/inference-system.md`
-- `docs/evaluation-system.md`
-- `docs/api-guide.md`
-- `docs/benchmark-guide.md`
-- `docs/experiment-playbook.md`
-- `docs/runbook.md`
-- `docs/deployment-guide.md`
-- `docs/notebook-guide.md`
-- `docs/contributor-guide.md`
-- `docs/reproducibility.md`
-- `docs/troubleshooting.md`
-- `docs/model-card.md`
-- `docs/roadmap.md`
-
-## Useful Commands
-
+### **Installation**
 ```bash
-make doctor
-make refresh-lab
-make latest-run
-make api-smoke
-make test
-make train-dry
-make evaluate
-make notebooks
-make frontend-typecheck
-ai-factory new --config configs/finetune.yaml
-ai-factory list --type finetune
-ai-factory tasks <instance-id>
-ai-factory events <instance-id>
-ai-factory retry <instance-id>
-ai-factory cancel <instance-id>
-ai-factory new --config configs/finetune.yaml --environment cloud --port-forward 6006:6006
-ai-factory tui --refresh-seconds 2
+# Clone the repository
+git clone https://github.com/super244/ml-sytem.git
+cd ai-factory
+
+# Install in development mode
+pip install -e .[dev]
+
+# Verify installation
+ai-factory --help
 ```
 
-Start with `docs/runbook.md` for the end-to-end local workflow and `docs/experiment-playbook.md` for the recommended research loop.
-See `docs/foundation-layer.md` for the shared control-plane backend, instance lifecycle, and CLI/TUI surface.
+### **Basic Usage**
+```bash
+# List available domains
+ai-factory domain list
+
+# Check platform status
+ai-factory platform status
+
+# Start training with default config
+ai-factory new --config configs/finetune.yaml
+
+# Monitor progress
+ai-factory tui
+
+# Launch web interface
+ai-factory serve
+```
+
+### **Development Setup**
+```bash
+# Install frontend dependencies
+cd frontend && npm install
+
+# Run development servers
+ai-factory serve           # Backend server
+npm run dev               # Frontend development
+
+# Run tests
+pytest                    # Python tests
+npm test                   # Frontend tests
+```
+
+## 📚 **Documentation**
+
+### **Core Guides**
+- **[Architecture Guide](docs/architecture.md)** - System design and principles
+- **[Data System Guide](docs/data-system.md)** - Data layer and processing
+- **[Training Guide](tune-guide.md)** - Model training and fine-tuning
+- **[Deployment Guide](docs/deployment-guide.md)** - Deployment and production
+
+### **API Documentation**
+- **[API Reference](docs/api/README.md)** - REST API and endpoints
+- **[CLI Reference](docs/cli-guide.md)** - Command-line interface
+- **[Configuration Guide](docs/config-guide.md)** - Configuration options
+
+### **Tutorials & Examples**
+- **[Notebooks](notebooks/)** - Interactive tutorials and explorations
+- **[Examples](examples/)** - Code examples and templates
+- **[Best Practices](docs/best-practices.md)** - Development guidelines
+
+## 🛠️ **Development**
+
+### **Code Quality**
+```bash
+# Linting and formatting
+ruff check .              # Lint code
+ruff format .             # Format code
+mypy ai_factory/         # Type checking
+
+# Testing
+pytest                    # Run tests
+pytest --cov=ai_factory  # With coverage
+```
+
+### **Contributing**
+1. Fork the repository
+2. Create a feature branch
+3. Make your changes
+4. Add tests for new functionality
+5. Run the test suite
+6. Submit a pull request
+
+See [Contributor Guide](docs/contributor-guide.md) for detailed guidelines.
+
+## 🎯 **Use Cases**
+
+### **Research & Development**
+- **Academic Research**: Experiment with new training methods and architectures
+- **Model Development**: Develop and fine-tune domain-specific models
+- **Benchmarking**: Compare model performance across tasks and domains
+
+### **Production Deployment**
+- **API Services**: Deploy models as REST APIs
+- **Edge Computing**: Deploy to edge devices and IoT systems
+- **Batch Processing**: Large-scale data processing and inference
+
+### **Education & Learning**
+- **Teaching**: Interactive tools for AI/ML education
+- **Prototyping**: Rapid prototyping of AI applications
+- **Experimentation**: Safe environment for learning and exploration
+
+## 🔧 **Configuration**
+
+### **Environment Variables**
+```bash
+export AI_FACTORY_REPO_ROOT="/path/to/ai-factory"
+export AI_FACTORY_ARTIFACTS_DIR="/path/to/artifacts"
+export AI_FACTORY_LOG_LEVEL="INFO"
+```
+
+### **Key Configuration Files**
+- `configs/finetune.yaml` - Fine-tuning configuration
+- `configs/eval.yaml` - Evaluation settings
+- `configs/inference.yaml` - Inference server settings
+- `data/configs/processing.yaml` - Data processing pipeline
+- `training/configs/profiles/` - Training profiles
+
+## 🌟 **Community & Support**
+
+### **Getting Help**
+- **Issues**: [GitHub Issues](https://github.com/super244/ml-sytem/issues)
+- **Discussions**: [GitHub Discussions](https://github.com/super244/ml-sytem/discussions)
+- **Documentation**: [Full Documentation](docs/)
+
+### **Contributing**
+- **Code Contributions**: See [Contributor Guide](docs/contributor-guide.md)
+- **Bug Reports**: Use GitHub Issues with detailed information
+- **Feature Requests**: Use GitHub Discussions for ideas and proposals
+
+## 📜 **License**
+
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+
+## 🎉 **Acknowledgments**
+
+- Built with modern Python ecosystem (FastAPI, Pydantic, Next.js)
+- Inspired by best practices in ML engineering and research
+- Community-driven development and improvement
+
+---
+
+**AI-Factory** - *Your complete AI development platform* 🚀
+
+> For more information, visit our [documentation](docs/) or join our [community discussions](https://github.com/super244/ml-sytem/discussions).

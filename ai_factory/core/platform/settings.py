@@ -25,7 +25,7 @@ def _int_env(name: str, default: int) -> int:
     if raw in {None, ""}:
         return default
     try:
-        return int(raw)
+        return int(raw) if raw is not None else 0
     except ValueError:
         return default
 

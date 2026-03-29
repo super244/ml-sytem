@@ -16,8 +16,8 @@ class AlertManager:
     
     def __init__(self, config: MonitoringConfig):
         self.config = config
-        self._active_alerts = []
-        self._alert_history = []
+        self._active_alerts: list[Alert] = []
+        self._alert_history: list[Alert] = []
     
     async def check_alerts(self, metrics: dict[str, Any]) -> list[Alert]:
         """Check metrics against thresholds and generate alerts."""
