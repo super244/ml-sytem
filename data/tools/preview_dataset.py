@@ -2,8 +2,8 @@ from __future__ import annotations
 
 import argparse
 import json
-from pathlib import Path
 import sys
+from pathlib import Path
 from typing import Any
 
 if __package__ in {None, ""}:
@@ -17,7 +17,10 @@ def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Preview a few records from a dataset JSONL.")
     parser.add_argument("--input", required=True)
     parser.add_argument("--limit", type=int, default=5)
-    parser.add_argument("--fields", nargs="+", default=["question", "solution"], help="Fields to concatenate for tokenization preview.")
+    parser.add_argument(
+        "--fields", nargs="+", default=["question", "solution"],
+        help="Fields to concatenate for tokenization preview.",
+    )
     parser.add_argument("--tokenizer", default=None, help="Optional Hugging Face tokenizer name or local path.")
     parser.add_argument("--token-preview-length", type=int, default=12, help="Number of preview tokens to show per field.")
     return parser.parse_args()

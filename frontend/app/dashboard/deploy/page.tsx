@@ -73,17 +73,20 @@ export default function DeployPage() {
   const [deployed, setDeployed] = useState<InstanceSummary[]>([]);
 
   useEffect(() => {
-    getInstances().then((list) => {
-      const deployable = list.filter(
-        (i) =>
-          i.status === "completed" &&
-          (i.type === "train" || i.type === "finetune" || i.type === "evaluate"),
-      );
-      const deploys = list.filter((i) => i.type === "deploy");
-      setSources(deployable);
-      setDeployed(deploys);
-      if (deployable.length > 0) setSelectedId(deployable[0].id);
-    }).catch(() => null).finally(() => setLoading(false));
+    getInstances()
+      .then((list) => {
+        const deployable = list.filter(
+          (i) =>
+            i.status === "completed" &&
+            (i.type === "train" || i.type === "finetune" || i.type === "evaluate"),
+        );
+        const deploys = list.filter((i) => i.type === "deploy");
+        setSources(deployable);
+        setDeployed(deploys);
+        if (deployable.length > 0) setSelectedId(deployable[0].id);
+      })
+      .catch((e) => setError(e instanceof Error ? e.message : "Failed to load instances"))
+      .finally(() => setLoading(false));
   }, []);
 
   async function launch() {
@@ -122,7 +125,7 @@ export default function DeployPage() {
       <div className="deploy-grid">
         {/* Target Selection */}
         <div className="panel deploy-section">
-          <h2 className="eval-section-title">Deployment Target</h2>
+          <h2 className="section-title">Deployment Target</h2>
           <div className="deploy-target-grid">
             {DEPLOY_TARGETS.map((t) => (
               <button
@@ -144,7 +147,7 @@ export default function DeployPage() {
 
         {/* Source Selection */}
         <div className="panel deploy-section">
-          <h2 className="eval-section-title">Source Instance</h2>
+          <h2 className="section-title">Source Instance</h2>
           {loading && <p className="control-label">Loading…</p>}
           {!loading && sources.length === 0 && (
             <p className="control-label">No completed training or finetuning runs found.</p>
@@ -158,7 +161,7 @@ export default function DeployPage() {
                 onClick={() => setSelectedId(inst.id)}
               >
                 <span className="source-name">{inst.name}</span>
-                <span className="source-type">{inst.type} · {inst.lifecycle.learning_mode ?? "—"}</span>
+                <span className="source-type">{inst.type} · {inst.lifecycle?.learning_mode ?? "—"}</span>
               </button>
             ))}
           </div>
@@ -201,19 +204,26 @@ export default function DeployPage() {
         {/* Past Deployments */}
         {deployed.length > 0 && (
           <div className="panel deploy-section">
-            <h2 className="eval-section-title">Past Deployments</h2>
+            <h2 className="section-title">Past Deployments</h2>
             <div className="deploy-history-list">
               {deployed.slice(0, 6).map((inst) => (
-                <Link key={inst.id} href={`/runs/${inst.id}`} className="deploy-history-item">
-                  <div className="deploy-history-header">
-                    <span className="deploy-history-name">{inst.name}</span>
-                    <span className={`deploy-history-status status-${inst.status}`}>{inst.status}</span>
-                  </div>
-                  <span className="deploy-history-meta">
-                    {inst.lifecycle.deployment_targets?.join(", ") ?? "—"} ·{" "}
-                    {new Date(inst.updated_at).toLocaleDateString()}
-                  </span>
-                </Link>
+                <div key={inst.id} className="deploy-history-item-container" style={{display: "flex", alignItems: "center", gap: "12px"}}>
+                  <Link href={`/runs/${inst.id}`} className="deploy-history-item" style={{flex: 1}}>
+                    <div className="deploy-history-header">
+                      <span className="deploy-history-name">{inst.name}</span>
+                      <span className={`deploy-history-status status-${inst.status}`}>{inst.status}</span>
+                    </div>
+                    <span className="deploy-history-meta">
+                      {inst.lifecycle?.deployment_targets?.join(", ") ?? "—"} ·{" "}
+                      {inst.updated_at ? new Date(inst.updated_at).toLocaleDateString() : "—"}
+                    </span>
+                  </Link>
+                  {inst.status === "completed" && (
+                    <Link href="/dashboard/inference" className="secondary-button small">
+                      ◎ Sandbox
+                    </Link>
+                  )}
+                </div>
               ))}
             </div>
           </div>

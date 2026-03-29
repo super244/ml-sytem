@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-from collections import defaultdict
 import json
+from collections import defaultdict
 from pathlib import Path
 from statistics import mean
 from typing import Any
@@ -22,10 +22,18 @@ def aggregate_metrics(results: list[dict[str, Any]], key: str) -> dict[str, Any]
         "solve_rate": sum(1 for item in entries if item["solve"]) / len(entries) if entries else 0.0,
         "parse_rate": _mean([item["parse_rate"] for item in entries]),
         "step_correctness": _mean([item["step_correctness"] for item in entries]),
-        "verifier_agreement_rate": sum(1 for item in entries if item["verifier_agreement"]) / len(entries) if entries else 0.0,
-        "formatting_failure_rate": sum(1 for item in entries if item["formatting_failure"]) / len(entries) if entries else 0.0,
-        "arithmetic_slip_rate": sum(1 for item in entries if item["arithmetic_slip"]) / len(entries) if entries else 0.0,
-        "no_answer_rate": sum(1 for item in entries if item["no_answer"]) / len(entries) if entries else 0.0,
+        "verifier_agreement_rate": (
+            sum(1 for item in entries if item["verifier_agreement"]) / len(entries) if entries else 0.0
+        ),
+        "formatting_failure_rate": (
+            sum(1 for item in entries if item["formatting_failure"]) / len(entries) if entries else 0.0
+        ),
+        "arithmetic_slip_rate": (
+            sum(1 for item in entries if item["arithmetic_slip"]) / len(entries) if entries else 0.0
+        ),
+        "no_answer_rate": (
+            sum(1 for item in entries if item["no_answer"]) / len(entries) if entries else 0.0
+        ),
         "avg_latency_s": _mean([item["latency_s"] for item in entries]),
         "avg_prompt_tokens": _mean([item["prompt_tokens"] for item in entries]),
         "avg_completion_tokens": _mean([item["completion_tokens"] for item in entries]),

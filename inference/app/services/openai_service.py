@@ -235,7 +235,9 @@ class OpenAIService:
             step_checks=[],
         )
 
-    def _build_response(self, request: OpenAIChatCompletionRequest, generation: dict[str, Any]) -> OpenAICompletionResult:
+    def _build_response(
+        self, request: OpenAIChatCompletionRequest, generation: dict[str, Any]
+    ) -> OpenAICompletionResult:
         content = str(generation.get("answer") or generation.get("raw_text") or "").strip()
         prompt_text = str(generation.get("prompt") or "")
         prompt_tokens = approximate_token_count(prompt_text)

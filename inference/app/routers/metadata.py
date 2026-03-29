@@ -2,11 +2,9 @@ from __future__ import annotations
 
 from typing import Any
 
-from fastapi import APIRouter
-from fastapi import HTTPException
+from fastapi import APIRouter, HTTPException
 
 from inference.app.dependencies import get_metadata_service
-
 
 router = APIRouter(tags=["metadata"])
 
@@ -42,10 +40,6 @@ def get_model(model_id: str) -> dict:
             return _openai_model_record(model)
     raise HTTPException(status_code=404, detail=f"Unknown model: {model_id}")
 
-
-@router.get("/datasets")
-def list_datasets() -> dict:
-    return get_metadata_service().dataset_dashboard()
 
 
 @router.get("/prompts")

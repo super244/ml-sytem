@@ -213,7 +213,8 @@ def build_workspace_overview(root: Path | None = None) -> dict[str, Any]:
         _command_recipe(
             "orchestrated-finetune",
             "Orchestrated finetune",
-            "Create a managed finetune instance that records progress, lineage, metrics, and follow-up recommendations.",
+            "Create a managed finetune instance that records progress, lineage, "
+            "metrics, and follow-up recommendations.",
             "ai-factory new --config configs/finetune.yaml",
             "control-plane",
         ),
@@ -237,37 +238,44 @@ def build_workspace_overview(root: Path | None = None) -> dict[str, Any]:
         {
             "id": "shared-contracts",
             "title": "Shared control-plane contracts",
-            "detail": "CLI, API, and future TUI/desktop layers consume the same instance manifests, progress state, recommendations, and child-instance lineage.",
+            "detail": "CLI, API, and future TUI/desktop layers consume the same instance manifests, "
+            "progress state, recommendations, and child-instance lineage.",
         },
         {
             "id": "remote-ssh",
             "title": "Remote SSH orchestration",
-            "detail": "Cloud profiles, SSH key selection, and SSH port-forward definitions are modeled directly in orchestration configs and instance metadata.",
+            "detail": "Cloud profiles, SSH key selection, and SSH port-forward definitions are modeled "
+            "directly in orchestration configs and instance metadata.",
         },
         {
             "id": "feedback-loop",
             "title": "Continuous feedback loop",
-            "detail": "Training can recommend evaluation, evaluation can recommend deploy or more training, and bounded automatic child instances can carry those steps forward.",
+            "detail": "Training can recommend evaluation, evaluation can recommend deploy or more training, "
+            "and bounded automatic child instances can carry those steps forward.",
         },
         {
             "id": "publish-hooks",
             "title": "Publish hooks",
-            "detail": "Deployment hooks can target HuggingFace, Ollama, LM Studio, or custom APIs through the shared deployment pipeline.",
+            "detail": "Deployment hooks can target HuggingFace, Ollama, LM Studio, "
+            "or custom APIs through the shared deployment pipeline.",
         },
         {
             "id": "control-center",
             "title": "Lifecycle control center",
-            "detail": "The runs dashboard now acts as a control center: launch new branches, inspect lifecycle detail, open inference sandboxes, and prepare publish actions from the same surface.",
+            "detail": "The runs dashboard now acts as a control center: launch new branches, inspect lifecycle "
+            "detail, open inference sandboxes, and prepare publish actions from the same surface.",
         },
         {
             "id": "plugin-registry",
             "title": "Extension-point registry",
-            "detail": "Training methods, evaluation suites, and deployment targets are exposed as explicit extension points so every interface can discover the same backend capabilities.",
+            "detail": "Training methods, evaluation suites, and deployment targets are exposed as explicit "
+            "extension points so every interface can discover the same backend capabilities.",
         },
         {
             "id": "live-state-manager",
             "title": "Live state manager",
-            "detail": "The shared state layer projects orchestration metadata together with live progress and metric views, so CLI, TUI, API, and desktop surfaces stay aligned while jobs are running.",
+            "detail": "The shared state layer projects orchestration metadata together with live progress and "
+            "metric views, so CLI, TUI, API, and desktop surfaces stay aligned while jobs are running.",
         },
     ]
 

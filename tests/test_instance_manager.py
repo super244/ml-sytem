@@ -246,25 +246,22 @@ def test_manager_finalize_evaluation_schedules_reports_and_publish_hooks(
 
     scheduled: dict[str, list[dict[str, str]]] = {"instances": [], "deployments": []}
 
-    monkeypatch.setattr(
-        manager,
-        "create_instance",
-        lambda config_path, **kwargs: scheduled["instances"].append({"config_path": config_path}) or eval_manifest,
-    )
-    monkeypatch.setattr(
-        manager,
-        "create_deployment_instance",
-        lambda source_instance_id, **kwargs: (
-            scheduled["deployments"].append(
-                {
-                    "source_instance_id": source_instance_id,
-                    "target": kwargs["target"],
-                    "config_path": kwargs["config_path"],
-                }
-            )
-            or eval_manifest
-        ),
-    )
+    def mock_create_instance(config_path, **kwargs):
+        scheduled["instances"].append({"config_path": config_path})
+        return eval_manifest
+
+    def mock_create_deployment_instance(source_instance_id, **kwargs):
+        scheduled["deployments"].append(
+            {
+                "source_instance_id": source_instance_id,
+                "target": kwargs["target"],
+                "config_path": kwargs["config_path"],
+            }
+        )
+        return eval_manifest
+
+    monkeypatch.setattr(manager, "create_instance", mock_create_instance)
+    monkeypatch.setattr(manager, "create_deployment_instance", mock_create_deployment_instance)
     monkeypatch.setattr(manager, "start_instance", lambda instance_id: eval_manifest)
 
     finalized = manager.finalize_instance(eval_manifest.id, 0)

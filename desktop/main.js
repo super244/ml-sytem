@@ -27,7 +27,13 @@ function createWindow() {
     window.show();
   });
 
-  window.loadURL(DEFAULT_URL);
+  const loadWithRetry = () => {
+    window.loadURL(DEFAULT_URL).catch((err) => {
+      console.log("Failed to load dashboard, retrying in 2s...", err.message);
+      setTimeout(loadWithRetry, 2000);
+    });
+  };
+  loadWithRetry();
 
   if (process.env.NODE_ENV === "development") {
     window.webContents.openDevTools({ mode: "detach" });
@@ -36,6 +42,13 @@ function createWindow() {
   window.webContents.setWindowOpenHandler(({ url }) => {
     shell.openExternal(url);
     return { action: "deny" };
+  });
+
+  window.webContents.on("did-fail-load", (event, errorCode, errorDescription) => {
+    if (errorCode === -102 || errorCode === -7) {
+      console.log(`Connection refused (${errorDescription}), auto-retrying...`);
+      setTimeout(loadWithRetry, 2000);
+    }
   });
 }
 

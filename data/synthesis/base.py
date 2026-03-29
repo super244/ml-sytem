@@ -1,12 +1,11 @@
 from __future__ import annotations
 
+import random
 from dataclasses import dataclass
 from fractions import Fraction
-import random
 from typing import Any
 
 from ai_factory.core.schemas import ContaminationStatus, GeneratorMetadata, SourceLineage, StepCheck
-
 
 Difficulty = str
 

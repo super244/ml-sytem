@@ -1,0 +1,1 @@
+{"timestamp": 1774755316.858064, "prompt": "What is 2+2?", "assistant_output": "5", "expected_output": "4", "model_variant": "default", "latency_s": 0.5}

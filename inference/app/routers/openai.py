@@ -5,7 +5,6 @@ from fastapi import APIRouter, Request
 from inference.app.dependencies import get_openai_service
 from inference.app.openai_schemas import OpenAIChatCompletionRequest
 
-
 router = APIRouter(tags=["openai"])
 
 

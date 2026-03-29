@@ -6,9 +6,9 @@ from threading import Lock
 from typing import Any
 
 import torch
+import yaml
 from peft import PeftModel
 from transformers import AutoModelForCausalLM, AutoTokenizer, BitsAndBytesConfig
-import yaml
 
 
 @dataclass

@@ -10,8 +10,8 @@ from inference.app.telemetry import JsonlTelemetryLogger
 
 if TYPE_CHECKING:
     from inference.app.services.generation_service import GenerationService
-    from inference.app.services.openai_service import OpenAIService
     from inference.app.services.instance_service import InstanceService
+    from inference.app.services.openai_service import OpenAIService
 
 
 def get_app_settings() -> AppSettings:

@@ -4,7 +4,6 @@ import json
 from pathlib import Path
 from typing import Any
 
-
 DEFAULT_CATALOG_PATH = Path("data/catalog.json")
 DEFAULT_PACK_SUMMARY_PATH = Path("data/processed/pack_summary.json")
 

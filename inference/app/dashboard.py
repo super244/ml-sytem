@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-from inference.app.dependencies import get_metadata_service
 from ai_factory.core.discovery import list_training_runs as _list_training_runs
+from inference.app.dependencies import get_metadata_service
 
 
 def dataset_dashboard() -> dict:

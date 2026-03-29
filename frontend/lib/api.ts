@@ -678,3 +678,163 @@ export async function getOrchestrationSummary(): Promise<OrchestrationSummary> {
   const payload = await fetchJson<{ summary: OrchestrationSummary }>("/v1/orchestration/summary");
   return payload.summary;
 }
+
+export type FlagTelemetryRequest = {
+  prompt: string;
+  assistant_output: string;
+  expected_output: string;
+  model_variant: string;
+  latency_s?: number | null;
+};
+
+export async function flagTelemetry(payload: FlagTelemetryRequest): Promise<{status: string, message: string}> {
+  return fetchJson<{status: string, message: string}>("/v1/telemetry/flag", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(payload),
+  });
+}
+
+export type ClusterNodeHardware = {
+  id: string;
+  name: string;
+  type: string;
+  memory: string;
+  usage: number;
+  status: "online" | "idle" | "offline";
+  activeJobs: number;
+};
+
+export async function getClusterNodes(): Promise<ClusterNodeHardware[]> {
+  const payload = await fetchJson<{ nodes: ClusterNodeHardware[] }>("/v1/cluster/nodes");
+  return payload.nodes;
+}
+
+export type TelemetryRecord = {
+  timestamp: number;
+  prompt: string;
+  assistant_output: string;
+  expected_output: string;
+  model_variant: string;
+  latency_s?: number | null;
+};
+
+export async function getTelemetryBacklog(): Promise<TelemetryRecord[]> {
+  const payload = await fetchJson<{ telemetry: TelemetryRecord[] }>("/v1/datasets/telemetry");
+  return payload.telemetry;
+}
+
+export type SynthesizeRequest = {
+  seed_prompt: string;
+  num_variants: number;
+  model_variant: string;
+};
+
+export type SynthesizeResponse = {
+  status: string;
+  job_id: string;
+  message: string;
+  estimated_time_s: number;
+};
+
+export async function synthesizeDataset(payload: SynthesizeRequest): Promise<SynthesizeResponse> {
+  return fetchJson<SynthesizeResponse>("/v1/datasets/synthesize", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(payload),
+  });
+}
+
+export type AgentSwarmStatus = {
+  id: string;
+  name: string;
+  role: string;
+  model: string;
+  status: "active" | "sleeping" | "offline";
+  uptime_s: number;
+  tokens_used: number;
+};
+
+export type AgentLogEvent = {
+  timestamp: number;
+  message: string;
+  level: string;
+};
+
+export async function getAgentSwarmStatus(): Promise<AgentSwarmStatus[]> {
+  const payload = await fetchJson<{ swarm: AgentSwarmStatus[] }>("/v1/agents/swarm");
+  return payload.swarm;
+}
+
+export async function getAgentLogs(limit: number = 20): Promise<AgentLogEvent[]> {
+  const payload = await fetchJson<{ logs: AgentLogEvent[] }>(`/v1/agents/logs?limit=${limit}`);
+  return payload.logs;
+}
+
+export type AutoMLTrialParams = {
+  learning_rate: number;
+  batch_size: number;
+  warmup_ratio: number;
+  lora_rank: number;
+};
+
+export type AutoMLTrialMetrics = {
+  final_loss: number;
+  accuracy: number;
+  perplexity: number;
+};
+
+export type AutoMLTrial = {
+  trial_id: string;
+  status: string;
+  params: AutoMLTrialParams;
+  metrics: AutoMLTrialMetrics;
+  duration_s: number;
+};
+
+export type AutoMLSweep = {
+  id: string;
+  name: string;
+  base_model: string;
+  strategy: string;
+  status: string;
+  num_trials: number;
+  completed_trials: number;
+  created_at: number;
+  best_trial: AutoMLTrial;
+  trials: AutoMLTrial[];
+};
+
+export type LaunchSweepRequest = {
+  name: string;
+  base_model: string;
+  strategy: string;
+  num_trials: number;
+  search_space?: {
+    learning_rate?: number[];
+    batch_size?: number[];
+    warmup_ratio?: number[];
+    lora_rank?: number[];
+  };
+};
+
+export async function getSweeps(): Promise<AutoMLSweep[]> {
+  const payload = await fetchJson<{ sweeps: AutoMLSweep[] }>("/v1/automl/sweeps");
+  return payload.sweeps;
+}
+
+export async function launchSweep(payload: LaunchSweepRequest): Promise<AutoMLSweep> {
+  return fetchJson<AutoMLSweep>("/v1/automl/sweeps", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+}
+
+export async function getSweepDetail(sweepId: string): Promise<AutoMLSweep> {
+  return fetchJson<AutoMLSweep>(`/v1/automl/sweeps/${sweepId}`);
+}

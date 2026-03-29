@@ -7,6 +7,8 @@ import {
   getInstances,
   getOrchestrationSummary,
   runManagedInstanceAction,
+  getClusterNodes,
+  type ClusterNodeHardware,
   type InstanceSummary,
   type OrchestrationSummary,
 } from "@/lib/api";
@@ -31,6 +33,9 @@ function formatTime(value?: string | null): string {
 
 export default function MonitoringPage() {
   const [instances, setInstances] = useState<InstanceSummary[]>([]);
+  
+  // V2 Cluster Real Data
+  const [clusterNodes, setClusterNodes] = useState<ClusterNodeHardware[]>([]);
   const [summary, setSummary] = useState<OrchestrationSummary | null>(null);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState<"all" | "running" | "completed" | "failed">("all");
@@ -38,12 +43,14 @@ export default function MonitoringPage() {
   const [lastRefresh, setLastRefresh] = useState<Date>(new Date());
 
   async function refresh() {
-    const [instancesRes, summaryRes] = await Promise.allSettled([
+    const [instancesRes, summaryRes, clusterRes] = await Promise.allSettled([
       getInstances(),
       getOrchestrationSummary(),
+      getClusterNodes(),
     ]);
     setInstances(instancesRes.status === "fulfilled" ? instancesRes.value : []);
     setSummary(summaryRes.status === "fulfilled" ? summaryRes.value : null);
+    setClusterNodes(clusterRes.status === "fulfilled" ? clusterRes.value : []);
     setLoading(false);
     setLastRefresh(new Date());
   }
@@ -124,6 +131,34 @@ export default function MonitoringPage() {
               <span className="monitor-chip-label">Active tasks</span>
             </div>
           )}
+        </div>
+      </div>
+
+      {/* V2 Cluster Health */}
+      <div className="panel" style={{ padding: "1.5rem", marginBottom: "1.5rem" }}>
+        <h2 className="eval-section-title" style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+          <span>Cluster Node Health</span>
+          <span style={{ fontSize: "0.75rem", opacity: 0.5, border: "1px solid var(--border)", padding: "0.2rem 0.5rem", borderRadius: "4px" }}>V2 Preview</span>
+        </h2>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(250px, 1fr))", gap: "1rem" }}>
+          {clusterNodes.map((node) => (
+            <div key={node.id} style={{ border: "1px solid var(--border)", borderRadius: "8px", padding: "1rem", background: "rgba(255,255,255,0.02)" }}>
+              <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "0.5rem" }}>
+                <strong style={{ fontSize: "0.9rem" }}>{node.name}</strong>
+                <span style={{ fontSize: "0.75rem", color: node.status === "online" ? "var(--accent)" : "var(--foreground)", opacity: node.status === "online" ? 1 : 0.5 }}>● {node.status}</span>
+              </div>
+              <div style={{ fontSize: "0.8rem", opacity: 0.7, marginBottom: "1rem" }}>
+                {node.type} · {node.memory}
+              </div>
+              <div className="monitor-progress-track">
+                <div 
+                  className="monitor-progress-fill" 
+                  style={{ width: `${node.usage}%`, background: node.usage > 90 ? "var(--error)" : "var(--accent)" }} 
+                />
+                <span className="monitor-progress-label">{node.usage}% VRAM</span>
+              </div>
+            </div>
+          ))}
         </div>
       </div>
 
