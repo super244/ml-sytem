@@ -1,12 +1,11 @@
 """Alert management for AI-Factory monitoring."""
 
-from typing import Any
-from pathlib import Path
 import logging
 from datetime import datetime
+from pathlib import Path
+from typing import Any
 
 from ai_factory.core.schemas import Alert, MonitoringConfig
-
 
 logger = logging.getLogger(__name__)
 

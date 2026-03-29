@@ -1,20 +1,14 @@
 """Deployment manager for multi-target model deployment."""
 
-from typing import Any
-from pathlib import Path
 import asyncio
 import logging
 from enum import Enum
+from pathlib import Path
+from typing import Any
 
 from ai_factory.core.schemas import DeploymentSpec, ModelArtifact
-from .targets import (
-    HuggingFaceTarget,
-    OllamaTarget,
-    LMStudioTarget,
-    CustomAPITarget,
-    EdgeDeviceTarget
-)
 
+from .targets import CustomAPITarget, EdgeDeviceTarget, HuggingFaceTarget, LMStudioTarget, OllamaTarget
 
 logger = logging.getLogger(__name__)
 

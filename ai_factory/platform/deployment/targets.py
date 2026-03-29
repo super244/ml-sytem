@@ -1,12 +1,11 @@
 """Deployment targets for AI-Factory models."""
 
-from abc import ABC, abstractmethod
-from typing import Any
 import asyncio
 import logging
+from abc import ABC, abstractmethod
+from typing import Any
 
 from ai_factory.core.schemas import DeploymentSpec, ModelArtifact
-
 
 logger = logging.getLogger(__name__)
 

@@ -1,11 +1,10 @@
 """Metrics collection for AI-Factory monitoring."""
 
-from typing import Any
 import logging
 from datetime import datetime
+from typing import Any
 
 from ai_factory.core.schemas import MetricPoint, MonitoringConfig
-
 
 logger = logging.getLogger(__name__)
 

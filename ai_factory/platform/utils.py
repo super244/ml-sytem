@@ -1,9 +1,10 @@
 """Utility functions for platform management."""
 
-from typing import Any
 from pathlib import Path
+from typing import Any
 
 from ai_factory.core.schemas import ScalingConfig
+
 from .scaling.manager import ScalingManager
 
 

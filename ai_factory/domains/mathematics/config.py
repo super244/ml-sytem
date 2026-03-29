@@ -1,6 +1,7 @@
 """Mathematics domain configuration."""
 
 from typing import Literal
+
 from pydantic import BaseModel, Field
 
 from ai_factory.core.schemas import MetricSpec

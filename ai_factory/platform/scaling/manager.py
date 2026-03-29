@@ -1,13 +1,13 @@
 """Scaling manager for distributed training and resource management."""
 
-from typing import Any
-from pathlib import Path
 import logging
+from pathlib import Path
+from typing import Any
 
-from ai_factory.core.schemas import TrainingJob, ScalingConfig
+from ai_factory.core.schemas import ScalingConfig, TrainingJob
+
 from .cluster import ClusterManager
 from .resources import ResourceManager
-
 
 logger = logging.getLogger(__name__)
 

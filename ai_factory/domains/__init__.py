@@ -16,12 +16,12 @@ Available domains:
 """
 
 from .mathematics import (
-    MathDomainConfig,
     MathDatasetRegistry,
+    MathDomainConfig,
     MathEvaluationSuite,
     MathTrainingProfiles,
 )
-from .utils import list_available_domains, get_domain_info
+from .utils import get_domain_info, list_available_domains
 
 __all__ = [
     "MathDomainConfig",

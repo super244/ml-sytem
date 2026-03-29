@@ -3,9 +3,9 @@
 Real-time metrics collection, alerting, and system health monitoring.
 """
 
+from .alerts import AlertManager
 from .manager import MonitoringManager
 from .metrics import MetricsCollector
-from .alerts import AlertManager
 
 __all__ = [
     "MonitoringManager",

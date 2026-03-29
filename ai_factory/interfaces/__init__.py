@@ -11,9 +11,9 @@ consistent functionality and user experience.
 """
 
 from .cli import CLIInterface
-from .tui import TUIInterface  
-from .web import WebInterface
 from .desktop import DesktopInterface
+from .tui import TUIInterface
+from .web import WebInterface
 
 __all__ = [
     "CLIInterface",
