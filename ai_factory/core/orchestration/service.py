@@ -143,8 +143,7 @@ class OrchestrationService:
             ),
             metadata={
                 "agent_capabilities": [
-                    capability.model_dump(mode="json")
-                    for capability in self.registry.list_capabilities()
+                    capability.model_dump(mode="json") for capability in self.registry.list_capabilities()
                 ]
             },
         )
@@ -212,9 +211,7 @@ class OrchestrationService:
         )
         self.control_plane.upsert_task(task)
         for dependency_id in dependencies or []:
-            self.control_plane.create_dependency(
-                TaskDependency(task_id=task.id, depends_on_task_id=dependency_id)
-            )
+            self.control_plane.create_dependency(TaskDependency(task_id=task.id, depends_on_task_id=dependency_id))
         self.append_event(
             run_id,
             task.id,
@@ -399,9 +396,7 @@ class OrchestrationService:
             event_type="task.completed" if exit_code == 0 else "task.failed",
             level="info" if exit_code == 0 else "error",
             message=(
-                f"{task.task_type} task completed successfully."
-                if exit_code == 0
-                else f"{task.task_type} task failed."
+                f"{task.task_type} task completed successfully." if exit_code == 0 else f"{task.task_type} task failed."
             ),
             agent_type=task.agent_type,
             payload={
@@ -706,4 +701,7 @@ class OrchestrationService:
             legacy_or_run_id
         )
         events = self.control_plane.list_events(run_id=run.id) if run else []
-        return {"run": run.model_dump(mode="json") if run else None, "events": [item.model_dump(mode="json") for item in events]}
+        return {
+            "run": run.model_dump(mode="json") if run else None,
+            "events": [item.model_dump(mode="json") for item in events],
+        }

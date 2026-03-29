@@ -29,7 +29,7 @@ def _env_flag(name: str, default: str = "1") -> bool:
 def get_settings() -> AppSettings:
     cors_origins = [origin.strip() for origin in os.getenv("CORS_ORIGINS", "*").split(",")]
     return AppSettings(
-        title="Atlas Math Lab API",
+        title="AI-Factory API",
         version="0.2.0",
         cors_origins=cors_origins,
         model_registry_path=os.getenv("MODEL_REGISTRY_PATH", "inference/configs/model_registry.yaml"),

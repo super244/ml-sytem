@@ -1,4 +1,4 @@
-const { app, BrowserWindow, Menu, ipcMain } = require("electron");
+const { app, BrowserWindow, Menu, Notification, dialog, ipcMain, shell } = require("electron");
 const path = require("path");
 
 const DEFAULT_URL = process.env.AI_FACTORY_DESKTOP_URL ?? "http://127.0.0.1:3000/workspace";
@@ -23,66 +23,119 @@ function createWindow() {
     },
   });
 
-  // Show window when ready to prevent visual flash
-  window.once('ready-to-show', () => {
+  window.once("ready-to-show", () => {
     window.show();
   });
 
   window.loadURL(DEFAULT_URL);
-  
-  // Open DevTools in development
-  if (process.env.NODE_ENV === 'development') {
-    window.webContents.openDevTools();
+
+  if (process.env.NODE_ENV === "development") {
+    window.webContents.openDevTools({ mode: "detach" });
   }
+
+  window.webContents.setWindowOpenHandler(({ url }) => {
+    shell.openExternal(url);
+    return { action: "deny" };
+  });
 }
 
 function createMenu() {
   const template = [
     {
-      label: 'AI-Factory',
+      label: "AI-Factory",
       submenu: [
         {
-          label: 'About AI-Factory',
+          label: "About AI-Factory",
           click: () => {
-            // Show about dialog
-          }
+            shell.openExternal("https://github.com/super244/ml-sytem");
+          },
         },
-        { type: 'separator' },
+        { type: "separator" },
         {
-          label: 'Quit',
-          accelerator: process.platform === 'darwin' ? 'Cmd+Q' : 'Ctrl+Q',
+          label: "Quit",
+          accelerator: process.platform === "darwin" ? "Cmd+Q" : "Ctrl+Q",
           click: () => {
             app.quit();
-          }
-        }
-      ]
+          },
+        },
+      ],
     },
     {
-      label: 'View',
+      label: "View",
       submenu: [
-        { role: 'reload' },
-        { role: 'forceReload' },
-        { role: 'toggleDevTools' },
-        { type: 'separator' },
-        { role: 'resetZoom' },
-        { role: 'zoomIn' },
-        { role: 'zoomOut' },
-        { type: 'separator' },
-        { role: 'togglefullscreen' }
-      ]
+        { role: "reload" },
+        { role: "forceReload" },
+        { role: "toggleDevTools" },
+        { type: "separator" },
+        { role: "resetZoom" },
+        { role: "zoomIn" },
+        { role: "zoomOut" },
+        { type: "separator" },
+        { role: "togglefullscreen" },
+      ],
     },
     {
-      label: 'Window',
+      label: "Window",
       submenu: [
-        { role: 'minimize' },
-        { role: 'close' }
-      ]
-    }
+        { role: "minimize" },
+        { role: "close" },
+      ],
+    },
   ];
 
   const menu = Menu.buildFromTemplate(template);
   Menu.setApplicationMenu(menu);
 }
+
+function getFocusedWindow() {
+  return BrowserWindow.getFocusedWindow() ?? BrowserWindow.getAllWindows()[0] ?? null;
+}
+
+ipcMain.handle("show-notification", (_event, payload) => {
+  const notification = new Notification({
+    title: payload?.title ?? "AI-Factory",
+    body: payload?.body ?? "",
+  });
+  notification.show();
+  return true;
+});
+
+ipcMain.handle("select-file", async (_event, filters) => {
+  const result = await dialog.showOpenDialog({
+    properties: ["openFile"],
+    filters,
+  });
+  return result.canceled ? null : result.filePaths[0] ?? null;
+});
+
+ipcMain.handle("select-directory", async () => {
+  const result = await dialog.showOpenDialog({
+    properties: ["openDirectory"],
+  });
+  return result.canceled ? null : result.filePaths[0] ?? null;
+});
+
+ipcMain.handle("get-app-version", () => app.getVersion());
+
+ipcMain.on("minimize-window", () => {
+  getFocusedWindow()?.minimize();
+});
+
+ipcMain.on("maximize-window", () => {
+  const window = getFocusedWindow();
+  if (!window) {
+    return;
+  }
+  if (window.isMaximized()) {
+    window.unmaximize();
+  } else {
+    window.maximize();
+  }
+});
+
+ipcMain.on("close-window", () => {
+  getFocusedWindow()?.close();
+});
 
 app.whenReady().then(() => {
   createWindow();
@@ -93,21 +146,18 @@ app.whenReady().then(() => {
       createWindow();
     }
   });
+  app.on("window-all-closed", () => {
+    if (process.platform !== "darwin") {
+      app.quit();
+    }
+  });
+
+  app.setAsDefaultProtocolClient("ai-factory");
 });
 
-app.on("window-all-closed", () => {
-  if (process.platform !== "darwin") {
-    app.quit();
-  }
-});
-
-// Handle app protocol for deep linking
-app.setAsDefaultProtocolClient('ai-factory');
-
-// Security: Prevent new window creation
-app.on('web-contents-created', (event, contents) => {
-  contents.on('new-window', (navigationEvent, navigationURL) => {
-    navigationEvent.preventDefault();
-    require('electron').shell.openExternal(navigationURL);
+app.on("web-contents-created", (_event, contents) => {
+  contents.setWindowOpenHandler(({ url }) => {
+    shell.openExternal(url);
+    return { action: "deny" };
   });
 });

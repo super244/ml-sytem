@@ -17,11 +17,7 @@ def decide_next_step(summary: dict, policy: DecisionPolicy) -> DecisionResult:
         "verifier_agreement_rate": summary.get("verifier_agreement_rate"),
         "no_answer_rate": summary.get("no_answer_rate"),
     }
-    missing_metrics = [
-        key
-        for key, value in required_metrics.items()
-        if not isinstance(value, (int, float))
-    ]
+    missing_metrics = [key for key, value in required_metrics.items() if not isinstance(value, (int, float))]
     thresholds = {
         "min_accuracy": policy.min_accuracy,
         "min_parse_rate": policy.min_parse_rate,
@@ -183,7 +179,8 @@ def build_feedback_recommendations(
             FeedbackRecommendation(
                 action="retrain",
                 reason=(
-                    "The evaluation is below the fine-tuning floor, so a broader retraining pass is the safer next step."
+                    "The evaluation is below the fine-tuning floor, so a broader retraining "
+                    "pass is the safer next step."
                 ),
                 priority=1,
                 target_instance_type="train",
@@ -221,7 +218,10 @@ def build_feedback_recommendations(
         recommendations.append(
             FeedbackRecommendation(
                 action="evaluate",
-                reason="Queue a follow-up evaluation after the next training cycle to measure whether the changes helped.",
+                reason=(
+                    "Queue a follow-up evaluation after the next training cycle to "
+                    "measure whether the changes helped."
+                ),
                 priority=3,
                 target_instance_type="evaluate",
                 config_path=default_eval_config,

@@ -175,7 +175,7 @@ export function WorkspaceView() {
           <StatePanel
             eyebrow="Loading"
             title="Workspace overview is loading."
-            description="Atlas is discovering configs, artifacts, and readiness checks."
+            description="AI-Factory is discovering configs, artifacts, and readiness checks."
             tone="loading"
           />
         ) : null}

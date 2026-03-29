@@ -77,6 +77,45 @@ def test_latest_training_run_falls_back_to_run_id_timestamp(tmp_path: Path):
     assert latest["run_name"] == "zeta-newer-id"
 
 
+def test_latest_training_run_parses_embedded_timestamp_in_run_id(tmp_path: Path):
+    _write_run_manifest(
+        tmp_path / "runs" / "zeta-release-20260324-120000-build-7",
+        run_id="zeta-release-20260324-120000-build-7",
+        run_name="zeta-release",
+        created_at="",
+    )
+    _write_run_manifest(
+        tmp_path / "runs" / "alpha-release-20260324-110000-build-9",
+        run_id="alpha-release-20260324-110000-build-9",
+        run_name="alpha-release",
+        created_at="",
+    )
+
+    latest = latest_training_run(list_training_runs(str(tmp_path)))
+
+    assert latest is not None
+    assert latest["run_name"] == "zeta-release"
+
+
+def test_list_training_runs_skips_invalid_manifests(tmp_path: Path):
+    good_run = tmp_path / "runs" / "good-run"
+    _write_run_manifest(
+        good_run,
+        run_id="good-20260324-120000",
+        run_name="good-run",
+        created_at="2026-03-24T12:00:00+00:00",
+    )
+    bad_run = tmp_path / "runs" / "bad-run"
+    bad_manifest = bad_run / "manifests" / "run_manifest.json"
+    bad_manifest.parent.mkdir(parents=True, exist_ok=True)
+    bad_manifest.write_text("{not valid json")
+
+    runs = list_training_runs(str(tmp_path))
+
+    assert len(runs) == 1
+    assert runs[0]["run_name"] == "good-run"
+
+
 def test_importing_ai_factory_core_stays_light_without_sympy(monkeypatch):
     original_import = builtins.__import__
 

@@ -11,10 +11,10 @@ export function AppNav() {
     <nav className="app-nav">
       <div className="nav-brand-row">
         <Link className="brand-mark" href={ROUTES.solve}>
-          <span className="brand-kicker">Atlas Math Lab</span>
-          <strong>Competitive reasoning platform</strong>
+          <span className="brand-kicker">AI-Factory</span>
+          <strong>Unified AI control center</strong>
         </Link>
-        <span className="nav-badge">Local-first specialist stack</span>
+        <span className="nav-badge">Local-first lifecycle platform</span>
       </div>
 
       <div className="nav-links">
@@ -34,7 +34,7 @@ export function AppNav() {
           Command Center
         </Link>
         <Link className="primary-button small" href={ROUTES.compare}>
-          Compare Models
+          Compare runs
         </Link>
       </div>
     </nav>

@@ -1,6 +1,6 @@
 # Deployment Guide
 
-Atlas Math Lab ships with lightweight deployment scaffolding for a demo or pre-production style environment.
+AI-Factory ships with lightweight deployment scaffolding for a demo or pre-production style environment.
 
 ## Included Assets
 

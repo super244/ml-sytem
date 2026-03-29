@@ -50,10 +50,7 @@ def _deploy_echo_command(payload: dict[str, Any]) -> list[str]:
     return [
         _python_bin_from_runtime(),
         "-c",
-        (
-            "import json; "
-            f"print(json.dumps({json.dumps(payload)}, indent=2, sort_keys=True))"
-        ),
+        (f"import json; print(json.dumps({json.dumps(payload)}, indent=2, sort_keys=True))"),
     ]
 
 

@@ -1,6 +1,6 @@
 # Experiment Design
 
-Atlas Math Lab is set up to support fast local ablations and more serious specialist runs without changing the operating model. The intended experiment ladder is:
+AI-Factory is set up to support fast local ablations and more serious specialist runs without changing the operating model. The intended experiment ladder is:
 
 1. Establish a prompt-engineered base-model baseline.
 2. Validate the data build and tokenizer path with `--dry-run`.

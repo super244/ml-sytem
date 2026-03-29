@@ -20,7 +20,7 @@ export function DatasetsView() {
         <PageHeader
           eyebrow="Dataset Explorer"
           title="Packs, adapters, and preview slices"
-          description="Browse the synthetic families, public adapters, and derived training and benchmark packs that feed Atlas Math Lab."
+          description="Browse the synthetic families, public adapters, and derived training and benchmark packs that feed AI-Factory."
           metrics={[
             { label: "Datasets", value: formatCount(dashboard?.summary.num_datasets) },
             { label: "Total rows", value: formatCount(dashboard?.summary.total_rows), tone: "secondary" },
@@ -42,7 +42,7 @@ export function DatasetsView() {
           <StatePanel
             eyebrow="Loading"
             title="Dataset metadata is loading."
-            description="Atlas is fetching the catalog, pack manifests, and preview examples."
+            description="AI-Factory is fetching the catalog, pack manifests, and preview examples."
             tone="loading"
           />
         ) : null}

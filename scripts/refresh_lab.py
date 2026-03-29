@@ -6,7 +6,7 @@ from common import active_python, run_step
 
 
 def parse_args() -> argparse.Namespace:
-    parser = argparse.ArgumentParser(description="Refresh the local Atlas Math Lab workspace.")
+    parser = argparse.ArgumentParser(description="Refresh the local AI-Factory workspace.")
     parser.add_argument("--skip-generate", action="store_true")
     parser.add_argument("--skip-notebooks", action="store_true")
     parser.add_argument("--skip-train-dry-run", action="store_true")
@@ -53,7 +53,7 @@ def main() -> None:
     if not args.skip_tests:
         run_step("Pytest suite", [python, "-m", "pytest"])
 
-    print("[atlas] Workspace refresh complete.")
+    print("[ai-factory] Workspace refresh complete.")
 
 
 if __name__ == "__main__":

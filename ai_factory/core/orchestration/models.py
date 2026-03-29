@@ -5,7 +5,6 @@ from typing import Any, Literal
 
 from pydantic import BaseModel, Field
 
-
 AgentType = Literal[
     "data_processing",
     "training_orchestration",

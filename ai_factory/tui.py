@@ -3,13 +3,13 @@ from __future__ import annotations
 import argparse
 import curses
 import locale
+import textwrap
 import time
 from dataclasses import dataclass
 from datetime import datetime
 from typing import Any
 
 from ai_factory.core.platform.container import build_platform_container
-
 
 locale.setlocale(locale.LC_ALL, "")
 
@@ -81,6 +81,21 @@ def _metric(summary: dict[str, Any], *names: str) -> Any:
 def _tail_lines(text: str, *, max_lines: int) -> list[str]:
     lines = text.splitlines() or [""]
     return lines[-max_lines:]
+
+
+def _wrap_lines(text: str, width: int) -> list[str]:
+    if width <= 1:
+        return [text]
+    wrapped: list[str] = []
+    for paragraph in text.splitlines() or [""]:
+        chunks = textwrap.wrap(
+            paragraph,
+            width=width,
+            break_long_words=False,
+            break_on_hyphens=False,
+        )
+        wrapped.extend(chunks or [""])
+    return wrapped or [""]
 
 
 class TuiController:
@@ -162,13 +177,20 @@ def _render_header(screen, snapshot: DashboardSnapshot) -> int:
         f"instances={len(snapshot.instances)}",
         f"runs={summary.get('runs', 0)}",
         f"tasks={summary.get('tasks', 0)}",
+        f"active={summary.get('active_runs', 0)}",
         f"running={counts.get('running', 0)}",
         f"retries={counts.get('retry_waiting', 0)}",
         f"stream={snapshot.selected_stream}",
         f"loaded={time.strftime('%H:%M:%S', time.localtime(snapshot.loaded_at or time.time()))}",
     ]
     _safe_addstr(screen, 0, 0, " | ".join(header), curses.A_REVERSE)
-    _safe_addstr(screen, 1, 0, "q quit  up/down move  tab toggle log stream  r refresh", curses.A_DIM)
+    _safe_addstr(
+        screen,
+        1,
+        0,
+        "q quit  up/down move  tab toggle stream  r refresh  g top  G bottom",
+        curses.A_DIM,
+    )
     if snapshot.error:
         _safe_addstr(screen, 2, 0, f"Last refresh error: {snapshot.error}", curses.A_BOLD)
         return 4
@@ -188,7 +210,16 @@ def _render_instances(screen, top: int, width: int, height: int, controller: Tui
         row = top + offset
         selected = start + offset - 1 == controller.selected_index
         attr = curses.A_REVERSE if selected else _status_attr(instance.status)
-        summary = f"{instance.type:<9} {instance.status:<9} {instance.environment.kind:<5} {instance.name}"
+        progress = "n/a"
+        if instance.progress and isinstance(instance.progress.percent, (int, float)):
+            progress = f"{instance.progress.percent * 100:.0f}%"
+        elif instance.progress:
+            progress = instance.progress.stage
+        updated = _format_timestamp(instance.updated_at)
+        summary = (
+            f"{instance.name:<18} {instance.type:<9} {instance.status:<9} "
+            f"{instance.environment.kind:<5} {progress:<8} {updated}"
+        )
         _safe_addstr(screen, row, 0, summary[: max(width - 1, 1)], attr)
 
 
@@ -200,6 +231,7 @@ def _render_detail(screen, top: int, left: int, width: int, height: int, control
         return
     instance = snapshot.instances[controller.selected_index]
     metrics_summary = snapshot.metrics.get("summary") or {}
+    task_summary = instance.task_summary or {}
     logs = snapshot.logs.get(controller.selected_stream, "")
 
     _safe_addstr(screen, top, left, f"Details: {instance.id}", curses.A_BOLD)
@@ -207,7 +239,11 @@ def _render_detail(screen, top: int, left: int, width: int, height: int, control
         f"name: {instance.name}",
         f"type/status: {instance.type} / {instance.status}",
         f"lifecycle: {(instance.lifecycle.stage if instance.lifecycle and instance.lifecycle.stage else 'n/a')}",
-        f"origin/mode: {((instance.lifecycle.origin or 'n/a') if instance.lifecycle else 'n/a')} / {((instance.lifecycle.learning_mode or 'n/a') if instance.lifecycle else 'n/a')}",
+        (
+            "origin/mode: "
+            f"{((instance.lifecycle.origin or 'n/a') if instance.lifecycle else 'n/a')} / "
+            f"{((instance.lifecycle.learning_mode or 'n/a') if instance.lifecycle else 'n/a')}"
+        ),
         f"environment: {instance.environment.kind}",
         f"orchestration run: {instance.orchestration_run_id or 'n/a'}",
         f"progress: {(instance.progress.stage if instance.progress else 'n/a')}",
@@ -219,23 +255,39 @@ def _render_detail(screen, top: int, left: int, width: int, height: int, control
     ]
     if instance.parent_instance_id:
         lines.append(f"parent: {instance.parent_instance_id}")
+    if task_summary:
+        lines.append(
+            "tasks: "
+            + ", ".join(f"{key}={_format_metric(value)}" for key, value in list(task_summary.items())[:4])
+        )
     if instance.progress and instance.progress.status_message:
         lines.append(f"message: {instance.progress.status_message}")
     if instance.decision is not None:
         lines.append(f"decision: {instance.decision.action} ({instance.decision.rule})")
+    detail_width = max(width - 1, 1)
+    rendered_lines: list[str] = []
+    for line in lines:
+        rendered_lines.extend(_wrap_lines(line, detail_width))
+
     if instance.recommendations:
-        lines.append(f"recommendations: {len(instance.recommendations)}")
-        lines.append(f"next: {instance.recommendations[0].action}")
+        rendered_lines.append("recommendations:")
+        for recommendation in instance.recommendations[:3]:
+            rendered_lines.extend(
+                _wrap_lines(
+                    f"- {recommendation.action} (priority {recommendation.priority}): {recommendation.reason}",
+                    detail_width,
+                )
+            )
 
-    log_top = top + len(lines) + 2
-    max_detail_lines = max(height - top - 6, 1)
-    for offset, line in enumerate(lines[:max_detail_lines], start=1):
-        _safe_addstr(screen, top + offset, left, line[: max(width - 1, 1)])
+    max_detail_lines = max(height - top - 10, 1)
+    for offset, line in enumerate(rendered_lines[:max_detail_lines], start=1):
+        _safe_addstr(screen, top + offset, left, line[: detail_width])
 
+    log_top = top + min(len(rendered_lines), max_detail_lines) + 2
     _safe_addstr(screen, log_top, left, f"{controller.selected_stream} tail", curses.A_BOLD)
     log_rows = max(height - log_top - 1, 1)
     for offset, line in enumerate(_tail_lines(logs, max_lines=log_rows), start=1):
-        _safe_addstr(screen, log_top + offset, left, line[: max(width - 1, 1)], curses.A_DIM)
+        _safe_addstr(screen, log_top + offset, left, line[: detail_width], curses.A_DIM)
 
 
 def _curses_main(screen, controller: TuiController) -> None:
@@ -288,6 +340,11 @@ def _curses_main(screen, controller: TuiController) -> None:
             continue
         if key == ord("\t"):
             controller.toggle_stream()
+            controller.refresh()
+            last_refresh = time.time()
+            continue
+        if key in {ord("g"), ord("G")}:
+            controller.selected_index = 0 if key == ord("g") else max(len(controller.snapshot.instances) - 1, 0)
             controller.refresh()
             last_refresh = time.time()
             continue

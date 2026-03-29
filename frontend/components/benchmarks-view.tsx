@@ -19,7 +19,7 @@ export function BenchmarksView() {
         <PageHeader
           eyebrow="Benchmark Library"
           title="Held-out slices and verification suites"
-          description="Atlas serves benchmark metadata directly from the same registry used by the offline evaluation pipeline."
+          description="AI-Factory serves benchmark metadata directly from the same registry used by the offline evaluation pipeline."
           metrics={[
             { label: "Benchmarks", value: formatCount(metadata.benchmarks.length) },
             { label: "Models", value: formatCount(metadata.models.length), tone: "secondary" },
@@ -41,7 +41,7 @@ export function BenchmarksView() {
           <StatePanel
             eyebrow="Loading"
             title="Benchmark metadata is loading."
-            description="Atlas is discovering held-out benchmark packs and verification suites."
+            description="AI-Factory is discovering held-out benchmark packs and verification suites."
             tone="loading"
           />
         ) : null}

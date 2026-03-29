@@ -22,7 +22,6 @@ def estimate_generation_cost_usd(
 ) -> float | None:
     if input_cost_per_million is None or output_cost_per_million is None:
         return None
-    return (
-        (prompt_tokens / 1_000_000) * input_cost_per_million
-        + (completion_tokens / 1_000_000) * output_cost_per_million
-    )
+    return (prompt_tokens / 1_000_000) * input_cost_per_million + (
+        completion_tokens / 1_000_000
+    ) * output_cost_per_million

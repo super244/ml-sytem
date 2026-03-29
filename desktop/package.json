@@ -5,7 +5,9 @@
   "description": "Electron shell for the AI-FACTORY control center.",
   "main": "main.js",
   "scripts": {
-    "start": "electron ."
+    "start": "electron .",
+    "native:build": "cd macos/AIFactoryNative && swift build",
+    "native:run": "cd macos/AIFactoryNative && swift run"
   },
   "devDependencies": {
     "electron": "^37.0.0"

@@ -42,9 +42,7 @@ def get_platform_settings(
 ) -> PlatformSettings:
     resolved_repo_root = Path(repo_root or os.getenv("AI_FACTORY_REPO_ROOT") or Path.cwd()).resolve()
     resolved_artifacts_dir = Path(
-        artifacts_dir
-        or os.getenv("ARTIFACTS_DIR")
-        or resolved_repo_root / "artifacts"
+        artifacts_dir or os.getenv("ARTIFACTS_DIR") or resolved_repo_root / "artifacts"
     ).resolve()
     control_plane_dir = Path(
         os.getenv("AI_FACTORY_CONTROL_PLANE_DIR", str(resolved_artifacts_dir / "control_plane"))

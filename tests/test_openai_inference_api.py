@@ -1,9 +1,8 @@
 from __future__ import annotations
 
-from starlette.requests import Request
-
 import httpx
 import pytest
+from starlette.requests import Request
 
 from inference.app.config import get_settings
 from inference.app.main import app
@@ -83,7 +82,7 @@ class DummyOpenAIService:
         self.usage["stream_requests"] += 1
 
         async def event_stream():
-            yield "data: {\"object\": \"chat.completion.chunk\"}\n\n"
+            yield 'data: {"object": "chat.completion.chunk"}\n\n'
             yield "data: [DONE]\n\n"
 
         from fastapi.responses import StreamingResponse

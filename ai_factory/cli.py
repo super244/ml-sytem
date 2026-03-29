@@ -48,6 +48,157 @@ def _render_payload(payload: Any, *, as_json: bool) -> None:
     print(payload)
 
 
+def _print_section(title: str) -> None:
+    print()
+    print(title)
+    print("-" * len(title))
+
+
+def _format_metric_value(value: Any) -> str:
+    if isinstance(value, bool):
+        return "yes" if value else "no"
+    if isinstance(value, float):
+        if abs(value) >= 100:
+            return f"{value:.0f}"
+        if abs(value) >= 10:
+            return f"{value:.1f}"
+        return f"{value:.2f}"
+    if value is None:
+        return "n/a"
+    return str(value)
+
+
+def _format_progress(manifest: InstanceManifest) -> str:
+    progress = manifest.progress
+    if progress is None:
+        return "n/a"
+    if isinstance(progress.percent, (int, float)):
+        return f"{progress.stage} {progress.percent * 100:.0f}%"
+    return progress.stage
+
+
+def _format_instance_row(manifest: InstanceManifest) -> str:
+    stage = manifest.lifecycle.stage or (manifest.progress.stage if manifest.progress else None)
+    updated = manifest.updated_at[:19].replace("T", " ") if manifest.updated_at else "n/a"
+    return (
+        f"{manifest.id:<18} {manifest.type:<10} {manifest.status:<10} env={manifest.environment.kind:<5} "
+        f"stage={stage or 'n/a':<10} progress={_format_progress(manifest):<14} updated={updated} name={manifest.name}"
+    )
+
+
+def _render_instance_report(manifest: InstanceManifest) -> None:
+    _print_section(f"Instance {manifest.id}")
+    print(f"name: {manifest.name}")
+    print(f"type/status: {manifest.type} / {manifest.status}")
+    print(f"environment: {manifest.environment.kind}")
+    if manifest.environment.kind == "cloud":
+        endpoint = manifest.environment.host or "profile-managed"
+        identity = manifest.environment.user or "n/a"
+        print(f"cloud endpoint: {identity}@{endpoint}:{manifest.environment.port}")
+        if manifest.environment.remote_repo_root:
+            print(f"remote repo: {manifest.environment.remote_repo_root}")
+    print(f"lifecycle stage: {manifest.lifecycle.stage or 'n/a'}")
+    print(f"origin: {manifest.lifecycle.origin or 'n/a'}")
+    print(f"learning mode: {manifest.lifecycle.learning_mode or 'n/a'}")
+    if manifest.lifecycle.source_model:
+        print(f"source model: {manifest.lifecycle.source_model}")
+    if manifest.progress:
+        print(f"progress: {_format_progress(manifest)}")
+        if manifest.progress.status_message:
+            print(f"progress note: {manifest.progress.status_message}")
+    print(f"updated: {manifest.updated_at}")
+    print(f"orchestration run: {manifest.orchestration_run_id or 'n/a'}")
+    if manifest.decision is not None:
+        print(f"decision: {manifest.decision.action} ({manifest.decision.rule})")
+        if manifest.decision.explanation:
+            print(f"decision note: {manifest.decision.explanation}")
+    if manifest.metrics_summary:
+        _print_section("Metrics")
+        for key in sorted(manifest.metrics_summary):
+            print(f"{key}: {_format_metric_value(manifest.metrics_summary[key])}")
+    if manifest.task_summary:
+        _print_section("Task summary")
+        for key in sorted(manifest.task_summary):
+            print(f"{key}: {_format_metric_value(manifest.task_summary[key])}")
+    if manifest.recommendations:
+        _print_section("Recommendations")
+        for recommendation in manifest.recommendations[:5]:
+            print(
+                f"- {recommendation.action} | priority={recommendation.priority} | {recommendation.reason}"
+            )
+    if manifest.error is not None:
+        _print_section("Error")
+        print(f"{manifest.error.code}: {manifest.error.message}")
+
+
+def _render_workspace_overview(payload: dict[str, Any]) -> None:
+    summary = payload.get("summary") or {}
+    readiness = payload.get("readiness_checks") or []
+    recipes = payload.get("command_recipes") or []
+    templates = payload.get("orchestration_templates") or []
+    training_profiles = payload.get("training_profiles") or []
+    evaluation_configs = payload.get("evaluation_configs") or []
+    interfaces = payload.get("interfaces") or []
+    capabilities = payload.get("orchestration_capabilities") or []
+
+    _print_section("Workspace overview")
+    print(f"repo root: {payload.get('repo_root', 'n/a')}")
+    print(
+        "summary: "
+        + ", ".join(
+            f"{label}={summary.get(label, 0)}"
+            for label in (
+                "datasets",
+                "packs",
+                "models",
+                "benchmarks",
+                "runs",
+                "training_profiles",
+                "evaluation_configs",
+                "orchestration_templates",
+            )
+        )
+    )
+    print(
+        f"readiness: {summary.get('ready_checks', 0)}/{summary.get('total_checks', 0)} checks ready"
+    )
+    if readiness:
+        _print_section("Readiness checks")
+        for check in readiness:
+            state = "ok" if check.get("ok") else "needs setup"
+            print(f"- {check.get('label', check.get('id', 'check'))}: {state} | {check.get('detail', '')}")
+    if interfaces:
+        _print_section("Interfaces")
+        for surface in interfaces:
+            print(
+                f"- {surface.get('label', surface.get('id', 'surface'))}: "
+                f"{surface.get('entrypoint', 'n/a')} ({surface.get('status', 'unknown')})"
+            )
+    if capabilities:
+        _print_section("Capabilities")
+        for capability in capabilities[:6]:
+            print(f"- {capability.get('title', capability.get('id', 'capability'))}: {capability.get('detail', '')}")
+    if recipes:
+        _print_section("Top recipes")
+        for recipe in recipes[:5]:
+            print(f"- {recipe.get('title', recipe.get('id', 'recipe'))}: {recipe.get('command', '')}")
+    if templates:
+        _print_section("Managed templates")
+        for template in templates[:4]:
+            print(
+                f"- {template.get('title', template.get('id', 'template'))} "
+                f"[{template.get('instance_type', 'n/a')}] {template.get('path', 'n/a')}"
+            )
+    if training_profiles:
+        _print_section("Training profiles")
+        for profile in training_profiles[:4]:
+            print(f"- {profile.get('title', profile.get('id', 'profile'))}: {profile.get('train_command', '')}")
+    if evaluation_configs:
+        _print_section("Evaluation configs")
+        for config in evaluation_configs[:4]:
+            print(f"- {config.get('title', config.get('id', 'config'))}: {config.get('run_command', '')}")
+
+
 def _prompt(text: str, default: str | None = None) -> str:
     suffix = f" [{default}]" if default else ""
     response = input(f"{text}{suffix}: ").strip()
@@ -97,8 +248,12 @@ def _environment_from_args(args: argparse.Namespace) -> EnvironmentSpec | None:
     host = args.cloud_host or (_prompt("Cloud host") if interactive else None)
     user = args.cloud_user or (_prompt("Cloud user") if interactive else None)
     key_path = args.cloud_key_path or (_prompt("SSH key path", "") if interactive else "")
-    remote_repo_root = args.remote_repo_root or (_prompt("Remote repo root", "/tmp/ai-factory") if interactive else None)
-    python_bin = args.python_bin or (_prompt("Remote python", "python3") if interactive else "python3")
+    remote_repo_root = args.remote_repo_root or (
+        _prompt("Remote repo root", "/tmp/ai-factory") if interactive else None
+    )
+    python_bin = args.python_bin or (
+        _prompt("Remote python", "python3") if interactive else "python3"
+    )
     port_forwards = []
     for raw in getattr(args, "port_forwards", []) or []:
         local_port, remote_port, bind_host = _parse_port_forward(raw)
@@ -123,7 +278,11 @@ def _environment_from_args(args: argparse.Namespace) -> EnvironmentSpec | None:
 
 def _lifecycle_from_args(args: argparse.Namespace) -> LifecycleProfile | None:
     interactive = _interactive_enabled(args)
-    origin = args.origin or (_prompt("Training origin (existing_model/from_scratch)", "existing_model") if interactive else None)
+    origin = args.origin or (
+        _prompt("Training origin (existing_model/from_scratch)", "existing_model")
+        if interactive
+        else None
+    )
     learning_mode = args.learning_mode or (_prompt("Learning mode", "qlora") if interactive else None)
     architecture_family = args.architecture_family
     if origin == "from_scratch" and not architecture_family and interactive:
@@ -298,7 +457,17 @@ def parse_args() -> argparse.Namespace:
     action_parser.add_argument("instance_id")
     action_parser.add_argument("action")
     action_parser.add_argument("--config")
-    action_parser.add_argument("--target", choices=["huggingface", "ollama", "lmstudio", "api", "custom_api", "openai_compatible_api"])
+    action_parser.add_argument(
+        "--target",
+        choices=[
+            "huggingface",
+            "ollama",
+            "lmstudio",
+            "api",
+            "custom_api",
+            "openai_compatible_api",
+        ],
+    )
     action_parser.add_argument("--no-start", action="store_true")
 
     logs_parser = subparsers.add_parser("logs", parents=[common_json])
@@ -313,7 +482,17 @@ def parse_args() -> argparse.Namespace:
 
     deploy_parser = subparsers.add_parser("deploy", parents=[common_json])
     deploy_parser.add_argument("instance_id")
-    deploy_parser.add_argument("--target", choices=["huggingface", "ollama", "lmstudio", "api", "custom_api", "openai_compatible_api"])
+    deploy_parser.add_argument(
+        "--target",
+        choices=[
+            "huggingface",
+            "ollama",
+            "lmstudio",
+            "api",
+            "custom_api",
+            "openai_compatible_api",
+        ],
+    )
     deploy_parser.add_argument("--config", default="configs/deploy.yaml")
     deploy_parser.add_argument("--no-start", action="store_true")
 
@@ -396,19 +575,16 @@ def main() -> None:
         if args.json:
             _render_payload([_manifest_payload(item) for item in manifests], as_json=True)
             return
-        rows = [
-            (
-                f"{item.id}  {item.type:<9}  {item.status:<9}  {item.environment.kind:<5}  "
-                f"level={item.user_level:<9}  mode={item.orchestration_mode:<14}  parent={item.parent_instance_id or '-'}"
-            )
-            for item in manifests
-        ]
+        rows = [_format_instance_row(item) for item in manifests]
         _render_payload(rows, as_json=False)
         return
 
     if args.command == "status":
         manifest = control.get_instance(args.instance_id)
-        _render_payload(_manifest_payload(manifest), as_json=args.json)
+        if args.json:
+            _render_payload(_manifest_payload(manifest), as_json=True)
+            return
+        _render_instance_report(manifest)
         return
 
     if args.command == "children":
@@ -510,7 +686,10 @@ def main() -> None:
 
     if args.command == "workspace":
         payload = build_workspace_overview(Path(args.root) if args.root else None)
-        _render_payload(payload, as_json=args.json)
+        if args.json:
+            _render_payload(payload, as_json=True)
+            return
+        _render_workspace_overview(payload)
         return
     
     # NEW: Domain command handlers

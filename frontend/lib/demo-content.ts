@@ -3,7 +3,7 @@ import type { ModelInfo, PromptExample, PromptPreset } from "@/lib/api";
 export const FALLBACK_MODELS: ModelInfo[] = [
   {
     name: "finetuned",
-    label: "Atlas Specialist",
+    label: "Factory Specialist",
     description: "Default local specialist adapter.",
     base_model: "Qwen2.5-Math-1.5B-Instruct",
     available: true,

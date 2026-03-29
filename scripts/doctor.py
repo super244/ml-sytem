@@ -15,7 +15,7 @@ from data.catalog import load_catalog, load_pack_summary
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
-        description="Inspect the local Atlas Math Lab environment and artifact state."
+        description="Inspect the local AI-Factory environment and artifact state."
     )
     parser.add_argument("--json", action="store_true", help="Emit machine-readable JSON.")
     return parser.parse_args()

@@ -5,7 +5,6 @@ from typing import Any, Literal
 
 from pydantic import BaseModel, Field, model_validator
 
-
 InstanceType = Literal["prepare", "train", "finetune", "evaluate", "inference", "deploy", "report"]
 InstanceStatus = Literal["pending", "running", "completed", "failed"]
 EnvironmentKind = Literal["local", "cloud"]

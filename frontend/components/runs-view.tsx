@@ -358,7 +358,7 @@ export function RunsView() {
           <StatePanel
             eyebrow="Loading"
             title="Artifact runs are loading."
-            description="Atlas is scanning local training manifests and metric summaries."
+            description="AI-Factory is scanning local training manifests and metric summaries."
             tone="loading"
           />
         ) : null}

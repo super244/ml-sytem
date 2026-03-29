@@ -1,6 +1,6 @@
 # Data System
 
-Atlas Math Lab uses a canonical `v2` record schema so synthetic, public, replay, and benchmark data can move through the same tooling.
+AI-Factory uses a canonical `v2` record schema so synthetic, public, replay, and benchmark data can move through the same tooling.
 
 ## Schema Highlights
 

@@ -1,12 +1,11 @@
 from __future__ import annotations
 
 import json
-from pathlib import Path
 import shlex
 import subprocess
 import sys
+from pathlib import Path
 from typing import Any
-
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 if str(REPO_ROOT) not in sys.path:
@@ -23,7 +22,7 @@ def active_python() -> str:
 
 def run_step(label: str, command: list[str], cwd: Path | None = None) -> None:
     rendered = " ".join(shlex.quote(part) for part in command)
-    print(f"[atlas] {label}: {rendered}")
+    print(f"[ai-factory] {label}: {rendered}")
     subprocess.run(command, cwd=str(cwd or REPO_ROOT), check=True)
 
 

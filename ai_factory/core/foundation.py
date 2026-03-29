@@ -8,7 +8,6 @@ from pydantic import BaseModel, Field
 from ai_factory.core.discovery import load_benchmark_registry
 from ai_factory.core.instances.models import UserLevel
 
-
 InterfaceId = Literal["cli", "tui", "web", "desktop"]
 ExtensionKind = Literal["training_method", "evaluation_suite", "deployment_target"]
 
@@ -99,7 +98,10 @@ def _experience_tiers() -> list[ExperienceTier]:
         ExperienceTier(
             id="hobbyist",
             label="Hobbyist",
-            description="Balanced control with common tuning knobs, follow-up workflows, and manageable remote options.",
+            description=(
+                "Balanced control with common tuning knobs, follow-up workflows, "
+                "and manageable remote options."
+            ),
             visible_controls=["templates", "hyperparameters", "remote profiles", "recommendations"],
             recommended_modes=["single", "local_parallel", "hybrid"],
             safe_defaults=["guardrailed overrides", "limited concurrency", "managed evaluation loop"],
@@ -107,7 +109,10 @@ def _experience_tiers() -> list[ExperienceTier]:
         ExperienceTier(
             id="dev",
             label="Developer",
-            description="Full-fidelity lifecycle control including raw configs, backend selection, and architecture-level decisions.",
+            description=(
+                "Full-fidelity lifecycle control including raw configs, backend "
+                "selection, and architecture-level decisions."
+            ),
             visible_controls=["raw configs", "command overrides", "agent policies", "publish hooks"],
             recommended_modes=["single", "local_parallel", "cloud_parallel", "hybrid"],
             safe_defaults=["no forced UI guardrails", "explicit control-plane visibility"],

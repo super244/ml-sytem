@@ -8,7 +8,6 @@ from pydantic import BaseModel, Field, field_validator, model_validator
 
 from ai_factory.core.hashing import normalize_text, stable_question_fingerprint
 
-
 Difficulty = Literal["easy", "medium", "hard", "olympiad"]
 DatasetSplit = Literal["train", "eval", "test", "benchmark", "unspecified"]
 ReasoningStyle = Literal["chain_of_thought", "proof", "exam", "verification", "mixed"]
@@ -69,6 +68,7 @@ class ContaminationStatus(BaseModel):
 
 class ResourceSpec(BaseModel):
     """Resource specification for training jobs."""
+
     cpu_cores: int = 4
     memory_gb: int = 16
     gpu_count: int = 1
@@ -79,6 +79,7 @@ class ResourceSpec(BaseModel):
 
 class DatasetRecordV2(BaseModel):
     """Universal dataset record for any domain."""
+
     schema_version: Literal["v2"] = "v2"
     id: str | None = None
     question: str
@@ -104,6 +105,7 @@ class DatasetRecordV2(BaseModel):
 
 class MathRecordV2(DatasetRecordV2):
     """Mathematics-specific dataset record (backward compatibility)."""
+
     domain: Literal["mathematics"] = "mathematics"
 
     @field_validator("step_checks", mode="before")
@@ -239,6 +241,7 @@ class RunManifest(BaseModel):
 
 class DatasetSpec(BaseModel):
     """Dataset specification for domain registry."""
+
     name: str
     description: str
     path: str
@@ -252,6 +255,7 @@ class DatasetSpec(BaseModel):
 
 class MetricSpec(BaseModel):
     """Metric specification for domain evaluation."""
+
     name: str
     description: str
     type: str  # accuracy, score, ranking, etc.
@@ -263,6 +267,7 @@ class MetricSpec(BaseModel):
 
 class EvaluationSpec(BaseModel):
     """Evaluation specification for domain benchmarks."""
+
     name: str
     description: str
     domain: str
@@ -276,6 +281,7 @@ class EvaluationSpec(BaseModel):
 
 class TrainingProfileSpec(BaseModel):
     """Training profile specification for domains."""
+
     name: str
     description: str
     domain: str
@@ -290,6 +296,7 @@ class TrainingProfileSpec(BaseModel):
 
 class ModelArtifact(BaseModel):
     """Model artifact for deployment."""
+
     name: str
     version: str
     path: str
@@ -302,6 +309,7 @@ class ModelArtifact(BaseModel):
 
 class DeploymentTarget(BaseModel):
     """Deployment target specification."""
+
     name: str
     type: str  # huggingface, ollama, etc.
     description: str
@@ -311,6 +319,7 @@ class DeploymentTarget(BaseModel):
 
 class DeploymentSpec(BaseModel):
     """Deployment specification."""
+
     target: str
     model_name: str
     config: dict[str, Any] = Field(default_factory=dict)
@@ -320,6 +329,7 @@ class DeploymentSpec(BaseModel):
 
 class ScalingConfig(BaseModel):
     """Configuration for scaling manager."""
+
     max_nodes: int = 10
     default_resources: dict[str, Any] = Field(default_factory=dict)
     cluster_type: str = "local"  # local, slurm, kubernetes
@@ -328,6 +338,7 @@ class ScalingConfig(BaseModel):
 
 class MonitoringConfig(BaseModel):
     """Configuration for monitoring manager."""
+
     collection_interval_seconds: float = 5.0
     storage_backend: str = "file"  # file, prometheus, influxdb
     alert_channels: list[str] = Field(default_factory=list)
@@ -337,6 +348,7 @@ class MonitoringConfig(BaseModel):
 
 class TrainingJob(BaseModel):
     """Training job specification for scaling."""
+
     name: str
     profile: str
     resource_requirements: dict[str, Any] = Field(default_factory=dict)
@@ -347,6 +359,7 @@ class TrainingJob(BaseModel):
 
 class Alert(BaseModel):
     """Alert specification for monitoring."""
+
     id: str
     severity: str  # info, warning, critical
     message: str
@@ -357,6 +370,7 @@ class Alert(BaseModel):
 
 class MetricPoint(BaseModel):
     """Single metric data point."""
+
     timestamp: datetime
     name: str
     value: float
