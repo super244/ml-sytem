@@ -42,7 +42,7 @@ def test_compare_runs_reports_winner_and_markdown(tmp_path):
     report = compare_runs(left, right, primary_metric="eval_loss")
 
     assert report["winner"] == "right"
-    assert report["delta"]["eval_loss"] == -0.11
+    assert report["delta"]["eval_loss"]["delta"] == -0.11
     assert report["shared_metrics"] == ["eval_accuracy", "eval_loss"]
     assert load_run_summary(left)["status"] == "completed"
 

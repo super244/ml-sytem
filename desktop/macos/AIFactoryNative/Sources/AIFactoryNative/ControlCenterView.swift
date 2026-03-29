@@ -9,6 +9,7 @@ struct ControlCenterView: View {
         ScrollView {
             VStack(alignment: .leading, spacing: 20) {
                 header
+                statusBar
                 actionGrid
                 launchStrip
             }
@@ -45,19 +46,96 @@ struct ControlCenterView: View {
             VStack(alignment: .trailing, spacing: 10) {
                 Label("SwiftUI shell", systemImage: "macwindow")
                 Label("Electron fallback remains available", systemImage: "window.viewfinder")
-                Label("Connected to shared backend URLs", systemImage: "dot.radiowaves.left.and.right")
+                HStack(spacing: 6) {
+                    Circle()
+                        .fill(store.apiReachable ? Color.green : Color.red)
+                        .frame(width: 8, height: 8)
+                    Text(store.apiReachable ? "Backend connected" : "Backend unreachable")
+                }
+                .font(.system(size: 13, weight: .medium, design: .rounded))
             }
             .font(.system(size: 13, weight: .medium, design: .rounded))
             .foregroundStyle(.secondary)
         }
     }
 
+    private var statusBar: some View {
+        HStack(spacing: 16) {
+            statusPill(
+                icon: "dot.radiowaves.left.and.right",
+                label: store.apiReachable ? "API Online" : "API Offline",
+                color: store.apiReachable ? .green : .red
+            )
+            statusPill(
+                icon: "square.stack.3d.up",
+                label: "\(store.instanceCount) instances",
+                color: .blue
+            )
+            statusPill(
+                icon: "bolt.fill",
+                label: "\(store.runningCount) running",
+                color: store.runningCount > 0 ? .orange : .secondary
+            )
+            if store.apiReachable {
+                statusPill(
+                    icon: "clock",
+                    label: "Up \(store.formattedUptime)",
+                    color: .secondary
+                )
+                statusPill(
+                    icon: "tag",
+                    label: store.apiVersion,
+                    color: .secondary
+                )
+            }
+            Spacer()
+            if let error = store.statusError {
+                Text(error)
+                    .font(.system(size: 11, weight: .regular, design: .monospaced))
+                    .foregroundStyle(.red.opacity(0.8))
+                    .lineLimit(1)
+            }
+            Button {
+                Task { await store.fetchStatus() }
+            } label: {
+                Image(systemName: "arrow.clockwise")
+                    .font(.system(size: 13, weight: .medium))
+            }
+            .buttonStyle(.bordered)
+            .help("Refresh backend status")
+        }
+        .padding(14)
+        .background(.white.opacity(0.72), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: 16, style: .continuous)
+                .strokeBorder(Color.black.opacity(0.06))
+        )
+    }
+
+    private func statusPill(icon: String, label: String, color: Color) -> some View {
+        HStack(spacing: 5) {
+            Image(systemName: icon)
+                .font(.system(size: 11, weight: .semibold))
+                .foregroundStyle(color)
+            Text(label)
+                .font(.system(size: 12, weight: .medium, design: .rounded))
+        }
+        .padding(.horizontal, 10)
+        .padding(.vertical, 5)
+        .background(color.opacity(0.1), in: Capsule())
+    }
+
     private var actionGrid: some View {
         LazyVGrid(columns: [GridItem(.adaptive(minimum: 240), spacing: 14)], spacing: 14) {
             ForEach(store.quickActions) { action in
                 VStack(alignment: .leading, spacing: 12) {
-                    Text(action.title)
-                        .font(.system(size: 18, weight: .semibold, design: .rounded))
+                    HStack(spacing: 8) {
+                        Image(systemName: action.icon)
+                            .font(.system(size: 20, weight: .medium))
+                            .foregroundStyle(.blue)
+                        Text(action.title)
+                            .font(.system(size: 18, weight: .semibold, design: .rounded))
+                    }
                     Text(action.detail)
                         .font(.system(size: 13, weight: .regular, design: .rounded))
                         .foregroundStyle(.secondary)
@@ -66,6 +144,8 @@ struct ControlCenterView: View {
                         Button("Open") {
                             if let url = URL(string: action.command), action.command.hasPrefix("http") {
                                 bridge.open(url)
+                            } else if action.command.hasPrefix("python") || action.command.hasPrefix("swift") {
+                                bridge.runShellCommand(action.command)
                             } else {
                                 bridge.reveal(URL(fileURLWithPath: action.command))
                             }

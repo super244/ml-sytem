@@ -1221,3 +1221,79 @@ a:focus-visible {
     padding: 18px;
   }
 }
+
+/* Decision badges */
+.decision-badge {
+  display: inline-block;
+  border-radius: 999px;
+  padding: 3px 10px;
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  margin-left: auto;
+}
+
+.decision-deploy {
+  background: rgba(15, 122, 97, 0.12);
+  color: var(--accent-strong, #0f7a61);
+  border: 1px solid rgba(15, 122, 97, 0.22);
+}
+
+.decision-finetune {
+  background: rgba(37, 95, 155, 0.12);
+  color: var(--secondary, #255f9b);
+  border: 1px solid rgba(37, 95, 155, 0.18);
+}
+
+.decision-retrain {
+  background: rgba(180, 80, 40, 0.12);
+  color: #b45028;
+  border: 1px solid rgba(180, 80, 40, 0.18);
+}
+
+.decision-evaluate {
+  background: rgba(130, 90, 200, 0.12);
+  color: #7a5ac8;
+  border: 1px solid rgba(130, 90, 200, 0.18);
+}
+
+.decision-inference {
+  background: rgba(40, 140, 180, 0.10);
+  color: #1e8cab;
+  border: 1px solid rgba(40, 140, 180, 0.18);
+}
+
+.decision-default {
+  background: var(--secondary-soft, rgba(37, 95, 155, 0.08));
+  color: var(--secondary, #255f9b);
+  border: 1px solid rgba(37, 95, 155, 0.12);
+}
+
+/* Progress bar */
+.progress-track {
+  position: relative;
+  height: 6px;
+  border-radius: 3px;
+  background: var(--secondary-soft, rgba(37, 95, 155, 0.08));
+  margin: 8px 0 4px;
+  overflow: visible;
+}
+
+.progress-fill {
+  height: 100%;
+  border-radius: 3px;
+  background: var(--accent-strong, #0f7a61);
+  transition: width 0.4s ease;
+  min-width: 2px;
+}
+
+.progress-label {
+  position: absolute;
+  right: 0;
+  top: -16px;
+  font-size: 0.68rem;
+  font-weight: 600;
+  color: var(--text-secondary, #6b7280);
+  letter-spacing: 0.02em;
+}

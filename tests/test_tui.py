@@ -118,11 +118,19 @@ def test_run_tui_uses_curses_wrapper(monkeypatch):
         COLOR_GREEN = 2
         COLOR_RED = 1
         COLOR_CYAN = 6
+        COLOR_WHITE = 7
+        COLOR_BLACK = 0
         A_REVERSE = 1
         A_DIM = 2
         A_BOLD = 4
+        A_NORMAL = 0
+        ACS_VLINE = ord("|")
+        ACS_HLINE = ord("-")
         KEY_UP = 259
         KEY_DOWN = 258
+        COLORS = 256
+        COLOR_PAIRS = 256
+        error = Exception
 
         def wrapper(self, fn, controller):
             captured["wrapped"] = True
@@ -143,11 +151,47 @@ def test_run_tui_uses_curses_wrapper(monkeypatch):
                 def addnstr(self, *args, **kwargs):
                     captured["addnstr"] = True
 
+                def addch(self, *args, **kwargs):
+                    pass
+
+                def hline(self, *args, **kwargs):
+                    pass
+
+                def attrset(self, *args, **kwargs):
+                    pass
+
+                def bkgd(self, *args, **kwargs):
+                    pass
+
+                def clrtoeol(self, *args, **kwargs):
+                    pass
+
+                def move(self, *args, **kwargs):
+                    pass
+
+                def insstr(self, *args, **kwargs):
+                    pass
+
+                def attron(self, *args, **kwargs):
+                    pass
+
+                def attroff(self, *args, **kwargs):
+                    pass
+
+                def subwin(self, *args, **kwargs):
+                    return self
+
+                def derwin(self, *args, **kwargs):
+                    return self
+
                 def refresh(self):
                     captured["refresh"] = True
 
                 def getch(self):
                     return ord("q")
+
+                def timeout(self, *args):
+                    pass
 
             fn(_Screen(), controller)
 
@@ -156,6 +200,12 @@ def test_run_tui_uses_curses_wrapper(monkeypatch):
 
         def has_colors(self):
             return False
+
+        def color_pair(self, n):
+            return 0
+
+        def init_pair(self, *args):
+            pass
 
     monkeypatch.setattr(tui, "curses", _FakeCurses())
 
