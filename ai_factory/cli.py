@@ -21,6 +21,14 @@ from ai_factory.core.platform.container import build_platform_container
 from inference.app.workspace import build_workspace_overview
 
 
+_STATUS_ICONS = {
+    "running": "*",
+    "completed": "+",
+    "failed": "!",
+    "pending": "~",
+}
+
+
 def _build_control_service(args: argparse.Namespace) -> FactoryControlService:
     return build_platform_container(
         repo_root=args.repo_root,
@@ -80,8 +88,9 @@ def _format_progress(manifest: InstanceManifest) -> str:
 def _format_instance_row(manifest: InstanceManifest) -> str:
     stage = manifest.lifecycle.stage or (manifest.progress.stage if manifest.progress else None)
     updated = manifest.updated_at[:19].replace("T", " ") if manifest.updated_at else "n/a"
+    icon = _STATUS_ICONS.get(manifest.status, " ")
     return (
-        f"{manifest.id:<18} {manifest.type:<10} {manifest.status:<10} env={manifest.environment.kind:<5} "
+        f"  {icon} {manifest.id:<18} {manifest.type:<10} {manifest.status:<10} env={manifest.environment.kind:<5} "
         f"stage={stage or 'n/a':<10} progress={_format_progress(manifest):<14} updated={updated} name={manifest.name}"
     )
 
@@ -115,20 +124,59 @@ def _render_instance_report(manifest: InstanceManifest) -> None:
     if manifest.metrics_summary:
         _print_section("Metrics")
         for key in sorted(manifest.metrics_summary):
-            print(f"{key}: {_format_metric_value(manifest.metrics_summary[key])}")
+            print(f"  {key}: {_format_metric_value(manifest.metrics_summary[key])}")
     if manifest.task_summary:
         _print_section("Task summary")
         for key in sorted(manifest.task_summary):
-            print(f"{key}: {_format_metric_value(manifest.task_summary[key])}")
+            print(f"  {key}: {_format_metric_value(manifest.task_summary[key])}")
     if manifest.recommendations:
         _print_section("Recommendations")
         for recommendation in manifest.recommendations[:5]:
             print(
-                f"- {recommendation.action} | priority={recommendation.priority} | {recommendation.reason}"
+                f"  - {recommendation.action} | priority={recommendation.priority} | {recommendation.reason}"
             )
     if manifest.error is not None:
         _print_section("Error")
-        print(f"{manifest.error.code}: {manifest.error.message}")
+        print(f"  {manifest.error.code}: {manifest.error.message}")
+
+    _print_section("Next steps")
+    _print_next_steps(manifest)
+
+
+def _print_next_steps(manifest: InstanceManifest) -> None:
+    iid = manifest.id
+    if manifest.status == "failed":
+        print(f"  retry:    ai-factory retry {iid}")
+        print(f"  logs:     ai-factory logs {iid} --follow")
+        return
+    if manifest.status == "running":
+        print(f"  watch:    ai-factory watch {iid}")
+        print(f"  logs:     ai-factory logs {iid} --follow")
+        return
+    if manifest.status == "completed":
+        if manifest.type in {"train", "finetune"}:
+            print(f"  evaluate: ai-factory evaluate {iid}")
+            print(f"  infer:    ai-factory inference {iid}")
+            print(f"  deploy:   ai-factory deploy {iid} --target ollama")
+        elif manifest.type == "evaluate":
+            if manifest.decision:
+                action = manifest.decision.action
+                if action == "deploy":
+                    print(f"  deploy:   ai-factory deploy {iid} --target ollama")
+                elif action in {"finetune", "retrain"}:
+                    print(f"  iterate:  ai-factory action {iid} {action}")
+                elif action == "open_inference":
+                    print(f"  infer:    ai-factory inference {iid}")
+            print(f"  compare:  ai-factory compare {iid}")
+        elif manifest.type == "deploy":
+            print(f"  status:   ai-factory status {iid}")
+        elif manifest.type == "inference":
+            print(f"  status:   ai-factory status {iid}")
+        if manifest.recommendations:
+            rec = manifest.recommendations[0]
+            print(f"  top rec:  ai-factory action {iid} {rec.action}")
+        return
+    print(f"  status:   ai-factory status {iid}")
 
 
 def _render_workspace_overview(payload: dict[str, Any]) -> None:
@@ -159,44 +207,87 @@ def _render_workspace_overview(payload: dict[str, Any]) -> None:
             )
         )
     )
-    print(
-        f"readiness: {summary.get('ready_checks', 0)}/{summary.get('total_checks', 0)} checks ready"
-    )
+    ready = summary.get("ready_checks", 0)
+    total = summary.get("total_checks", 0)
+    print(f"readiness: {ready}/{total} checks ready")
     if readiness:
         _print_section("Readiness checks")
         for check in readiness:
             state = "ok" if check.get("ok") else "needs setup"
-            print(f"- {check.get('label', check.get('id', 'check'))}: {state} | {check.get('detail', '')}")
+            print(f"  [{state:>11}] {check.get('label', check.get('id', 'check'))}: {check.get('detail', '')}")
     if interfaces:
         _print_section("Interfaces")
         for surface in interfaces:
             print(
-                f"- {surface.get('label', surface.get('id', 'surface'))}: "
+                f"  - {surface.get('label', surface.get('id', 'surface'))}: "
                 f"{surface.get('entrypoint', 'n/a')} ({surface.get('status', 'unknown')})"
             )
     if capabilities:
         _print_section("Capabilities")
         for capability in capabilities[:6]:
-            print(f"- {capability.get('title', capability.get('id', 'capability'))}: {capability.get('detail', '')}")
+            print(f"  - {capability.get('title', capability.get('id', 'capability'))}: {capability.get('detail', '')}")
     if recipes:
         _print_section("Top recipes")
         for recipe in recipes[:5]:
-            print(f"- {recipe.get('title', recipe.get('id', 'recipe'))}: {recipe.get('command', '')}")
+            print(f"  - {recipe.get('title', recipe.get('id', 'recipe'))}: {recipe.get('command', '')}")
     if templates:
         _print_section("Managed templates")
         for template in templates[:4]:
             print(
-                f"- {template.get('title', template.get('id', 'template'))} "
+                f"  - {template.get('title', template.get('id', 'template'))} "
                 f"[{template.get('instance_type', 'n/a')}] {template.get('path', 'n/a')}"
             )
     if training_profiles:
         _print_section("Training profiles")
         for profile in training_profiles[:4]:
-            print(f"- {profile.get('title', profile.get('id', 'profile'))}: {profile.get('train_command', '')}")
+            print(f"  - {profile.get('title', profile.get('id', 'profile'))}: {profile.get('train_command', '')}")
     if evaluation_configs:
         _print_section("Evaluation configs")
         for config in evaluation_configs[:4]:
-            print(f"- {config.get('title', config.get('id', 'config'))}: {config.get('run_command', '')}")
+            print(f"  - {config.get('title', config.get('id', 'config'))}: {config.get('run_command', '')}")
+
+
+def _render_ready_summary(payload: dict[str, Any]) -> None:
+    readiness = payload.get("readiness_checks") or []
+    ready = sum(1 for c in readiness if c.get("ok"))
+    total = len(readiness)
+    print(f"Workspace readiness: {ready}/{total}")
+    for check in readiness:
+        ok = check.get("ok")
+        mark = "OK" if ok else "MISSING"
+        print(f"  [{mark:>7}] {check.get('label', check.get('id', '?'))}")
+        if not ok:
+            print(f"           {check.get('detail', '')}")
+    if ready == total:
+        print("\nAll checks passed. Workspace is ready.")
+    else:
+        print(f"\n{total - ready} check(s) need attention before full operation.")
+
+
+def _render_compare_summary(left: InstanceManifest, right: InstanceManifest) -> None:
+    _print_section("Run comparison")
+    print(f"  left:  {left.id} ({left.name}) [{left.status}]")
+    print(f"  right: {right.id} ({right.name}) [{right.status}]")
+
+    all_keys = sorted(set(left.metrics_summary) | set(right.metrics_summary))
+    if not all_keys:
+        print("\n  No metrics available to compare.")
+        return
+
+    _print_section("Metric deltas")
+    print(f"  {'metric':<30} {'left':>12} {'right':>12} {'delta':>12}")
+    print(f"  {'-'*30} {'-'*12} {'-'*12} {'-'*12}")
+    for key in all_keys:
+        lv = left.metrics_summary.get(key)
+        rv = right.metrics_summary.get(key)
+        lf = _format_metric_value(lv)
+        rf = _format_metric_value(rv)
+        if isinstance(lv, (int, float)) and isinstance(rv, (int, float)):
+            delta = rv - lv
+            df = f"{delta:+.4f}"
+        else:
+            df = "n/a"
+        print(f"  {key:<30} {lf:>12} {rf:>12} {df:>12}")
 
 
 def _prompt(text: str, default: str | None = None) -> str:
@@ -506,32 +597,39 @@ def parse_args() -> argparse.Namespace:
 
     workspace_parser = subparsers.add_parser("workspace", parents=[common_json])
     workspace_parser.add_argument("--root")
-    
-    # NEW: Domain-related commands
+
+    ready_parser = subparsers.add_parser("ready", parents=[common_json])
+    ready_parser.add_argument("--root")
+
+    compare_parser = subparsers.add_parser("compare", parents=[common_json])
+    compare_parser.add_argument("left_instance_id")
+    compare_parser.add_argument("right_instance_id", nargs="?")
+
+    doctor_parser = subparsers.add_parser("doctor", parents=[common_json])
+    doctor_parser.add_argument("--root")
+
     domain_parser = subparsers.add_parser("domain", parents=[common_json])
     domain_subparsers = domain_parser.add_subparsers(dest="domain_command", required=True)
-    
+
     domain_list_parser = domain_subparsers.add_parser("list", parents=[common_json])
     domain_list_parser.add_argument("--show-details", action="store_true")
-    
+
     domain_info_parser = domain_subparsers.add_parser("info", parents=[common_json])
     domain_info_parser.add_argument("domain_name")
-    
-    # NEW: Platform commands
+
     platform_parser = subparsers.add_parser("platform", parents=[common_json])
     platform_subparsers = platform_parser.add_subparsers(dest="platform_command", required=True)
-    
+
     platform_subparsers.add_parser("status", parents=[common_json])
-    
+
     platform_scale_parser = platform_subparsers.add_parser("scale", parents=[common_json])
     platform_scale_parser.add_argument("target_nodes", type=int)
-    
-    # NEW: Multi-domain training
+
     multi_train_parser = subparsers.add_parser("multi-train", parents=[common_json])
     multi_train_parser.add_argument("--domains", nargs="+", required=True)
     multi_train_parser.add_argument("--config", default="configs/multi_domain.yaml")
     multi_train_parser.add_argument("--no-start", action="store_true")
-    
+
     return parser.parse_args()
 
 
@@ -545,6 +643,23 @@ def main() -> None:
             artifacts_dir=args.artifacts_dir,
             refresh_seconds=args.refresh_seconds,
         )
+        return
+
+    if args.command in {"workspace", "ready", "doctor"}:
+        root = Path(getattr(args, "root", None) or ".") if hasattr(args, "root") and args.root else None
+        payload = build_workspace_overview(root)
+        if args.json:
+            _render_payload(payload, as_json=True)
+            return
+        if args.command == "ready":
+            _render_ready_summary(payload)
+        elif args.command == "doctor":
+            _render_ready_summary(payload)
+            _print_section("Quick recipes")
+            for recipe in (payload.get("command_recipes") or [])[:5]:
+                print(f"  {recipe.get('title', '?')}: {recipe.get('command', '')}")
+        else:
+            _render_workspace_overview(payload)
         return
 
     control = _build_control_service(args)
@@ -575,6 +690,10 @@ def main() -> None:
         if args.json:
             _render_payload([_manifest_payload(item) for item in manifests], as_json=True)
             return
+        if not manifests:
+            print("No instances found. Create one with: ai-factory new --config configs/finetune.yaml")
+            return
+        print(f"Instances ({len(manifests)}):")
         rows = [_format_instance_row(item) for item in manifests]
         _render_payload(rows, as_json=False)
         return
@@ -619,8 +738,20 @@ def main() -> None:
 
     if args.command == "recommendations":
         manifest = control.get_instance(args.instance_id)
-        payload = [item.model_dump(mode="json") for item in manifest.recommendations]
-        _render_payload(payload, as_json=args.json)
+        if args.json:
+            payload = [item.model_dump(mode="json") for item in manifest.recommendations]
+            _render_payload(payload, as_json=True)
+            return
+        if not manifest.recommendations:
+            print(f"No recommendations for {args.instance_id}.")
+            return
+        _print_section(f"Recommendations for {args.instance_id}")
+        for idx, rec in enumerate(manifest.recommendations, 1):
+            print(f"  {idx}. [{rec.action}] priority={rec.priority}")
+            print(f"     {rec.reason}")
+            if rec.config_path:
+                print(f"     config: {rec.config_path}")
+            print(f"     run: ai-factory action {args.instance_id} {rec.action}")
         return
 
     if args.command == "action":
@@ -684,15 +815,27 @@ def main() -> None:
         _render_payload(_manifest_payload(manifest), as_json=args.json)
         return
 
-    if args.command == "workspace":
-        payload = build_workspace_overview(Path(args.root) if args.root else None)
+    if args.command == "compare":
+        left = control.get_instance(args.left_instance_id)
+        if args.right_instance_id:
+            right = control.get_instance(args.right_instance_id)
+        else:
+            parent_id = left.parent_instance_id
+            if not parent_id:
+                raise SystemExit("No right instance specified and no parent instance to compare against.")
+            right = control.get_instance(parent_id)
         if args.json:
-            _render_payload(payload, as_json=True)
+            _render_payload(
+                {
+                    "left": _manifest_payload(left),
+                    "right": _manifest_payload(right),
+                },
+                as_json=True,
+            )
             return
-        _render_workspace_overview(payload)
+        _render_compare_summary(left, right)
         return
-    
-    # NEW: Domain command handlers
+
     if args.command == "domain":
         if args.domain_command == "list":
             from ai_factory.domains import list_available_domains
@@ -702,28 +845,26 @@ def main() -> None:
             else:
                 _render_payload([domain.name for domain in domains], as_json=args.json)
             return
-        
+
         if args.domain_command == "info":
             from ai_factory.domains import get_domain_info
             domain_info = get_domain_info(args.domain_name)
             _render_payload(domain_info, as_json=args.json)
             return
-    
-    # NEW: Platform command handlers
+
     if args.command == "platform":
         if args.platform_command == "status":
             from ai_factory.platform import get_platform_status
             status = get_platform_status()
             _render_payload(status, as_json=args.json)
             return
-        
+
         if args.platform_command == "scale":
             from ai_factory.platform import scale_platform
             result = scale_platform(args.target_nodes)
             _render_payload(result, as_json=args.json)
             return
-    
-    # NEW: Multi-domain training
+
     if args.command == "multi-train":
         from ai_factory.platform import create_multi_domain_training
         manifest = create_multi_domain_training(

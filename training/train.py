@@ -152,7 +152,7 @@ def main() -> None:
     set_seed(config.seed)
 
     layout = prepare_run_layout(config.training.artifacts_dir, config.run_name)
-    resume_from_checkpoint = resolve_resume_checkpoint(
+    resume_from_checkpoint, checkpoint_report = resolve_resume_checkpoint(
         layout.checkpoints_dir,
         explicit_checkpoint=args.resume_from_checkpoint,
         resume_from_latest=args.resume_from_latest_checkpoint,
@@ -209,6 +209,7 @@ def main() -> None:
     validation_report = {
         "warnings": validation_warnings,
         "resume_from_checkpoint": resume_from_checkpoint,
+        "checkpoint_report": checkpoint_report,
         "config_report_path": str(config_report_path),
         "config_snapshot_path": str(config_snapshot_path),
     }

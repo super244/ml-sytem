@@ -5,13 +5,20 @@ import curses
 import locale
 import textwrap
 import time
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import datetime
 from typing import Any
 
 from ai_factory.core.platform.container import build_platform_container
 
 locale.setlocale(locale.LC_ALL, "")
+
+_STATUS_ICONS = {"running": "*", "completed": "+", "failed": "!", "pending": "~"}
+_ACTION_KEYS = {
+    "e": "evaluate",
+    "d": "deploy",
+    "i": "inference",
+}
 
 
 @dataclass
@@ -22,6 +29,7 @@ class DashboardSnapshot:
     metrics: dict[str, Any]
     selected_stream: str
     loaded_at: float
+    available_actions: list[str] = field(default_factory=list)
     error: str | None = None
 
 
@@ -36,7 +44,7 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     return parser.parse_args(argv)
 
 
-def _safe_addstr(screen, y: int, x: int, text: str, attr: int = 0) -> None:
+def _safe_addstr(screen: Any, y: int, x: int, text: str, attr: int = 0) -> None:
     height, width = screen.getmaxyx()
     if y < 0 or y >= height or x >= width:
         return
@@ -49,7 +57,32 @@ def _safe_addstr(screen, y: int, x: int, text: str, attr: int = 0) -> None:
         return
 
 
+def _hline(screen: Any, y: int, x: int, width: int, attr: int = 0) -> None:
+    try:
+        screen.hline(y, x, curses.ACS_HLINE, width, attr)
+    except curses.error:
+        pass
+
+
+def _vline(screen: Any, y: int, x: int, height: int, attr: int = 0) -> None:
+    for row in range(height):
+        try:
+            screen.addch(y + row, x, curses.ACS_VLINE, attr)
+        except curses.error:
+            pass
+
+
 def _format_timestamp(value: str | None) -> str:
+    if not value:
+        return "n/a"
+    normalized = value.replace("Z", "+00:00")
+    try:
+        return datetime.fromisoformat(normalized).strftime("%H:%M:%S")
+    except ValueError:
+        return value
+
+
+def _format_timestamp_full(value: str | None) -> str:
     if not value:
         return "n/a"
     normalized = value.replace("Z", "+00:00")
@@ -76,6 +109,13 @@ def _metric(summary: dict[str, Any], *names: str) -> Any:
         if name in summary:
             return summary[name]
     return None
+
+
+def _progress_bar(percent: float | None, width: int = 12) -> str:
+    if percent is None or not isinstance(percent, (int, float)):
+        return "[" + "." * width + "]"
+    filled = int(min(max(percent, 0.0), 1.0) * width)
+    return "[" + "#" * filled + "." * (width - filled) + "]"
 
 
 def _tail_lines(text: str, *, max_lines: int) -> list[str]:
@@ -107,6 +147,9 @@ class TuiController:
         self.refresh_seconds = max(refresh_seconds, 0.5)
         self.selected_index = 0
         self.selected_stream = "stdout"
+        self.show_help = False
+        self.last_action_msg: str | None = None
+        self.last_action_time: float = 0.0
         self.snapshot = DashboardSnapshot(
             instances=[],
             summary={},
@@ -119,12 +162,14 @@ class TuiController:
     def refresh(self) -> None:
         try:
             instances = self.control.list_instances()
+            available_actions: list[str] = []
             if instances:
                 self.selected_index = max(0, min(self.selected_index, len(instances) - 1))
                 selected = instances[self.selected_index]
                 live = self.control.get_live_instance_snapshot(selected.id)
                 logs = live.logs.model_dump(mode="json")
                 metrics = live.metrics.model_dump(mode="json")
+                available_actions = list(live.available_actions or [])
             else:
                 self.selected_index = 0
                 logs = {"stdout": "", "stderr": ""}
@@ -136,6 +181,7 @@ class TuiController:
                 metrics=metrics,
                 selected_stream=self.selected_stream,
                 loaded_at=time.time(),
+                available_actions=available_actions,
             )
         except Exception as exc:
             self.snapshot = DashboardSnapshot(
@@ -145,6 +191,7 @@ class TuiController:
                 metrics=self.snapshot.metrics,
                 selected_stream=self.selected_stream,
                 loaded_at=time.time(),
+                available_actions=self.snapshot.available_actions,
                 error=str(exc),
             )
 
@@ -155,6 +202,24 @@ class TuiController:
 
     def toggle_stream(self) -> None:
         self.selected_stream = "stderr" if self.selected_stream == "stdout" else "stdout"
+
+    def execute_action(self, action_key: str) -> None:
+        action_name = _ACTION_KEYS.get(action_key)
+        if not action_name or not self.snapshot.instances:
+            return
+        instance = self.snapshot.instances[self.selected_index]
+        try:
+            self.control.execute_action(instance.id, action_name)
+            self.last_action_msg = f"{action_name} triggered on {instance.name}"
+        except Exception as exc:
+            self.last_action_msg = f"Error: {exc}"
+        self.last_action_time = time.time()
+
+    @property
+    def selected_instance(self) -> Any | None:
+        if not self.snapshot.instances:
+            return None
+        return self.snapshot.instances[self.selected_index]
 
 
 def _status_attr(status: str) -> int:
@@ -169,128 +234,239 @@ def _status_attr(status: str) -> int:
     return mapping.get(status, curses.A_NORMAL)
 
 
-def _render_header(screen, snapshot: DashboardSnapshot) -> int:
+def _render_header(screen: Any, snapshot: DashboardSnapshot, width: int) -> int:
     summary = snapshot.summary or {}
     counts = summary.get("task_status_counts") or {}
-    header = [
-        "ai-factory TUI",
-        f"instances={len(snapshot.instances)}",
-        f"runs={summary.get('runs', 0)}",
-        f"tasks={summary.get('tasks', 0)}",
-        f"active={summary.get('active_runs', 0)}",
-        f"running={counts.get('running', 0)}",
-        f"retries={counts.get('retry_waiting', 0)}",
-        f"stream={snapshot.selected_stream}",
-        f"loaded={time.strftime('%H:%M:%S', time.localtime(snapshot.loaded_at or time.time()))}",
-    ]
-    _safe_addstr(screen, 0, 0, " | ".join(header), curses.A_REVERSE)
-    _safe_addstr(
-        screen,
-        1,
-        0,
-        "q quit  up/down move  tab toggle stream  r refresh  g top  G bottom",
-        curses.A_DIM,
+    left = f" AI-FACTORY  instances:{len(snapshot.instances)}  active:{summary.get('active_runs', 0)}"
+    right = (
+        f"runs:{summary.get('runs', 0)}  "
+        f"ok:{counts.get('completed', 0)}  "
+        f"fail:{counts.get('failed', 0)}  "
+        f"retry:{counts.get('retry_waiting', 0)}  "
+        f"{snapshot.selected_stream}  "
+        f"{time.strftime('%H:%M:%S', time.localtime(snapshot.loaded_at or time.time()))}"
     )
+    pad = max(width - len(left) - len(right) - 1, 1)
+    _safe_addstr(screen, 0, 0, (left + " " * pad + right).ljust(width), curses.A_REVERSE | curses.A_BOLD)
+
     if snapshot.error:
-        _safe_addstr(screen, 2, 0, f"Last refresh error: {snapshot.error}", curses.A_BOLD)
-        return 4
-    return 3
+        _safe_addstr(screen, 1, 1, f"ERROR: {snapshot.error}", curses.color_pair(4) if curses.has_colors() else curses.A_BOLD)
+        return 3
+    return 1
 
 
-def _render_instances(screen, top: int, width: int, height: int, controller: TuiController) -> None:
-    _safe_addstr(screen, top, 0, "Instances", curses.A_BOLD)
+def _render_statusbar(screen: Any, height: int, width: int, controller: TuiController) -> None:
+    now = time.time()
+    if controller.last_action_msg and (now - controller.last_action_time) < 5.0:
+        msg = f" {controller.last_action_msg}"
+    else:
+        msg = " q:quit  j/k:move  tab:stream  r:refresh  e:eval  d:deploy  i:infer  ?:help"
+    _safe_addstr(screen, height - 1, 0, msg.ljust(width), curses.A_REVERSE)
+
+
+def _render_help_overlay(screen: Any, height: int, width: int) -> None:
+    lines = [
+        "KEYBOARD SHORTCUTS",
+        "",
+        "  q / Q          Quit",
+        "  j / DOWN       Move down",
+        "  k / UP         Move up",
+        "  g              Jump to top",
+        "  G              Jump to bottom",
+        "  TAB            Toggle stdout / stderr",
+        "  r / R          Force refresh",
+        "  e              Evaluate selected instance",
+        "  d              Deploy selected instance",
+        "  i              Open inference for selected",
+        "  ?              Toggle this help",
+        "",
+        "Press any key to close.",
+    ]
+    box_w = min(50, width - 4)
+    box_h = min(len(lines) + 2, height - 4)
+    start_y = max((height - box_h) // 2, 1)
+    start_x = max((width - box_w) // 2, 1)
+    for row in range(box_h):
+        _safe_addstr(screen, start_y + row, start_x, " " * box_w, curses.A_REVERSE)
+    for idx, line in enumerate(lines[:box_h - 2]):
+        _safe_addstr(screen, start_y + 1 + idx, start_x + 1, line[:box_w - 2], curses.A_REVERSE)
+
+
+def _render_instances(screen: Any, top: int, width: int, height: int, controller: TuiController) -> int:
+    _safe_addstr(screen, top, 1, "INSTANCES", curses.A_BOLD)
     instances = controller.snapshot.instances
     if not instances:
-        _safe_addstr(screen, top + 1, 0, "No managed instances yet.", curses.A_DIM)
-        return
-    available_rows = max(height - top - 1, 1)
+        _safe_addstr(screen, top + 1, 1, "No instances yet.", curses.A_DIM)
+        _safe_addstr(screen, top + 2, 1, "ai-factory new --config ...", curses.A_DIM)
+        return top + 3
+    col_header = f"{'NAME':<16} {'TYPE':<8} {'STATUS':<8} {'PROGRESS':<14} {'UPDATED':<9}"
+    _safe_addstr(screen, top + 1, 1, col_header[:width - 2], curses.A_DIM)
+    available_rows = max(height - top - 5, 1)
     start = max(0, controller.selected_index - available_rows + 1)
     rows = instances[start : start + available_rows]
-    for offset, instance in enumerate(rows, start=1):
-        row = top + offset
-        selected = start + offset - 1 == controller.selected_index
-        attr = curses.A_REVERSE if selected else _status_attr(instance.status)
-        progress = "n/a"
+    for offset, instance in enumerate(rows):
+        row = top + 2 + offset
+        actual_idx = start + offset
+        selected = actual_idx == controller.selected_index
+        icon = _STATUS_ICONS.get(instance.status, " ")
+        progress_str = "n/a"
         if instance.progress and isinstance(instance.progress.percent, (int, float)):
-            progress = f"{instance.progress.percent * 100:.0f}%"
+            bar = _progress_bar(instance.progress.percent, width=8)
+            progress_str = f"{bar} {instance.progress.percent * 100:.0f}%"
         elif instance.progress:
-            progress = instance.progress.stage
+            progress_str = instance.progress.stage[:14]
         updated = _format_timestamp(instance.updated_at)
-        summary = (
-            f"{instance.name:<18} {instance.type:<9} {instance.status:<9} "
-            f"{instance.environment.kind:<5} {progress:<8} {updated}"
-        )
-        _safe_addstr(screen, row, 0, summary[: max(width - 1, 1)], attr)
+        line = f"{icon} {instance.name:<15} {instance.type:<8} {instance.status:<8} {progress_str:<14} {updated}"
+        attr = curses.A_REVERSE if selected else _status_attr(instance.status)
+        _safe_addstr(screen, row, 1, line[:width - 2], attr)
+    bottom = top + 2 + len(rows) + 1
+    if len(instances) > available_rows:
+        _safe_addstr(screen, bottom - 1, 1, f"  [{start + 1}-{start + len(rows)} of {len(instances)}]", curses.A_DIM)
+    return bottom
 
 
-def _render_detail(screen, top: int, left: int, width: int, height: int, controller: TuiController) -> None:
+def _render_detail(screen: Any, top: int, left: int, width: int, height: int, controller: TuiController) -> int:
     snapshot = controller.snapshot
     if not snapshot.instances:
-        _safe_addstr(screen, top, left, "Details", curses.A_BOLD)
-        _safe_addstr(screen, top + 1, left, "Create an instance with `ai-factory new --config ...`.", curses.A_DIM)
-        return
+        _safe_addstr(screen, top, left, "DETAIL", curses.A_BOLD)
+        _safe_addstr(screen, top + 1, left, "Select an instance.", curses.A_DIM)
+        return top + 2
     instance = snapshot.instances[controller.selected_index]
     metrics_summary = snapshot.metrics.get("summary") or {}
-    task_summary = instance.task_summary or {}
-    logs = snapshot.logs.get(controller.selected_stream, "")
+    dw = max(width - 1, 1)
 
-    _safe_addstr(screen, top, left, f"Details: {instance.id}", curses.A_BOLD)
-    lines = [
-        f"name: {instance.name}",
-        f"type/status: {instance.type} / {instance.status}",
-        f"lifecycle: {(instance.lifecycle.stage if instance.lifecycle and instance.lifecycle.stage else 'n/a')}",
-        (
-            "origin/mode: "
-            f"{((instance.lifecycle.origin or 'n/a') if instance.lifecycle else 'n/a')} / "
-            f"{((instance.lifecycle.learning_mode or 'n/a') if instance.lifecycle else 'n/a')}"
-        ),
-        f"environment: {instance.environment.kind}",
-        f"orchestration run: {instance.orchestration_run_id or 'n/a'}",
-        f"progress: {(instance.progress.stage if instance.progress else 'n/a')}",
-        f"updated: {_format_timestamp(instance.updated_at)}",
-        f"accuracy: {_format_metric(_metric(metrics_summary, 'accuracy'), percent=True)}",
-        f"parse rate: {_format_metric(_metric(metrics_summary, 'parse_rate'), percent=True)}",
-        f"latency: {_format_metric(_metric(metrics_summary, 'avg_latency_s'))} s",
-        f"latest step: {_format_metric(_metric(metrics_summary, 'latest_step'))}",
+    _safe_addstr(screen, top, left, f"DETAIL: {instance.id[:24]}", curses.A_BOLD)
+    row = top + 1
+
+    kv_pairs = [
+        ("name", instance.name),
+        ("type", f"{instance.type} / {instance.status}"),
+        ("env", instance.environment.kind),
+        ("lifecycle", (instance.lifecycle.stage if instance.lifecycle and instance.lifecycle.stage else "n/a")),
+        ("origin", ((instance.lifecycle.origin or "n/a") if instance.lifecycle else "n/a")),
+        ("mode", ((instance.lifecycle.learning_mode or "n/a") if instance.lifecycle else "n/a")),
     ]
+    if instance.lifecycle and instance.lifecycle.source_model:
+        kv_pairs.append(("model", instance.lifecycle.source_model))
     if instance.parent_instance_id:
-        lines.append(f"parent: {instance.parent_instance_id}")
-    if task_summary:
-        lines.append(
-            "tasks: "
-            + ", ".join(f"{key}={_format_metric(value)}" for key, value in list(task_summary.items())[:4])
-        )
-    if instance.progress and instance.progress.status_message:
-        lines.append(f"message: {instance.progress.status_message}")
-    if instance.decision is not None:
-        lines.append(f"decision: {instance.decision.action} ({instance.decision.rule})")
-    detail_width = max(width - 1, 1)
-    rendered_lines: list[str] = []
-    for line in lines:
-        rendered_lines.extend(_wrap_lines(line, detail_width))
+        kv_pairs.append(("parent", instance.parent_instance_id[:20]))
+    kv_pairs.append(("updated", _format_timestamp_full(instance.updated_at)))
 
-    if instance.recommendations:
-        rendered_lines.append("recommendations:")
-        for recommendation in instance.recommendations[:3]:
-            rendered_lines.extend(
-                _wrap_lines(
-                    f"- {recommendation.action} (priority {recommendation.priority}): {recommendation.reason}",
-                    detail_width,
-                )
-            )
+    for key, val in kv_pairs:
+        if row >= height - 8:
+            break
+        label = f"  {key}: {val}"
+        _safe_addstr(screen, row, left, label[:dw])
+        row += 1
 
-    max_detail_lines = max(height - top - 10, 1)
-    for offset, line in enumerate(rendered_lines[:max_detail_lines], start=1):
-        _safe_addstr(screen, top + offset, left, line[: detail_width])
+    if instance.progress:
+        row += 1
+        _safe_addstr(screen, row, left, "PROGRESS", curses.A_BOLD)
+        row += 1
+        bar = _progress_bar(instance.progress.percent, width=20)
+        pct = f"{instance.progress.percent * 100:.0f}%" if isinstance(instance.progress.percent, (int, float)) else "n/a"
+        _safe_addstr(screen, row, left, f"  {bar} {pct}  {instance.progress.stage}")
+        row += 1
+        if instance.progress.status_message:
+            _safe_addstr(screen, row, left, f"  {instance.progress.status_message}"[:dw], curses.A_DIM)
+            row += 1
+        if instance.progress.eta_seconds and isinstance(instance.progress.eta_seconds, (int, float)):
+            eta_m = int(instance.progress.eta_seconds) // 60
+            eta_s = int(instance.progress.eta_seconds) % 60
+            _safe_addstr(screen, row, left, f"  ETA: {eta_m}m {eta_s}s", curses.A_DIM)
+            row += 1
 
-    log_top = top + min(len(rendered_lines), max_detail_lines) + 2
-    _safe_addstr(screen, log_top, left, f"{controller.selected_stream} tail", curses.A_BOLD)
-    log_rows = max(height - log_top - 1, 1)
+    metric_keys = [
+        ("accuracy", True), ("parse_rate", True), ("avg_latency_s", False),
+        ("loss", False), ("perplexity", False), ("latest_step", False),
+    ]
+    visible_metrics = [(k, p) for k, p in metric_keys if _metric(metrics_summary, k) is not None]
+    if visible_metrics:
+        row += 1
+        _safe_addstr(screen, row, left, "METRICS", curses.A_BOLD)
+        row += 1
+        for mk, is_pct in visible_metrics:
+            if row >= height - 4:
+                break
+            val = _format_metric(_metric(metrics_summary, mk), percent=is_pct)
+            _safe_addstr(screen, row, left, f"  {mk}: {val}")
+            row += 1
+
+    if instance.decision:
+        row += 1
+        _safe_addstr(screen, row, left, "DECISION", curses.A_BOLD)
+        row += 1
+        _safe_addstr(screen, row, left, f"  {instance.decision.action} ({instance.decision.rule})")
+        row += 1
+
+    if instance.error:
+        row += 1
+        err_attr = curses.color_pair(4) if curses.has_colors() else curses.A_BOLD
+        _safe_addstr(screen, row, left, "ERROR", curses.A_BOLD | err_attr)
+        row += 1
+        _safe_addstr(screen, row, left, f"  {instance.error.code}: {instance.error.message}"[:dw], err_attr)
+        row += 1
+
+    return row
+
+
+def _render_logs(screen: Any, top: int, left: int, width: int, height: int, controller: TuiController) -> None:
+    snapshot = controller.snapshot
+    logs = snapshot.logs.get(controller.selected_stream, "")
+    dw = max(width - 1, 1)
+    _safe_addstr(screen, top, left, f"LOG ({controller.selected_stream})", curses.A_BOLD)
+    log_rows = max(height - top - 2, 1)
     for offset, line in enumerate(_tail_lines(logs, max_lines=log_rows), start=1):
-        _safe_addstr(screen, log_top + offset, left, line[: detail_width], curses.A_DIM)
+        if top + offset >= height - 1:
+            break
+        _safe_addstr(screen, top + offset, left, line[:dw], curses.A_DIM)
 
 
-def _curses_main(screen, controller: TuiController) -> None:
+def _render_recommendations(screen: Any, top: int, left: int, width: int, height: int, controller: TuiController) -> None:
+    _safe_addstr(screen, top, left, "ACTIONS & NEXT STEPS", curses.A_BOLD)
+    row = top + 1
+    dw = max(width - 1, 1)
+
+    avail = controller.snapshot.available_actions
+    if avail:
+        _safe_addstr(screen, row, left, "available:", curses.A_DIM)
+        row += 1
+        for action in avail[:6]:
+            if row >= height - 1:
+                break
+            _safe_addstr(screen, row, left, f"  {action}"[:dw])
+            row += 1
+        row += 1
+
+    instance = controller.selected_instance
+    if instance and instance.recommendations:
+        _safe_addstr(screen, row, left, "recommended:", curses.A_DIM)
+        row += 1
+        for idx, rec in enumerate(instance.recommendations[:5]):
+            if row >= height - 2:
+                break
+            priority_str = "*" * min(rec.priority, 3)
+            _safe_addstr(screen, row, left, f"  {priority_str} {rec.action}"[:dw])
+            row += 1
+            reason_lines = _wrap_lines(rec.reason, dw - 4)
+            for rline in reason_lines[:2]:
+                if row >= height - 2:
+                    break
+                _safe_addstr(screen, row, left, f"    {rline}"[:dw], curses.A_DIM)
+                row += 1
+        row += 1
+
+    if instance and instance.task_summary:
+        _safe_addstr(screen, row, left, "tasks:", curses.A_DIM)
+        row += 1
+        for key, value in list(instance.task_summary.items())[:4]:
+            if row >= height - 1:
+                break
+            _safe_addstr(screen, row, left, f"  {key}: {_format_metric(value)}"[:dw])
+            row += 1
+
+
+def _curses_main(screen: Any, controller: TuiController) -> None:
     curses.curs_set(0)
     screen.nodelay(True)
     screen.keypad(True)
@@ -301,6 +477,7 @@ def _curses_main(screen, controller: TuiController) -> None:
         curses.init_pair(3, curses.COLOR_GREEN, -1)
         curses.init_pair(4, curses.COLOR_RED, -1)
         curses.init_pair(5, curses.COLOR_CYAN, -1)
+        curses.init_pair(6, curses.COLOR_MAGENTA, -1)
 
     controller.refresh()
     last_refresh = time.time()
@@ -312,15 +489,68 @@ def _curses_main(screen, controller: TuiController) -> None:
 
         height, width = screen.getmaxyx()
         screen.erase()
-        top = _render_header(screen, controller.snapshot)
-        if height < 12 or width < 80:
-            _safe_addstr(screen, top, 0, "Resize the terminal to at least 80x12.", curses.A_BOLD)
+
+        if height < 10 or width < 60:
+            _safe_addstr(screen, 0, 0, "Resize terminal to at least 60x10.", curses.A_BOLD)
             screen.refresh()
+            key = screen.getch()
+            if key == -1:
+                time.sleep(0.05)
+                continue
+            if key in {ord("q"), ord("Q")}:
+                return
+            continue
+
+        top = _render_header(screen, controller.snapshot, width)
+        _render_statusbar(screen, height, width, controller)
+
+        if controller.show_help:
+            _render_help_overlay(screen, height, width)
+            screen.refresh()
+            key = screen.getch()
+            if key == -1:
+                time.sleep(0.05)
+                continue
+            controller.show_help = False
+            continue
+
+        usable_height = height - 1
+        if width >= 120:
+            col1_w = max(int(width * 0.35), 30)
+            col2_w = max(int(width * 0.35), 30)
+            col3_w = width - col1_w - col2_w - 2
+
+            inst_bottom = _render_instances(screen, top + 1, col1_w - 1, usable_height, controller)
+            _vline(screen, top + 1, col1_w, usable_height - top - 2, curses.A_DIM)
+
+            detail_left = col1_w + 1
+            detail_bottom = _render_detail(screen, top + 1, detail_left, col2_w - 1, usable_height, controller)
+            log_space = usable_height - detail_bottom - 1
+            if log_space > 3:
+                _render_logs(screen, detail_bottom + 1, detail_left, col2_w - 1, usable_height, controller)
+
+            _vline(screen, top + 1, col1_w + col2_w, usable_height - top - 2, curses.A_DIM)
+            rec_left = col1_w + col2_w + 1
+            _render_recommendations(screen, top + 1, rec_left, col3_w, usable_height, controller)
+        elif width >= 80:
+            col1_w = max(int(width * 0.42), 30)
+            col2_w = width - col1_w - 1
+
+            inst_bottom = _render_instances(screen, top + 1, col1_w - 1, usable_height, controller)
+            _vline(screen, top + 1, col1_w, usable_height - top - 2, curses.A_DIM)
+
+            detail_left = col1_w + 1
+            detail_bottom = _render_detail(screen, top + 1, detail_left, col2_w, usable_height, controller)
+            log_space = usable_height - detail_bottom - 1
+            if log_space > 3:
+                _render_logs(screen, detail_bottom + 1, detail_left, col2_w, usable_height, controller)
         else:
-            left_width = max(int(width * 0.42), 30)
-            _render_instances(screen, top, left_width, height, controller)
-            _render_detail(screen, top, left_width + 2, width - left_width - 2, height, controller)
-            screen.refresh()
+            inst_bottom = _render_instances(screen, top + 1, width - 1, usable_height, controller)
+            remaining = usable_height - inst_bottom - 1
+            if remaining > 4:
+                _render_detail(screen, inst_bottom, 1, width - 2, usable_height, controller)
+
+        screen.refresh()
 
         key = screen.getch()
         if key == -1:
@@ -343,12 +573,25 @@ def _curses_main(screen, controller: TuiController) -> None:
             controller.refresh()
             last_refresh = time.time()
             continue
-        if key in {ord("g"), ord("G")}:
-            controller.selected_index = 0 if key == ord("g") else max(len(controller.snapshot.instances) - 1, 0)
+        if key in {ord("g"),}:
+            controller.selected_index = 0
+            controller.refresh()
+            last_refresh = time.time()
+            continue
+        if key in {ord("G"),}:
+            controller.selected_index = max(len(controller.snapshot.instances) - 1, 0)
             controller.refresh()
             last_refresh = time.time()
             continue
         if key in {ord("r"), ord("R")}:
+            controller.refresh()
+            last_refresh = time.time()
+            continue
+        if key == ord("?"):
+            controller.show_help = True
+            continue
+        if chr(key) in _ACTION_KEYS if 0 <= key < 256 else False:
+            controller.execute_action(chr(key))
             controller.refresh()
             last_refresh = time.time()
 

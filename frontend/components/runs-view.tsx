@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 
 import {
@@ -8,6 +9,9 @@ import {
   getOrchestrationRuns,
   getOrchestrationSummary,
   getWorkspaceOverview,
+  runManagedInstanceAction,
+  type DeploymentTarget,
+  type FeedbackRecommendation,
   type InstanceSummary,
   type OrchestrationRun,
   type OrchestrationSummary,
@@ -68,11 +72,54 @@ function runningInstances(instances: InstanceSummary[]): number {
   return instances.filter((instance) => instance.status === "running").length;
 }
 
+const DECISION_TONES: Record<string, string> = {
+  deploy: "decision-deploy",
+  finetune: "decision-finetune",
+  retrain: "decision-retrain",
+  evaluate: "decision-evaluate",
+  inference: "decision-inference",
+};
+
+function DecisionBadge({ decision }: { decision?: { action: string; explanation: string } | null }) {
+  if (!decision) {
+    return null;
+  }
+  const tone = DECISION_TONES[decision.action] ?? "decision-default";
+  return (
+    <span className={`decision-badge ${tone}`} title={decision.explanation}>
+      {decision.action}
+    </span>
+  );
+}
+
+function ProgressBar({ percent }: { percent?: number | null }) {
+  if (typeof percent !== "number" || !Number.isFinite(percent)) {
+    return null;
+  }
+  const clamped = Math.max(0, Math.min(100, percent * 100));
+  return (
+    <div className="progress-track">
+      <div className="progress-fill" style={{ width: `${clamped}%` }} />
+      <span className="progress-label">{clamped.toFixed(0)}%</span>
+    </div>
+  );
+}
+
+function topRecommendation(recs?: FeedbackRecommendation[]): FeedbackRecommendation | null {
+  if (!recs || !recs.length) {
+    return null;
+  }
+  return recs.reduce((best, item) => (item.priority > best.priority ? item : best), recs[0]);
+}
+
 export function RunsView() {
+  const router = useRouter();
   const metadata = useLabMetadata();
   const [controlPlane, setControlPlane] = useState<ControlPlaneState>(INITIAL_CONTROL_PLANE_STATE);
   const [templates, setTemplates] = useState<WorkspaceOrchestrationTemplate[]>([]);
   const [createNotice, setCreateNotice] = useState<string | null>(null);
+  const [busyAction, setBusyAction] = useState<string | null>(null);
+  const [actionNotice, setActionNotice] = useState<string | null>(null);
 
   useEffect(() => {
     let active = true;
@@ -151,6 +198,31 @@ export function RunsView() {
     }));
   }
 
+  async function triggerQuickAction(
+    instance: InstanceSummary,
+    rec: FeedbackRecommendation,
+  ) {
+    const key = `${instance.id}:${rec.action}`;
+    setBusyAction(key);
+    setActionNotice(null);
+    try {
+      const nextDetail = await runManagedInstanceAction(instance.id, {
+        action: rec.action,
+        config_path: rec.config_path ?? undefined,
+        deployment_target: rec.deployment_target ?? undefined,
+        start: true,
+      });
+      setActionNotice(`Launched ${rec.action} → ${nextDetail.name}`);
+      router.push(`/runs/${nextDetail.id}`);
+    } catch (nextError) {
+      setActionNotice(
+        `Action failed: ${nextError instanceof Error ? nextError.message : "unknown error"}`,
+      );
+    } finally {
+      setBusyAction(null);
+    }
+  }
+
   return (
     <AppShell>
       <section className="route-stack">
@@ -186,6 +258,10 @@ export function RunsView() {
             </>
           }
         />
+
+        {actionNotice ? (
+          <StatePanel eyebrow="Quick Action" title="Action dispatched." description={actionNotice} />
+        ) : null}
 
         {createNotice ? (
           <StatePanel eyebrow="Launch Flow" title="Managed branch created." description={createNotice} />
@@ -261,13 +337,18 @@ export function RunsView() {
               <p>Every managed operation projects into the same instance model.</p>
             </div>
             <div className="card-grid compact">
-              {instances.slice(0, 8).map((instance) => (
+              {instances.slice(0, 8).map((instance) => {
+                const rec = topRecommendation(instance.recommendations);
+                const actionKey = rec ? `${instance.id}:${rec.action}` : null;
+                return (
                 <article key={instance.id} className="panel catalog-panel">
                   <div className="message-meta">
                     <span>{instance.type}</span>
                     <span className="status-pill">{instance.status}</span>
+                    <DecisionBadge decision={instance.decision} />
                   </div>
                   <h2>{instance.name}</h2>
+                  <ProgressBar percent={instance.progress?.percent} />
                   <div className="badge-row">
                     <MetricBadge label="Env" value={instance.environment.kind} />
                     <MetricBadge
@@ -315,9 +396,20 @@ export function RunsView() {
                     <Link className="secondary-button small" href={`/runs/${instance.id}`}>
                       Inspect branch
                     </Link>
+                    {rec ? (
+                      <button
+                        className="primary-button small"
+                        type="button"
+                        disabled={busyAction === actionKey}
+                        onClick={() => void triggerQuickAction(instance, rec)}
+                      >
+                        {busyAction === actionKey ? "Working..." : rec.action}
+                      </button>
+                    ) : null}
                   </div>
                 </article>
-              ))}
+                );
+              })}
             </div>
           </>
         ) : null}

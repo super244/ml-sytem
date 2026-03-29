@@ -178,4 +178,63 @@ class InstanceManifest(BaseModel):
         self.updated_at = utc_now_iso()
 
 
+class DeploymentReadiness(BaseModel):
+    ready: bool = False
+    blockers: list[str] = Field(default_factory=list)
+    warnings: list[str] = Field(default_factory=list)
+    suggested_target: DeploymentTarget | None = None
+    artifact_path: str | None = None
+    summary: dict[str, Any] = Field(default_factory=dict)
+
+
+def check_deployment_readiness(
+    manifest: InstanceManifest,
+    *,
+    min_accuracy: float = 0.0,
+    required_status: str = "completed",
+) -> DeploymentReadiness:
+    blockers: list[str] = []
+    warnings: list[str] = []
+
+    if manifest.status != required_status:
+        blockers.append(f"Instance status is '{manifest.status}', expected '{required_status}'.")
+
+    if manifest.type not in {"train", "finetune", "evaluate", "inference"}:
+        blockers.append(f"Instance type '{manifest.type}' is not a deployable source.")
+
+    accuracy = manifest.metrics_summary.get("accuracy")
+    if isinstance(accuracy, (int, float)) and accuracy < min_accuracy:
+        blockers.append(
+            f"Accuracy {accuracy:.3f} is below the deployment floor {min_accuracy:.3f}."
+        )
+
+    if manifest.decision and manifest.decision.action == "retrain":
+        blockers.append("Decision engine recommends retraining before deployment.")
+
+    if manifest.decision and manifest.decision.action == "re_evaluate":
+        warnings.append("Decision engine recommends re-evaluation before deployment.")
+
+    artifact_path = manifest.artifact_refs.get("source_artifact") or manifest.artifact_refs.get("run_dir")
+
+    suggested_target: DeploymentTarget | None = None
+    if manifest.lifecycle.deployment_targets:
+        suggested_target = manifest.lifecycle.deployment_targets[0]
+
+    ready = len(blockers) == 0
+    return DeploymentReadiness(
+        ready=ready,
+        blockers=blockers,
+        warnings=warnings,
+        suggested_target=suggested_target,
+        artifact_path=str(artifact_path) if artifact_path else None,
+        summary={
+            "instance_id": manifest.id,
+            "instance_type": manifest.type,
+            "status": manifest.status,
+            "accuracy": accuracy if isinstance(accuracy, (int, float)) else None,
+            "decision_action": manifest.decision.action if manifest.decision else None,
+        },
+    )
+
+
 EnvironmentSpec.model_rebuild()

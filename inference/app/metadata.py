@@ -1,10 +1,13 @@
 from __future__ import annotations
 
+import time
 from typing import Any
 
 from ai_factory.core.discovery import list_training_runs, load_benchmark_registry
 from data.catalog import list_sample_prompts, load_catalog, load_pack_summary
 from inference.app.config import AppSettings
+
+_START_TIME = time.monotonic()
 
 
 class MetadataService:
@@ -14,11 +17,15 @@ class MetadataService:
         models_catalog: list[dict[str, Any]],
         prompt_presets: dict[str, Any],
         cache: Any,
+        instance_service: Any = None,
+        start_time: float | None = None,
     ):
         self.settings = settings
         self.models_catalog = models_catalog
         self.prompt_presets = prompt_presets
         self.cache = cache
+        self.instance_service = instance_service
+        self.start_time = start_time or _START_TIME
 
     def dataset_dashboard(self) -> dict[str, Any]:
         catalog = load_catalog()
@@ -46,7 +53,19 @@ class MetadataService:
     def models(self) -> list[dict[str, Any]]:
         return self.models_catalog
 
+    def _instance_counts(self) -> tuple[int, int]:
+        try:
+            from inference.app.dependencies import get_instance_service
+            svc = get_instance_service()
+            all_instances = svc.store.list_instances()
+            total = len(all_instances)
+            running = sum(1 for i in all_instances if getattr(i, "status", "") == "running")
+            return total, running
+        except Exception:
+            return 0, 0
+
     def status(self) -> dict[str, Any]:
+        instance_count, running_count = self._instance_counts()
         return {
             "title": self.settings.title,
             "version": self.settings.version,
@@ -54,4 +73,7 @@ class MetadataService:
             "cache": self.cache.stats() if self.cache is not None else {"enabled": False},
             "benchmarks": len(self.benchmark_library()),
             "runs": len(self.runs()),
+            "instance_count": instance_count,
+            "running_count": running_count,
+            "uptime_seconds": round(time.monotonic() - self.start_time, 1),
         }
