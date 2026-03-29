@@ -82,8 +82,8 @@ export default function AutoMLPage() {
         {/* Left: Launch Panel */}
         <div style={{ display: "flex", flexDirection: "column", gap: "1.5rem" }}>
 
-          <div className="panel">
-            <h2 className="eval-section-title">Launch Sweep</h2>
+          <div className="panel aside-section">
+            <h2 className="section-title">Launch Sweep</h2>
 
             <div style={{ display: "flex", flexDirection: "column", gap: "1rem", marginTop: "1rem" }}>
               <div className="input-group">
@@ -148,8 +148,8 @@ export default function AutoMLPage() {
           </div>
 
           {/* Sweep history list */}
-          <div className="panel">
-            <h2 className="eval-section-title">All Sweeps</h2>
+          <div className="panel aside-section">
+            <h2 className="section-title">All Sweeps</h2>
             {loading ? (
               <div className="dash-loading" style={{ marginTop: "1rem" }}>⟳ Loading...</div>
             ) : sweeps.length === 0 ? (
@@ -162,7 +162,7 @@ export default function AutoMLPage() {
                     onClick={() => setActiveSweep(s)}
                     style={{
                       background: activeSweep?.id === s.id ? "rgba(15,122,97,0.12)" : "rgba(255,255,255,0.03)",
-                      border: `1px solid ${activeSweep?.id === s.id ? "var(--accent)" : "var(--border)"}`,
+                      border: `1px solid ${activeSweep?.id === s.id ? "var(--accent)" : "var(--line)"}`,
                       borderRadius: "6px",
                       padding: "0.75rem 1rem",
                       cursor: "pointer",
@@ -193,7 +193,7 @@ export default function AutoMLPage() {
           <div style={{ display: "flex", flexDirection: "column", gap: "1.5rem" }}>
 
             {/* Best trial highlight */}
-            <div className="panel" style={{ borderTop: "3px solid var(--accent)" }}>
+            <div className="resource-card" style={{ borderTop: "3px solid var(--accent)" }}>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "1rem" }}>
                 <div>
                   <h2 style={{ margin: 0 }}>🏆 Best Trial: {getBestTrial(activeSweep).trial_id}</h2>
@@ -206,7 +206,7 @@ export default function AutoMLPage() {
 
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "1rem" }}>
                 {Object.entries(getBestTrial(activeSweep).metrics).map(([key, val]) => (
-                  <div key={key} style={{ background: "rgba(255,255,255,0.03)", border: "1px solid var(--border)", borderRadius: "6px", padding: "1rem", textAlign: "center" }}>
+                  <div key={key} style={{ background: "rgba(255,255,255,0.03)", border: "1px solid var(--line)", borderRadius: "6px", padding: "1rem", textAlign: "center" }}>
                     <div style={{ fontSize: "1.5rem", fontWeight: 700, color: "var(--accent)" }}>{String(val)}</div>
                     <div style={{ fontSize: "0.8rem", opacity: 0.7, textTransform: "capitalize", marginTop: "0.25rem" }}>{key.replace("_", " ")}</div>
                   </div>
@@ -215,7 +215,7 @@ export default function AutoMLPage() {
 
               <div style={{ marginTop: "1rem", display: "grid", gridTemplateColumns: "1fr 1fr 1fr 1fr", gap: "0.75rem" }}>
                 {Object.entries(getBestTrial(activeSweep).params).map(([key, val]) => (
-                  <div key={key} style={{ background: "rgba(255,255,255,0.02)", border: "1px solid var(--border)", borderRadius: "4px", padding: "0.6rem 0.75rem" }}>
+                  <div key={key} style={{ background: "rgba(255,255,255,0.02)", border: "1px solid var(--line)", borderRadius: "4px", padding: "0.6rem 0.75rem" }}>
                     <div style={{ fontSize: "0.75rem", opacity: 0.6, marginBottom: "0.2rem" }}>{key.replace("_", " ")}</div>
                     <div style={{ fontSize: "0.9rem", fontWeight: 600 }}>{String(val)}</div>
                   </div>
@@ -224,11 +224,11 @@ export default function AutoMLPage() {
             </div>
 
             {/* Trial leaderboard */}
-            <div className="panel">
-              <h2 className="eval-section-title">Trial Leaderboard</h2>
+            <div className="panel aside-section">
+              <h2 className="section-title">Trial Leaderboard</h2>
               <table style={{ width: "100%", borderCollapse: "collapse", marginTop: "1rem", fontSize: "0.85rem" }}>
                 <thead>
-                  <tr style={{ borderBottom: "1px solid var(--border)" }}>
+                  <tr style={{ borderBottom: "1px solid var(--line)" }}>
                     {["Rank", "Trial", "Loss ↑", "Accuracy", "PPL", "LR", "BS", "LoRA Rank", "Duration"].map(col => (
                       <th key={col} style={{ padding: "0.5rem 0.75rem", textAlign: "left", opacity: 0.7, fontWeight: 600 }}>{col}</th>
                     ))}

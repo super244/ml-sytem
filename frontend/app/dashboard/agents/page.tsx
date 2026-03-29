@@ -68,17 +68,17 @@ export default function AgentsPage() {
         </div>
       </div>
 
-      <div style={{ display: "flex", flexDirection: "column", gap: "1.5rem" }}>
+      <div className="workspace-section-grid">
         
         {/* Top: Active Swarm Cards */}
-        <div style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
-          <h2 className="eval-section-title">Active Swarm Agents</h2>
+        <div className="panel aside-section">
+          <h2 className="section-title">Active Swarm Agents</h2>
           
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(300px, 1fr))", gap: "1rem" }}>
             {loading ? (
               <div className="dash-loading"><span>⟳</span> Connecting to Swarm...</div>
             ) : agents.map((agent) => (
-              <div key={agent.id} className="panel" style={{ borderTop: agent.status === "active" ? "3px solid var(--accent)" : "3px solid var(--border)" }}>
+              <div key={agent.id} className="resource-card" style={{ borderTop: agent.status === "active" ? "3px solid var(--accent)" : "3px solid var(--line)" }}>
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "0.5rem" }}>
                   <h3 style={{ margin: 0, fontSize: "1.1rem" }}>{agent.name}</h3>
                   <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
@@ -106,7 +106,7 @@ export default function AgentsPage() {
                   </div>
                 </div>
                 
-                <div style={{ marginTop: "1rem", paddingTop: "1rem", borderTop: "1px solid var(--border)", display: "flex", justifyContent: "flex-end" }}>
+                <div style={{ marginTop: "1rem", paddingTop: "1rem", borderTop: "1px solid var(--line)", display: "flex", justifyContent: "flex-end" }}>
                   <button className="ghost-button small">Configure Instructions</button>
                 </div>
               </div>
@@ -115,9 +115,9 @@ export default function AgentsPage() {
         </div>
 
         {/* Bottom: Thought Stream Terminal */}
-        <div className="panel" style={{ display: "flex", flexDirection: "column", gap: "1rem", flex: 1 }}>
+        <div className="panel aside-section" style={{ flex: 1 }}>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-            <h2 className="eval-section-title" style={{ margin: 0 }}>Live Thought Stream</h2>
+            <h2 className="section-title" style={{ margin: 0 }}>Live Thought Stream</h2>
             <div style={{ fontSize: "0.8rem", color: "var(--accent)", display: "flex", alignItems: "center", gap: "0.5rem" }}>
               <span className="monitor-status-dot status-running" /> Network Connected
             </div>
@@ -126,7 +126,7 @@ export default function AgentsPage() {
           <div 
             style={{ 
               backgroundColor: "#0d1117", 
-              border: "1px solid var(--border)", 
+              border: "1px solid var(--line)", 
               borderRadius: "8px", 
               padding: "1rem", 
               height: "400px", 

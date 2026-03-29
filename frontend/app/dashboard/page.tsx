@@ -146,7 +146,7 @@ export default function DashboardPage() {
   const completed = state.instances.filter((i) => i.status === "completed").length;
   const failed = state.instances.filter((i) => i.status === "failed").length;
   const recent = [...state.instances]
-    .sort((a, b) => b.updated_at.localeCompare(a.updated_at))
+    .sort((a, b) => (b.updated_at || "").localeCompare(a.updated_at || ""))
     .slice(0, 6);
 
   return (

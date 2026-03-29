@@ -61,7 +61,7 @@ export default function DatasetsPage() {
         {/* Left Pane: Telemetry Queue */}
         <div className="panel aside-section">
           <div>
-            <h2 className="eval-section-title">Telemetry Queue</h2>
+            <h2 className="section-title">Telemetry Queue</h2>
             <p className="control-label">Flagged failure cases ready for dataset inclusion.</p>
           </div>
 
@@ -109,7 +109,7 @@ export default function DatasetsPage() {
         {/* Right Pane: Synthesizer */}
         <div className="panel aside-section">
           <div>
-            <h2 className="eval-section-title">Data Synthesizer (Auto-Prompt)</h2>
+            <h2 className="section-title">Data Synthesizer (Auto-Prompt)</h2>
             <p className="control-label">Use an LLM to automatically generate diverse JSONL variations.</p>
           </div>
 
