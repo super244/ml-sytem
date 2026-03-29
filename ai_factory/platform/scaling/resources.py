@@ -1,6 +1,6 @@
 """Resource management for distributed training."""
 
-from typing import List, Dict, Any, Optional
+from typing import Any
 import logging
 
 from ai_factory.core.schemas import ResourceSpec
@@ -16,7 +16,7 @@ class ResourceManager:
         self.config = config
         self._resources = {}
     
-    def select_optimal_node(self, suitable_nodes: List[str], requirements: ResourceSpec) -> str:
+    def select_optimal_node(self, suitable_nodes: list[str], requirements: ResourceSpec) -> str:
         """Select the optimal node from suitable candidates."""
         if not suitable_nodes:
             raise ValueError("No suitable nodes available")
@@ -24,7 +24,7 @@ class ResourceManager:
         # Simple selection - in real implementation would consider load, latency, etc.
         return suitable_nodes[0]
     
-    async def get_node_resources(self, node_id: str) -> Dict[str, Any]:
+    async def get_node_resources(self, node_id: str) -> dict[str, Any]:
         """Get current resource usage for a node."""
         return {
             "node_id": node_id,
@@ -35,7 +35,7 @@ class ResourceManager:
             "available_gpu_memory": "4GB"
         }
     
-    async def get_cluster_resources(self) -> Dict[str, Any]:
+    async def get_cluster_resources(self) -> dict[str, Any]:
         """Get cluster-wide resource summary."""
         return {
             "total_cpu_cores": 64,

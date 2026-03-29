@@ -10,7 +10,7 @@ if TYPE_CHECKING:
 
 
 class GenerationService:
-    def __init__(self, generator: "MathGenerator", settings: AppSettings):
+    def __init__(self, generator: MathGenerator, settings: AppSettings):
         self.generator = generator
         self.settings = settings
 

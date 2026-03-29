@@ -1,22 +1,18 @@
 """Utility functions for domain management."""
 
-from typing import List, Dict, Any
-from pathlib import Path
+from typing import Any
 
 from .mathematics.config import MathDomainConfig
-from .mathematics.datasets import MathDatasetRegistry
-from .mathematics.evaluation import MathEvaluationSuite
-from .mathematics.training import MathTrainingProfiles
 
 
-def list_available_domains() -> List[MathDomainConfig]:
+def list_available_domains() -> list[MathDomainConfig]:
     """List all available domains."""
     return [
         MathDomainConfig()
     ]
 
 
-def get_domain_info(domain_name: str) -> Dict[str, Any]:
+def get_domain_info(domain_name: str) -> dict[str, Any]:
     """Get information about a specific domain."""
     if domain_name == "mathematics":
         config = MathDomainConfig()

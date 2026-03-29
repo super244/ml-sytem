@@ -1,6 +1,5 @@
 """Mathematics domain dataset registry."""
 
-from typing import Dict, List, Any
 from pathlib import Path
 
 from ai_factory.core.schemas import DatasetSpec
@@ -13,7 +12,7 @@ class MathDatasetRegistry:
         self.repo_root = repo_root
         self._datasets = self._load_math_datasets()
     
-    def _load_math_datasets(self) -> Dict[str, DatasetSpec]:
+    def _load_math_datasets(self) -> dict[str, DatasetSpec]:
         """Load mathematics dataset specifications."""
         datasets = {}
         
@@ -63,7 +62,7 @@ class MathDatasetRegistry:
         
         return datasets
     
-    def list_datasets(self) -> List[str]:
+    def list_datasets(self) -> list[str]:
         """List all available mathematics datasets."""
         return list(self._datasets.keys())
     
@@ -73,7 +72,7 @@ class MathDatasetRegistry:
             raise ValueError(f"Mathematics dataset '{name}' not found")
         return self._datasets[name]
     
-    def get_datasets_by_subdomain(self, subdomain: str) -> List[DatasetSpec]:
+    def get_datasets_by_subdomain(self, subdomain: str) -> list[DatasetSpec]:
         """Get datasets for a specific mathematics subdomain."""
         return [
             dataset for dataset in self._datasets.values()

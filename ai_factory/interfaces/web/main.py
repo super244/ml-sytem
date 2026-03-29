@@ -1,6 +1,5 @@
 """Web interface implementation."""
 
-from typing import Optional
 from pathlib import Path
 import subprocess
 import sys
@@ -9,7 +8,7 @@ import sys
 class WebInterface:
     """Unified web interface for AI-Factory."""
     
-    def __init__(self, repo_root: Optional[Path] = None, artifacts_dir: Optional[Path] = None):
+    def __init__(self, repo_root: Path | None = None, artifacts_dir: Path | None = None):
         self.repo_root = repo_root or Path.cwd()
         self.artifacts_dir = artifacts_dir or self.repo_root / "artifacts"
     

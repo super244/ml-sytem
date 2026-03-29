@@ -1,7 +1,7 @@
 """Alert management for AI-Factory monitoring."""
 
-from typing import List, Dict, Any, Optional
-import asyncio
+from typing import Any
+from pathlib import Path
 import logging
 from datetime import datetime
 
@@ -19,7 +19,7 @@ class AlertManager:
         self._active_alerts = []
         self._alert_history = []
     
-    async def check_alerts(self, metrics: Dict[str, Any]) -> List[Alert]:
+    async def check_alerts(self, metrics: dict[str, Any]) -> list[Alert]:
         """Check metrics against thresholds and generate alerts."""
         alerts = []
         
@@ -84,11 +84,11 @@ class AlertManager:
         with open(log_file, "a") as f:
             f.write(f"{alert.timestamp.isoformat()} [{alert.severity}] {alert.message}\n")
     
-    async def get_active_alerts(self) -> List[Alert]:
+    async def get_active_alerts(self) -> list[Alert]:
         """Get currently active alerts."""
         return self._active_alerts.copy()
     
-    async def get_alert_history(self, limit: int = 100) -> List[Alert]:
+    async def get_alert_history(self, limit: int = 100) -> list[Alert]:
         """Get alert history."""
         return self._alert_history[-limit:]
     

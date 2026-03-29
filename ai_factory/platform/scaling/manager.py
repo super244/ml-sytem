@@ -1,8 +1,7 @@
 """Scaling manager for distributed training and resource management."""
 
-from typing import List, Dict, Any, Optional
+from typing import Any
 from pathlib import Path
-import asyncio
 import logging
 
 from ai_factory.core.schemas import TrainingJob, ScalingConfig
@@ -21,7 +20,7 @@ class ScalingManager:
         self.repo_root = repo_root
         self.cluster_manager = ClusterManager(config)
         self.resource_manager = ResourceManager(config)
-        self._active_jobs: Dict[str, TrainingJob] = {}
+        self._active_jobs: dict[str, TrainingJob] = {}
     
     async def schedule_training_job(self, job: TrainingJob) -> str:
         """Schedule a training job across available resources."""
@@ -56,7 +55,7 @@ class ScalingManager:
         
         return True
     
-    async def get_job_status(self, job_id: str) -> Dict[str, Any]:
+    async def get_job_status(self, job_id: str) -> dict[str, Any]:
         """Get status of a distributed training job."""
         if job_id not in self._active_jobs:
             raise ValueError(f"Job {job_id} not found")
@@ -74,7 +73,7 @@ class ScalingManager:
         
         return success
     
-    async def list_active_jobs(self) -> List[Dict[str, Any]]:
+    async def list_active_jobs(self) -> list[dict[str, Any]]:
         """List all active training jobs."""
         jobs = []
         for job_id in self._active_jobs:
@@ -82,6 +81,6 @@ class ScalingManager:
             jobs.append(status)
         return jobs
     
-    async def get_cluster_metrics(self) -> Dict[str, Any]:
+    async def get_cluster_metrics(self) -> dict[str, Any]:
         """Get cluster-wide metrics and resource usage."""
         return await self.cluster_manager.get_cluster_metrics()

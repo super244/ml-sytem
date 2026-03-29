@@ -1,6 +1,6 @@
 """Cluster management for distributed training."""
 
-from typing import List, Dict, Any, Optional
+from typing import Any
 import asyncio
 import logging
 
@@ -17,7 +17,7 @@ class ClusterManager:
         self.config = config
         self._nodes = {}
     
-    async def find_suitable_nodes(self, resource_requirements: ResourceSpec) -> List[str]:
+    async def find_suitable_nodes(self, resource_requirements: ResourceSpec) -> list[str]:
         """Find nodes that meet resource requirements."""
         suitable_nodes = []
         for node_id, node_info in self._nodes.items():
@@ -31,7 +31,7 @@ class ClusterManager:
         logger.info(f"Scheduling job {job_id} on node {primary_node}")
         return job_id
     
-    async def get_job_status(self, job_id: str) -> Dict[str, Any]:
+    async def get_job_status(self, job_id: str) -> dict[str, Any]:
         """Get status of a scheduled job."""
         return {
             "job_id": job_id,
@@ -54,11 +54,11 @@ class ClusterManager:
         logger.info(f"Scaling down cluster by {nodes_to_remove} nodes")
         return True
     
-    async def list_nodes(self) -> List[str]:
+    async def list_nodes(self) -> list[str]:
         """List all nodes in the cluster."""
         return list(self._nodes.keys())
     
-    async def get_cluster_metrics(self) -> Dict[str, Any]:
+    async def get_cluster_metrics(self) -> dict[str, Any]:
         """Get cluster-wide metrics."""
         return {
             "total_nodes": len(self._nodes),
@@ -67,7 +67,7 @@ class ClusterManager:
             "resource_utilization": 0.75
         }
     
-    def _node_meets_requirements(self, node_info: Dict[str, Any], requirements: ResourceSpec) -> bool:
+    def _node_meets_requirements(self, node_info: dict[str, Any], requirements: ResourceSpec) -> bool:
         """Check if a node meets resource requirements."""
         # Simplified check - in real implementation would compare actual resources
         return True

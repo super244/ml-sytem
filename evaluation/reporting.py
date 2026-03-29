@@ -6,7 +6,7 @@ from pathlib import Path
 from statistics import mean
 from typing import Any
 
-from ai_factory.core.io import write_json, write_markdown
+from ai_factory.core.io import write_markdown
 from evaluation.error_taxonomy import summarize_failure_taxonomy
 
 

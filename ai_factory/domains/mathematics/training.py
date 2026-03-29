@@ -1,6 +1,5 @@
 """Mathematics domain training profiles."""
 
-from typing import Dict, List, Any
 from pathlib import Path
 
 from ai_factory.core.schemas import TrainingProfileSpec
@@ -13,7 +12,7 @@ class MathTrainingProfiles:
         self.repo_root = repo_root
         self._profiles = self._load_math_profiles()
     
-    def _load_math_profiles(self) -> Dict[str, TrainingProfileSpec]:
+    def _load_math_profiles(self) -> dict[str, TrainingProfileSpec]:
         """Load mathematics training profiles."""
         return {
             "baseline_qlora": TrainingProfileSpec(
@@ -79,7 +78,7 @@ class MathTrainingProfiles:
             )
         }
     
-    def list_profiles(self) -> List[str]:
+    def list_profiles(self) -> list[str]:
         """List all available mathematics training profiles."""
         return list(self._profiles.keys())
     
@@ -89,7 +88,7 @@ class MathTrainingProfiles:
             raise ValueError(f"Mathematics training profile '{name}' not found")
         return self._profiles[name]
     
-    def get_profiles_by_method(self, method: str) -> List[TrainingProfileSpec]:
+    def get_profiles_by_method(self, method: str) -> list[TrainingProfileSpec]:
         """Get training profiles by training method."""
         return [
             profile for profile in self._profiles.values()
