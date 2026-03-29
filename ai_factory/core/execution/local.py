@@ -39,9 +39,11 @@ class LocalExecutor(BaseExecutor):
                 "--payload",
                 encode_payload(payload),
             ],
+            stdin=subprocess.DEVNULL,
             stdout=subprocess.DEVNULL,
             stderr=subprocess.DEVNULL,
             start_new_session=True,
+            close_fds=True,
         )
         return ExecutionHandle(
             backend=self.backend_name,

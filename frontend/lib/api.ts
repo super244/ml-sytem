@@ -775,6 +775,22 @@ export async function getAgentLogs(limit: number = 20): Promise<AgentLogEvent[]>
   return payload.logs;
 }
 
+export type AgentDeployRequest = {
+  name: string;
+  role: string;
+  model: string;
+};
+
+export async function deployAgent(payload: AgentDeployRequest): Promise<{ status: string; agent: AgentSwarmStatus }> {
+  return fetchJson<{ status: string; agent: AgentSwarmStatus }>("/v1/agents/deploy", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(payload),
+  });
+}
+
 export type AutoMLTrialParams = {
   learning_rate: number;
   batch_size: number;

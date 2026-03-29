@@ -4,8 +4,10 @@ import { useEffect, useState, useRef } from "react";
 import {
   getAgentSwarmStatus,
   getAgentLogs,
+  deployAgent,
   type AgentSwarmStatus,
   type AgentLogEvent,
+  type AgentDeployRequest,
 } from "@/lib/api";
 
 export default function AgentsPage() {
@@ -13,6 +15,15 @@ export default function AgentsPage() {
   const [logs, setLogs] = useState<AgentLogEvent[]>([]);
   const [loading, setLoading] = useState(true);
   
+  // Deploy Agent State
+  const [showDeployModal, setShowDeployModal] = useState(false);
+  const [newAgent, setNewAgent] = useState<AgentDeployRequest>({
+    name: "",
+    role: "",
+    model: "gpt-4o",
+  });
+  const [deploying, setDeploying] = useState(false);
+
   const endOfTerminalRef = useRef<HTMLDivElement>(null);
 
   // Initial load
@@ -55,6 +66,21 @@ export default function AgentsPage() {
     return `${h}h ${m}m`;
   }
 
+  async function handleDeploy() {
+    if (!newAgent.name || !newAgent.role || deploying) return;
+    setDeploying(true);
+    try {
+      const res = await deployAgent(newAgent);
+      setAgents((prev) => [...prev, res.agent]);
+      setShowDeployModal(false);
+      setNewAgent({ name: "", role: "", model: "gpt-4o" });
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setDeploying(false);
+    }
+  }
+
   return (
     <div className="dashboard-content">
       <div className="dash-page-header panel">
@@ -72,7 +98,15 @@ export default function AgentsPage() {
         
         {/* Top: Active Swarm Cards */}
         <div className="panel aside-section">
-          <h2 className="section-title">Active Swarm Agents</h2>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "0.5rem" }}>
+            <h2 className="section-title" style={{ margin: 0 }}>Active Swarm Agents</h2>
+            <button 
+              className="primary-button small" 
+              onClick={() => setShowDeployModal(true)}
+            >
+              + Add Agent
+            </button>
+          </div>
           
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(300px, 1fr))", gap: "1rem" }}>
             {loading ? (
@@ -154,6 +188,64 @@ export default function AgentsPage() {
         </div>
 
       </div>
+
+      {/* Deploy Agent Modal */}
+      {showDeployModal && (
+        <div className="modal-overlay" style={{ position: "fixed", top: 0, left: 0, right: 0, bottom: 0, background: "rgba(0,0,0,0.6)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000, backdropFilter: "blur(4px)" }}>
+          <div className="panel" style={{ width: "400px", padding: "1.5rem", display: "flex", flexDirection: "column", gap: "1rem" }}>
+            <h2 className="section-title">Deploy New Swarm Agent</h2>
+            
+            <div className="input-group">
+              <label className="control-label">Agent Name</label>
+              <input 
+                type="text" 
+                value={newAgent.name} 
+                onChange={e => setNewAgent({...newAgent, name: e.target.value})}
+                placeholder="e.g. Code Reviewer"
+              />
+            </div>
+
+            <div className="input-group">
+              <label className="control-label">Primary Role</label>
+              <textarea 
+                value={newAgent.role} 
+                onChange={e => setNewAgent({...newAgent, role: e.target.value})}
+                placeholder="e.g. Analyzes diffs for security vulnerabilities..."
+                style={{ height: "80px" }}
+              />
+            </div>
+
+            <div className="input-group">
+              <label className="control-label">Inference Model</label>
+              <select 
+                value={newAgent.model} 
+                onChange={e => setNewAgent({...newAgent, model: e.target.value})}
+              >
+                <option value="gpt-4o">GPT-4o</option>
+                <option value="claude-3-sonnet">Claude 3.5 Sonnet</option>
+                <option value="qwen-2-72b">Qwen-2 72B</option>
+              </select>
+            </div>
+
+            <div style={{ display: "flex", gap: "0.75rem", marginTop: "0.5rem" }}>
+              <button 
+                className="primary-button" 
+                style={{ flex: 1, justifyContent: "center" }}
+                disabled={deploying || !newAgent.name || !newAgent.role}
+                onClick={() => void handleDeploy()}
+              >
+                {deploying ? "⟳ Deploying..." : "Deploy Agent"}
+              </button>
+              <button 
+                className="ghost-button" 
+                onClick={() => setShowDeployModal(false)}
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

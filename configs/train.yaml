@@ -23,7 +23,7 @@ lifecycle:
 execution:
   backend: local
 subsystem:
-  config_ref: training/configs/profiles/baseline_qlora.yaml
+  config_ref: ../training/configs/profiles/baseline_qlora.yaml
   dry_run: true
 monitoring:
   collect_gpu: true

@@ -21,7 +21,7 @@ lifecycle:
 execution:
   backend: local
 subsystem:
-  config_ref: evaluation/configs/base_vs_finetuned.yaml
+  config_ref: ../evaluation/configs/base_vs_finetuned.yaml
 monitoring:
   collect_gpu: false
   write_timeseries: true
