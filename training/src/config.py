@@ -233,6 +233,17 @@ def _require(condition: bool, message: str, errors: list[str]) -> None:
         errors.append(message)
 
 
+def _find_project_root(start_path: Path) -> Path:
+    """Find project root by looking for common project markers."""
+    current = start_path
+    while current != current.parent:
+        if (current / "pyproject.toml").exists() or (current / "setup.py").exists():
+            return current
+        current = current.parent
+    # Fallback to current directory if no markers found
+    return start_path
+
+
 def _path_exists(path_like: str | None, base_path: str | None = None) -> bool:
     """Check if a path exists, handling relative paths intelligently.
     
@@ -265,10 +276,10 @@ def _path_exists(path_like: str | None, base_path: str | None = None) -> bool:
     
     # For data/ paths, try resolving from project root
     # This handles the case where data files are relative to project root
-    # but config files are in subdirectories like training/configs/profiles/
+    # but config files are in subdirectories
     if path_like.startswith("data/"):
-        # Navigate from training/configs/profiles/ to project root
-        project_root = base_dir.parent.parent.parent
+        # Find project root dynamically
+        project_root = _find_project_root(base_dir)
         resolved = project_root / path
         return resolved.exists()
     
