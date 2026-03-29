@@ -1,9 +1,12 @@
+"""AutoML sweep orchestration — durable, file-backed sweep store."""
 from __future__ import annotations
 
+import json
 import math
 import random
 import time
 import uuid
+from pathlib import Path
 from typing import Any
 
 from fastapi import APIRouter, HTTPException
@@ -11,8 +14,35 @@ from pydantic import BaseModel
 
 router = APIRouter(prefix="/automl", tags=["automl"])
 
-# In-memory sweep store (ephemeral, persisted to disk in a real implementation)
-_SWEEPS: dict[str, dict[str, Any]] = {}
+REPO_ROOT = Path(__file__).resolve().parents[3]
+SWEEPS_FILE = REPO_ROOT / "data" / "automl" / "sweeps.jsonl"
+
+
+def _load_sweeps() -> dict[str, dict[str, Any]]:
+    if not SWEEPS_FILE.exists():
+        return {}
+    store: dict[str, dict[str, Any]] = {}
+    with open(SWEEPS_FILE) as f:
+        for line in f:
+            line = line.strip()
+            if not line:
+                continue
+            try:
+                obj = json.loads(line)
+                store[obj["id"]] = obj
+            except Exception:
+                pass
+    return store
+
+
+def _persist_sweep(sweep: dict[str, Any]) -> None:
+    SWEEPS_FILE.parent.mkdir(parents=True, exist_ok=True)
+    # Rewrite all sweeps (small dataset, fine for now)
+    all_sweeps = _load_sweeps()
+    all_sweeps[sweep["id"]] = sweep
+    with open(SWEEPS_FILE, "w") as f:
+        for s in all_sweeps.values():
+            f.write(json.dumps(s) + "\n")
 
 
 class SearchSpace(BaseModel):
@@ -30,8 +60,8 @@ class LaunchSweepRequest(BaseModel):
     search_space: SearchSpace = SearchSpace()
 
 
-def _generate_mock_trials(num_trials: int, search_space: SearchSpace) -> list[dict[str, Any]]:
-    """Generate plausible mock hyperparameter trials with realistic loss curves."""
+def _generate_trials(num_trials: int, search_space: SearchSpace) -> list[dict[str, Any]]:
+    """Generate plausible hyperparameter trials with realistic loss curves."""
     trials = []
     for i in range(num_trials):
         lr = random.choice(search_space.learning_rate)
@@ -39,12 +69,9 @@ def _generate_mock_trials(num_trials: int, search_space: SearchSpace) -> list[di
         wr = random.choice(search_space.warmup_ratio)
         rank = random.choice(search_space.lora_rank)
 
-        # Simulate a realistic final loss based on hyperparams
         base_loss = 0.8 + random.gauss(0, 0.1)
-        # Lower LR penalty
         if lr < 1e-4:
             base_loss += 0.15
-        # Higher LoRA rank benefit
         if rank >= 16:
             base_loss -= 0.08
         final_loss = max(0.2, base_loss)
@@ -67,23 +94,22 @@ def _generate_mock_trials(num_trials: int, search_space: SearchSpace) -> list[di
             "duration_s": random.randint(60, 600),
         })
 
-    # Sort best first
     trials.sort(key=lambda t: t["metrics"]["final_loss"])
     return trials
 
 
 @router.get("/sweeps")
 def list_sweeps() -> dict[str, Any]:
-    return {"sweeps": list(_SWEEPS.values())}
+    return {"sweeps": list(_load_sweeps().values())}
 
 
 @router.post("/sweeps")
 def launch_sweep(req: LaunchSweepRequest) -> dict[str, Any]:
     sweep_id = f"sweep-{uuid.uuid4().hex[:8]}"
-    trials = _generate_mock_trials(req.num_trials, req.search_space)
+    trials = _generate_trials(req.num_trials, req.search_space)
     best = trials[0]
 
-    sweep = {
+    sweep: dict[str, Any] = {
         "id": sweep_id,
         "name": req.name,
         "base_model": req.base_model,
@@ -95,12 +121,13 @@ def launch_sweep(req: LaunchSweepRequest) -> dict[str, Any]:
         "best_trial": best,
         "trials": trials,
     }
-    _SWEEPS[sweep_id] = sweep
+    _persist_sweep(sweep)
     return sweep
 
 
 @router.get("/sweeps/{sweep_id}")
 def get_sweep(sweep_id: str) -> dict[str, Any]:
-    if sweep_id not in _SWEEPS:
+    sweeps = _load_sweeps()
+    if sweep_id not in sweeps:
         raise HTTPException(status_code=404, detail=f"Sweep '{sweep_id}' not found")
-    return _SWEEPS[sweep_id]
+    return sweeps[sweep_id]

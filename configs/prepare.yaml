@@ -9,7 +9,7 @@ experience:
 execution:
   backend: local
 subsystem:
-  config_ref: data/configs/processing.yaml
+  config_ref: ../data/configs/processing.yaml
 monitoring:
   collect_gpu: false
   write_timeseries: true

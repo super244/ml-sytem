@@ -1317,6 +1317,11 @@ a:focus-visible {
   gap: 18px;
   align-items: start;
   margin-top: 18px;
+  transition: grid-template-columns 0.25s ease;
+}
+
+.dashboard-body.sidebar-collapsed {
+  grid-template-columns: 58px minmax(0, 1fr);
 }
 
 /* Lifecycle Sidebar */
@@ -1330,9 +1335,53 @@ a:focus-visible {
   min-height: 480px;
   max-height: calc(100vh - 100px);
   overflow-y: auto;
+  overflow-x: hidden;
   background:
     linear-gradient(180deg, rgba(255,255,255,0.96), rgba(242,248,245,0.92));
+  transition: padding 0.25s ease, width 0.25s ease;
 }
+
+.lifecycle-sidebar.collapsed {
+  padding: 18px 8px;
+  align-items: center;
+}
+
+.lifecycle-sidebar.collapsed .sidebar-nav-item {
+  justify-content: center;
+  padding: 10px;
+  gap: 0;
+}
+
+.lifecycle-sidebar.collapsed .sidebar-nav-icon {
+  font-size: 1.1rem;
+}
+
+/* Toggle Button */
+.sidebar-toggle-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  border: 1px solid var(--line);
+  background: var(--surface);
+  color: var(--muted);
+  font-size: 1rem;
+  cursor: pointer;
+  margin: 0 auto 12px;
+  flex-shrink: 0;
+  transition: all 0.15s ease;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.06);
+}
+
+.sidebar-toggle-btn:hover {
+  background: var(--accent);
+  color: white;
+  border-color: var(--accent);
+  transform: none;
+}
+
 
 .sidebar-brand {
   display: flex;
@@ -1448,6 +1497,28 @@ a:focus-visible {
   display: flex;
   flex-direction: column;
   gap: 20px;
+}
+
+/* Selected instance highlight */
+.selected-instance {
+  background: linear-gradient(135deg, rgba(15,122,97,0.07), rgba(255,255,255,0.95)) !important;
+  border-color: var(--accent) !important;
+}
+
+/* Instance detail panel */
+.instance-detail-panel {
+  padding: 1.5rem;
+  animation: slide-down 0.2s ease;
+}
+
+@keyframes slide-down {
+  from { opacity: 0; transform: translateY(-8px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes pulse-bar {
+  0%, 100% { opacity: 0.7; }
+  50%       { opacity: 1; }
 }
 
 /* Page Header */
