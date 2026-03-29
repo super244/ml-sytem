@@ -1,7 +1,7 @@
 const { app, BrowserWindow, Menu, Notification, dialog, ipcMain, shell } = require("electron");
 const path = require("path");
 
-const DEFAULT_URL = process.env.AI_FACTORY_DESKTOP_URL ?? "http://127.0.0.1:3000/workspace";
+const DEFAULT_URL = process.env.AI_FACTORY_DESKTOP_URL ?? "http://127.0.0.1:3000/dashboard";
 
 function createWindow() {
   const window = new BrowserWindow({
