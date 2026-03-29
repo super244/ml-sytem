@@ -5,7 +5,6 @@ from typing import Any
 
 from ai_factory.core.hashing import normalize_text
 
-
 DIFFICULTY_ALIASES = {
     "easy": 1,
     "medium": 2,

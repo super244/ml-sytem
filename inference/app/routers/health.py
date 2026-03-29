@@ -4,7 +4,6 @@ from fastapi import APIRouter
 
 from inference.app.dependencies import get_metadata_service
 
-
 router = APIRouter(tags=["health"])
 
 

@@ -1,15 +1,15 @@
 from __future__ import annotations
 
-from collections.abc import Iterable
 import csv
-from dataclasses import dataclass, field
 import glob
 import io
 import json
 import math
-from pathlib import Path
 import random
 import re
+from collections.abc import Iterable
+from dataclasses import dataclass, field
+from pathlib import Path
 from typing import Any
 from urllib.parse import urlparse
 from urllib.request import Request, urlopen
@@ -18,14 +18,21 @@ import yaml
 
 from ai_factory.core.artifacts import current_git_sha, sha256_file, sha256_text, write_json, write_jsonl, write_markdown
 from ai_factory.core.hashing import normalize_text, stable_question_fingerprint
-from ai_factory.core.schemas import DatasetBuildInfo, DatasetFileInfo, DatasetManifest, MathRecord, PackagedMathRecord, SourceLineage, StepCheck
+from ai_factory.core.schemas import (
+    DatasetBuildInfo,
+    DatasetFileInfo,
+    DatasetManifest,
+    MathRecord,
+    PackagedMathRecord,
+    SourceLineage,
+    StepCheck,
+)
 from data.builders.pack_registry import build_derived_packs
 from data.quality.contamination import apply_contamination_status, deduplicate_near_duplicates
 from data.quality.difficulty import difficulty_score, estimate_difficulty, normalize_difficulty
 from data.quality.scoring import estimate_quality_score
 from data.quality.stats import compute_record_stats
 from data.reports.cards import pack_card_text, size_report_markdown
-
 
 QUESTION_KEYS = ("question", "problem", "prompt", "instruction")
 SOLUTION_KEYS = ("solution", "rationale", "response", "gold_solution", "answer_explanation", "output")

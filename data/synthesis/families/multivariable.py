@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-from fractions import Fraction
 import random
+from fractions import Fraction
 from typing import Any
 
 from data.synthesis.base import DatasetSpec, frac_str, make_record, nz

@@ -19,6 +19,10 @@ export const ROUTES = {
   datasets: "/datasets",
   benchmarks: "/benchmarks",
   runs: "/runs",
+  dashboard_datasets: "/dashboard/datasets",
+  dashboard_agents: "/dashboard/agents",
+  dashboard_automl: "/dashboard/automl",
+  dashboard_cluster: "/dashboard/cluster",
 } as const satisfies Record<string, Route>;
 
 export const NAV_ITEMS = [
@@ -39,4 +43,11 @@ export const LIFECYCLE_NAV = [
   { href: ROUTES.finetune, label: "Finetune", icon: "⟳", stage: "finetune" },
   { href: ROUTES.deploy, label: "Deploy", icon: "⬆", stage: "deploy" },
   { href: ROUTES.inference, label: "Inference", icon: "◎", stage: "inference" },
+] as const;
+
+export const LAB_NAV = [
+  { href: ROUTES.dashboard_datasets, label: "Datasets", icon: "▤", stage: "datasets" },
+  { href: ROUTES.dashboard_agents, label: "Agents", icon: "⍾", stage: "agents" },
+  { href: ROUTES.dashboard_automl, label: "AutoML", icon: "⎈", stage: "automl" },
+  { href: ROUTES.dashboard_cluster, label: "Cluster", icon: "▦", stage: "cluster" },
 ] as const;

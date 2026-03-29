@@ -1,15 +1,13 @@
 from __future__ import annotations
 
+from collections.abc import Callable
 from pathlib import Path
 from typing import Any
-from collections.abc import Callable
 
-from ai_factory.core.hashing import normalize_text
+from ai_factory.core.hashing import normalize_text, sha256_file
 from ai_factory.core.io import write_json, write_jsonl, write_markdown
 from ai_factory.core.schemas import DatasetBuildInfo, DatasetFileInfo, DatasetManifest
-from ai_factory.core.hashing import sha256_file
 from data.reports.cards import pack_card_text
-
 
 Predicate = Callable[[dict[str, Any]], bool]
 

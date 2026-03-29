@@ -4,7 +4,6 @@ import json
 from pathlib import Path
 from typing import Any
 
-
 ROOT = Path(__file__).resolve().parents[1]
 NOTEBOOK_DIR = ROOT / "notebooks"
 
@@ -213,9 +212,12 @@ generator.generate(GenerationParameters(question=question, model_variant="base",
                 """
 from ai_factory.core.io import read_jsonl
 
-rows = read_jsonl(REPO_ROOT / "evaluation" / "results" / "latest" / "per_example.jsonl")
-win_cases = [row for row in rows if row.get("primary", {}).get("correct") and not row.get("secondary", {}).get("correct")]
-len(win_cases), win_cases[:1]
+    rows = read_jsonl(REPO_ROOT / "evaluation" / "results" / "latest" / "per_example.jsonl")
+    win_cases = [
+        row for row in rows
+        if row.get("primary", {}).get("correct") and not row.get("secondary", {}).get("correct")
+    ]
+    len(win_cases), win_cases[:1]
 """
             ),
         ],

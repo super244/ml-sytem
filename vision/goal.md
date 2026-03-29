@@ -1,187 +1,89 @@
-# AI-FACTORY: Ultimate Vision & Goal
+# AI-FACTORY: V2 Ultimate Vision & Goal
 
 ## 🌌 Vision
 
-AI-Factory is a unified, personal AI operating system designed to manage the entire lifecycle of large language models.
+AI-Factory has evolved from a foundational ML lifecycle manager into a **Unified, Autonomous AI Research Lab**. 
 
-It is built to be:
+It is designed to manage large language models, *but now, the system operates itself*. It is built to be:
 
-* Powerful enough for advanced experimentation
-* Simple enough for fast iteration
-* Structured enough to scale infinitely
+* **Autonomous** enough to iterate models while you sleep.
+* **Scalable** enough to coordinate distributed GPU clusters.
+* **Structured** enough to maintain perfect data lineage from dataset generation to inference deployment.
 
-The goal is to eliminate friction in AI development.
-
-No scattered scripts.
-No confusing pipelines.
-No bloated frameworks.
-
-Just a clean, intelligent system that lets me think, build, and iterate faster than ever before.
+The goal is to eliminate friction in AI development and automate the tedious parts of the scientific method.
 
 ---
 
-## 🧠 Core Idea
+## 🧠 Core Idea (The V2 Expansion)
 
-AI-Factory is a **full-cycle LLM platform** that allows me to:
+V1 successfully established a **full-cycle LLM platform** for training, evaluating, and deploying models. 
+V2 introduces the **Autonomous Loop**, enabling intelligent agents to guide that lifecycle:
 
-1. Train models (locally or remotely)
-2. Monitor training in real time
-3. Evaluate performance across benchmarks
-4. Iteratively improve models (retraining + finetuning)
-5. Deploy models for inference and real-world use
+1. **Dataset Generation & Curation**: Automated pipelines that synthesize rigorous training data, validate it, and pack it.
+2. **AutoML & Search**: Intelligent hyperparameter and architecture searches that systematically explore the loss landscape.
+3. **Multi-Agent Orchestration**: Agent swarms that write self-improving evaluation benchmarks, run training scripts, and analyze metrics to queue the next best experiment.
+4. **Distributed Cluster Orchestration**: Seamless management of compute workloads across a fleet of local and remote GPU nodes.
 
-All of this happens inside a single, connected system.
-
----
-
-## 🔁 The AI Lifecycle (End-to-End)
-
-### 1. Training
-
-Create a new training instance with full flexibility:
-
-* Train from scratch (custom architecture, configs)
-* Train on existing models (continued training)
-
-Supports:
-
-* Local execution
-* Remote / VM / cloud execution via SSH
-
-Fully customizable:
-
-* Model architecture (transformers and beyond)
-* Training type:
-
-  * Supervised Learning
-  * Unsupervised Learning
-  * RLHF (future expansion)
-* Datasets
-* Hyperparameters
+All of this happens inside a single, connected system accessible through web and native shells.
 
 ---
 
-### 2. Monitoring
+## 🔁 The AI Lifecycle (End-to-End V2)
 
-Real-time visibility into training:
+### 1. Data Assembly (Datasets)
+AI-Factory does not just train on data; it builds it.
+* Visualize the data curation pipeline.
+* Filter, clean, and deduplicate synthetic datasets in real-time.
+* Track lineage from raw internet dumps to `pack_summary.json`.
 
-* Live graphs (loss, accuracy, perplexity)
-* Token throughput
-* Logs and system metrics
+### 2. Autonomous Experimentation (AutoML & Agents)
+Instead of manually tweaking learning rates:
+* Launch an `AutoML` search tree. The system trains 5 LoRAs concurrently across different hyperparameter bands.
+* **Agents** continuously evaluate these models. The swarm prunes failing runs and spawns deeper finetuning runs on promising candidates (e.g., using DPO or RLHF on the winner).
 
-Central dashboard:
+### 3. Distributed Training (Cluster)
+* The same simple interface from V1, but now scaled. 
+* Transparently dispatch training runs to local Macs, remote EC2/Lambda GPUs, or local Linux rigs.
+* Health monitoring for distributed compute limits (`nvidia-smi` metrics beamed straight to the dashboard).
 
-* View all running and completed instances
-* Drill down into any instance for full control
-
----
-
-### 3. Evaluation
-
-After training:
-
-* Run standardized benchmarks
-* Test on custom datasets
-
-Measure:
-
-* Accuracy
-* Latency
-* Tokens per second
-* Time to first token
-
-Compare:
-
-* Against previous runs
-* Against open-weight models
+### 4. Seamless Inference & Deployment
+* Zero-click deployments to local API shims, Ollama, LM Studio, or Hugging Face.
+* Interactive chat UI with built-in telemetry to automatically flag user-prompt failures as future dataset additions.
 
 ---
 
-### 4. Intelligent Iteration
+## 🧩 Interfaces V2
 
-An AI-assisted system analyzes results and suggests:
+AI-Factory is accessible through multiple perfectly-synced interfaces:
 
-* Retraining
-* Finetuning
-* Deployment
-
-Human override is always available.
-
----
-
-### 5. Finetuning
-
-Flexible refinement layer:
-
-* Full finetuning
-* LoRA
-* QLoRA
-
-Supports:
-
-* Multiple iterations
-* Version tracking
-* Experiment comparison
-
----
-
-### 6. Inference & Deployment
-
-Seamless transition from model → usable system:
-
-* Built-in web UI for chatting with models
-* API access for integration
-* Export to:
-
-  * HuggingFace
-  * Ollama
-  * LM Studio
-
----
-
-## 🧩 Interfaces
-
-AI-Factory is accessible through multiple interfaces:
-
-* CLI → Core control layer
-* TUI → Interactive terminal experience
-* Web Dashboard → Monitoring and control
-* Desktop App (Mac) → Full visual control
-
-All interfaces connect to the same backend system.
+* **Web Control Center (Next.js)** → The ultimate window into the laboratory. Includes separate spheres for the *Lifecycle* (V1) and the *Lab* (V2: Datasets, Agents, AutoML, Clusters).
+* **Desktop Shell (Electron Native)** → A robust native Mac application wrapping the Web Control Center. It features native OS menus, deep-linking, background auto-retries, and native file management.
+* **TUI (Terminal UI)** → Low-latency, fast keyboard-driven matrix for cluster ops and live metric monitoring.
+* **CLI** → Core scriptable control layer for pipeline integrations.
 
 ---
 
 ## 🎚️ User Levels
 
-The system adapts to the user:
+The system adapts to the user's operational depth:
 
 ### Beginner
-
-* Minimal configuration
-* Guided workflows
-* “Click and run”
+* **“Click and run”**: Uses guided workflows, out-of-the-box synthetic datasets, and one-click training presets.
+* Minimal exposure to distributed complexities.
 
 ### Hobbyist
+* **Experimenter**: Adjusts parameters, links customized local datasets, manages single-node multi-GPU runs.
 
-* Moderate control
-* Adjustable parameters
-
-### Developer
-
-* Full control
-* Architecture-level customization
-* Complete system access
+### Developer / Researcher
+* **Architect**: Orchestrates agent swarms, overrides raw `peft` and `transformers` architectures, maps complex distributed clusters, and authors fully custom AutoML traversal strategies.
 
 ---
 
 ## 🏗️ Design Principles
 
-* **Modularity** → Every component is replaceable
-* **Scalability** → From local laptop to distributed systems
-* **Clarity** → No hidden complexity
-* **Speed** → Fast iteration > perfect abstraction
-* **Extensibility** → Easy to add new training methods, benchmarks, and deployment targets
+* **Lineage Above All** → Every model must track exactly what dataset it used, what its parent was, and what its evaluation scores were.
+* **Immaculate Codebase** → Perfect PEP-8 styling, 100% strict `mypy` typing, and ruthless enforcement of clean architecture interfaces.
+* **Modularity** → Every component is replaceable. The frontend calls an API block; the CLI calls the same block.
 
 ---
 
@@ -189,40 +91,6 @@ The system adapts to the user:
 
 AI-Factory becomes:
 
-> A personal, extensible AI laboratory that rivals frameworks like NVIDIA NeMo,
-> but is cleaner, faster, and fully tailored to my workflow.
+> An autonomous AI laboratory that rivals enterprise platform systems (like NVIDIA NeMo), but is built natively for hackers, researchers, and individuals operating at hyperspeed.
 
-It is not just a tool.
-
-It is a system that amplifies my ability to:
-
-* Learn faster
-* Experiment faster
-* Build faster
-
----
-
-## 🧬 Long-Term Evolution
-
-Future expansions include:
-
-* Multi-agent automation (self-improving training loops)
-* Distributed training orchestration
-* AutoML for LLM pipelines
-* Dataset generation + curation systems
-* Full “AI research lab” capabilities
-
----
-
-## 🧭 Final Note
-
-This project is intentionally ambitious.
-
-The goal is not to build everything at once,
-but to build a strong foundation that can evolve into this vision.
-
-Every feature added should move the system closer to:
-
-* Simplicity
-* Power
-* Control
+It is a system that amplifies your ability to build intelligence continuously.

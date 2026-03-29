@@ -7,6 +7,7 @@ import {
   generateAnswer,
   getInstances,
   startManagedInference,
+  flagTelemetry,
   type GenerateResult,
   type InstanceSummary,
 } from "@/lib/api";
@@ -15,6 +16,7 @@ type Message = {
   role: "user" | "assistant";
   content: string;
   latency?: number;
+  flagged?: boolean;
 };
 
 export default function InferencePage() {
@@ -28,6 +30,10 @@ export default function InferencePage() {
   const [maxTokens, setMaxTokens] = useState(512);
   const [launchingId, setLaunchingId] = useState<string | null>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
+  
+  // V2 Telemetry Flag State
+  const [flagModalIdx, setFlagModalIdx] = useState<number | null>(null);
+  const [flagReason, setFlagReason] = useState("");
 
   useEffect(() => {
     getInstances()
@@ -219,10 +225,68 @@ export default function InferencePage() {
             )}
             {messages.map((msg, idx) => (
               <div key={idx} className={`inference-message ${msg.role}`}>
-                <div className="inference-message-role">
-                  {msg.role === "user" ? "You" : "Model"}
+                <div className="inference-message-role" style={{ display: "flex", justifyContent: "space-between" }}>
+                  <span>{msg.role === "user" ? "You" : "Model"}</span>
+                  {msg.role === "assistant" && (
+                    <button
+                      type="button"
+                      className="ghost-button small"
+                      style={{ padding: "0 0.5rem", height: "auto", fontSize: "0.75rem", opacity: msg.flagged ? 1 : 0.6 }}
+                      onClick={() => setFlagModalIdx(flagModalIdx === idx ? null : idx)}
+                      disabled={msg.flagged}
+                    >
+                      {msg.flagged ? "✓ Flagged for dataset" : "👎 Flag as failure"}
+                    </button>
+                  )}
                 </div>
-                <div className="inference-message-content">{msg.content}</div>
+                <div className="inference-message-content" style={{ whiteSpace: "pre-wrap" }}>{msg.content}</div>
+                
+                {flagModalIdx === idx && (
+                  <div className="panel" style={{ marginTop: "1rem", padding: "1rem", background: "rgba(255,255,255,0.02)", border: "1px solid var(--border)" }}>
+                    <p style={{ fontSize: "0.8rem", marginBottom: "0.5rem", opacity: 0.8 }}>
+                      What went wrong? This pairs the prompt with your correction for the V2 synthetics pipeline.
+                    </p>
+                    <textarea 
+                      value={flagReason} 
+                      onChange={(e) => setFlagReason(e.target.value)}
+                      placeholder="Expected output or reason for failure..."
+                      style={{ width: "100%", background: "transparent", color: "inherit", border: "1px solid var(--border)", borderRadius: "4px", padding: "0.5rem", minHeight: "60px", fontSize: "0.85rem", marginBottom: "0.5rem" }}
+                    />
+                    <div style={{ display: "flex", gap: "0.5rem" }}>
+                      <button 
+                        className="primary-button small"
+                        onClick={() => {
+                          const newMessages = [...messages];
+                          newMessages[idx].flagged = true;
+                          setMessages(newMessages);
+                          
+                          let promptText = "";
+                          for (let i = idx - 1; i >= 0; i--) {
+                            if (messages[i].role === "user") {
+                              promptText = messages[i].content;
+                              break;
+                            }
+                          }
+
+                          void flagTelemetry({
+                            prompt: promptText,
+                            assistant_output: msg.content,
+                            expected_output: flagReason,
+                            model_variant: selectedModel,
+                            latency_s: msg.latency
+                          });
+
+                          setFlagModalIdx(null);
+                          setFlagReason("");
+                        }}
+                      >
+                        Submit to Telemetry
+                      </button>
+                      <button className="ghost-button small" onClick={() => setFlagModalIdx(null)}>Cancel</button>
+                    </div>
+                  </div>
+                )}
+
                 {msg.latency != null && (
                   <div className="inference-message-meta">
                     {msg.latency.toFixed(2)}s

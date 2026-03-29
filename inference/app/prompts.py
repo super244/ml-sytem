@@ -5,7 +5,6 @@ from pathlib import Path
 
 import yaml
 
-
 DEFAULT_PROMPT_PRESET_ID = "atlas_rigorous"
 
 

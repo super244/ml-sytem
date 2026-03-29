@@ -22,7 +22,7 @@ type LaunchState = {
   learningMode: string;
   sourceModel: string;
   configPath: string;
-  environment: "local" | "cloud";
+  environment: "local" | "remote" | "cloud";
   instanceName: string;
 };
 
@@ -45,6 +45,12 @@ const USER_LEVELS: { id: UserLevel; label: string; desc: string; icon: string }[
     icon: "🔬",
     desc: "Full control. Architecture-level customization.",
   },
+];
+
+const ENVIRONMENTS = [
+  { id: "local", label: "Local Mac", desc: "Run natively on local Apple Silicon.", icon: "💻" },
+  { id: "remote", label: "Remote Linux Rig", desc: "Dispatch via SSH to a dedicated GPU box.", icon: "🖥️" },
+  { id: "cloud", label: "Cloud Fleet", desc: "Auto-provision EC2/Lambda orchestrator.", icon: "☁️" },
 ];
 
 const LEARNING_MODES = [
@@ -102,7 +108,7 @@ export default function TrainingPage() {
           learning_mode: form.learningMode as never,
           source_model: form.sourceModel || null,
         },
-        environment: form.environment === "cloud" ? { kind: "cloud" } : { kind: "local" },
+        environment: form.environment === "local" ? { kind: "local" } : { kind: "cloud" },
         name: form.instanceName || undefined,
       });
       setLaunched(instance.id);
@@ -229,11 +235,36 @@ export default function TrainingPage() {
           </div>
         )}
 
-        {/* Step 4: Config / Profile */}
+        {/* Step 4: Environment */}
         <div className="training-step panel">
           <div className="step-header">
             <span className="step-number">{form.userLevel === "beginner" ? "03" : "04"}</span>
-            <h2>Configuration</h2>
+            <h2>Compute Environment</h2>
+          </div>
+          <div className="learning-mode-grid">
+            {ENVIRONMENTS.map((env) => (
+              <button
+                key={env.id}
+                type="button"
+                className={`mode-card ${form.environment === env.id ? "active" : ""}`}
+                onClick={() => update({ environment: env.id as LaunchState["environment"] })}
+                style={{ padding: "1rem" }}
+              >
+                <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", marginBottom: "0.25rem" }}>
+                  <span style={{ fontSize: "1.2rem" }}>{env.icon}</span>
+                  <span className="mode-label" style={{ margin: 0 }}>{env.label}</span>
+                </div>
+                <span className="mode-desc">{env.desc}</span>
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* Step 5: Configuration */}
+        <div className="training-step panel">
+          <div className="step-header">
+            <span className="step-number">{form.userLevel === "beginner" ? "04" : "05"}</span>
+            <h2>Configuration Details</h2>
           </div>
 
           {profiles.length > 0 && (
@@ -275,15 +306,6 @@ export default function TrainingPage() {
               />
             </div>
             <div className="input-group">
-              <label className="control-label" htmlFor="environment">Environment</label>
-              <select
-                id="environment"
-                value={form.environment}
-                onChange={(e) => update({ environment: e.target.value as "local" | "cloud" })}
-              >
-                <option value="local">Local</option>
-                <option value="cloud">Cloud / SSH</option>
-              </select>
             </div>
           </div>
         </div>

@@ -1,10 +1,10 @@
 from __future__ import annotations
 
 import json
-from pathlib import Path
 import random
-from typing import Any
 from collections.abc import Callable
+from pathlib import Path
+from typing import Any
 
 from data.reports.cards import dataset_card_text
 from data.synthesis.base import DatasetSpec, choose_weighted
@@ -16,7 +16,6 @@ from data.synthesis.families import (
     generate_odes_optimization_example,
     generate_olympiad_reasoning_example,
 )
-
 
 GeneratorFn = Callable[[random.Random, DatasetSpec, int, str], dict[str, Any]]
 
