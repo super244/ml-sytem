@@ -128,7 +128,7 @@ export default function InferencePage() {
         <div className="inference-sidebar">
           {/* Model Selection */}
           <div className="panel inference-settings-panel">
-            <h2 className="eval-section-title">Model</h2>
+            <h2 className="section-title">Model</h2>
             <div className="input-group">
               <label className="control-label" htmlFor="model-select">Active model</label>
               <select
@@ -156,7 +156,7 @@ export default function InferencePage() {
 
           {/* Settings */}
           <div className="panel inference-settings-panel">
-            <h2 className="eval-section-title">Settings</h2>
+            <h2 className="section-title">Settings</h2>
             <div className="input-group">
               <label className="control-label" htmlFor="temperature">
                 Temperature: {temperature.toFixed(1)}
@@ -190,7 +190,7 @@ export default function InferencePage() {
           {/* Quick Launch */}
           {!loading && instances.length === 0 && (
             <div className="panel inference-settings-panel">
-              <h2 className="eval-section-title">No Active Instances</h2>
+              <h2 className="section-title">No Active Instances</h2>
               <p className="control-label">
                 Start an inference instance from a completed training run.
               </p>
@@ -242,7 +242,7 @@ export default function InferencePage() {
                 <div className="inference-message-content" style={{ whiteSpace: "pre-wrap" }}>{msg.content}</div>
                 
                 {flagModalIdx === idx && (
-                  <div className="panel" style={{ marginTop: "1rem", padding: "1rem", background: "rgba(255,255,255,0.02)", border: "1px solid var(--border)" }}>
+                  <div className="panel" style={{ marginTop: "1rem", padding: "1rem", background: "rgba(255,255,255,0.02)", border: "1px solid var(--line)" }}>
                     <p style={{ fontSize: "0.8rem", marginBottom: "0.5rem", opacity: 0.8 }}>
                       What went wrong? This pairs the prompt with your correction for the V2 synthetics pipeline.
                     </p>
@@ -250,7 +250,7 @@ export default function InferencePage() {
                       value={flagReason} 
                       onChange={(e) => setFlagReason(e.target.value)}
                       placeholder="Expected output or reason for failure..."
-                      style={{ width: "100%", background: "transparent", color: "inherit", border: "1px solid var(--border)", borderRadius: "4px", padding: "0.5rem", minHeight: "60px", fontSize: "0.85rem", marginBottom: "0.5rem" }}
+                      style={{ width: "100%", background: "transparent", color: "inherit", border: "1px solid var(--line)", borderRadius: "4px", padding: "0.5rem", minHeight: "60px", fontSize: "0.85rem", marginBottom: "0.5rem" }}
                     />
                     <div style={{ display: "flex", gap: "0.5rem" }}>
                       <button 

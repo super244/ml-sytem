@@ -54,7 +54,7 @@ export default function FinetunePage() {
         setSources(completed);
         if (completed.length > 0) {
           setSelectedSource(completed[0].id);
-          setSourceModel(completed[0].lifecycle.source_model ?? "");
+          setSourceModel(completed[0].lifecycle?.source_model ?? "");
         }
       })
       .catch(() => null)
@@ -107,7 +107,7 @@ export default function FinetunePage() {
       <div className="finetune-grid">
         {/* Mode Selection */}
         <div className="panel finetune-section">
-          <h2 className="eval-section-title">Finetuning Method</h2>
+          <h2 className="section-title">Finetuning Method</h2>
           <div className="finetune-mode-grid">
             {FINETUNE_MODES.map((m) => (
               <button
@@ -131,7 +131,7 @@ export default function FinetunePage() {
 
         {/* Source Model */}
         <div className="panel finetune-section">
-          <h2 className="eval-section-title">Source Model</h2>
+          <h2 className="section-title">Source Model</h2>
 
           {sources.length > 0 && (
             <>
@@ -144,7 +144,7 @@ export default function FinetunePage() {
                     className={`source-item ${selectedSource === inst.id ? "active" : ""}`}
                     onClick={() => {
                       setSelectedSource(inst.id);
-                      setSourceModel(inst.lifecycle.source_model ?? "");
+                      setSourceModel(inst.lifecycle?.source_model ?? "");
                     }}
                   >
                     <span className="source-name">{inst.name}</span>
@@ -171,7 +171,7 @@ export default function FinetunePage() {
 
         {/* Config */}
         <div className="panel finetune-section">
-          <h2 className="eval-section-title">Configuration</h2>
+          <h2 className="section-title">Configuration</h2>
           <div className="control-row">
             <div className="input-group">
               <label className="control-label" htmlFor="ft-config">Config path</label>

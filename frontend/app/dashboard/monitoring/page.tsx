@@ -74,7 +74,7 @@ export default function MonitoringPage() {
 
   const filtered = instances
     .filter((i) => filter === "all" || i.status === filter)
-    .sort((a, b) => b.updated_at.localeCompare(a.updated_at));
+    .sort((a, b) => (b.updated_at || "").localeCompare(a.updated_at || ""));
 
   const running = instances.filter((i) => i.status === "running").length;
   const completed = instances.filter((i) => i.status === "completed").length;
@@ -136,13 +136,13 @@ export default function MonitoringPage() {
 
       {/* V2 Cluster Health */}
       <div className="panel" style={{ padding: "1.5rem", marginBottom: "1.5rem" }}>
-        <h2 className="eval-section-title" style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+        <h2 className="section-title" style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
           <span>Cluster Node Health</span>
-          <span style={{ fontSize: "0.75rem", opacity: 0.5, border: "1px solid var(--border)", padding: "0.2rem 0.5rem", borderRadius: "4px" }}>V2 Preview</span>
+          <span style={{ fontSize: "0.75rem", opacity: 0.5, border: "1px solid var(--line)", padding: "0.2rem 0.5rem", borderRadius: "4px" }}>V2 Preview</span>
         </h2>
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(250px, 1fr))", gap: "1rem" }}>
           {clusterNodes.map((node) => (
-            <div key={node.id} style={{ border: "1px solid var(--border)", borderRadius: "8px", padding: "1rem", background: "rgba(255,255,255,0.02)" }}>
+            <div key={node.id} style={{ border: "1px solid var(--line)", borderRadius: "8px", padding: "1rem", background: "rgba(255,255,255,0.02)" }}>
               <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "0.5rem" }}>
                 <strong style={{ fontSize: "0.9rem" }}>{node.name}</strong>
                 <span style={{ fontSize: "0.75rem", color: node.status === "online" ? "var(--accent)" : "var(--foreground)", opacity: node.status === "online" ? 1 : 0.5 }}>● {node.status}</span>

@@ -28,7 +28,7 @@ export default function EvaluatePage() {
   useEffect(() => {
     getInstances()
       .then((list) => {
-        const sorted = [...list].sort((a, b) => b.updated_at.localeCompare(a.updated_at));
+        const sorted = [...list].sort((a, b) => (b.updated_at || "").localeCompare(a.updated_at || ""));
         setInstances(sorted);
         // Auto-select most recent completed
         const firstCompleted = sorted.find((i) => i.status === "completed");
@@ -79,14 +79,14 @@ export default function EvaluatePage() {
         {/* Launch Evaluation */}
         {evaluatable.length > 0 && (
           <div className="eval-launch-panel panel">
-            <h2 className="eval-section-title">Launch Evaluation</h2>
+            <h2 className="section-title">Launch Evaluation</h2>
             <p className="control-label">Select a completed training or finetuning run to evaluate.</p>
             <div className="eval-launch-list">
               {evaluatable.slice(0, 6).map((inst) => (
                 <div key={inst.id} className="eval-launch-item">
                   <div className="eval-launch-info">
                     <span className="eval-launch-name">{inst.name}</span>
-                    <span className="eval-launch-type">{inst.type} · {inst.lifecycle.learning_mode ?? "—"}</span>
+                    <span className="eval-launch-type">{inst.type} · {inst.lifecycle?.learning_mode ?? "—"}</span>
                   </div>
                   <button
                     type="button"
@@ -105,7 +105,7 @@ export default function EvaluatePage() {
         {/* Evaluation Results */}
         {evaluated.length > 0 && (
           <div className="eval-results-panel panel">
-            <h2 className="eval-section-title">Evaluation Results</h2>
+            <h2 className="section-title">Evaluation Results</h2>
             <div className="eval-results-list">
               {evaluated.slice(0, 8).map((inst) => {
                 const isSelected = inst.id === selected;
@@ -178,7 +178,7 @@ export default function EvaluatePage() {
         {/* Comparison View */}
         {selectedInstance && compareInstance && (
           <div className="eval-comparison-panel panel">
-            <h2 className="eval-section-title">Side-by-Side Comparison</h2>
+            <h2 className="section-title">Side-by-Side Comparison</h2>
             <div className="comparison-header-row">
               <div className="comparison-col-header">
                 <span className="eval-col-label selected">Primary</span>
