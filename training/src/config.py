@@ -233,8 +233,48 @@ def _require(condition: bool, message: str, errors: list[str]) -> None:
         errors.append(message)
 
 
-def _path_exists(path_like: str | None) -> bool:
-    return not path_like or Path(path_like).exists()
+def _path_exists(path_like: str | None, base_path: str | None = None) -> bool:
+    """Check if a path exists, handling relative paths intelligently.
+    
+    Args:
+        path_like: Path to check (relative or absolute)
+        base_path: Base config file path for resolving relative paths
+        
+    Returns:
+        True if path exists, False otherwise
+    """
+    if not path_like:
+        return True
+    
+    path = Path(path_like)
+    
+    # If absolute, just check existence
+    if path.is_absolute():
+        return path.exists()
+    
+    # If no base path provided, check relative to current working directory
+    if not base_path:
+        return path.exists()
+    
+    base_dir = Path(base_path).parent
+    
+    # First try resolving relative to config file directory
+    resolved = base_dir / path
+    if resolved.exists():
+        return True
+    
+    # For data/ paths, try resolving from project root
+    # This handles the case where data files are relative to project root
+    # but config files are in subdirectories like training/configs/profiles/
+    if path_like.startswith("data/"):
+        # Navigate from training/configs/profiles/ to project root
+        project_root = base_dir.parent.parent.parent
+        resolved = project_root / path
+        return resolved.exists()
+    
+    # Try other common relative patterns
+    # Check relative to current working directory as fallback
+    return path.exists()
 
 
 def validate_experiment_config(config: ExperimentConfig) -> list[str]:
@@ -348,32 +388,32 @@ def validate_experiment_config(config: ExperimentConfig) -> list[str]:
         errors,
     )
     _require(
-        _path_exists(config.data.train_file),
+        _path_exists(config.data.train_file, config.config_path),
         f"training data file not found: {config.data.train_file}",
         errors,
     )
     _require(
-        _path_exists(config.data.eval_file),
+        _path_exists(config.data.eval_file, config.config_path),
         f"eval data file not found: {config.data.eval_file}",
         errors,
     )
     _require(
-        _path_exists(config.data.test_file),
+        _path_exists(config.data.test_file, config.config_path),
         f"test data file not found: {config.data.test_file}",
         errors,
     )
     _require(
-        _path_exists(config.data.pack_manifest),
+        _path_exists(config.data.pack_manifest, config.config_path),
         f"pack manifest not found: {config.data.pack_manifest}",
         errors,
     )
     _require(
-        _path_exists(config.runtime.accelerate_config),
+        _path_exists(config.runtime.accelerate_config, config.config_path),
         f"accelerate config not found: {config.runtime.accelerate_config}",
         errors,
     )
     _require(
-        _path_exists(config.runtime.deepspeed_config),
+        _path_exists(config.runtime.deepspeed_config, config.config_path),
         f"deepspeed config not found: {config.runtime.deepspeed_config}",
         errors,
     )
