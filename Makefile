@@ -1,6 +1,6 @@
 PYTHON ?= python3
 
-.PHONY: doctor refresh-lab latest-run api-smoke generate-datasets prepare-data validate-data audit-data preview-data export-subset dedupe-near benchmark-pack mine-failures train train-dry validate-model serve evaluate analyze-failures notebooks frontend-typecheck frontend-build frontend-dev frontend-install test smoke
+.PHONY: doctor refresh-lab latest-run api-smoke generate-datasets prepare-data validate-data audit-data preview-data export-subset dedupe-near benchmark-pack mine-failures train train-dry validate-model serve evaluate analyze-failures notebooks frontend-typecheck frontend-build frontend-dev frontend-install test smoke docker-up docker-down lint format clean install
 
 doctor:
 	$(PYTHON) scripts/doctor.py
@@ -80,3 +80,34 @@ test:
 smoke:
 	$(PYTHON) -m compileall ai_factory data training inference evaluation
 	$(PYTHON) notebooks/build_notebooks.py
+
+# Development helpers
+install:
+	pip install -e ".[dev]"
+
+lint:
+	ruff check .
+	mypy .
+
+format:
+	ruff format .
+
+clean:
+	find . -type d -name "__pycache__" -exec rm -rf {} + 2>/dev/null || true
+	find . -type d -name "*.egg-info" -exec rm -rf {} + 2>/dev/null || true
+	find . -type f -name "*.pyc" -delete
+	rm -rf build/
+	rm -rf dist/
+	rm -rf .coverage
+	rm -rf htmlcov/
+	cd frontend && rm -rf node_modules/.cache
+
+# Docker helpers
+docker-up:
+	docker-compose up -d
+
+docker-down:
+	docker-compose down
+
+docker-build:
+	docker-compose build
