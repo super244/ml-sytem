@@ -79,20 +79,23 @@ class MathGenerator:
         sampling = (params.temperature > 0) or (candidate_count > 1)
 
         with torch.inference_mode():
-            for _ in range(candidate_count):
-                generate_kwargs = dict(
-                    **model_inputs,
-                    do_sample=sampling,
-                    top_p=params.top_p,
-                    max_new_tokens=params.max_new_tokens,
-                    repetition_penalty=1.05,
-                    pad_token_id=runtime.tokenizer.pad_token_id,
-                    eos_token_id=runtime.tokenizer.eos_token_id,
-                )
-                if sampling:
-                    generate_kwargs["temperature"] = max(1e-6, float(params.temperature))
-                output_ids = runtime.model.generate(**generate_kwargs)
-                generated_ids = output_ids[0][prompt_length:]
+            generate_kwargs = dict(
+                **model_inputs,
+                do_sample=sampling,
+                top_p=params.top_p,
+                max_new_tokens=params.max_new_tokens,
+                repetition_penalty=1.05,
+                pad_token_id=runtime.tokenizer.pad_token_id,
+                eos_token_id=runtime.tokenizer.eos_token_id,
+                num_return_sequences=candidate_count,
+            )
+            if sampling:
+                generate_kwargs["temperature"] = max(1e-6, float(params.temperature))
+
+            output_ids_batch = runtime.model.generate(**generate_kwargs)
+
+            for output_ids in output_ids_batch:
+                generated_ids = output_ids[prompt_length:]
                 raw_text = runtime.tokenizer.decode(generated_ids, skip_special_tokens=True).strip()
                 resolved_text, calculator_trace = resolve_calculator_tags(raw_text)
                 reasoning, final_answer = split_reasoning(resolved_text)
