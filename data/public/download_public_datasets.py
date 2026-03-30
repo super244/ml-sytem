@@ -33,9 +33,7 @@ def main() -> None:
         print(f"Downloading {entry.id} from {entry.path} split={entry.split}")
         dataset = iter_source_rows(entry, cache_dir=str(cache_dir))
         marker = cache_dir / f"{entry.id}.downloaded.txt"
-        marker.write_text(
-            f"Downloaded {entry.path} split={entry.split} with {len(dataset)} rows.\n"
-        )
+        marker.write_text(f"Downloaded {entry.path} split={entry.split} with {len(dataset)} rows.\n")
         print(f"Saved cache marker to {marker}")
 
 

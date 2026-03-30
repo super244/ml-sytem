@@ -203,7 +203,86 @@ export type CompareRequest = {
   use_cache: boolean;
 };
 
-const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8000";
+const REQUEST_TIMEOUT_MS = 20_000;
+
+function normalizeBase(base: string): string {
+  return base.replace(/\/$/, "");
+}
+
+function resolveApiBases(): string[] {
+  const configured = process.env.NEXT_PUBLIC_API_BASE_URL?.trim();
+  if (configured) {
+    return [normalizeBase(configured)];
+  }
+
+  const bases = ["http://127.0.0.1:8000", "http://localhost:8000"];
+  if (typeof window !== "undefined") {
+    const protocol = window.location.protocol === "https:" ? "https:" : "http:";
+    bases.unshift(`${protocol}//${window.location.hostname}:8000`);
+  }
+
+  return Array.from(new Set(bases.map(normalizeBase)));
+}
+
+function extractErrorMessage(payload: unknown): string | null {
+  if (typeof payload === "string") {
+    return payload.trim() || null;
+  }
+
+  if (!payload || typeof payload !== "object" || Array.isArray(payload)) {
+    return null;
+  }
+
+  const record = payload as Record<string, unknown>;
+  const detail = record.detail;
+  if (typeof detail === "string" && detail.trim()) {
+    return detail;
+  }
+  if (Array.isArray(detail) && detail.length > 0) {
+    return detail
+      .map((entry) => {
+        if (typeof entry === "string") {
+          return entry;
+        }
+        if (entry && typeof entry === "object" && !Array.isArray(entry)) {
+          const nested = entry as Record<string, unknown>;
+          const location = Array.isArray(nested.loc) ? nested.loc.join(".") : null;
+          const message = typeof nested.msg === "string" ? nested.msg : null;
+          return [location, message].filter(Boolean).join(": ");
+        }
+        return "";
+      })
+      .filter(Boolean)
+      .join("; ");
+  }
+
+  const error = record.error;
+  if (error && typeof error === "object" && !Array.isArray(error)) {
+    const nested = error as Record<string, unknown>;
+    if (typeof nested.message === "string" && nested.message.trim()) {
+      return nested.message;
+    }
+  }
+
+  if (typeof record.message === "string" && record.message.trim()) {
+    return record.message;
+  }
+
+  return null;
+}
+
+async function readResponsePayload(response: Response): Promise<unknown> {
+  const text = await response.text();
+  if (!text.trim()) {
+    return null;
+  }
+
+  try {
+    return JSON.parse(text);
+  } catch {
+    return text;
+  }
+}
 
 export type DatasetPreview = {
   id: string;
@@ -517,6 +596,79 @@ export type InstanceDetail = InstanceSummary & {
   available_actions: InstanceActionDescriptor[];
 };
 
+export type MissionControlSnapshot = {
+  generated_at: string;
+  repo_root: string;
+  workspace: WorkspaceOverview;
+  orchestration: OrchestrationSummary;
+  watchlist: {
+    instances: InstanceSummary[];
+    running_instances: InstanceSummary[];
+    failed_instances: InstanceSummary[];
+    agents: AgentSwarmStatus[];
+    sweeps: AutoMLSweep[];
+    cluster_nodes: ClusterNodeHardware[];
+    telemetry: TelemetryRecord[];
+  };
+  control_plane: {
+    instances: InstanceSummary[];
+    runs: OrchestrationRun[];
+    orchestration_summary: OrchestrationSummary;
+  };
+  agents: {
+    path: string;
+    count: number;
+    status_counts: Record<string, number>;
+    swarm: AgentSwarmStatus[];
+  };
+  automl: {
+    path: string;
+    count: number;
+    status_counts: Record<string, number>;
+    latest: AutoMLSweep | null;
+    sweeps: AutoMLSweep[];
+  };
+  cluster: {
+    nodes: ClusterNodeHardware[];
+    status_counts: Record<string, number>;
+  };
+  telemetry: {
+    flagged: {
+      path: string;
+      count: number;
+      recent: TelemetryRecord[];
+      latest: TelemetryRecord | null;
+    };
+    requests: {
+      path: string;
+      count: number;
+      by_model: Record<string, number>;
+      recent: Array<Record<string, unknown>>;
+    };
+  };
+  summary: {
+    workspace_ready_checks: number;
+    workspace_total_checks: number;
+    instances: number;
+    running_instances: number;
+    failed_instances: number;
+    orchestration_runs: number;
+    agents: number;
+    automl_sweeps: number;
+    cluster_nodes: number;
+    telemetry_flags: number;
+    telemetry_requests: number;
+    active_agents: number;
+    running_sweeps: number;
+    telemetry_backlog: number;
+    ready_checks: number;
+    total_checks: number;
+    datasets: number;
+    training_profiles: number;
+    open_circuits: number;
+  };
+};
+
 export type CreateManagedInstanceRequest = {
   config_path: string;
   start?: boolean;
@@ -530,15 +682,61 @@ export type CreateManagedInstanceRequest = {
 };
 
 async function fetchJson<T>(path: string, options?: RequestInit): Promise<T> {
-  const response = await fetch(`${API_BASE}${path}`, {
-    cache: "no-store",
-    ...options,
-  });
-  if (!response.ok) {
-    const errorText = await response.text();
-    throw new Error(errorText || `Request failed: ${path}`);
+  const externalSignal = options?.signal;
+  let lastNetworkError: unknown = null;
+
+  for (const base of resolveApiBases()) {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+
+    if (externalSignal) {
+      if (externalSignal.aborted) {
+        controller.abort();
+      } else {
+        externalSignal.addEventListener("abort", () => controller.abort(), { once: true });
+      }
+    }
+
+    try {
+      const response = await fetch(`${base}${path}`, {
+        cache: "no-store",
+        ...options,
+        signal: controller.signal,
+      });
+
+      if (!response.ok) {
+        const payload = await readResponsePayload(response);
+        const message =
+          extractErrorMessage(payload) ??
+          `Request failed (${response.status}): ${path}`;
+        throw new Error(message);
+      }
+
+      const payload = await readResponsePayload(response);
+      return payload as T;
+    } catch (error) {
+      if (error instanceof Error && error.message.startsWith("Request failed")) {
+        throw error;
+      }
+      if (error instanceof DOMException && error.name === "AbortError") {
+        lastNetworkError = new Error(`Request timed out after ${REQUEST_TIMEOUT_MS / 1000}s: ${path}`);
+        continue;
+      }
+      if (error instanceof TypeError) {
+        lastNetworkError = error;
+        continue;
+      }
+      throw error;
+    } finally {
+      clearTimeout(timeout);
+    }
   }
-  return (await response.json()) as T;
+
+  const errorMessage =
+    lastNetworkError instanceof Error
+      ? lastNetworkError.message
+      : `Network request failed for ${path}. Check that the AI-Factory API is reachable.`;
+  throw new Error(`${errorMessage} Tried: ${resolveApiBases().join(", ")}`);
 }
 
 export async function generateAnswer(payload: GenerateRequest): Promise<GenerateResponse> {
@@ -679,6 +877,10 @@ export async function getOrchestrationSummary(): Promise<OrchestrationSummary> {
   return payload.summary;
 }
 
+export async function getMissionControl(): Promise<MissionControlSnapshot> {
+  return fetchJson<MissionControlSnapshot>("/v1/lab/mission-control");
+}
+
 export type FlagTelemetryRequest = {
   prompt: string;
   assistant_output: string;
@@ -713,6 +915,7 @@ export async function getClusterNodes(): Promise<ClusterNodeHardware[]> {
 }
 
 export type TelemetryRecord = {
+  id: string;
   timestamp: number;
   prompt: string;
   assistant_output: string;
@@ -721,9 +924,28 @@ export type TelemetryRecord = {
   latency_s?: number | null;
 };
 
+export type TelemetryActionResult = {
+  status: string;
+  record: TelemetryRecord;
+  destination?: string | null;
+  message?: string | null;
+};
+
 export async function getTelemetryBacklog(): Promise<TelemetryRecord[]> {
   const payload = await fetchJson<{ telemetry: TelemetryRecord[] }>("/v1/datasets/telemetry");
   return payload.telemetry;
+}
+
+export async function promoteTelemetryRecord(recordId: string): Promise<TelemetryActionResult> {
+  return fetchJson<TelemetryActionResult>(`/v1/datasets/telemetry/${recordId}/promote`, {
+    method: "POST",
+  });
+}
+
+export async function discardTelemetryRecord(recordId: string): Promise<TelemetryActionResult> {
+  return fetchJson<TelemetryActionResult>(`/v1/datasets/telemetry/${recordId}/discard`, {
+    method: "POST",
+  });
 }
 
 export type SynthesizeRequest = {
@@ -739,6 +961,18 @@ export type SynthesizeResponse = {
   estimated_time_s: number;
 };
 
+export type SynthesisJob = {
+  job_id: string;
+  status: string;
+  seed_prompt: string;
+  num_variants: number;
+  model_variant: string;
+  created_at: number;
+  estimated_time_s: number;
+  completed_rows: number;
+  output_path: string;
+};
+
 export async function synthesizeDataset(payload: SynthesizeRequest): Promise<SynthesizeResponse> {
   return fetchJson<SynthesizeResponse>("/v1/datasets/synthesize", {
     method: "POST",
@@ -747,6 +981,10 @@ export async function synthesizeDataset(payload: SynthesizeRequest): Promise<Syn
     },
     body: JSON.stringify(payload),
   });
+}
+
+export async function getSynthesisJob(jobId: string): Promise<SynthesisJob> {
+  return fetchJson<SynthesisJob>(`/v1/datasets/synthesize/${jobId}`);
 }
 
 export type AgentSwarmStatus = {
@@ -781,9 +1019,29 @@ export type AgentDeployRequest = {
   model: string;
 };
 
+export type AgentUpdateRequest = {
+  name?: string;
+  role?: string;
+  model?: string;
+  status?: AgentSwarmStatus["status"];
+};
+
 export async function deployAgent(payload: AgentDeployRequest): Promise<{ status: string; agent: AgentSwarmStatus }> {
   return fetchJson<{ status: string; agent: AgentSwarmStatus }>("/v1/agents/deploy", {
     method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(payload),
+  });
+}
+
+export async function updateAgent(
+  agentId: string,
+  payload: AgentUpdateRequest,
+): Promise<{ status: string; agent: AgentSwarmStatus }> {
+  return fetchJson<{ status: string; agent: AgentSwarmStatus }>(`/v1/agents/${agentId}`, {
+    method: "PATCH",
     headers: {
       "Content-Type": "application/json",
     },

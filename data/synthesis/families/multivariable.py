@@ -22,7 +22,7 @@ def generate_multivariable_example(
         fy = b * x0 + 2 * c * y0
         answer = f"<{fx}, {fy}>"
         solution = (
-            f"Compute partial derivatives: f_x = {2*a}x {b:+d}y and f_y = {b}x {2*c:+d}y. "
+            f"Compute partial derivatives: f_x = {2 * a}x {b:+d}y and f_y = {b}x {2 * c:+d}y. "
             f"Evaluate at ({x0}, {y0}) to get <{fx}, {fy}>.\nFinal Answer: {answer}"
         )
         return make_record(spec, index, difficulty, question, solution, answer, [str(fx), str(fy)], "gradient")
@@ -44,12 +44,14 @@ def generate_multivariable_example(
             f"Find the directional derivative at ({x0}, {y0}) in the direction <{u1}, {u2}>."
         )
         solution = (
-            f"First compute ∇f = <{2*a}x {c:+d}y, {2*b}y {c:+d}x>. "
+            f"First compute ∇f = <{2 * a}x {c:+d}y, {2 * b}y {c:+d}x>. "
             f"At ({x0}, {y0}), the gradient is <{fx}, {fy}>. "
             f"The corresponding unit direction is {unit_direction}, so the directional derivative is {answer}.\n"
             f"Final Answer: {answer}"
         )
-        return make_record(spec, index, difficulty, question, solution, answer, [str(fx), str(fy), answer], "directional derivative")
+        return make_record(
+            spec, index, difficulty, question, solution, answer, [str(fx), str(fy), answer], "directional derivative"
+        )
     if mode == "tangent_plane":
         a, b = nz(rng, -3, 3), nz(rng, -3, 3)
         x0, y0 = rng.randint(-2, 2), rng.randint(-2, 2)
@@ -64,7 +66,9 @@ def generate_multivariable_example(
             f"Here f(x0,y0) = {z0}, f_x = {fx}, and f_y = {fy}. "
             f"So the plane is {answer}.\nFinal Answer: {answer}"
         )
-        return make_record(spec, index, difficulty, question, solution, answer, [str(z0), str(fx), str(fy)], "tangent plane")
+        return make_record(
+            spec, index, difficulty, question, solution, answer, [str(z0), str(fx), str(fy)], "tangent plane"
+        )
 
     a, b = nz(rng, 1, 4), nz(rng, 1, 4)
     upper_x, upper_y = rng.randint(1, 4), rng.randint(1, 4)

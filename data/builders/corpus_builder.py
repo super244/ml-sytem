@@ -169,7 +169,9 @@ def _parse_source_entry(entry: Any, index: int) -> list[SourceSpec]:
     if not isinstance(entry, dict):
         raise TypeError(f"Unsupported source spec: {entry!r}")
 
-    kind = _source_kind_from_value(entry.get("kind") or entry.get("loader") or entry.get("path") or entry.get("url") or entry.get("uri"))
+    kind = _source_kind_from_value(
+        entry.get("kind") or entry.get("loader") or entry.get("path") or entry.get("url") or entry.get("uri")
+    )
     if kind in {"composite", "mix", "group"}:
         child_specs: list[SourceSpec] = []
         for child_index, child in enumerate(entry.get("sources") or []):
@@ -177,7 +179,11 @@ def _parse_source_entry(entry: Any, index: int) -> list[SourceSpec]:
         parent_ratio = _coerce_ratio(entry.get("sample_ratio") or entry.get("ratio") or entry.get("mix_ratio"))
         inherited_version = entry.get("version")
         inherited_optional = bool(entry.get("optional", False))
-        inherited_metadata = {k: v for k, v in entry.items() if k not in {"kind", "loader", "sources", "sample_ratio", "ratio", "mix_ratio"}}
+        inherited_metadata = {
+            k: v
+            for k, v in entry.items()
+            if k not in {"kind", "loader", "sources", "sample_ratio", "ratio", "mix_ratio"}
+        }
         for child_spec in child_specs:
             if parent_ratio is not None:
                 child_spec.sample_ratio = _coerce_ratio((child_spec.sample_ratio or 1.0) * parent_ratio)
@@ -400,9 +406,7 @@ def _source_metadata(spec: SourceSpec, summary: dict[str, Any]) -> dict[str, Any
 
 
 def _build_source_input_infos(specs: list[SourceSpec], summaries: list[dict[str, Any]]) -> list[DatasetFileInfo]:
-    summary_lookup = {
-        (summary["id"], summary.get("path"), summary.get("version")): summary for summary in summaries
-    }
+    summary_lookup = {(summary["id"], summary.get("path"), summary.get("version")): summary for summary in summaries}
     inputs: list[DatasetFileInfo] = []
     for spec in specs:
         if spec.kind == "local" and spec.path:
@@ -478,13 +482,16 @@ def normalize_record(
     reasoning_style = str(record.get("reasoning_style") or ("verification" if record.get("failure_case") else "mixed"))
     loader_kind = str((source_meta or {}).get("source_kind") or "local")
     origin_path = str((source_meta or {}).get("source_path") or record.get("origin_path") or default_source)
-    lineage = record.get("lineage") or SourceLineage(
-        dataset_id=source,
-        dataset_family=source,
-        origin_path=origin_path,
-        loader=loader_kind,
-        source_url=(source_meta or {}).get("source_path") if loader_kind in {"web", "s3"} else None,
-    ).model_dump()
+    lineage = (
+        record.get("lineage")
+        or SourceLineage(
+            dataset_id=source,
+            dataset_family=source,
+            origin_path=origin_path,
+            loader=loader_kind,
+            source_url=(source_meta or {}).get("source_path") if loader_kind in {"web", "s3"} else None,
+        ).model_dump()
+    )
     if not isinstance(lineage, dict):
         lineage = SourceLineage.model_validate(lineage).model_dump()
     if source_meta:
@@ -520,7 +527,8 @@ def normalize_record(
         "reasoning_style": reasoning_style,
         "failure_case": bool(record.get("failure_case", False)),
         "pack_id": record.get("pack_id") or source,
-        "contamination": record.get("contamination") or {
+        "contamination": record.get("contamination")
+        or {
             "checked_against": [],
             "exact_match": False,
             "near_match": False,
@@ -595,9 +603,7 @@ def stratified_split(
 def build_messages(record: dict[str, Any], system_prompt: str) -> list[dict[str, str]]:
     difficulty_line = f"Difficulty target: {record['difficulty']}.\n" if record.get("difficulty") else ""
     topic_line = f"Topic: {record['topic']}.\n" if record.get("topic") else ""
-    reasoning_line = (
-        f"Reasoning style: {record['reasoning_style']}.\n" if record.get("reasoning_style") else ""
-    )
+    reasoning_line = f"Reasoning style: {record['reasoning_style']}.\n" if record.get("reasoning_style") else ""
     failure_line = (
         "This problem comes from a prior model failure case, so be extra careful about correctness.\n"
         if record.get("failure_case")
@@ -733,7 +739,11 @@ def build_corpus(config: ProcessingConfig, config_path: str | Path) -> dict[str,
         config_path=str(config_path),
         config_sha256=sha256_text(config_text),
         seed=config.seed,
-        notes=["atlas_math_lab_v2", f"processing_version={config.processing_version}", f"dataset_version={config.dataset_version}"],
+        notes=[
+            "atlas_math_lab_v2",
+            f"processing_version={config.processing_version}",
+            f"dataset_version={config.dataset_version}",
+        ],
     )
     manifest = DatasetManifest(
         manifest_type="dataset",

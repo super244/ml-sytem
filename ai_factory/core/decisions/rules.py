@@ -219,8 +219,7 @@ def build_feedback_recommendations(
             FeedbackRecommendation(
                 action="evaluate",
                 reason=(
-                    "Queue a follow-up evaluation after the next training cycle to "
-                    "measure whether the changes helped."
+                    "Queue a follow-up evaluation after the next training cycle to measure whether the changes helped."
                 ),
                 priority=3,
                 target_instance_type="evaluate",

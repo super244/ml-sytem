@@ -4,20 +4,14 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 
 import {
-  getInstances,
-  getOrchestrationSummary,
-  getWorkspaceOverview,
-  type InstanceSummary,
-  type OrchestrationSummary,
-  type WorkspaceOverview,
+  getMissionControl,
+  type MissionControlSnapshot,
 } from "@/lib/api";
 import { ROUTES } from "@/lib/routes";
 import { formatCount } from "@/lib/formatting";
 
 type DashboardState = {
-  instances: InstanceSummary[];
-  summary: OrchestrationSummary | null;
-  workspace: WorkspaceOverview | null;
+  mission: MissionControlSnapshot | null;
   loading: boolean;
   error: string | null;
 };
@@ -108,11 +102,52 @@ const LIFECYCLE_STAGES = [
   },
 ];
 
+const LAB_SURFACES = [
+  {
+    stage: "datasets",
+    label: "Datasets",
+    icon: "▤",
+    href: ROUTES.dashboard_datasets,
+    description: "Curate telemetry and dispatch synthesis jobs",
+    color: "var(--accent)",
+    bg: "rgba(15, 122, 97, 0.08)",
+    border: "rgba(15, 122, 97, 0.18)",
+  },
+  {
+    stage: "agents",
+    label: "Agents",
+    icon: "⍾",
+    href: ROUTES.dashboard_agents,
+    description: "Adjust swarm roles and watch orchestration logs",
+    color: "var(--secondary)",
+    bg: "rgba(37, 95, 155, 0.08)",
+    border: "rgba(37, 95, 155, 0.18)",
+  },
+  {
+    stage: "automl",
+    label: "AutoML",
+    icon: "⎈",
+    href: ROUTES.dashboard_automl,
+    description: "Launch sweeps and inspect the best trial fast",
+    color: "#a26e1f",
+    bg: "rgba(162, 110, 31, 0.08)",
+    border: "rgba(162, 110, 31, 0.18)",
+  },
+  {
+    stage: "cluster",
+    label: "Cluster",
+    icon: "▦",
+    href: ROUTES.dashboard_cluster,
+    description: "Track node health, load, and distributed capacity",
+    color: "#6a589b",
+    bg: "rgba(106, 88, 155, 0.08)",
+    border: "rgba(106, 88, 155, 0.18)",
+  },
+];
+
 export default function DashboardPage() {
   const [state, setState] = useState<DashboardState>({
-    instances: [],
-    summary: null,
-    workspace: null,
+    mission: null,
     loading: true,
     error: null,
   });
@@ -120,19 +155,22 @@ export default function DashboardPage() {
   useEffect(() => {
     let active = true;
     async function load() {
-      const [instancesRes, summaryRes, workspaceRes] = await Promise.allSettled([
-        getInstances(),
-        getOrchestrationSummary(),
-        getWorkspaceOverview(),
-      ]);
-      if (!active) return;
-      setState({
-        instances: instancesRes.status === "fulfilled" ? instancesRes.value : [],
-        summary: summaryRes.status === "fulfilled" ? summaryRes.value : null,
-        workspace: workspaceRes.status === "fulfilled" ? workspaceRes.value : null,
-        loading: false,
-        error: null,
-      });
+      try {
+        const mission = await getMissionControl();
+        if (!active) return;
+        setState({
+          mission,
+          loading: false,
+          error: null,
+        });
+      } catch (error) {
+        if (!active) return;
+        setState({
+          mission: null,
+          loading: false,
+          error: error instanceof Error ? error.message : "Mission control could not be loaded.",
+        });
+      }
     }
     void load();
     const interval = setInterval(() => void load(), 8000);
@@ -142,12 +180,20 @@ export default function DashboardPage() {
     };
   }, []);
 
-  const running = state.instances.filter((i) => i.status === "running").length;
-  const completed = state.instances.filter((i) => i.status === "completed").length;
-  const failed = state.instances.filter((i) => i.status === "failed").length;
-  const recent = [...state.instances]
-    .sort((a, b) => (b.updated_at || "").localeCompare(a.updated_at || ""))
-    .slice(0, 6);
+  const mission = state.mission;
+  const instances = mission?.watchlist.instances ?? [];
+  const recent = instances.slice(0, 6);
+  const running = mission?.summary.running_instances ?? 0;
+  const failed = mission?.summary.failed_instances ?? 0;
+  const totalInstances = mission?.summary.instances ?? 0;
+  const completed = Math.max(totalInstances - running - failed, 0);
+  const openCircuits = mission?.summary.open_circuits ?? 0;
+  const labSurfaceCounts = {
+    datasets: mission?.summary.telemetry_backlog ?? 0,
+    agents: mission?.summary.active_agents ?? 0,
+    automl: mission?.summary.running_sweeps ?? 0,
+    cluster: mission?.summary.cluster_nodes ?? 0,
+  } as const;
 
   return (
     <div className="dashboard-content">
@@ -155,26 +201,40 @@ export default function DashboardPage() {
       <div className="dash-hero panel">
         <div className="dash-hero-inner">
           <div className="dash-hero-copy">
-            <span className="eyebrow">AI-Factory v1</span>
-            <h1 className="dash-hero-title">
-              Your Personal<br />AI Laboratory
-            </h1>
+            <span className="eyebrow">V2 Autonomous Loop</span>
+            <h1 className="dash-hero-title">Operate the lab, not just the run.</h1>
             <p className="dash-hero-desc">
-              Full-cycle LLM platform — train, evaluate, finetune, and deploy models
-              from one unified system. End-to-end AI lifecycle management.
+              Launch training, promote failures into new data, configure agents, and keep the full lifecycle moving from one control surface.
             </p>
             <div className="dash-hero-actions">
               <Link className="primary-button" href={ROUTES.training}>
                 Launch Training ▲
               </Link>
-              <Link className="secondary-button" href={ROUTES.monitoring}>
-                Monitor Instances
+              <Link className="secondary-button" href={ROUTES.dashboard_datasets}>
+                Open Lab Loop
               </Link>
+            </div>
+            <div className="dash-command-strip">
+              <span className="dash-command-pill">
+                Ready {mission?.summary.ready_checks ?? 0}/{mission?.summary.total_checks ?? 0}
+              </span>
+              <span className="dash-command-pill">
+                Agents {formatCount(mission?.summary.active_agents ?? 0)}
+              </span>
+              <span className="dash-command-pill">
+                Sweeps {formatCount(mission?.summary.running_sweeps ?? 0)}
+              </span>
+              <span className="dash-command-pill">
+                Telemetry {formatCount(mission?.summary.telemetry_backlog ?? 0)}
+              </span>
+              <span className="dash-command-pill">
+                Circuits {formatCount(openCircuits)}
+              </span>
             </div>
           </div>
           <div className="dash-hero-stats">
             <div className="dash-stat-card">
-              <span className="dash-stat-value">{formatCount(state.instances.length)}</span>
+              <span className="dash-stat-value">{formatCount(totalInstances)}</span>
               <span className="dash-stat-label">Total instances</span>
             </div>
             <div className="dash-stat-card accent">
@@ -193,19 +253,25 @@ export default function DashboardPage() {
         </div>
       </div>
 
+      {state.error && (
+        <div className="dash-error-banner panel">
+          <span>⚠</span> {state.error}
+        </div>
+      )}
+
       {/* Lifecycle Stage Grid */}
       <div className="dash-section-heading">
         <h2 className="dash-section-title">AI Lifecycle</h2>
         <p className="dash-section-desc">
-          Navigate the complete model lifecycle from training through production.
+          Move cleanly from training to deployment without losing operational context.
         </p>
       </div>
 
       <div className="lifecycle-grid">
         {LIFECYCLE_STAGES.map((stage) => {
           const stageInstances = stage.instanceTypes.length
-            ? state.instances.filter((i) => (stage.instanceTypes as string[]).includes(i.type))
-            : state.instances;
+            ? instances.filter((i) => (stage.instanceTypes as string[]).includes(i.type))
+            : instances;
           const stageRunning = stageInstances.filter((i) => i.status === "running").length;
 
           return (
@@ -231,6 +297,39 @@ export default function DashboardPage() {
             </Link>
           );
         })}
+      </div>
+
+      <div className="dash-section-heading">
+        <h2 className="dash-section-title">Autonomous Lab</h2>
+        <p className="dash-section-desc">
+          Dataset curation, swarm control, sweep orchestration, and cluster visibility.
+        </p>
+      </div>
+
+      <div className="lifecycle-grid">
+        {LAB_SURFACES.map((stage) => (
+          <Link key={stage.stage} href={stage.href} className="lifecycle-stage-card">
+            <div
+              className="lifecycle-stage-icon"
+              style={{ background: stage.bg, border: `1px solid ${stage.border}`, color: stage.color }}
+            >
+              {stage.icon}
+            </div>
+            <div className="lifecycle-stage-body">
+              <h3 className="lifecycle-stage-title" style={{ color: stage.color }}>
+                {stage.label}
+              </h3>
+              <p className="lifecycle-stage-desc">{stage.description}</p>
+              <span
+                className="lifecycle-stage-badge"
+                style={{ background: stage.bg, color: stage.color, border: `1px solid ${stage.border}` }}
+              >
+                {formatCount(labSurfaceCounts[stage.stage as keyof typeof labSurfaceCounts])} live
+              </span>
+            </div>
+            <span className="lifecycle-stage-arrow">→</span>
+          </Link>
+        ))}
       </div>
 
       {/* Recent Instances */}
@@ -279,19 +378,19 @@ export default function DashboardPage() {
       )}
 
       {/* Workspace Summary */}
-      {state.workspace && (
+      {mission?.workspace && (
         <>
           <div className="dash-section-heading">
             <h2 className="dash-section-title">Workspace</h2>
           </div>
           <div className="workspace-summary-grid">
             {[
-              { label: "Models", value: state.workspace.summary.models },
-              { label: "Datasets", value: state.workspace.summary.datasets },
-              { label: "Training Profiles", value: state.workspace.summary.training_profiles },
-              { label: "Eval Configs", value: state.workspace.summary.evaluation_configs },
-              { label: "Benchmarks", value: state.workspace.summary.benchmarks },
-              { label: "Runs", value: state.workspace.summary.runs },
+              { label: "Models", value: mission.workspace.summary.models },
+              { label: "Datasets", value: mission.workspace.summary.datasets },
+              { label: "Training Profiles", value: mission.workspace.summary.training_profiles },
+              { label: "Eval Configs", value: mission.workspace.summary.evaluation_configs },
+              { label: "Benchmarks", value: mission.workspace.summary.benchmarks },
+              { label: "Runs", value: mission.workspace.summary.runs },
             ].map((item) => (
               <div key={item.label} className="workspace-summary-card panel">
                 <span className="workspace-summary-value">{formatCount(item.value) ?? "0"}</span>
@@ -302,7 +401,7 @@ export default function DashboardPage() {
         </>
       )}
 
-      {state.loading && !state.instances.length && (
+      {state.loading && !mission && (
         <div className="dash-loading panel">
           <span className="dash-loading-icon">⟳</span>
           <span>Loading AI-Factory dashboard…</span>

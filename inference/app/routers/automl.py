@@ -1,4 +1,5 @@
 """AutoML sweep orchestration — durable, file-backed sweep store."""
+
 from __future__ import annotations
 
 import json
@@ -77,22 +78,24 @@ def _generate_trials(num_trials: int, search_space: SearchSpace) -> list[dict[st
         final_loss = max(0.2, base_loss)
         accuracy = min(0.99, 1.0 - final_loss * 0.6 + random.gauss(0, 0.02))
 
-        trials.append({
-            "trial_id": f"trial-{i:02d}",
-            "status": "completed" if i < num_trials - 1 else "running",
-            "params": {
-                "learning_rate": lr,
-                "batch_size": bs,
-                "warmup_ratio": wr,
-                "lora_rank": rank,
-            },
-            "metrics": {
-                "final_loss": round(final_loss, 4),
-                "accuracy": round(accuracy, 4),
-                "perplexity": round(math.exp(final_loss), 3),
-            },
-            "duration_s": random.randint(60, 600),
-        })
+        trials.append(
+            {
+                "trial_id": f"trial-{i:02d}",
+                "status": "completed" if i < num_trials - 1 else "running",
+                "params": {
+                    "learning_rate": lr,
+                    "batch_size": bs,
+                    "warmup_ratio": wr,
+                    "lora_rank": rank,
+                },
+                "metrics": {
+                    "final_loss": round(final_loss, 4),
+                    "accuracy": round(accuracy, 4),
+                    "perplexity": round(math.exp(final_loss), 3),
+                },
+                "duration_s": random.randint(60, 600),
+            }
+        )
 
     trials.sort(key=lambda t: t["metrics"]["final_loss"])
     return trials

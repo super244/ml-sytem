@@ -8,9 +8,7 @@ from ai_factory.core.discovery import latest_training_run, list_training_runs
 
 
 def parse_args() -> argparse.Namespace:
-    parser = argparse.ArgumentParser(
-        description="Print a compact summary for the latest Atlas training run."
-    )
+    parser = argparse.ArgumentParser(description="Print a compact summary for the latest Atlas training run.")
     parser.add_argument("--json", action="store_true")
     return parser.parse_args()
 

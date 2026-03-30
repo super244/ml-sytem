@@ -36,7 +36,9 @@ def generate_integral_example(
             f"Using the Fundamental Theorem of Calculus, evaluate at the bounds 0 and {upper}. "
             f"The result is {final_answer}.\nFinal Answer: {final_answer}"
         )
-        return make_record(spec, index, difficulty, question, solution, final_answer, [anti_text, final_answer], "definite integration")
+        return make_record(
+            spec, index, difficulty, question, solution, final_answer, [anti_text, final_answer], "definite integration"
+        )
     if mode == "poly_indefinite":
         terms = [(nz(rng, -5, 5), rng.randint(2, 5)), (nz(rng, -5, 5), rng.randint(0, 1))]
         poly = poly_str(terms)
@@ -48,7 +50,9 @@ def generate_integral_example(
             f"That gives the antiderivative {antiderivative} + C.\n"
             f"Final Answer: {final_answer}"
         )
-        return make_record(spec, index, difficulty, question, solution, final_answer, [antiderivative], "termwise antiderivative")
+        return make_record(
+            spec, index, difficulty, question, solution, final_answer, [antiderivative], "termwise antiderivative"
+        )
     if mode == "exp_sub":
         a, b = nz(rng, 1, 5), nz(rng, -5, 5)
         question = f"Evaluate int ({a})e^({a}x {b:+d}) dx."
@@ -58,7 +62,9 @@ def generate_integral_example(
             f"This integrates to e^u + C = e^({a}x {b:+d}) + C.\n"
             f"Final Answer: {final_answer}"
         )
-        return make_record(spec, index, difficulty, question, solution, final_answer, [f"u = {a}x {b:+d}", "e^u"], "substitution")
+        return make_record(
+            spec, index, difficulty, question, solution, final_answer, [f"u = {a}x {b:+d}", "e^u"], "substitution"
+        )
 
     a = nz(rng, 1, 6)
     trig = rng.choice(["sin", "cos"])
@@ -72,4 +78,6 @@ def generate_integral_example(
         f"A factor of 1/{a} appears because the inside derivative is {a}. "
         f"The integral equals {final_answer}.\nFinal Answer: {final_answer}"
     )
-    return make_record(spec, index, difficulty, question, solution, final_answer, [str(a), final_answer], "trigonometric integral")
+    return make_record(
+        spec, index, difficulty, question, solution, final_answer, [str(a), final_answer], "trigonometric integral"
+    )

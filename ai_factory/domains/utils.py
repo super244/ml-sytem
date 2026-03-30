@@ -7,9 +7,7 @@ from .mathematics.config import MathDomainConfig
 
 def list_available_domains() -> list[MathDomainConfig]:
     """List all available domains."""
-    return [
-        MathDomainConfig()
-    ]
+    return [MathDomainConfig()]
 
 
 def get_domain_info(domain_name: str) -> dict[str, Any]:
@@ -22,7 +20,7 @@ def get_domain_info(domain_name: str) -> dict[str, Any]:
             "description": config.description,
             "subdomains": config.subdomains,
             "dataset_families": config.dataset_families,
-            "benchmarks": config.benchmarks
+            "benchmarks": config.benchmarks,
         }
     else:
         raise ValueError(f"Unknown domain: {domain_name}")

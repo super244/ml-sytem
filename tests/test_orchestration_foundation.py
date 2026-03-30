@@ -100,7 +100,8 @@ def test_repository_prepare_template_loads(monkeypatch: pytest.MonkeyPatch):
     config = loader.load_orchestration_config("configs/prepare.yaml")
 
     assert config.instance.type == "prepare"
-    assert config.subsystem.config_ref == "data/configs/processing.yaml"
+    assert config.subsystem.config_ref == "../data/configs/processing.yaml"
+    assert config.resolved_subsystem_config_path.endswith("data/configs/processing.yaml")
 
 
 def test_save_cloud_profile_uses_nested_store_and_secure_permissions(

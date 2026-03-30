@@ -18,11 +18,15 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--input", required=True)
     parser.add_argument("--limit", type=int, default=5)
     parser.add_argument(
-        "--fields", nargs="+", default=["question", "solution"],
+        "--fields",
+        nargs="+",
+        default=["question", "solution"],
         help="Fields to concatenate for tokenization preview.",
     )
     parser.add_argument("--tokenizer", default=None, help="Optional Hugging Face tokenizer name or local path.")
-    parser.add_argument("--token-preview-length", type=int, default=12, help="Number of preview tokens to show per field.")
+    parser.add_argument(
+        "--token-preview-length", type=int, default=12, help="Number of preview tokens to show per field."
+    )
     return parser.parse_args()
 
 

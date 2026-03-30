@@ -51,7 +51,7 @@ Recommended:
 ## 2. Clone And Enter The Repo
 
 ```bash
-git clone <your-repo-url> ai-factory
+git clone https://github.com/super244/ai-factory.git
 cd ai-factory
 ```
 
@@ -344,9 +344,9 @@ docker compose up --build
 
 Repo files:
 
-- [Dockerfile.api](/Users/raofu/ai-factory/Dockerfile.api)
-- [Dockerfile.frontend](/Users/raofu/ai-factory/Dockerfile.frontend)
-- [docker-compose.yml](/Users/raofu/ai-factory/docker-compose.yml)
+- [Dockerfile.api](Dockerfile.api)
+- [Dockerfile.frontend](Dockerfile.frontend)
+- [docker-compose.yml](docker-compose.yml)
 
 This is useful when you want a cleaner separation between API and frontend services.
 
@@ -415,7 +415,7 @@ make frontend-build
 
 ## 17. Where To Go Next
 
-- [README.md](/Users/raofu/ai-factory/README.md)
-- [docs/runbook.md](/Users/raofu/ai-factory/docs/runbook.md)
-- [docs/experiment-playbook.md](/Users/raofu/ai-factory/docs/experiment-playbook.md)
-- [docs/deployment-guide.md](/Users/raofu/ai-factory/docs/deployment-guide.md)
+- [README.md](README.md)
+- [docs/runbook.md](docs/runbook.md)
+- [docs/experiment-playbook.md](docs/experiment-playbook.md)
+- [docs/deployment-guide.md](docs/deployment-guide.md)

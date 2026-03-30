@@ -26,9 +26,7 @@ class DesktopInterface:
 
     def _should_use_native_shell(self) -> bool:
         return (
-            os.environ.get("AI_FACTORY_DESKTOP_NATIVE") == "1"
-            and sys.platform == "darwin"
-            and self.native_available()
+            os.environ.get("AI_FACTORY_DESKTOP_NATIVE") == "1" and sys.platform == "darwin" and self.native_available()
         )
 
     def build_native(self) -> None:

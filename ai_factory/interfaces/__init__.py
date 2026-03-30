@@ -2,7 +2,7 @@
 
 This package provides consistent interfaces across all interaction methods:
 - CLI: Command-line interface for automation and scripting
-- TUI: Terminal user interface for interactive system management  
+- TUI: Terminal user interface for interactive system management
 - Web: Browser-based dashboard for monitoring and control
 - Desktop: Native desktop application for full visual control
 
@@ -15,9 +15,4 @@ from .desktop import DesktopInterface
 from .tui import TUIInterface
 from .web import WebInterface
 
-__all__ = [
-    "CLIInterface",
-    "TUIInterface", 
-    "WebInterface",
-    "DesktopInterface"
-]
+__all__ = ["CLIInterface", "TUIInterface", "WebInterface", "DesktopInterface"]

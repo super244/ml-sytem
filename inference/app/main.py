@@ -12,6 +12,7 @@ from inference.app.routers.datasets import router as datasets_router
 from inference.app.routers.generation import router as generation_router
 from inference.app.routers.health import router as health_router
 from inference.app.routers.instances import router as instances_router
+from inference.app.routers.lab import router as lab_router
 from inference.app.routers.metadata import router as metadata_router
 from inference.app.routers.openai import router as openai_router
 from inference.app.routers.orchestration import router as orchestration_router
@@ -41,6 +42,7 @@ app.include_router(cluster_router, prefix="/v1")
 app.include_router(datasets_router, prefix="/v1")
 app.include_router(agents_router, prefix="/v1")
 app.include_router(automl_router, prefix="/v1")
+app.include_router(lab_router, prefix="/v1")
 
 # Backward-compatible aliases.
 app.include_router(health_router)

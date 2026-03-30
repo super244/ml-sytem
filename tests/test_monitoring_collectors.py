@@ -51,9 +51,7 @@ def test_collect_metrics_for_training_instance(tmp_path: Path, monkeypatch: pyte
         '"metadata": {"published": {"final_adapter": "artifacts/models/demo"}}}'
     )
     (run_dir / "metrics" / "metrics.json").write_text('{"eval_loss": 0.42, "train_loss": 0.9}')
-    (run_dir / "metrics" / "dataset_report.json").write_text(
-        '{"tokenized_train_rows": 12, "tokenized_eval_rows": 4}'
-    )
+    (run_dir / "metrics" / "dataset_report.json").write_text('{"tokenized_train_rows": 12, "tokenized_eval_rows": 4}')
     (run_dir / "metrics" / "model_report.json").write_text('{"trainable_ratio": 0.123}')
     (run_dir / "logs" / "training_metrics.jsonl").write_text(
         '{"step": 1, "loss": 1.5, "lr": 0.001}\n{"step": 2, "loss": 1.0, "lr": 0.0005}\n'

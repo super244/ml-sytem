@@ -170,8 +170,7 @@ class TuiController:
                 logs = live.logs.model_dump(mode="json")
                 metrics = live.metrics.model_dump(mode="json")
                 available_actions = [
-                    action.get("label", action.get("action", ""))
-                    for action in (live.available_actions or [])
+                    action.get("label", action.get("action", "")) for action in (live.available_actions or [])
                 ]
             else:
                 self.selected_index = 0
@@ -292,8 +291,8 @@ def _render_help_overlay(screen: Any, height: int, width: int) -> None:
     start_x = max((width - box_w) // 2, 1)
     for row in range(box_h):
         _safe_addstr(screen, start_y + row, start_x, " " * box_w, curses.A_REVERSE)
-    for idx, line in enumerate(lines[:box_h - 2]):
-        _safe_addstr(screen, start_y + 1 + idx, start_x + 1, line[:box_w - 2], curses.A_REVERSE)
+    for idx, line in enumerate(lines[: box_h - 2]):
+        _safe_addstr(screen, start_y + 1 + idx, start_x + 1, line[: box_w - 2], curses.A_REVERSE)
 
 
 def _render_instances(screen: Any, top: int, width: int, height: int, controller: TuiController) -> int:
@@ -304,7 +303,7 @@ def _render_instances(screen: Any, top: int, width: int, height: int, controller
         _safe_addstr(screen, top + 2, 1, "ai-factory new --config ...", curses.A_DIM)
         return top + 3
     col_header = f"{'NAME':<16} {'TYPE':<8} {'STATUS':<8} {'PROGRESS':<14} {'UPDATED':<9}"
-    _safe_addstr(screen, top + 1, 1, col_header[:width - 2], curses.A_DIM)
+    _safe_addstr(screen, top + 1, 1, col_header[: width - 2], curses.A_DIM)
     available_rows = max(height - top - 5, 1)
     start = max(0, controller.selected_index - available_rows + 1)
     rows = instances[start : start + available_rows]
@@ -322,7 +321,7 @@ def _render_instances(screen: Any, top: int, width: int, height: int, controller
         updated = _format_timestamp(instance.updated_at)
         line = f"{icon} {instance.name:<15} {instance.type:<8} {instance.status:<8} {progress_str:<14} {updated}"
         attr = curses.A_REVERSE if selected else _status_attr(instance.status)
-        _safe_addstr(screen, row, 1, line[:width - 2], attr)
+        _safe_addstr(screen, row, 1, line[: width - 2], attr)
     bottom = top + 2 + len(rows) + 1
     if len(instances) > available_rows:
         _safe_addstr(screen, bottom - 1, 1, f"  [{start + 1}-{start + len(rows)} of {len(instances)}]", curses.A_DIM)
@@ -369,9 +368,7 @@ def _render_detail(screen: Any, top: int, left: int, width: int, height: int, co
         row += 1
         bar = _progress_bar(instance.progress.percent, width=20)
         pct = (
-            f"{instance.progress.percent * 100:.0f}%"
-            if isinstance(instance.progress.percent, (int, float))
-            else "n/a"
+            f"{instance.progress.percent * 100:.0f}%" if isinstance(instance.progress.percent, (int, float)) else "n/a"
         )
         _safe_addstr(screen, row, left, f"  {bar} {pct}  {instance.progress.stage}")
         row += 1
@@ -385,8 +382,12 @@ def _render_detail(screen: Any, top: int, left: int, width: int, height: int, co
             row += 1
 
     metric_keys = [
-        ("accuracy", True), ("parse_rate", True), ("avg_latency_s", False),
-        ("loss", False), ("perplexity", False), ("latest_step", False),
+        ("accuracy", True),
+        ("parse_rate", True),
+        ("avg_latency_s", False),
+        ("loss", False),
+        ("perplexity", False),
+        ("latest_step", False),
     ]
     visible_metrics = [(k, p) for k, p in metric_keys if _metric(metrics_summary, k) is not None]
     if visible_metrics:
@@ -588,12 +589,16 @@ def _curses_main(screen: Any, controller: TuiController) -> None:
             controller.refresh()
             last_refresh = time.time()
             continue
-        if key in {ord("g"),}:
+        if key in {
+            ord("g"),
+        }:
             controller.selected_index = 0
             controller.refresh()
             last_refresh = time.time()
             continue
-        if key in {ord("G"),}:
+        if key in {
+            ord("G"),
+        }:
             controller.selected_index = max(len(controller.snapshot.instances) - 1, 0)
             controller.refresh()
             last_refresh = time.time()

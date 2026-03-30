@@ -93,11 +93,7 @@ class JsonArtifactTracker:
         self._append_event("params", payload)
 
     def log_metrics(self, payload: dict[str, Any], *, step: int | None = None) -> None:
-        metrics = {
-            key: value
-            for key, value in payload.items()
-            if isinstance(value, (int, float, bool))
-        }
+        metrics = {key: value for key, value in payload.items() if isinstance(value, (int, float, bool))}
         if not metrics:
             return
         if step is not None:
@@ -142,11 +138,7 @@ class MlflowTracker(NullTracker):
         self._mlflow.log_params(sanitized)
 
     def log_metrics(self, payload: dict[str, Any], *, step: int | None = None) -> None:
-        metrics = {
-            key: float(value)
-            for key, value in payload.items()
-            if isinstance(value, (int, float))
-        }
+        metrics = {key: float(value) for key, value in payload.items() if isinstance(value, (int, float))}
         if metrics:
             self._mlflow.log_metrics(metrics, step=step)
 
@@ -185,11 +177,7 @@ class WandbTracker(NullTracker):
         return None
 
     def log_metrics(self, payload: dict[str, Any], *, step: int | None = None) -> None:
-        metrics = {
-            key: value
-            for key, value in payload.items()
-            if isinstance(value, (int, float, bool))
-        }
+        metrics = {key: value for key, value in payload.items() if isinstance(value, (int, float, bool))}
         if metrics:
             self._wandb.log(metrics, step=step)
 

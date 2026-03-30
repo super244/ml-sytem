@@ -42,7 +42,9 @@ def generate_limits_series_example(
             f"For rational functions of the same degree, the limit at infinity is the ratio of leading coefficients. "
             f"That ratio is {a}/{d} = {answer}.\nFinal Answer: {answer}"
         )
-        return make_record(spec, index, difficulty, question, solution, answer, [f"{a}/{d}", answer], "asymptotic ratio")
+        return make_record(
+            spec, index, difficulty, question, solution, answer, [f"{a}/{d}", answer], "asymptotic ratio"
+        )
     if mode == "p_series":
         p = rng.choice([Fraction(1, 2), Fraction(2, 3), Fraction(3, 2), Fraction(5, 4), Fraction(2, 1), Fraction(3, 1)])
         answer = "converges" if p > 1 else "diverges"
@@ -52,7 +54,9 @@ def generate_limits_series_example(
             f"A p-series converges exactly when p > 1. Therefore the series {answer}.\n"
             f"Final Answer: {answer}"
         )
-        return make_record(spec, index, difficulty, question, solution, answer, [f"p = {frac_str(p)}", answer], "convergence test")
+        return make_record(
+            spec, index, difficulty, question, solution, answer, [f"p = {frac_str(p)}", answer], "convergence test"
+        )
 
     ratio = Fraction(rng.choice([1, 2, 3, 4]), rng.choice([5, 6, 7, 8]))
     answer = frac_str(Fraction(1, 1) / (1 - ratio))
@@ -61,4 +65,6 @@ def generate_limits_series_example(
         f"The common ratio is r = {frac_str(ratio)}, which satisfies |r| < 1. "
         f"So the sum is 1/(1-r) = {answer}.\nFinal Answer: {answer}"
     )
-    return make_record(spec, index, difficulty, question, solution, answer, [f"r = {frac_str(ratio)}", answer], "geometric series")
+    return make_record(
+        spec, index, difficulty, question, solution, answer, [f"r = {frac_str(ratio)}", answer], "geometric series"
+    )

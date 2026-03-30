@@ -41,6 +41,7 @@ async def test_orchestration_routes_expose_runs_tasks_and_summary(tmp_path: Path
     settings = AppSettings(
         title="test",
         version="0.0.0",
+        repo_root=str(tmp_path),
         cors_origins=["*"],
         model_registry_path=str(tmp_path / "inference" / "configs" / "model_registry.yaml"),
         prompt_library_path=str(tmp_path / "inference" / "configs" / "prompt_presets.yaml"),
@@ -118,6 +119,7 @@ async def test_instance_routes_support_control_center_creation_and_inference(tmp
     settings = AppSettings(
         title="test",
         version="0.0.0",
+        repo_root=str(tmp_path),
         cors_origins=["*"],
         model_registry_path=str(tmp_path / "inference" / "configs" / "model_registry.yaml"),
         prompt_library_path=str(tmp_path / "inference" / "configs" / "prompt_presets.yaml"),
@@ -196,6 +198,7 @@ async def test_instance_live_stream_and_foundation_routes(tmp_path: Path, monkey
     settings = AppSettings(
         title="test",
         version="0.0.0",
+        repo_root=str(tmp_path),
         cors_origins=["*"],
         model_registry_path=str(tmp_path / "inference" / "configs" / "model_registry.yaml"),
         prompt_library_path=str(tmp_path / "inference" / "configs" / "prompt_presets.yaml"),
@@ -257,6 +260,7 @@ async def test_instance_action_route_supports_generic_follow_up_actions(tmp_path
     settings = AppSettings(
         title="test",
         version="0.0.0",
+        repo_root=str(tmp_path),
         cors_origins=["*"],
         model_registry_path=str(tmp_path / "inference" / "configs" / "model_registry.yaml"),
         prompt_library_path=str(tmp_path / "inference" / "configs" / "prompt_presets.yaml"),

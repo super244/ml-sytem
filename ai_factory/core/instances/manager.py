@@ -10,8 +10,6 @@ from typing import Any
 import yaml
 
 from ai_factory.core.config.loader import (
-    apply_environment_override,
-    apply_experience_guardrails,
     build_orchestration_config,
     load_cloud_profile,
     load_orchestration_config,
@@ -34,6 +32,7 @@ from ai_factory.core.instances.models import (
 )
 from ai_factory.core.instances.queries import InstanceQueryService
 from ai_factory.core.instances.store import FileInstanceStore
+from ai_factory.core.instances.utils import _SafeTemplateDict, _deep_merge, _source_artifact_ref, _stage_for_instance_type
 from ai_factory.core.io import write_json
 from ai_factory.core.monitoring.collectors import collect_metrics_for_instance
 from ai_factory.core.monitoring.events import InstanceEvent
@@ -42,42 +41,6 @@ from ai_factory.core.orchestration.sqlite import SqliteControlPlane
 from ai_factory.core.platform.settings import PlatformSettings, get_platform_settings
 from ai_factory.core.plugins.registry import PluginRegistry, build_default_plugin_registry
 from ai_factory.core.state import LifecycleStateManager
-
-
-class _SafeTemplateDict(dict[str, Any]):
-    def __missing__(self, key: str) -> str:
-        return "{" + key + "}"
-
-
-def _deep_merge(left: dict[str, Any], right: dict[str, Any]) -> dict[str, Any]:
-    merged = deepcopy(left)
-    for key, value in right.items():
-        if isinstance(value, dict) and isinstance(merged.get(key), dict):
-            merged[key] = _deep_merge(merged[key], value)
-        else:
-            merged[key] = value
-    return merged
-
-
-def _source_artifact_ref(manifest: InstanceManifest) -> str | None:
-    return (
-        (manifest.artifact_refs.get("published") or {}).get("final_adapter")
-        or (manifest.artifact_refs.get("published") or {}).get("merged_model")
-        or manifest.artifact_refs.get("source_artifact")
-    )
-
-
-def _stage_for_instance_type(instance_type: str) -> str:
-    mapping = {
-        "prepare": "prepare",
-        "train": "train",
-        "finetune": "finetune",
-        "evaluate": "evaluate",
-        "inference": "infer",
-        "deploy": "publish",
-        "report": "decide",
-    }
-    return mapping.get(instance_type, "train")
 
 
 class InstanceManager:
@@ -377,17 +340,19 @@ class InstanceManager:
             execution_updates=execution_updates,
             metadata_updates=metadata_updates,
         )
-        config = apply_environment_override(config, environment_override)
-        config = apply_experience_guardrails(config)
+        
+        # Create the base instance using the original manager logic
         manifest = self._base_manifest(
             config,
             config_path=config_path,
             parent_instance_id=parent_instance_id,
             metadata_updates=metadata_updates,
         )
-        snapshot = config.model_dump(mode="json")
-        self.store.create(manifest, snapshot)
-        self.orchestration.ensure_run_for_instance(manifest, snapshot)
+        
+        # Save using store
+        self.store.create(manifest, config.model_dump(mode="json"))
+        
+        self.orchestration.ensure_run_for_instance(manifest, config.model_dump(mode="json"))
         manifest = self._project_manifest(manifest)
         self.store.save(manifest)
 

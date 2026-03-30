@@ -41,11 +41,7 @@ def get_generation_service() -> GenerationService:
     registry = MathModelRegistry(load_registry_from_yaml(settings.model_registry_path))
     presets = load_prompt_presets(settings.prompt_library_path)
     cache = FileResponseCache(settings.cache_dir) if settings.cache_enabled else None
-    telemetry = (
-        JsonlTelemetryLogger(settings.telemetry_path)
-        if settings.telemetry_enabled
-        else None
-    )
+    telemetry = JsonlTelemetryLogger(settings.telemetry_path) if settings.telemetry_enabled else None
     generator = MathGenerator(registry, prompt_presets=presets, cache=cache, telemetry=telemetry)
     return GenerationService(generator, settings)
 

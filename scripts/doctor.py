@@ -14,9 +14,7 @@ from data.catalog import load_catalog, load_pack_summary
 
 
 def parse_args() -> argparse.Namespace:
-    parser = argparse.ArgumentParser(
-        description="Inspect the local AI-Factory environment and artifact state."
-    )
+    parser = argparse.ArgumentParser(description="Inspect the local AI-Factory environment and artifact state.")
     parser.add_argument("--json", action="store_true", help="Emit machine-readable JSON.")
     return parser.parse_args()
 
@@ -43,8 +41,7 @@ def main() -> None:
         recommended_next_steps.append("python scripts/latest_run.py")
     else:
         recommended_next_steps.append(
-            "python -m training.train --config "
-            "training/configs/profiles/baseline_qlora.yaml --dry-run"
+            "python -m training.train --config training/configs/profiles/baseline_qlora.yaml --dry-run"
         )
     if not frontend_ready:
         recommended_next_steps.append("cd frontend && npm install")

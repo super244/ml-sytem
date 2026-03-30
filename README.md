@@ -83,7 +83,7 @@ AI-Factory/
 ### **Installation**
 ```bash
 # Clone the repository
-git clone https://github.com/super244/ml-sytem.git
+git clone https://github.com/super244/ai-factory.git
 cd ai-factory
 
 # Install in development mode
@@ -203,8 +203,8 @@ export AI_FACTORY_LOG_LEVEL="INFO"
 ## 🌟 **Community & Support**
 
 ### **Getting Help**
-- **Issues**: [GitHub Issues](https://github.com/super244/ml-sytem/issues)
-- **Discussions**: [GitHub Discussions](https://github.com/super244/ml-sytem/discussions)
+- **Issues**: [GitHub Issues](https://github.com/super244/ai-factory/issues)
+- **Discussions**: [GitHub Discussions](https://github.com/super244/ai-factory/discussions)
 - **Documentation**: [Full Documentation](docs/)
 
 ### **Contributing**
@@ -226,4 +226,4 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 **AI-Factory** - *Your complete AI development platform* 🚀
 
-> For more information, visit our [documentation](docs/) or join our [community discussions](https://github.com/super244/ml-sytem/discussions).
+> For more information, visit our [documentation](docs/) or join our [community discussions](https://github.com/super244/ai-factory/discussions).

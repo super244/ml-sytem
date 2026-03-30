@@ -20,7 +20,9 @@ def _is_calculus_like(record: dict[str, Any]) -> bool:
 DEFAULT_PACK_DEFINITIONS: dict[str, dict[str, Any]] = {
     "core_train_mix": {
         "description": "Primary mixed-source training corpus across all supported math reasoning families.",
-        "predicate": lambda record: record.get("dataset_split") in {"train", "eval", "test", "benchmark", "unspecified"},
+        "predicate": lambda record: (
+            record.get("dataset_split") in {"train", "eval", "test", "benchmark", "unspecified"}
+        ),
     },
     "calculus_hard_pack": {
         "description": "Hard and olympiad calculus-focused examples for specialist adaptation.",
@@ -28,7 +30,9 @@ DEFAULT_PACK_DEFINITIONS: dict[str, dict[str, Any]] = {
     },
     "olympiad_reasoning_pack": {
         "description": "Proof-style olympiad reasoning examples spanning algebra, number theory, and combinatorics.",
-        "predicate": lambda record: record.get("reasoning_style") == "proof" or "olympiad" in (record.get("tags") or []),
+        "predicate": lambda record: (
+            record.get("reasoning_style") == "proof" or "olympiad" in (record.get("tags") or [])
+        ),
     },
     "failure_replay_pack": {
         "description": "Failure-driven replay corpus collected from previous evaluations.",

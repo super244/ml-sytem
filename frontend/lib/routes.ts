@@ -1,7 +1,5 @@
-import type { Route } from "next";
-
 type NavItem = {
-  href: Route;
+  href: string;
   label: string;
 };
 
@@ -23,7 +21,7 @@ export const ROUTES = {
   dashboard_agents: "/dashboard/agents",
   dashboard_automl: "/dashboard/automl",
   dashboard_cluster: "/dashboard/cluster",
-} as const satisfies Record<string, Route>;
+} as const;
 
 export const NAV_ITEMS = [
   { href: ROUTES.dashboard, label: "Dashboard" },

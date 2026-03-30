@@ -5,15 +5,19 @@ import {
   getAgentSwarmStatus,
   getAgentLogs,
   deployAgent,
+  updateAgent,
   type AgentSwarmStatus,
   type AgentLogEvent,
   type AgentDeployRequest,
+  type AgentUpdateRequest,
 } from "@/lib/api";
 
 export default function AgentsPage() {
   const [agents, setAgents] = useState<AgentSwarmStatus[]>([]);
   const [logs, setLogs] = useState<AgentLogEvent[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
   
   // Deploy Agent State
   const [showDeployModal, setShowDeployModal] = useState(false);
@@ -23,6 +27,14 @@ export default function AgentsPage() {
     model: "gpt-4o",
   });
   const [deploying, setDeploying] = useState(false);
+  const [editingAgentId, setEditingAgentId] = useState<string | null>(null);
+  const [editingAgent, setEditingAgent] = useState<AgentUpdateRequest>({
+    name: "",
+    role: "",
+    model: "gpt-4o",
+    status: "active",
+  });
+  const [savingAgent, setSavingAgent] = useState(false);
 
   const endOfTerminalRef = useRef<HTMLDivElement>(null);
 
@@ -33,7 +45,9 @@ export default function AgentsPage() {
         setAgents(swarm);
         setLogs(initialLogs);
       })
-      .catch(() => null)
+      .catch((nextError) => {
+        setError(nextError instanceof Error ? nextError.message : "Failed to load swarm state.");
+      })
       .finally(() => setLoading(false));
   }, []);
 
@@ -69,15 +83,46 @@ export default function AgentsPage() {
   async function handleDeploy() {
     if (!newAgent.name || !newAgent.role || deploying) return;
     setDeploying(true);
+    setError(null);
+    setNotice(null);
     try {
       const res = await deployAgent(newAgent);
       setAgents((prev) => [...prev, res.agent]);
       setShowDeployModal(false);
       setNewAgent({ name: "", role: "", model: "gpt-4o" });
-    } catch (e) {
-      console.error(e);
+      setNotice(`Agent '${res.agent.name}' deployed.`);
+    } catch (nextError) {
+      setError(nextError instanceof Error ? nextError.message : "Failed to deploy agent.");
     } finally {
       setDeploying(false);
+    }
+  }
+
+  function openAgentEditor(agent: AgentSwarmStatus) {
+    setEditingAgentId(agent.id);
+    setEditingAgent({
+      name: agent.name,
+      role: agent.role,
+      model: agent.model,
+      status: agent.status,
+    });
+  }
+
+  async function handleAgentSave() {
+    if (!editingAgentId || savingAgent) return;
+    setSavingAgent(true);
+    setError(null);
+    setNotice(null);
+
+    try {
+      const res = await updateAgent(editingAgentId, editingAgent);
+      setAgents((prev) => prev.map((agent) => (agent.id === editingAgentId ? res.agent : agent)));
+      setNotice(`Updated ${res.agent.name}.`);
+      setEditingAgentId(null);
+    } catch (nextError) {
+      setError(nextError instanceof Error ? nextError.message : "Failed to update agent.");
+    } finally {
+      setSavingAgent(false);
     }
   }
 
@@ -88,11 +133,13 @@ export default function AgentsPage() {
           <span className="eyebrow">V2 Lab → Agents</span>
           <h1 className="dash-page-title">Swarm Controller</h1>
           <p className="dash-page-desc">
-            Monitor the multi-agent AI brain orchestrating the lab. 
-            View autonomous data curation, red-team evaluations, and training optimizations in real-time.
+            Inspect the active swarm, adjust agent roles, and watch orchestration activity as it happens.
           </p>
         </div>
       </div>
+
+      {error && <div className="dash-error-banner panel">⚠ {error}</div>}
+      {notice && <div className="panel state-panel">{notice}</div>}
 
       <div className="workspace-section-grid">
         
@@ -141,7 +188,9 @@ export default function AgentsPage() {
                 </div>
                 
                 <div style={{ marginTop: "1rem", paddingTop: "1rem", borderTop: "1px solid var(--line)", display: "flex", justifyContent: "flex-end" }}>
-                  <button className="ghost-button small">Configure Instructions</button>
+                  <button className="ghost-button small" onClick={() => openAgentEditor(agent)}>
+                    Configure Instructions
+                  </button>
                 </div>
               </div>
             ))}
@@ -240,6 +289,67 @@ export default function AgentsPage() {
                 className="ghost-button" 
                 onClick={() => setShowDeployModal(false)}
               >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {editingAgentId && (
+        <div className="modal-overlay" style={{ position: "fixed", top: 0, left: 0, right: 0, bottom: 0, background: "rgba(0,0,0,0.6)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000, backdropFilter: "blur(4px)" }}>
+          <div className="panel" style={{ width: "420px", padding: "1.5rem", display: "flex", flexDirection: "column", gap: "1rem" }}>
+            <h2 className="section-title">Configure Agent</h2>
+
+            <div className="input-group">
+              <label className="control-label">Agent Name</label>
+              <input
+                type="text"
+                value={editingAgent.name ?? ""}
+                onChange={(e) => setEditingAgent((current) => ({ ...current, name: e.target.value }))}
+              />
+            </div>
+
+            <div className="input-group">
+              <label className="control-label">Role</label>
+              <textarea
+                value={editingAgent.role ?? ""}
+                onChange={(e) => setEditingAgent((current) => ({ ...current, role: e.target.value }))}
+                style={{ height: "88px" }}
+              />
+            </div>
+
+            <div className="input-group">
+              <label className="control-label">Model</label>
+              <input
+                type="text"
+                value={editingAgent.model ?? ""}
+                onChange={(e) => setEditingAgent((current) => ({ ...current, model: e.target.value }))}
+              />
+            </div>
+
+            <div className="input-group">
+              <label className="control-label">Status</label>
+              <select
+                value={editingAgent.status ?? "active"}
+                onChange={(e) => setEditingAgent((current) => ({ ...current, status: e.target.value as AgentSwarmStatus["status"] }))}
+              >
+                <option value="active">Active</option>
+                <option value="sleeping">Sleeping</option>
+                <option value="offline">Offline</option>
+              </select>
+            </div>
+
+            <div style={{ display: "flex", gap: "0.75rem", marginTop: "0.5rem" }}>
+              <button
+                className="primary-button"
+                style={{ flex: 1, justifyContent: "center" }}
+                disabled={savingAgent || !editingAgent.name || !editingAgent.role}
+                onClick={() => void handleAgentSave()}
+              >
+                {savingAgent ? "Saving..." : "Save Changes"}
+              </button>
+              <button className="ghost-button" onClick={() => setEditingAgentId(null)}>
                 Cancel
               </button>
             </div>

@@ -88,10 +88,12 @@ def compare_runs(
                 "right": right_value,
                 "delta": abs_delta,
                 "pct_change": _pct_change(left_value, right_value),
-                "direction": "improved" if (
+                "direction": "improved"
+                if (
                     (_metric_lower_is_better(key) and abs_delta < 0)
                     or (not _metric_lower_is_better(key) and abs_delta > 0)
-                ) else ("regressed" if abs_delta != 0 else "unchanged"),
+                )
+                else ("regressed" if abs_delta != 0 else "unchanged"),
             }
     metric_name = primary_metric or _best_metric_key({**left["metrics"], **right["metrics"]})
     winner = None
@@ -151,34 +153,44 @@ def _build_comparison_recommendations(
 ) -> list[dict[str, str]]:
     recs: list[dict[str, str]] = []
     if not primary_metric or not winner:
-        recs.append({
-            "action": "add_metrics",
-            "reason": "No comparable metrics found. Ensure both runs produce evaluation metrics.",
-        })
+        recs.append(
+            {
+                "action": "add_metrics",
+                "reason": "No comparable metrics found. Ensure both runs produce evaluation metrics.",
+            }
+        )
         return recs
     if winner == "tie":
-        recs.append({
-            "action": "differentiate",
-            "reason": f"Both runs tied on {primary_metric}. Try adjusting learning rate, data mix, or adapter rank.",
-        })
+        recs.append(
+            {
+                "action": "differentiate",
+                "reason": f"Both runs tied on {primary_metric}. Try adjusting learning rate, data mix, or adapter rank.",
+            }
+        )
     elif winner == "right":
-        recs.append({
-            "action": "iterate_on_right",
-            "reason": f"Right run is better on {primary_metric}. Consider continuing from its checkpoint.",
-        })
+        recs.append(
+            {
+                "action": "iterate_on_right",
+                "reason": f"Right run is better on {primary_metric}. Consider continuing from its checkpoint.",
+            }
+        )
     else:
-        recs.append({
-            "action": "iterate_on_left",
-            "reason": f"Left run is better on {primary_metric}. Consider continuing from its checkpoint.",
-        })
+        recs.append(
+            {
+                "action": "iterate_on_left",
+                "reason": f"Left run is better on {primary_metric}. Consider continuing from its checkpoint.",
+            }
+        )
 
     loss_info = delta.get("eval_loss") or delta.get("loss")
     if loss_info and isinstance(loss_info, dict):
         if loss_info.get("direction") == "regressed":
-            recs.append({
-                "action": "check_overfitting",
-                "reason": "Loss regressed between runs. Check for overfitting or data distribution shift.",
-            })
+            recs.append(
+                {
+                    "action": "check_overfitting",
+                    "reason": "Loss regressed between runs. Check for overfitting or data distribution shift.",
+                }
+            )
 
     return recs
 
@@ -209,12 +221,14 @@ def format_comparison_report(report: dict[str, Any]) -> str:
         lines.append("")
 
     if report.get("config_diff"):
-        lines.extend([
-            "## Config Differences",
-            "",
-            _json_block(report["config_diff"]),
-            "",
-        ])
+        lines.extend(
+            [
+                "## Config Differences",
+                "",
+                _json_block(report["config_diff"]),
+                "",
+            ]
+        )
 
     if report.get("recommendations"):
         lines.extend(["## Recommendations", ""])

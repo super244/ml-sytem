@@ -7,8 +7,4 @@ from .alerts import AlertManager
 from .manager import MonitoringManager
 from .metrics import MetricsCollector
 
-__all__ = [
-    "MonitoringManager",
-    "MetricsCollector",
-    "AlertManager"
-]
+__all__ = ["MonitoringManager", "MetricsCollector", "AlertManager"]

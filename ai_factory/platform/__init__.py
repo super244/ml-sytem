@@ -5,7 +5,7 @@ monitoring, and deployment of AI-Factory workloads.
 
 Key components:
 - scaling: Distributed training and resource management
-- monitoring: Real-time metrics collection and alerting  
+- monitoring: Real-time metrics collection and alerting
 - deployment: Multi-target model deployment pipeline
 """
 
@@ -16,9 +16,9 @@ from .utils import create_multi_domain_training, get_platform_status, scale_plat
 
 __all__ = [
     "ScalingManager",
-    "MonitoringManager", 
+    "MonitoringManager",
     "DeploymentManager",
     "get_platform_status",
     "scale_platform",
-    "create_multi_domain_training"
+    "create_multi_domain_training",
 ]

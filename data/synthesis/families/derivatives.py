@@ -26,7 +26,9 @@ def generate_derivative_example(
             f"Therefore f'(x) = u'(x)v(x) + u(x)v'(x) = ({dpoly})e^({c}x) + {c}({poly})e^({c}x).\n"
             f"Final Answer: {derivative}"
         )
-        return make_record(spec, index, difficulty, question, solution, derivative, [dpoly, f"e^({c}x)"], "product rule")
+        return make_record(
+            spec, index, difficulty, question, solution, derivative, [dpoly, f"e^({c}x)"], "product rule"
+        )
     if mode == "poly_trig":
         a, n, c, d = nz(rng, 1, 5), rng.randint(2, 5), nz(rng, 1, 5), rng.randint(-4, 4)
         trig = rng.choice(["sin", "cos"])
@@ -57,7 +59,16 @@ def generate_derivative_example(
             f"The derivative of the polynomial part is {dpoly}. "
             f"Add the two contributions.\nFinal Answer: {derivative}"
         )
-        return make_record(spec, index, difficulty, question, solution, derivative, [dpoly, f"{a}/({a}x {b:+d})"], "logarithmic differentiation")
+        return make_record(
+            spec,
+            index,
+            difficulty,
+            question,
+            solution,
+            derivative,
+            [dpoly, f"{a}/({a}x {b:+d})"],
+            "logarithmic differentiation",
+        )
 
     point = rng.randint(-2, 3)
     terms = [(nz(rng, -4, 4), rng.randint(2, 5)), (nz(rng, -4, 4), 1), (rng.randint(-5, 5), 0)]
@@ -71,4 +82,13 @@ def generate_derivative_example(
         f"Substitute x = {point}: h'({point}) = {frac_str(slope)}.\n"
         f"Final Answer: {derivative}"
     )
-    return make_record(spec, index, difficulty, question, solution, derivative, [poly_str(dterms), derivative], "pointwise derivative evaluation")
+    return make_record(
+        spec,
+        index,
+        difficulty,
+        question,
+        solution,
+        derivative,
+        [poly_str(dterms), derivative],
+        "pointwise derivative evaluation",
+    )

@@ -75,37 +75,11 @@ function Sparkline({ values, color = "var(--accent)", height = 40, width = 120 }
 
 // ─── Live Terminal Component ───────────────────────────────────────────────────
 
-function LiveTerminal({ instanceId, running }: { instanceId: string; running: boolean }) {
-  const [lines, setLines] = useState<string[]>(["Connecting to instance log stream…"]);
+function LiveTerminal({ logText }: { logText: string }) {
   const bottomRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    if (!instanceId) return;
-    let active = true;
-
-    async function fetchLogs() {
-      try {
-        const detail = await getInstanceDetail(instanceId);
-        if (!active) return;
-        const stdout = detail.logs?.stdout ?? "";
-        const stderr = detail.logs?.stderr ?? "";
-        const combined = [stdout, stderr].filter(Boolean).join("\n");
-        const newLines = combined
-          ? combined.split("\n").filter((l) => l.trim()).slice(-200)
-          : ["No log output yet — instance is initializing…"];
-        setLines(newLines);
-      } catch {
-        if (active) setLines((prev) => [...prev, "[log fetch error — retrying…]"]);
-      }
-    }
-
-    void fetchLogs();
-    const interval = setInterval(() => void fetchLogs(), running ? 2000 : 10000);
-    return () => {
-      active = false;
-      clearInterval(interval);
-    };
-  }, [instanceId, running]);
+  const lines = logText
+    ? logText.split("\n").filter((line) => line.trim()).slice(-200)
+    : ["No log output yet — instance is initializing…"];
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -177,7 +151,7 @@ function InstanceDetailPanel({
       }
     }
     void poll();
-    const interval = setInterval(() => void poll(), isRunning ? 2000 : 8000);
+    const interval = setInterval(() => void poll(), isRunning ? 3000 : 10_000);
     return () => { active = false; clearInterval(interval); };
   }, [instanceId, isRunning]);
 
@@ -194,6 +168,9 @@ function InstanceDetailPanel({
 
   const pct = detail ? progressPct(detail) : null;
   const numericMetrics = Object.entries(detail?.metrics_summary ?? {}).filter(([, v]) => typeof v === "number");
+  const logText = [detail?.logs?.stdout ?? "", detail?.logs?.stderr ?? ""]
+    .filter(Boolean)
+    .join("\n");
 
   return (
     <div className="instance-detail-panel panel" style={{ marginBottom: "1.5rem", border: `2px solid ${detail ? statusColor(detail.status) : "var(--line)"}` }}>
@@ -288,7 +265,7 @@ function InstanceDetailPanel({
                 </span>
               )}
             </div>
-            <LiveTerminal instanceId={instanceId} running={isRunning} />
+            <LiveTerminal logText={logText} />
           </div>
 
           {/* Action Buttons */}
@@ -340,7 +317,7 @@ export default function MonitoringPage() {
 
   useEffect(() => {
     void refresh();
-    const interval = setInterval(() => void refresh(), 4000);
+    const interval = setInterval(() => void refresh(), 6000);
     return () => clearInterval(interval);
   }, [refresh]);
 

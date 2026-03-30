@@ -21,7 +21,9 @@ def deduplicate_near_duplicates(
         "deduped_near": 0,
     }
     seen_exact: dict[str, dict[str, Any]] = {}
-    for record in sorted(records, key=lambda item: (item.get("quality_score", 0.0), item.get("difficulty", "")), reverse=True):
+    for record in sorted(
+        records, key=lambda item: (item.get("quality_score", 0.0), item.get("difficulty", "")), reverse=True
+    ):
         fingerprint = stable_question_fingerprint(record.get("question", ""))
         if fingerprint in seen_exact:
             report["deduped_exact"] += 1

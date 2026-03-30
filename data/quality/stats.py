@@ -25,6 +25,7 @@ def compute_record_stats(records: list[dict[str, Any]]) -> dict[str, Any]:
         "contaminated_count": sum(
             1
             for record in records
-            if (record.get("contamination") or {}).get("exact_match") or (record.get("contamination") or {}).get("near_match")
+            if (record.get("contamination") or {}).get("exact_match")
+            or (record.get("contamination") or {}).get("near_match")
         ),
     }

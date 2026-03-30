@@ -45,8 +45,7 @@ def inspect_checkpoint(ckpt_path: Path) -> CheckpointInfo | None:
         size_bytes=total_size,
         has_optimizer=any(ckpt_path.glob("optimizer*")),
         has_scheduler=any(ckpt_path.glob("scheduler*")),
-        has_adapter=(ckpt_path / "adapter_model.safetensors").exists()
-        or (ckpt_path / "adapter_model.bin").exists(),
+        has_adapter=(ckpt_path / "adapter_model.safetensors").exists() or (ckpt_path / "adapter_model.bin").exists(),
         trainer_state=_read_trainer_state(ckpt_path),
     )
 
@@ -83,11 +82,7 @@ def validate_checkpoint(ckpt_path: str | Path) -> list[str]:
     match = _CHECKPOINT_PATTERN.match(path.name)
     if not match:
         errors.append(f"Checkpoint directory name does not match pattern checkpoint-N: {path.name}")
-    has_model = (
-        any(path.glob("*.safetensors"))
-        or any(path.glob("*.bin"))
-        or any(path.glob("pytorch_model*"))
-    )
+    has_model = any(path.glob("*.safetensors")) or any(path.glob("*.bin")) or any(path.glob("pytorch_model*"))
     if not has_model:
         errors.append("No model weights found (safetensors/bin/pytorch_model)")
     state = _read_trainer_state(path)
@@ -111,8 +106,7 @@ def resolve_resume_checkpoint(
     }
     available = list_checkpoints(checkpoint_dir)
     report["available_checkpoints"] = [
-        {"step": c.step, "path": str(c.path), "size_mb": round(c.size_bytes / (1024 * 1024), 1)}
-        for c in available
+        {"step": c.step, "path": str(c.path), "size_mb": round(c.size_bytes / (1024 * 1024), 1)} for c in available
     ]
     if explicit_checkpoint:
         errors = validate_checkpoint(explicit_checkpoint)

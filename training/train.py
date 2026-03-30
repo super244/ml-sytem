@@ -387,11 +387,7 @@ def main() -> None:
         tracker_summary = {
             "train_rows": summary["train_rows"],
             "eval_rows": summary["eval_rows"],
-            **{
-                key: value
-                for key, value in metrics.items()
-                if isinstance(value, (int, float))
-            },
+            **{key: value for key, value in metrics.items() if isinstance(value, (int, float))},
         }
         if config.tracking.log_summary_artifact:
             tracker.log_artifact(summary_path, name="reports")
