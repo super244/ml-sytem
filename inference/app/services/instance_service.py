@@ -204,10 +204,22 @@ class InstanceService:
 
     def retry_orchestration_task(self, task_id: str) -> OrchestrationRunDetail:
         try:
-            self.control.retry_instance(task_id)
+            task = self.manager.orchestration.control_plane.get_task(task_id)
+            if task is None:
+                task = self.manager.orchestration.control_plane.get_task_by_legacy_instance(task_id)
+            if task is None:
+                raise FileNotFoundError(f"Unknown orchestration task: {task_id}")
+            retry_target = task.legacy_instance_id
+            if retry_target is None:
+                run = self.manager.orchestration.control_plane.get_run(task.run_id)
+                if run is not None and run.legacy_instance_id:
+                    retry_target = run.legacy_instance_id
+            if retry_target is None:
+                raise FileNotFoundError(f"Unknown orchestration task: {task_id}")
+            self.control.retry_instance(retry_target)
         except FileNotFoundError as exc:
             raise HTTPException(status_code=404, detail=str(exc)) from exc
-        return self.get_orchestration_run(task_id)
+        return self.get_orchestration_run(task.run_id)
 
     def get_orchestration_summary(self) -> OrchestrationSummaryResponse:
         return OrchestrationSummaryResponse(summary=self.control.monitoring_summary())

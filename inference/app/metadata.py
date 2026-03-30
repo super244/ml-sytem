@@ -1,10 +1,11 @@
 from __future__ import annotations
 
 import time
+from pathlib import Path
 from typing import Any
 
 from ai_factory.core.discovery import list_training_runs, load_benchmark_registry
-from data.catalog import list_sample_prompts, load_catalog, load_pack_summary
+from data.catalog import list_sample_prompts, load_catalog, load_dataset_provenance
 from inference.app.config import AppSettings
 
 _START_TIME = time.monotonic()
@@ -28,11 +29,19 @@ class MetadataService:
         self.start_time = start_time or _START_TIME
 
     def dataset_dashboard(self) -> dict[str, Any]:
-        catalog = load_catalog()
-        catalog["packs"] = load_pack_summary().get("packs", [])
+        repo_root = self.settings.repo_root
+        catalog = load_catalog(Path(repo_root) / "data" / "catalog.json", repo_root=repo_root)
+        provenance = load_dataset_provenance(
+            repo_root=repo_root,
+            processed_manifest_path=Path(repo_root) / "data" / "processed" / "manifest.json",
+            pack_summary_path=Path(repo_root) / "data" / "processed" / "pack_summary.json",
+        )
+        catalog["packs"] = provenance["pack_summary"].get("packs", [])
+        catalog["provenance"] = provenance
         return catalog
 
     def prompt_library(self, limit: int = 12) -> dict[str, Any]:
+        repo_root = self.settings.repo_root
         presets = [
             {
                 "id": preset.id,
@@ -42,7 +51,14 @@ class MetadataService:
             }
             for preset in self.prompt_presets.values()
         ]
-        return {"presets": presets, "examples": list_sample_prompts(limit=limit)}
+        return {
+            "presets": presets,
+            "examples": list_sample_prompts(
+                limit=limit,
+                path=Path(repo_root) / "data" / "catalog.json",
+                repo_root=repo_root,
+            ),
+        }
 
     def benchmark_library(self) -> list[dict[str, Any]]:
         return load_benchmark_registry(self.settings.benchmark_registry_path)

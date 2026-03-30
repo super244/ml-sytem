@@ -292,6 +292,73 @@ export type DatasetPreview = {
   final_answer: string;
 };
 
+export type DatasetBuildInfo = {
+  build_id: string;
+  created_at?: string;
+  git_sha?: string | null;
+  config_path?: string | null;
+  config_sha256?: string | null;
+  seed?: number | null;
+  notes?: string[];
+};
+
+export type DatasetFileInfo = {
+  path: string;
+  sha256: string;
+  size_bytes: number;
+  num_rows: number;
+};
+
+export type DatasetLineageSummaryGroup = {
+  source_id: string;
+  loader: string;
+  version?: string | null;
+  origin_path?: string | null;
+  dataset_split: string;
+  failure_case: boolean;
+  record_count: number;
+  exact_matches: number;
+  near_matches: number;
+  contaminated_records: number;
+  max_similarity: number;
+};
+
+export type DatasetLineageSummary = {
+  total_records: number;
+  contamination: {
+    exact_matches: number;
+    near_matches: number;
+    contaminated_records: number;
+    failure_cases: number;
+  };
+  by_split: Record<string, number>;
+  by_loader: Record<string, number>;
+  groups: DatasetLineageSummaryGroup[];
+};
+
+export type DatasetManifest = {
+  schema_version: string;
+  manifest_type: "dataset" | "pack" | "benchmark";
+  build: DatasetBuildInfo;
+  pack_id?: string | null;
+  description?: string | null;
+  inputs: DatasetFileInfo[];
+  outputs: DatasetFileInfo[];
+  source_lineage: Array<{
+    dataset_id: string;
+    dataset_family: string;
+    origin_path?: string | null;
+    loader: string;
+    source_url?: string | null;
+    license?: string | null;
+    filters: Record<string, unknown>;
+    source_record_id?: string | null;
+    notes: string[];
+  }>;
+  stats: Record<string, unknown>;
+  metadata: Record<string, unknown>;
+};
+
 export type DatasetEntry = {
   id: string;
   title: string;
@@ -315,6 +382,20 @@ export type PackEntry = {
   num_rows: number;
   size_bytes: number;
   path: string;
+  manifest_path?: string | null;
+  card_path?: string | null;
+  build_id?: string | null;
+  build?: DatasetBuildInfo | null;
+  stats?: Record<string, unknown>;
+};
+
+export type DatasetProvenance = {
+  processed_manifest: DatasetManifest | null;
+  pack_summary: {
+    packs: PackEntry[];
+  };
+  pack_manifests: DatasetManifest[];
+  lineage_summary: DatasetLineageSummary | null;
 };
 
 export type DatasetDashboard = {
@@ -328,6 +409,7 @@ export type DatasetDashboard = {
   };
   datasets: DatasetEntry[];
   packs?: PackEntry[];
+  provenance?: DatasetProvenance;
 };
 
 export type PromptPreset = {
@@ -601,6 +683,11 @@ export type MissionControlSnapshot = {
   repo_root: string;
   workspace: WorkspaceOverview;
   orchestration: OrchestrationSummary;
+  criticality: {
+    level: "critical" | "warning" | "opportunity" | "info";
+    counts: Record<string, number>;
+  };
+  recommendations: MissionControlRecommendation[];
   watchlist: {
     instances: InstanceSummary[];
     running_instances: InstanceSummary[];
@@ -667,6 +754,18 @@ export type MissionControlSnapshot = {
     training_profiles: number;
     open_circuits: number;
   };
+};
+
+export type MissionControlRecommendation = {
+  id: string;
+  severity: "critical" | "warning" | "opportunity" | "info";
+  title: string;
+  detail: string;
+  surface: string;
+  href: string;
+  metric_label?: string | null;
+  metric_value?: string | null;
+  command?: string | null;
 };
 
 export type CreateManagedInstanceRequest = {

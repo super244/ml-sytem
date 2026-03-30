@@ -1,10 +1,12 @@
 "use client";
 
+import type { Route } from "next";
 import Link from "next/link";
 import { useEffect, useState } from "react";
 
 import {
   getMissionControl,
+  type MissionControlRecommendation,
   type MissionControlSnapshot,
 } from "@/lib/api";
 import { ROUTES } from "@/lib/routes";
@@ -31,6 +33,39 @@ function InstanceStatusDot({ status }: { status: string }) {
       title={status}
     />
   );
+}
+
+function severityTone(severity: MissionControlRecommendation["severity"]) {
+  if (severity === "critical") {
+    return {
+      label: "Critical",
+      color: "var(--danger)",
+      bg: "rgba(191, 90, 64, 0.08)",
+      border: "rgba(191, 90, 64, 0.18)",
+    };
+  }
+  if (severity === "warning") {
+    return {
+      label: "Warning",
+      color: "#c47b20",
+      bg: "rgba(196, 123, 32, 0.08)",
+      border: "rgba(196, 123, 32, 0.18)",
+    };
+  }
+  if (severity === "opportunity") {
+    return {
+      label: "Opportunity",
+      color: "var(--accent)",
+      bg: "rgba(15, 122, 97, 0.08)",
+      border: "rgba(15, 122, 97, 0.18)",
+    };
+  }
+  return {
+    label: "Info",
+    color: "var(--secondary)",
+    bg: "rgba(37, 95, 155, 0.08)",
+    border: "rgba(37, 95, 155, 0.18)",
+  };
 }
 
 const LIFECYCLE_STAGES = [
@@ -188,6 +223,8 @@ export default function DashboardPage() {
   const totalInstances = mission?.summary.instances ?? 0;
   const completed = Math.max(totalInstances - running - failed, 0);
   const openCircuits = mission?.summary.open_circuits ?? 0;
+  const priorityQueue = mission?.recommendations ?? [];
+  const criticality = mission?.criticality.level ?? "info";
   const labSurfaceCounts = {
     datasets: mission?.summary.telemetry_backlog ?? 0,
     agents: mission?.summary.active_agents ?? 0,
@@ -230,6 +267,9 @@ export default function DashboardPage() {
               <span className="dash-command-pill">
                 Circuits {formatCount(openCircuits)}
               </span>
+              <span className="dash-command-pill">
+                Criticality {criticality}
+              </span>
             </div>
           </div>
           <div className="dash-hero-stats">
@@ -256,6 +296,62 @@ export default function DashboardPage() {
       {state.error && (
         <div className="dash-error-banner panel">
           <span>⚠</span> {state.error}
+        </div>
+      )}
+
+      <div className="dash-section-heading">
+        <h2 className="dash-section-title">Priority Queue</h2>
+        <p className="dash-section-desc">
+          The next best actions based on readiness, failures, telemetry backlog, and idle capacity.
+        </p>
+      </div>
+
+      {priorityQueue.length > 0 ? (
+        <div className="dash-priority-grid">
+          {priorityQueue.map((item) => {
+            const tone = severityTone(item.severity);
+            return (
+              <article
+                key={item.id}
+                className="recommendation-card dash-priority-card"
+                style={{ background: tone.bg, borderColor: tone.border }}
+              >
+                <div className="dash-priority-header">
+                  <span className="status-pill" style={{ color: tone.color, borderColor: tone.border }}>
+                    {tone.label}
+                  </span>
+                  <span className="dash-priority-surface">{item.surface}</span>
+                </div>
+                <h3 className="dash-priority-title" style={{ color: tone.color }}>
+                  {item.title}
+                </h3>
+                <p>{item.detail}</p>
+                <div className="dash-priority-footer">
+                  <div className="dash-priority-meta">
+                    {item.metric_label && item.metric_value ? (
+                      <span className="dash-priority-metric">
+                        {item.metric_label}: {item.metric_value}
+                      </span>
+                    ) : null}
+                    {item.command ? (
+                      <code className="dash-priority-command">{item.command}</code>
+                    ) : null}
+                  </div>
+                  <Link className="ghost-button small" href={item.href as Route}>
+                    Open →
+                  </Link>
+                </div>
+              </article>
+            );
+          })}
+        </div>
+      ) : (
+        <div className="panel state-panel">
+          <div className="eyebrow">Priority Queue</div>
+          <h2 className="state-title">No urgent blockers detected.</h2>
+          <p className="hero-copy">
+            Mission control did not detect any immediate actions. The workspace and lab surfaces are in a steady state.
+          </p>
         </div>
       )}
 
