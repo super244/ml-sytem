@@ -188,4 +188,9 @@ async def test_mission_control_endpoint_aggregates_lab_surfaces(tmp_path: Path, 
     assert payload["cluster"]["nodes"][0]["id"] == "gpu-1"
     assert payload["telemetry"]["flagged"]["count"] == 1
     assert payload["telemetry"]["requests"]["by_model"]["finetuned"] == 1
+    assert payload["criticality"]["counts"]["warning"] >= 1
+    assert any(
+        item["id"] == "telemetry-backlog" and item["surface"] == "datasets" and item["metric_value"] == "1"
+        for item in payload["recommendations"]
+    )
     assert payload["summary"]["telemetry_requests"] == 2

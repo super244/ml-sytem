@@ -71,11 +71,17 @@ async def test_orchestration_routes_expose_runs_tasks_and_summary(tmp_path: Path
         assert run_id is not None
         detail_response = await client.get(f"/v1/orchestration/runs/{run_id}")
         tasks_response = await client.get(f"/v1/orchestration/runs/{run_id}/tasks")
+        task_id = tasks_response.json()["tasks"][0]["id"]
+        retry_response = await client.post(f"/v1/orchestration/tasks/{task_id}/retry")
         summary_response = await client.get("/v1/orchestration/summary")
 
     assert detail_response.status_code == 200
     assert tasks_response.status_code == 200
     assert len(tasks_response.json()["tasks"]) == 1
+    assert retry_response.status_code == 200
+    retry_payload = retry_response.json()
+    assert retry_payload["run"]["id"] == run_id
+    assert retry_payload["tasks"][0]["run_id"] == run_id
     assert summary_response.status_code == 200
     assert summary_response.json()["summary"]["runs"] == 1
 

@@ -7,6 +7,7 @@ import json
 import math
 import random
 import re
+from collections import Counter
 from collections.abc import Iterable
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -405,6 +406,79 @@ def _source_metadata(spec: SourceSpec, summary: dict[str, Any]) -> dict[str, Any
     return {key: value for key, value in metadata.items() if value is not None}
 
 
+def _build_lineage_summary(records: list[dict[str, Any]]) -> dict[str, Any]:
+    groups: dict[tuple[str | None, str | None, str | None, str | None, str, bool], dict[str, Any]] = {}
+    totals = Counter()
+    for record in records:
+        lineage = record.get("lineage") if isinstance(record.get("lineage"), dict) else {}
+        metadata = record.get("metadata") if isinstance(record.get("metadata"), dict) else {}
+        contamination = record.get("contamination") if isinstance(record.get("contamination"), dict) else {}
+        source_id = str(
+            metadata.get("source_spec_id")
+            or lineage.get("dataset_id")
+            or record.get("source")
+            or "unknown"
+        )
+        loader = str(metadata.get("source_kind") or lineage.get("loader") or "unknown")
+        version = metadata.get("source_version")
+        origin_path = metadata.get("source_path") or lineage.get("origin_path")
+        split = str(record.get("dataset_split") or "unspecified")
+        failure_case = bool(record.get("failure_case"))
+        key = (source_id, loader, version, origin_path, split, failure_case)
+        group = groups.setdefault(
+            key,
+            {
+                "source_id": source_id,
+                "loader": loader,
+                "version": version,
+                "origin_path": origin_path,
+                "dataset_split": split,
+                "failure_case": failure_case,
+                "record_count": 0,
+                "exact_matches": 0,
+                "near_matches": 0,
+                "contaminated_records": 0,
+                "max_similarity": 0.0,
+            },
+        )
+        exact_match = bool(contamination.get("exact_match"))
+        near_match = bool(contamination.get("near_match"))
+        similarity = float(contamination.get("max_similarity") or 0.0)
+        group["record_count"] += 1
+        group["exact_matches"] += int(exact_match)
+        group["near_matches"] += int(near_match)
+        group["contaminated_records"] += int(exact_match or near_match)
+        group["max_similarity"] = max(group["max_similarity"], similarity)
+        totals["records"] += 1
+        totals["exact_matches"] += int(exact_match)
+        totals["near_matches"] += int(near_match)
+        totals["contaminated_records"] += int(exact_match or near_match)
+        totals["failure_cases"] += int(failure_case)
+        totals[f"split:{split}"] += 1
+        totals[f"loader:{loader}"] += 1
+    grouped_records = sorted(
+        groups.values(),
+        key=lambda item: (item["record_count"], item["exact_matches"], item["near_matches"], item["source_id"]),
+        reverse=True,
+    )
+    return {
+        "total_records": len(records),
+        "contamination": {
+            "exact_matches": totals["exact_matches"],
+            "near_matches": totals["near_matches"],
+            "contaminated_records": totals["contaminated_records"],
+            "failure_cases": totals["failure_cases"],
+        },
+        "by_split": {
+            key.split(":", 1)[1]: value for key, value in totals.items() if key.startswith("split:")
+        },
+        "by_loader": {
+            key.split(":", 1)[1]: value for key, value in totals.items() if key.startswith("loader:")
+        },
+        "groups": grouped_records,
+    }
+
+
 def _build_source_input_infos(specs: list[SourceSpec], summaries: list[dict[str, Any]]) -> list[DatasetFileInfo]:
     summary_lookup = {(summary["id"], summary.get("path"), summary.get("version")): summary for summary in summaries}
     inputs: list[DatasetFileInfo] = []
@@ -730,6 +804,9 @@ def build_corpus(config: ProcessingConfig, config_path: str | Path) -> dict[str,
     }
     stats_path = output_dir / "stats.json"
     write_json(stats_path, stats)
+    lineage_summary = _build_lineage_summary(normalized_all)
+    lineage_summary_path = output_dir / "lineage_summary.json"
+    write_json(lineage_summary_path, lineage_summary)
 
     repo_root = Path(__file__).resolve().parents[2]
     config_text = Path(config_path).read_text()
@@ -754,7 +831,10 @@ def build_corpus(config: ProcessingConfig, config_path: str | Path) -> dict[str,
             *_build_source_input_infos(source_specs, source_summaries),
             *[_build_file_info(path) for path in resolve_source_paths(config.failure_logs)],
         ],
-        outputs=[_build_file_info(path) for path in [normalized_path, train_path, eval_path, test_path, stats_path]],
+        outputs=[
+            _build_file_info(path)
+            for path in [normalized_path, train_path, eval_path, test_path, stats_path, lineage_summary_path]
+        ],
         source_lineage=[SourceLineage.model_validate(record["lineage"]) for record in normalized_all[:1000]],
         stats=stats,
         metadata={
@@ -762,6 +842,7 @@ def build_corpus(config: ProcessingConfig, config_path: str | Path) -> dict[str,
             "dataset_version": config.dataset_version,
             "processing_version": config.processing_version,
             "source_spec_version": config.source_spec_version,
+            "lineage_summary_path": str(lineage_summary_path),
             "source_summaries": source_summaries,
             "source_warnings": source_warnings,
         },
@@ -797,6 +878,7 @@ def build_corpus(config: ProcessingConfig, config_path: str | Path) -> dict[str,
         "output_dir": str(output_dir),
         "stats": stats,
         "manifest_path": str(manifest_path),
+        "lineage_summary_path": str(lineage_summary_path),
         "derived_packs": derived_pack_summaries,
         "source_summaries": source_summaries,
         "source_warnings": source_warnings,

@@ -43,6 +43,11 @@ def test_build_derived_packs(tmp_path: Path):
     ids = {item["id"] for item in summaries}
     assert "calculus_hard_pack" in ids
     assert "benchmark_holdout_pack" in ids
+    assert all(item["manifest_path"].endswith("manifest.json") for item in summaries)
+    assert all(item["card_path"].endswith("card.md") for item in summaries)
+    manifest = json.loads((tmp_path / "calculus_hard_pack" / "manifest.json").read_text())
+    assert manifest["build"]["build_id"] == "unit-test"
+    assert manifest["metadata"]["card_path"].endswith("card.md")
 
 
 def test_coerce_source_specs_flattens_composite_ratios():
@@ -108,6 +113,7 @@ def test_build_corpus_tracks_source_versions_and_ratios(tmp_path: Path, monkeypa
 
     result = corpus_builder.build_corpus(config, config_path)
     manifest = json.loads(Path(result["manifest_path"]).read_text())
+    lineage_summary = json.loads(Path(result["lineage_summary_path"]).read_text())
 
     assert result["stats"]["all"]["num_records"] == 4
     assert len(result["source_summaries"]) == 2
@@ -116,7 +122,11 @@ def test_build_corpus_tracks_source_versions_and_ratios(tmp_path: Path, monkeypa
     assert manifest["metadata"]["dataset_version"] == "v2"
     assert manifest["metadata"]["source_summaries"][0]["version"] == "2026.03"
     assert manifest["metadata"]["source_summaries"][1]["sample_ratio"] == 0.5
+    assert manifest["metadata"]["lineage_summary_path"].endswith("lineage_summary.json")
     assert "processing_version=v1" in manifest["build"]["notes"]
+    assert lineage_summary["total_records"] == 4
+    assert lineage_summary["contamination"]["contaminated_records"] == 0
+    assert lineage_summary["groups"][0]["record_count"] == 2
 
 
 def test_web_source_loader_reads_jsonl_payload(monkeypatch):

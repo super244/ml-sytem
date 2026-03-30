@@ -36,6 +36,30 @@
         },
         {
           "kind" : "file",
+          "name" : "/Users/luca/Projects/ai-factory/desktop/macos/AIFactoryNative/Sources/AIFactoryNative/InstanceListView.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/luca/Projects/ai-factory/desktop/macos/AIFactoryNative/Sources/AIFactoryNative/LogStreamView.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/luca/Projects/ai-factory/desktop/macos/AIFactoryNative/Sources/AIFactoryNative/MainTabView.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/luca/Projects/ai-factory/desktop/macos/AIFactoryNative/Sources/AIFactoryNative/MenuBarStatusView.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/luca/Projects/ai-factory/desktop/macos/AIFactoryNative/Sources/AIFactoryNative/MetricsChartView.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/luca/Projects/ai-factory/desktop/macos/AIFactoryNative/Sources/AIFactoryNative/SettingsView.swift"
+        },
+        {
+          "kind" : "file",
           "name" : "/Users/luca/Projects/ai-factory/desktop/macos/AIFactoryNative/.build/arm64-apple-macosx/debug/swift-version--58304C5D6DBC2206.txt"
         },
         {
@@ -49,11 +73,17 @@
       "objects" : [
         "/Users/luca/Projects/ai-factory/desktop/macos/AIFactoryNative/.build/arm64-apple-macosx/debug/AIFactoryNative.build/AIFactoryNativeApp.swift.o",
         "/Users/luca/Projects/ai-factory/desktop/macos/AIFactoryNative/.build/arm64-apple-macosx/debug/AIFactoryNative.build/ControlCenterView.swift.o",
-        "/Users/luca/Projects/ai-factory/desktop/macos/AIFactoryNative/.build/arm64-apple-macosx/debug/AIFactoryNative.build/DesktopBridge.swift.o"
+        "/Users/luca/Projects/ai-factory/desktop/macos/AIFactoryNative/.build/arm64-apple-macosx/debug/AIFactoryNative.build/DesktopBridge.swift.o",
+        "/Users/luca/Projects/ai-factory/desktop/macos/AIFactoryNative/.build/arm64-apple-macosx/debug/AIFactoryNative.build/InstanceListView.swift.o",
+        "/Users/luca/Projects/ai-factory/desktop/macos/AIFactoryNative/.build/arm64-apple-macosx/debug/AIFactoryNative.build/LogStreamView.swift.o",
+        "/Users/luca/Projects/ai-factory/desktop/macos/AIFactoryNative/.build/arm64-apple-macosx/debug/AIFactoryNative.build/MainTabView.swift.o",
+        "/Users/luca/Projects/ai-factory/desktop/macos/AIFactoryNative/.build/arm64-apple-macosx/debug/AIFactoryNative.build/MenuBarStatusView.swift.o",
+        "/Users/luca/Projects/ai-factory/desktop/macos/AIFactoryNative/.build/arm64-apple-macosx/debug/AIFactoryNative.build/MetricsChartView.swift.o",
+        "/Users/luca/Projects/ai-factory/desktop/macos/AIFactoryNative/.build/arm64-apple-macosx/debug/AIFactoryNative.build/SettingsView.swift.o"
       ],
       "otherArguments" : [
         "-target",
-        "arm64-apple-macosx13.0",
+        "arm64-apple-macosx14.0",
         "-incremental",
         "-enable-batch-mode",
         "-serialize-diagnostics",
@@ -74,6 +104,8 @@
         "AIFactoryNative_main",
         "-swift-version",
         "5",
+        "-enable-experimental-feature",
+        "StrictConcurrency",
         "-plugin-path",
         "/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/lib/swift/host/plugins/testing",
         "-sdk",
@@ -116,6 +148,30 @@
         },
         {
           "kind" : "file",
+          "name" : "/Users/luca/Projects/ai-factory/desktop/macos/AIFactoryNative/.build/arm64-apple-macosx/debug/AIFactoryNative.build/InstanceListView.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/luca/Projects/ai-factory/desktop/macos/AIFactoryNative/.build/arm64-apple-macosx/debug/AIFactoryNative.build/LogStreamView.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/luca/Projects/ai-factory/desktop/macos/AIFactoryNative/.build/arm64-apple-macosx/debug/AIFactoryNative.build/MainTabView.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/luca/Projects/ai-factory/desktop/macos/AIFactoryNative/.build/arm64-apple-macosx/debug/AIFactoryNative.build/MenuBarStatusView.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/luca/Projects/ai-factory/desktop/macos/AIFactoryNative/.build/arm64-apple-macosx/debug/AIFactoryNative.build/MetricsChartView.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/luca/Projects/ai-factory/desktop/macos/AIFactoryNative/.build/arm64-apple-macosx/debug/AIFactoryNative.build/SettingsView.swift.o"
+        },
+        {
+          "kind" : "file",
           "name" : "/Users/luca/Projects/ai-factory/desktop/macos/AIFactoryNative/.build/arm64-apple-macosx/debug/Modules/AIFactoryNative.swiftmodule"
         }
       ],
@@ -123,7 +179,13 @@
       "sources" : [
         "/Users/luca/Projects/ai-factory/desktop/macos/AIFactoryNative/Sources/AIFactoryNative/AIFactoryNativeApp.swift",
         "/Users/luca/Projects/ai-factory/desktop/macos/AIFactoryNative/Sources/AIFactoryNative/ControlCenterView.swift",
-        "/Users/luca/Projects/ai-factory/desktop/macos/AIFactoryNative/Sources/AIFactoryNative/DesktopBridge.swift"
+        "/Users/luca/Projects/ai-factory/desktop/macos/AIFactoryNative/Sources/AIFactoryNative/DesktopBridge.swift",
+        "/Users/luca/Projects/ai-factory/desktop/macos/AIFactoryNative/Sources/AIFactoryNative/InstanceListView.swift",
+        "/Users/luca/Projects/ai-factory/desktop/macos/AIFactoryNative/Sources/AIFactoryNative/LogStreamView.swift",
+        "/Users/luca/Projects/ai-factory/desktop/macos/AIFactoryNative/Sources/AIFactoryNative/MainTabView.swift",
+        "/Users/luca/Projects/ai-factory/desktop/macos/AIFactoryNative/Sources/AIFactoryNative/MenuBarStatusView.swift",
+        "/Users/luca/Projects/ai-factory/desktop/macos/AIFactoryNative/Sources/AIFactoryNative/MetricsChartView.swift",
+        "/Users/luca/Projects/ai-factory/desktop/macos/AIFactoryNative/Sources/AIFactoryNative/SettingsView.swift"
       ],
       "tempsPath" : "/Users/luca/Projects/ai-factory/desktop/macos/AIFactoryNative/.build/arm64-apple-macosx/debug/AIFactoryNative.build",
       "wholeModuleOptimization" : false
@@ -143,10 +205,16 @@
       "/Users/luca/Projects/ai-factory/desktop/macos/AIFactoryNative/Sources/AIFactoryNative/AIFactoryNativeApp.swift",
       "/Users/luca/Projects/ai-factory/desktop/macos/AIFactoryNative/Sources/AIFactoryNative/ControlCenterView.swift",
       "/Users/luca/Projects/ai-factory/desktop/macos/AIFactoryNative/Sources/AIFactoryNative/DesktopBridge.swift",
+      "/Users/luca/Projects/ai-factory/desktop/macos/AIFactoryNative/Sources/AIFactoryNative/InstanceListView.swift",
+      "/Users/luca/Projects/ai-factory/desktop/macos/AIFactoryNative/Sources/AIFactoryNative/LogStreamView.swift",
+      "/Users/luca/Projects/ai-factory/desktop/macos/AIFactoryNative/Sources/AIFactoryNative/MainTabView.swift",
+      "/Users/luca/Projects/ai-factory/desktop/macos/AIFactoryNative/Sources/AIFactoryNative/MenuBarStatusView.swift",
+      "/Users/luca/Projects/ai-factory/desktop/macos/AIFactoryNative/Sources/AIFactoryNative/MetricsChartView.swift",
+      "/Users/luca/Projects/ai-factory/desktop/macos/AIFactoryNative/Sources/AIFactoryNative/SettingsView.swift",
       "-I",
       "/Users/luca/Projects/ai-factory/desktop/macos/AIFactoryNative/.build/arm64-apple-macosx/debug/Modules",
       "-target",
-      "arm64-apple-macosx13.0",
+      "arm64-apple-macosx14.0",
       "-incremental",
       "-enable-batch-mode",
       "-serialize-diagnostics",
@@ -167,6 +235,8 @@
       "AIFactoryNative_main",
       "-swift-version",
       "5",
+      "-enable-experimental-feature",
+      "StrictConcurrency",
       "-plugin-path",
       "/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/lib/swift/host/plugins/testing",
       "-sdk",
@@ -245,6 +315,30 @@
         {
           "kind" : "file",
           "name" : "/Users/luca/Projects/ai-factory/desktop/macos/AIFactoryNative/Sources/AIFactoryNative/DesktopBridge.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/luca/Projects/ai-factory/desktop/macos/AIFactoryNative/Sources/AIFactoryNative/InstanceListView.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/luca/Projects/ai-factory/desktop/macos/AIFactoryNative/Sources/AIFactoryNative/LogStreamView.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/luca/Projects/ai-factory/desktop/macos/AIFactoryNative/Sources/AIFactoryNative/MainTabView.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/luca/Projects/ai-factory/desktop/macos/AIFactoryNative/Sources/AIFactoryNative/MenuBarStatusView.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/luca/Projects/ai-factory/desktop/macos/AIFactoryNative/Sources/AIFactoryNative/MetricsChartView.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/luca/Projects/ai-factory/desktop/macos/AIFactoryNative/Sources/AIFactoryNative/SettingsView.swift"
         }
       ],
       "outputFilePath" : "/Users/luca/Projects/ai-factory/desktop/macos/AIFactoryNative/.build/arm64-apple-macosx/debug/AIFactoryNative.build/sources"
@@ -267,6 +361,30 @@
         {
           "kind" : "file",
           "name" : "/Users/luca/Projects/ai-factory/desktop/macos/AIFactoryNative/.build/arm64-apple-macosx/debug/AIFactoryNative.build/DesktopBridge.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/luca/Projects/ai-factory/desktop/macos/AIFactoryNative/.build/arm64-apple-macosx/debug/AIFactoryNative.build/InstanceListView.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/luca/Projects/ai-factory/desktop/macos/AIFactoryNative/.build/arm64-apple-macosx/debug/AIFactoryNative.build/LogStreamView.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/luca/Projects/ai-factory/desktop/macos/AIFactoryNative/.build/arm64-apple-macosx/debug/AIFactoryNative.build/MainTabView.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/luca/Projects/ai-factory/desktop/macos/AIFactoryNative/.build/arm64-apple-macosx/debug/AIFactoryNative.build/MenuBarStatusView.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/luca/Projects/ai-factory/desktop/macos/AIFactoryNative/.build/arm64-apple-macosx/debug/AIFactoryNative.build/MetricsChartView.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/luca/Projects/ai-factory/desktop/macos/AIFactoryNative/.build/arm64-apple-macosx/debug/AIFactoryNative.build/SettingsView.swift.o"
         }
       ],
       "outputFilePath" : "/Users/luca/Projects/ai-factory/desktop/macos/AIFactoryNative/.build/arm64-apple-macosx/debug/AIFactoryNative.product/Objects.LinkFileList"

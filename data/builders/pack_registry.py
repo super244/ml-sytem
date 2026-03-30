@@ -96,6 +96,13 @@ def build_derived_packs(
                 "num_rows": len(pack_records),
                 "size_bytes": records_path.stat().st_size if records_path.exists() else 0,
                 "path": str(records_path),
+                "manifest_path": str(manifest_path),
+                "card_path": str(card_path),
+                "build_id": build.build_id,
+                "build": build.model_dump(mode="json"),
+                "stats": {
+                    "num_records": len(pack_records),
+                },
             }
         )
     return results

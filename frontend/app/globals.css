@@ -1713,6 +1713,73 @@ a:focus-visible {
   margin: 0;
 }
 
+.dash-priority-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 12px;
+}
+
+.dash-priority-card {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.dash-priority-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.dash-priority-surface {
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  color: var(--muted);
+  font-weight: 700;
+}
+
+.dash-priority-title {
+  margin: 0;
+  font-size: 1rem;
+  font-weight: 800;
+  letter-spacing: -0.03em;
+}
+
+.dash-priority-footer {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: auto;
+}
+
+.dash-priority-meta {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.dash-priority-metric {
+  font-size: 0.8rem;
+  color: var(--muted);
+  font-weight: 600;
+}
+
+.dash-priority-command {
+  display: block;
+  max-width: 100%;
+  overflow-x: auto;
+  padding: 8px 10px;
+  border-radius: 10px;
+  border: 1px solid var(--line);
+  background: rgba(255, 255, 255, 0.65);
+  color: var(--ink);
+  font-size: 0.76rem;
+  line-height: 1.4;
+}
+
 /* Lifecycle Stage Grid */
 .lifecycle-grid {
   display: grid;
@@ -2827,7 +2894,8 @@ a:focus-visible {
   }
 
   .lifecycle-grid,
-  .recent-instances-grid {
+  .recent-instances-grid,
+  .dash-priority-grid {
     grid-template-columns: repeat(2, 1fr);
   }
 
@@ -2860,6 +2928,15 @@ a:focus-visible {
 
   .dash-hero-inner {
     grid-template-columns: 1fr;
+  }
+
+  .dash-priority-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .dash-priority-footer {
+    align-items: stretch;
+    flex-direction: column;
   }
 
   .inference-layout {

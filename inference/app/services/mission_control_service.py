@@ -5,7 +5,7 @@ import time
 from collections import Counter
 from datetime import datetime
 from pathlib import Path
-from typing import Any
+from typing import Any, Literal
 
 from pydantic import BaseModel, Field
 
@@ -62,7 +62,31 @@ class MissionControlSnapshot(BaseModel):
     automl: dict[str, Any] = Field(default_factory=dict)
     cluster: dict[str, Any] = Field(default_factory=dict)
     telemetry: dict[str, Any] = Field(default_factory=dict)
+    criticality: dict[str, Any] = Field(default_factory=dict)
+    recommendations: list[dict[str, Any]] = Field(default_factory=list)
     summary: dict[str, Any] = Field(default_factory=dict)
+
+
+class MissionControlRecommendation(BaseModel):
+    id: str
+    severity: Literal["critical", "warning", "opportunity", "info"]
+    title: str
+    detail: str
+    surface: str
+    href: str
+    metric_label: str | None = None
+    metric_value: str | None = None
+    command: str | None = None
+
+
+def _severity_rank(value: str) -> int:
+    order = {
+        "critical": 0,
+        "warning": 1,
+        "opportunity": 2,
+        "info": 3,
+    }
+    return order.get(value, len(order))
 
 
 class MissionControlService:
@@ -124,6 +148,169 @@ class MissionControlService:
             },
         }
 
+    def _recommendations(
+        self,
+        *,
+        workspace_summary: dict[str, Any],
+        running_instances: list[dict[str, Any]],
+        failed_instances: list[dict[str, Any]],
+        agents: dict[str, Any],
+        automl: dict[str, Any],
+        telemetry: dict[str, Any],
+        cluster_nodes: list[dict[str, Any]],
+        open_circuits: list[Any],
+        instances: list[dict[str, Any]],
+    ) -> list[MissionControlRecommendation]:
+        recommendations: list[MissionControlRecommendation] = []
+        ready_checks = int(workspace_summary.get("ready_checks", 0) or 0)
+        total_checks = int(workspace_summary.get("total_checks", 0) or 0)
+        failed_checks = max(total_checks - ready_checks, 0)
+        telemetry_flags = int(telemetry["flagged"]["count"])
+        active_agents = int(agents["status_counts"].get("active", 0))
+        running_sweeps = int(automl["status_counts"].get("running", 0))
+        idle_nodes = [node for node in cluster_nodes if node.get("status") == "idle"]
+
+        if failed_checks:
+            recommendations.append(
+                MissionControlRecommendation(
+                    id="workspace-readiness",
+                    severity="critical",
+                    title="Finish workspace readiness before scaling the loop",
+                    detail=(
+                        f"{failed_checks} readiness checks are still unresolved. "
+                        "Fix the local control surfaces before launching more automation."
+                    ),
+                    surface="workspace",
+                    href="/workspace",
+                    metric_label="ready",
+                    metric_value=f"{ready_checks}/{total_checks}",
+                )
+            )
+
+        if failed_instances:
+            latest_failed = failed_instances[0]
+            recommendations.append(
+                MissionControlRecommendation(
+                    id="failed-instances",
+                    severity="critical",
+                    title="Investigate failed managed instances",
+                    detail=(
+                        f"{len(failed_instances)} managed instance(s) are failed. "
+                        f"Start with '{latest_failed.get('name', latest_failed.get('id', 'latest run'))}'."
+                    ),
+                    surface="monitoring",
+                    href="/dashboard/monitoring",
+                    metric_label="failed",
+                    metric_value=str(len(failed_instances)),
+                )
+            )
+
+        if open_circuits:
+            recommendations.append(
+                MissionControlRecommendation(
+                    id="open-circuits",
+                    severity="warning",
+                    title="Resolve orchestration circuits before dispatching more work",
+                    detail=(
+                        f"{len(open_circuits)} orchestration circuit(s) are open. "
+                        "Review stalled flows and clear the blockers before expanding the queue."
+                    ),
+                    surface="monitoring",
+                    href="/dashboard/monitoring",
+                    metric_label="circuits",
+                    metric_value=str(len(open_circuits)),
+                )
+            )
+
+        if telemetry_flags:
+            recommendations.append(
+                MissionControlRecommendation(
+                    id="telemetry-backlog",
+                    severity="warning",
+                    title="Promote flagged telemetry into the dataset loop",
+                    detail=(
+                        f"{telemetry_flags} flagged interaction(s) are waiting in backlog. "
+                        "Review them now to keep the failure-replay pipeline current."
+                    ),
+                    surface="datasets",
+                    href="/dashboard/datasets",
+                    metric_label="flagged",
+                    metric_value=str(telemetry_flags),
+                )
+            )
+
+        if telemetry_flags and active_agents == 0:
+            recommendations.append(
+                MissionControlRecommendation(
+                    id="wake-agents",
+                    severity="warning",
+                    title="Wake or deploy agents to cover the backlog",
+                    detail=(
+                        "The lab has work queued but no active agents. "
+                        "Bring a curator or evaluator online before the backlog grows."
+                    ),
+                    surface="agents",
+                    href="/dashboard/agents",
+                    metric_label="active agents",
+                    metric_value=str(active_agents),
+                )
+            )
+
+        if idle_nodes and running_sweeps == 0 and total_checks > 0 and ready_checks == total_checks:
+            recommendations.append(
+                MissionControlRecommendation(
+                    id="idle-cluster",
+                    severity="opportunity",
+                    title="Use idle cluster capacity for a new sweep",
+                    detail=(
+                        f"{len(idle_nodes)} cluster node(s) are idle and no sweep is running. "
+                        "This is a clean window to launch an AutoML search."
+                    ),
+                    surface="automl",
+                    href="/dashboard/automl",
+                    metric_label="idle nodes",
+                    metric_value=str(len(idle_nodes)),
+                )
+            )
+
+        if not instances and total_checks > 0 and ready_checks == total_checks:
+            recommendations.append(
+                MissionControlRecommendation(
+                    id="first-run",
+                    severity="info",
+                    title="Launch the first managed training branch",
+                    detail=(
+                        "The workspace is ready but there are no managed instances yet. "
+                        "Kick off a baseline run to seed the rest of the lifecycle."
+                    ),
+                    surface="training",
+                    href="/dashboard/training",
+                    metric_label="instances",
+                    metric_value="0",
+                    command="python3 -m training.train --config training/configs/profiles/baseline_qlora.yaml --dry-run",
+                )
+            )
+
+        if running_instances and active_agents == 0:
+            recommendations.append(
+                MissionControlRecommendation(
+                    id="uncovered-runs",
+                    severity="opportunity",
+                    title="Attach agents to active runs",
+                    detail=(
+                        f"{len(running_instances)} run(s) are in flight without any active agents. "
+                        "Add monitor or evaluator coverage so the loop can react automatically."
+                    ),
+                    surface="agents",
+                    href="/dashboard/agents",
+                    metric_label="running",
+                    metric_value=str(len(running_instances)),
+                )
+            )
+
+        recommendations.sort(key=lambda item: (_severity_rank(item.severity), item.id))
+        return recommendations[:6]
+
     def snapshot(self) -> MissionControlSnapshot:
         workspace = workspace_module.build_workspace_overview(self.repo_root)
         workspace_summary = workspace.get("summary", {})
@@ -149,6 +336,19 @@ class MissionControlService:
             if isinstance(orchestration_summary_payload, dict)
             else []
         )
+        recommendations = self._recommendations(
+            workspace_summary=workspace_summary,
+            running_instances=running_instances,
+            failed_instances=failed_instances,
+            agents=agents,
+            automl=automl,
+            telemetry=telemetry,
+            cluster_nodes=cluster_nodes,
+            open_circuits=open_circuits,
+            instances=instances,
+        )
+        criticality_counts = Counter(item.severity for item in recommendations)
+        highest_level = recommendations[0].severity if recommendations else "info"
         summary = {
             "workspace_ready_checks": workspace_summary.get("ready_checks", 0),
             "workspace_total_checks": workspace_summary.get("total_checks", 0),
@@ -197,5 +397,10 @@ class MissionControlService:
                 "status_counts": cluster_status_counts,
             },
             telemetry=telemetry,
+            criticality={
+                "level": highest_level,
+                "counts": dict(criticality_counts),
+            },
+            recommendations=[item.model_dump(mode="json") for item in recommendations],
             summary=summary,
         )

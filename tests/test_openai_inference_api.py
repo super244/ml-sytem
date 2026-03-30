@@ -203,3 +203,26 @@ def test_openai_service_tracks_usage():
     assert snapshot["requests"] == 1
     assert snapshot["total_tokens"] > 0
     assert snapshot["by_model"]["finetuned"]["requests"] == 1
+
+
+def test_openai_service_tracks_stream_usage():
+    settings = get_settings()
+    settings.openai_api_keys = []
+    settings.openai_rate_limit_requests_per_minute = 0
+    settings.openai_rate_limit_window_seconds = 60
+    service = OpenAIService(DummyGenerationService(), settings)
+
+    payload = OpenAIChatCompletionRequest(
+        model="finetuned",
+        messages=[{"role": "user", "content": "What is 1+1?"}],
+        stream=True,
+        stream_options={"include_usage": True},
+    )
+    response = service.create_chat_stream(payload, include_usage=True)
+
+    assert response.media_type == "text/event-stream"
+    snapshot = service.usage_snapshot()
+    assert snapshot["requests"] == 1
+    assert snapshot["stream_requests"] == 1
+    assert snapshot["by_model"]["finetuned"]["requests"] == 1
+    assert snapshot["by_model"]["finetuned"]["stream_requests"] == 1

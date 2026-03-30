@@ -236,7 +236,11 @@ class OpenAIService:
         )
 
     def _build_response(
-        self, request: OpenAIChatCompletionRequest, generation: dict[str, Any]
+        self,
+        request: OpenAIChatCompletionRequest,
+        generation: dict[str, Any],
+        *,
+        streamed: bool = False,
     ) -> OpenAICompletionResult:
         content = str(generation.get("answer") or generation.get("raw_text") or "").strip()
         prompt_text = str(generation.get("prompt") or "")
@@ -247,7 +251,7 @@ class OpenAIService:
             "completion_tokens": completion_tokens,
             "total_tokens": prompt_tokens + completion_tokens,
         }
-        self.usage_tracker.record(request.model, prompt_tokens, completion_tokens, streamed=False)
+        self.usage_tracker.record(request.model, prompt_tokens, completion_tokens, streamed=streamed)
         created = int(time.time())
         response_id = f"chatcmpl-{uuid.uuid4().hex[:24]}"
         response = {
@@ -285,7 +289,7 @@ class OpenAIService:
             raise
         except Exception as exc:  # pragma: no cover - defensive boundary
             raise OpenAIError(str(exc), status_code=500, error_type="server_error") from exc
-        return self._build_response(request, generation)
+        return self._build_response(request, generation, streamed=False)
 
     def _chunk_text(self, text: str, chunk_size: int = 96) -> list[str]:
         if not text:
@@ -297,7 +301,18 @@ class OpenAIService:
         request: OpenAIChatCompletionRequest,
         include_usage: bool,
     ) -> StreamingResponse:
-        result = self.create_chat_completion(request)
+        params = self._build_generation_parameters(request)
+        try:
+            generation = self.generation_service.generate(params)
+        except FileNotFoundError as exc:
+            raise OpenAIModelError(str(exc)) from exc
+        except KeyError as exc:
+            raise OpenAIModelError(str(exc)) from exc
+        except OpenAIError:
+            raise
+        except Exception as exc:  # pragma: no cover - defensive boundary
+            raise OpenAIError(str(exc), status_code=500, error_type="server_error") from exc
+        result = self._build_response(request, generation, streamed=True)
 
         async def event_stream():
             initial_chunk = {
