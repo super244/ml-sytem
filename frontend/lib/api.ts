@@ -30,13 +30,14 @@ export type LifecycleStage =
   | "publish";
 
 export type ArchitectureSpec = {
-  family?: string | null;
-  hidden_size?: number | null;
-  num_layers?: number | null;
-  num_attention_heads?: number | null;
-  max_position_embeddings?: number | null;
-  vocab_size?: number | null;
-  notes?: string | null;
+  base_model: string;
+  context_window?: number;
+  parameter_size_b?: number | null;
+  quantization?: "4bit" | "8bit" | "16bit" | "none";
+  lora_target_modules?: string[] | null;
+  lora_rank?: number | null;
+  lora_alpha?: number | null;
+  metadata?: Record<string, any>;
 };
 
 export type EvaluationSuiteSpec = {
@@ -1211,3 +1212,199 @@ export async function launchSweep(payload: LaunchSweepRequest): Promise<AutoMLSw
 export async function getSweepDetail(sweepId: string): Promise<AutoMLSweep> {
   return fetchJson<AutoMLSweep>(`/v1/automl/sweeps/${sweepId}`);
 }
+
+export type DatasetSpec = {
+  name: string;
+  description: string;
+  path: string;
+  domain: string;
+  subdomain?: string | null;
+  difficulty_range?: string[];
+  size?: number;
+  format?: string;
+  metadata?: Record<string, any>;
+};
+
+export type MetricSpec = {
+  name: string;
+  description: string;
+  type: string;
+  domain: string;
+  subdomain?: string | null;
+  range?: number[] | null;
+  metadata?: Record<string, any>;
+};
+
+export type EvaluationSpec = {
+  name: string;
+  description: string;
+  domain: string;
+  subdomain?: string | null;
+  datasets: string[];
+  metrics: string[];
+  splits?: string[];
+  size?: number;
+  metadata?: Record<string, any>;
+};
+
+export type TrainingProfileSpec = {
+  name: string;
+  description: string;
+  domain: string;
+  subdomain?: string | null;
+  training_method: string;
+  datasets: string[];
+  config_path: string;
+  curriculum_order?: string[] | null;
+  model_requirements?: Record<string, any>;
+  metadata?: Record<string, any>;
+};
+
+export type ModelArtifact = {
+  name: string;
+  version: string;
+  path: string;
+  domain?: string | null;
+  architecture: string;
+  parameters: number;
+  format: string;
+  metadata?: Record<string, any>;
+};
+
+export type DeploymentSpec = {
+  target: string;
+  model_name: string;
+  config?: Record<string, any>;
+  public?: boolean;
+  metadata?: Record<string, any>;
+};
+
+export type ScalingConfig = {
+  max_nodes?: number;
+  default_resources?: Record<string, any>;
+  cluster_type?: string;
+  metadata?: Record<string, any>;
+};
+
+export type MonitoringConfig = {
+  collection_interval_seconds?: number;
+  storage_backend?: string;
+  alert_channels?: string[];
+  thresholds?: Record<string, any>;
+  metadata?: Record<string, any>;
+};
+
+export type TrainingJob = {
+  name: string;
+  profile: string;
+  resource_requirements?: Record<string, any>;
+  estimated_duration_hours?: number;
+  priority?: string;
+  metadata?: Record<string, any>;
+};
+
+export type Alert = {
+  id: string;
+  severity: string;
+  message: string;
+  source: string;
+  timestamp: string;
+  metadata?: Record<string, any>;
+};
+
+export type DomainType = "mathematics" | "coding" | "reasoning" | "vision" | "general";
+
+export type ResourceProfile = {
+  vram_required_gb: number;
+  cpu_cores_required?: number;
+  system_memory_gb?: number;
+  recommended_gpus?: number;
+  storage_gb?: number;
+};
+
+export type PerformanceProfile = {
+  throughput_tokens_per_sec?: number | null;
+  latency_ms_per_token?: number | null;
+  memory_footprint_gb?: number | null;
+  power_consumption_w?: number | null;
+};
+
+export type ModelLineage = {
+  parent_model?: string | null;
+  training_dataset_ids?: string[];
+  training_run_ids?: string[];
+  creation_timestamp?: string;
+};
+
+export type ModelCapability = {
+  domain: DomainType;
+  score: number;
+  benchmark_name: string;
+  verified?: boolean;
+};
+
+export type UniversalModelSpec = {
+  id: string;
+  name: string;
+  version: string;
+  domain: DomainType;
+  architecture: ArchitectureSpec;
+  resource_profile: ResourceProfile;
+  performance_profile?: PerformanceProfile | null;
+  lineage?: ModelLineage;
+  capabilities?: ModelCapability[];
+  tags?: string[];
+  metadata?: Record<string, any>;
+};
+
+export type SearchSpaceSpec = {
+  hyperparameters?: Record<string, any[]>;
+  architectures?: string[] | null;
+  datasets?: string[] | null;
+};
+
+export type OptimizationObjective = {
+  metric: string;
+  maximize?: boolean;
+  target_value?: number | null;
+  weight?: number;
+};
+
+export type IterationStrategy = {
+  max_iterations?: number;
+  early_stopping_patience?: number;
+  exploration_factor?: number;
+  batch_size?: number;
+};
+
+export type ResourceBudget = {
+  max_compute_hours?: number | null;
+  max_cost_usd?: number | null;
+  max_gpu_hours?: number | null;
+};
+
+export type EvaluationCriterion = {
+  metric_name: string;
+  min_threshold: number;
+  critical?: boolean;
+};
+
+export type AutoDeploymentPolicy = {
+  enabled?: boolean;
+  targets?: DeploymentTarget[];
+  approval_required?: boolean;
+  rollback_on_failure?: boolean;
+};
+
+export type AutonomousExperimentConfig = {
+  experiment_id: string;
+  name: string;
+  domains: DomainType[];
+  search_space: SearchSpaceSpec;
+  objectives: OptimizationObjective[];
+  strategy?: IterationStrategy;
+  budget?: ResourceBudget;
+  evaluation_criteria?: EvaluationCriterion[];
+  deployment_policy?: AutoDeploymentPolicy;
+  metadata?: Record<string, any>;
+};
