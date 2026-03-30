@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from datetime import datetime, timezone
+from enum import Enum
 from pathlib import Path
 from typing import Any, Literal
 
@@ -389,3 +390,132 @@ def path_to_file_info(path: Path, sha256: str, num_rows: int = 0) -> DatasetFile
         size_bytes=path.stat().st_size if path.exists() else 0,
         num_rows=num_rows,
     )
+
+
+class DomainType(str, Enum):
+    """Domain categorization for models and datasets."""
+    MATHEMATICS = "mathematics"
+    CODING = "coding"
+    REASONING = "reasoning"
+    VISION = "vision"
+    GENERAL = "general"
+
+
+class ArchitectureSpec(BaseModel):
+    """Specification of the model's architecture."""
+    base_model: str
+    context_window: int = 8192
+    parameter_size_b: float | None = None
+    quantization: Literal["4bit", "8bit", "16bit", "none"] = "none"
+    lora_target_modules: list[str] | None = None
+    lora_rank: int | None = None
+    lora_alpha: int | None = None
+    metadata: dict[str, Any] = Field(default_factory=dict)
+
+
+class ResourceProfile(BaseModel):
+    """Hardware resource requirements for running the model."""
+    vram_required_gb: float
+    cpu_cores_required: int = 4
+    system_memory_gb: float = 16.0
+    recommended_gpus: int = 1
+    storage_gb: float = 50.0
+
+
+class PerformanceProfile(BaseModel):
+    """Expected performance metrics of the model."""
+    throughput_tokens_per_sec: float | None = None
+    latency_ms_per_token: float | None = None
+    memory_footprint_gb: float | None = None
+    power_consumption_w: float | None = None
+
+
+class ModelLineage(BaseModel):
+    """Historical lineage of the model's training and data."""
+    parent_model: str | None = None
+    training_dataset_ids: list[str] = Field(default_factory=list)
+    training_run_ids: list[str] = Field(default_factory=list)
+    creation_timestamp: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+
+class ModelCapability(BaseModel):
+    """Specific evaluated capabilities of the model."""
+    domain: DomainType
+    score: float
+    benchmark_name: str
+    verified: bool = False
+
+
+class UniversalModelSpec(BaseModel):
+    """Universal specification for any trained/deployed model."""
+    id: str
+    name: str
+    version: str
+    domain: DomainType
+    architecture: ArchitectureSpec
+    resource_profile: ResourceProfile
+    performance_profile: PerformanceProfile | None = None
+    lineage: ModelLineage = Field(default_factory=ModelLineage)
+    capabilities: list[ModelCapability] = Field(default_factory=list)
+    tags: list[str] = Field(default_factory=list)
+    metadata: dict[str, Any] = Field(default_factory=dict)
+
+
+class SearchSpaceSpec(BaseModel):
+    """Configuration for hyperparameter search space."""
+    hyperparameters: dict[str, list[Any]] = Field(default_factory=dict)
+    architectures: list[str] | None = None
+    datasets: list[str] | None = None
+
+
+class OptimizationObjective(BaseModel):
+    """Objective metric to optimize during experimentation."""
+    metric: str
+    maximize: bool = True
+    target_value: float | None = None
+    weight: float = 1.0
+
+
+class IterationStrategy(BaseModel):
+    """Strategy for experiment iterations."""
+    max_iterations: int = 10
+    early_stopping_patience: int = 3
+    exploration_factor: float = 0.2
+    batch_size: int = 1
+
+
+class ResourceBudget(BaseModel):
+    """Resource constraints for the experiment."""
+    max_compute_hours: float | None = None
+    max_cost_usd: float | None = None
+    max_gpu_hours: float | None = None
+
+
+class EvaluationCriterion(BaseModel):
+    """Criteria for evaluating model success."""
+    metric_name: str
+    min_threshold: float
+    critical: bool = True
+
+
+class AutoDeploymentPolicy(BaseModel):
+    """Policy for automated model deployment upon success."""
+    enabled: bool = False
+    targets: list[DeploymentTarget] = Field(default_factory=list)
+    approval_required: bool = True
+    rollback_on_failure: bool = True
+
+
+class AutonomousExperimentConfig(BaseModel):
+    """Configuration for autonomous model experimentation."""
+    experiment_id: str
+    name: str
+    domains: list[DomainType]
+    search_space: SearchSpaceSpec
+    objectives: list[OptimizationObjective]
+    strategy: IterationStrategy = Field(default_factory=IterationStrategy)
+    budget: ResourceBudget = Field(default_factory=ResourceBudget)
+    evaluation_criteria: list[EvaluationCriterion] = Field(default_factory=list)
+    deployment_policy: AutoDeploymentPolicy = Field(default_factory=AutoDeploymentPolicy)
+    metadata: dict[str, Any] = Field(default_factory=dict)
+

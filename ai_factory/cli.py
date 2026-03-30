@@ -599,6 +599,20 @@ def parse_args() -> argparse.Namespace:
     doctor_parser = subparsers.add_parser("doctor", parents=[common_json])
     doctor_parser.add_argument("--root")
 
+    api_smoke_parser = subparsers.add_parser("api-smoke", parents=[common_json])
+    api_smoke_parser.add_argument("--base-url", default="http://127.0.0.1:8000")
+    api_smoke_parser.add_argument("--skip-verify", action="store_true")
+    api_smoke_parser.add_argument("--include-generate", action="store_true")
+
+    subparsers.add_parser("latest-run", parents=[common_json])
+
+    refresh_lab_parser = subparsers.add_parser("refresh-lab")
+    refresh_lab_parser.add_argument("--skip-generate", action="store_true")
+    refresh_lab_parser.add_argument("--skip-notebooks", action="store_true")
+    refresh_lab_parser.add_argument("--skip-train-dry-run", action="store_true")
+    refresh_lab_parser.add_argument("--skip-tests", action="store_true")
+    refresh_lab_parser.add_argument("--profile", default="training/configs/profiles/baseline_qlora.yaml")
+
     domain_parser = subparsers.add_parser("domain", parents=[common_json])
     domain_subparsers = domain_parser.add_subparsers(dest="domain_command", required=True)
 
@@ -636,7 +650,7 @@ def main() -> None:
         )
         return
 
-    if args.command in {"workspace", "ready", "doctor"}:
+    if args.command in {"workspace", "ready"}:
         root = Path(getattr(args, "root", None) or ".") if hasattr(args, "root") and args.root else None
         payload = build_workspace_overview(root)
         if args.json:
@@ -644,13 +658,20 @@ def main() -> None:
             return
         if args.command == "ready":
             _render_ready_summary(payload)
-        elif args.command == "doctor":
-            _render_ready_summary(payload)
-            _print_section("Quick recipes")
-            for recipe in (payload.get("command_recipes") or [])[:5]:
-                print(f"  {recipe.get('title', '?')}: {recipe.get('command', '')}")
         else:
             _render_workspace_overview(payload)
+        return
+
+    if args.command in {"doctor", "api-smoke", "latest-run", "refresh-lab"}:
+        from ai_factory import cli_scripts
+        if args.command == "doctor":
+            cli_scripts.cmd_doctor(args)
+        elif args.command == "api-smoke":
+            cli_scripts.cmd_api_smoke(args)
+        elif args.command == "latest-run":
+            cli_scripts.cmd_latest_run(args)
+        elif args.command == "refresh-lab":
+            cli_scripts.cmd_refresh_lab(args)
         return
 
     control = _build_control_service(args)

@@ -60,8 +60,8 @@ def test_instance_service_resolves_relative_config_paths_against_repo_root(tmp_p
 
 @pytest.mark.anyio
 async def test_mission_control_endpoint_aggregates_lab_surfaces(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
-    from inference.app.routers import lab as lab_router
     from ai_factory.platform.monitoring import hardware
+    from inference.app.routers import lab as lab_router
 
     _write(
         tmp_path / "data" / "catalog.json",

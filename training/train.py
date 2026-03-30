@@ -2,11 +2,15 @@ from __future__ import annotations
 
 import argparse
 import json
+import logging
+import os
+import sys
 from pathlib import Path
 
 from transformers import TrainingArguments, set_seed
 
 from ai_factory.core.artifacts import prepare_run_layout, write_json
+from ai_factory.orchestration.distributed import DistributedConfig, DistributedTrainingOrchestrator
 from training.src.analysis import dataset_summary
 from training.src.callbacks import JsonlMetricsCallback, TrackerCallback
 from training.src.checkpoints import resolve_resume_checkpoint
@@ -24,6 +28,14 @@ from training.src.packaging import publish_model_artifacts, write_run_manifest, 
 from training.src.tracking import build_tracker
 from training.src.trainer import MathTrainer
 from training.src.validation import run_dry_validation
+
+# Set up structured logging
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
+    handlers=[logging.StreamHandler(sys.stdout)]
+)
+logger = logging.getLogger(__name__)
 
 
 def parse_args() -> argparse.Namespace:
@@ -44,6 +56,17 @@ def parse_args() -> argparse.Namespace:
         "--validate-model-load",
         action="store_true",
         help="Load the model after dry validation and exit.",
+    )
+    parser.add_argument(
+        "--distributed",
+        action="store_true",
+        help="Launch the script in distributed mode using DistributedTrainingOrchestrator.",
+    )
+    parser.add_argument(
+        "--num-gpus", 
+        type=int, 
+        default=1, 
+        help="Number of GPUs for distributed training."
     )
     return parser.parse_args()
 
@@ -121,6 +144,7 @@ def summarize_environment(snapshot: dict[str, object]) -> dict[str, object]:
 
 
 def build_dataset_artifacts(config: ExperimentConfig, tokenizer, layout):
+    logger.info("Building dataset artifacts.")
     train_dataset = build_dataset(
         file_path=config.data.train_file,
         tokenizer=tokenizer,
@@ -145,8 +169,39 @@ def build_dataset_artifacts(config: ExperimentConfig, tokenizer, layout):
     return train_dataset, eval_dataset, dataset_report
 
 
+def load_json_if_exists(path: Path) -> dict:
+    if not path.exists():
+        return {}
+    return json.loads(path.read_text())
+
+
 def main() -> None:
     args = parse_args()
+
+    # Orchestrator Integration: If distributed flag is set and we're not already the worker
+    if args.distributed and "LOCAL_RANK" not in os.environ:
+        logger.info("Distributed mode requested. Relaunching via DistributedTrainingOrchestrator.")
+        orchestrator = DistributedTrainingOrchestrator(
+            DistributedConfig(num_gpus_per_node=args.num_gpus)
+        )
+        script_args = []
+        # Filter out orchestrator-specific args
+        skip_next = False
+        for arg in sys.argv[1:]:
+            if skip_next:
+                skip_next = False
+                continue
+            if arg == "--distributed":
+                continue
+            if arg == "--num-gpus":
+                skip_next = True
+                continue
+            if arg.startswith("--num-gpus="):
+                continue
+            script_args.append(arg)
+        sys.exit(orchestrator.launch(sys.argv[0], script_args))
+
+    logger.info("Loading experiment config.")
     config = load_experiment_config(args.config)
     validation_warnings = validate_experiment_config(config)
     set_seed(config.seed)
@@ -164,6 +219,7 @@ def main() -> None:
         warnings=validation_warnings,
         resume_from_checkpoint=resume_from_checkpoint,
     )
+    
     tracker = build_tracker(layout, config)
     tracker_summary: dict[str, float | int] = {}
     status = "failed"
@@ -173,11 +229,7 @@ def main() -> None:
     if config.tracking.capture_environment:
         environment_snapshot_path, environment_snapshot = collect_environment_snapshot(config, layout)
         environment_summary = summarize_environment(environment_snapshot)
-        tracker.log_params(
-            {
-                "environment": environment_summary,
-            }
-        )
+        tracker.log_params({"environment": environment_summary})
         tracker.log_artifact(environment_snapshot_path, name="manifests")
 
     tracker.log_params(
@@ -219,7 +271,10 @@ def main() -> None:
         tracker.log_artifact(validation_report_path, name="manifests")
 
     validate_model_load = args.validate_model_load or config.runtime.validate_model_load
+    
+    logger.info("Loading tokenizer.")
     tokenizer = load_tokenizer(config) if (not args.dry_run or validate_model_load) else None
+    
     dry_validation = run_dry_validation(config, tokenizer)
     write_json(layout.metrics_dir / "dry_run_validation.json", dry_validation)
     tracker.log_metrics(
@@ -234,7 +289,9 @@ def main() -> None:
 
     try:
         if args.dry_run:
+            logger.info("Executing dry run mode.")
             if validate_model_load:
+                logger.info("Validating model load.")
                 tokenizer = tokenizer or load_tokenizer(config)
                 model = load_model_for_training(config)
                 parameter_report = trainable_parameter_report(model)
@@ -242,6 +299,7 @@ def main() -> None:
                 tracker.log_metrics({"trainable_ratio": parameter_report["trainable_ratio"]})
                 if config.tracking.log_model_artifacts:
                     tracker.log_artifact(layout.metrics_dir / "model_report.json", name="metrics")
+            
             manifest = write_run_manifest(
                 layout,
                 config,
@@ -307,11 +365,13 @@ def main() -> None:
                 },
             )
             status = "completed"
-            print(json.dumps({"status": "dry_run_complete", "run_dir": str(layout.root)}, indent=2))
+            logger.info(f"Dry run completed. Run directory: {layout.root}")
             return
 
+        logger.info("Initializing full training run.")
         tokenizer = tokenizer or load_tokenizer(config)
         model = load_model_for_training(config)
+        
         parameter_report = trainable_parameter_report(model)
         write_json(layout.metrics_dir / "model_report.json", parameter_report)
         tracker.log_metrics({"trainable_ratio": parameter_report["trainable_ratio"]})
@@ -327,6 +387,7 @@ def main() -> None:
         )
         if config.tracking.log_dataset_artifacts:
             tracker.log_artifact(layout.metrics_dir / "dataset_report.json", name="metrics")
+            
         data_collator = WeightedDataCollator(tokenizer=tokenizer, label_pad_token_id=-100, pad_to_multiple_of=8)
 
         trainer = MathTrainer(
@@ -343,14 +404,19 @@ def main() -> None:
             ],
         )
 
+        logger.info("Starting training loop.")
         trainer.train(resume_from_checkpoint=args.resume_from_checkpoint)
+        
+        logger.info("Training complete. Evaluating.")
         metrics = trainer.evaluate() if eval_dataset is not None else {}
         write_json(layout.metrics_dir / "metrics.json", metrics)
         tracker.log_metrics(metrics)
         tracker.log_artifact(layout.metrics_dir / "metrics.json", name="metrics")
 
+        logger.info("Publishing artifacts.")
         published = publish_model_artifacts(layout, config, trainer, tokenizer)
         trainer.save_state()
+        
         summary = {
             "run_name": config.run_name,
             "profile_name": config.profile_name,
@@ -383,6 +449,7 @@ def main() -> None:
             "resume_from_checkpoint": resume_from_checkpoint,
             "published": published,
         }
+        
         summary_path = write_training_summary(layout, summary, config.logging.summary_markdown_filename)
         tracker_summary = {
             "train_rows": summary["train_rows"],
@@ -391,6 +458,7 @@ def main() -> None:
         }
         if config.tracking.log_summary_artifact:
             tracker.log_artifact(summary_path, name="reports")
+            
         write_run_manifest(
             layout,
             config,
@@ -414,18 +482,13 @@ def main() -> None:
         )
 
         status = "completed"
-        print(json.dumps({"metrics": metrics, "published": published, "run_dir": str(layout.root)}, indent=2))
+        logger.info(f"Run completed successfully. Run directory: {layout.root}")
     except Exception as exc:
+        logger.exception("An error occurred during execution.")
         tracker.log_params({"error": {"type": type(exc).__name__, "message": str(exc)}})
         raise
     finally:
         tracker.finalize(status=status, summary=tracker_summary)
-
-
-def load_json_if_exists(path: Path) -> dict:
-    if not path.exists():
-        return {}
-    return json.loads(path.read_text())
 
 
 if __name__ == "__main__":
