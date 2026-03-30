@@ -193,19 +193,19 @@ export function InstanceDetailView({ instanceId }: { instanceId: string }) {
             <strong>Source model</strong>
             <p>{detail.lifecycle.source_model ?? "Inherited from the config/profile."}</p>
           </div>
-          {detail.lifecycle.architecture?.family ? (
+          {detail.lifecycle.architecture?.base_model ? (
             <div className="preview-block subtle">
               <strong>Architecture</strong>
               <p>
-                {detail.lifecycle.architecture.family}
-                {detail.lifecycle.architecture.hidden_size
-                  ? ` • hidden ${detail.lifecycle.architecture.hidden_size}`
+                {detail.lifecycle.architecture.base_model}
+                {detail.lifecycle.architecture.context_window
+                  ? ` • context ${detail.lifecycle.architecture.context_window}`
                   : ""}
-                {detail.lifecycle.architecture.num_layers
-                  ? ` • layers ${detail.lifecycle.architecture.num_layers}`
+                {detail.lifecycle.architecture.parameter_size_b
+                  ? ` • params ${detail.lifecycle.architecture.parameter_size_b}B`
                   : ""}
-                {detail.lifecycle.architecture.num_attention_heads
-                  ? ` • heads ${detail.lifecycle.architecture.num_attention_heads}`
+                {detail.lifecycle.architecture.quantization
+                  ? ` • quant ${detail.lifecycle.architecture.quantization}`
                   : ""}
               </p>
             </div>

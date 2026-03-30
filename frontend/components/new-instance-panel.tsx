@@ -82,6 +82,8 @@ export function NewInstancePanel({
   const [layers, setLayers] = useState("");
   const [heads, setHeads] = useState("");
   const [contextWindow, setContextWindow] = useState("");
+  const [parameterSizeB, setParameterSizeB] = useState("");
+  const [quantization, setQuantization] = useState<"4bit" | "8bit" | "16bit" | "none">("none");
   const [evaluationSuite, setEvaluationSuite] = useState("evaluation/configs/base_vs_finetuned.yaml");
   const [deploymentTargets, setDeploymentTargets] = useState<DeploymentTarget[]>(["ollama"]);
   const [submitting, setSubmitting] = useState(false);
@@ -119,11 +121,10 @@ export function NewInstancePanel({
           architecture:
             origin === "from_scratch"
               ? {
-                  family: architectureFamily || undefined,
-                  hidden_size: hiddenSize ? Number(hiddenSize) : undefined,
-                  num_layers: layers ? Number(layers) : undefined,
-                  num_attention_heads: heads ? Number(heads) : undefined,
-                  max_position_embeddings: contextWindow ? Number(contextWindow) : undefined,
+                  base_model: architectureFamily || "transformer",
+                  context_window: contextWindow ? Number(contextWindow) : undefined,
+                  parameter_size_b: parameterSizeB ? Number(parameterSizeB) : undefined,
+                  quantization: quantization,
                 }
               : undefined,
           evaluation_suite: evaluationSuite
