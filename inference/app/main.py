@@ -7,6 +7,7 @@ from fastapi.responses import JSONResponse
 from inference.app.config import get_settings
 from inference.app.routers.agents import router as agents_router
 from inference.app.routers.automl import router as automl_router
+from inference.app.routers.autonomous import router as autonomous_router
 from inference.app.routers.cluster import router as cluster_router
 from inference.app.routers.datasets import router as datasets_router
 from inference.app.routers.generation import router as generation_router
@@ -42,6 +43,7 @@ app.include_router(cluster_router, prefix="/v1")
 app.include_router(datasets_router, prefix="/v1")
 app.include_router(agents_router, prefix="/v1")
 app.include_router(automl_router, prefix="/v1")
+app.include_router(autonomous_router, prefix="/v1")
 app.include_router(lab_router, prefix="/v1")
 
 # Backward-compatible aliases.

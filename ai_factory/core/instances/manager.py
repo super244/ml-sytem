@@ -32,7 +32,12 @@ from ai_factory.core.instances.models import (
 )
 from ai_factory.core.instances.queries import InstanceQueryService
 from ai_factory.core.instances.store import FileInstanceStore
-from ai_factory.core.instances.utils import _SafeTemplateDict, _deep_merge, _source_artifact_ref, _stage_for_instance_type
+from ai_factory.core.instances.utils import (
+    _deep_merge,
+    _SafeTemplateDict,
+    _source_artifact_ref,
+    _stage_for_instance_type,
+)
 from ai_factory.core.io import write_json
 from ai_factory.core.monitoring.collectors import collect_metrics_for_instance
 from ai_factory.core.monitoring.events import InstanceEvent

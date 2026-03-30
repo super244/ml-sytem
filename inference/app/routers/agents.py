@@ -2,8 +2,8 @@
 
 from __future__ import annotations
 
+import asyncio
 import json
-import random
 import time
 import uuid
 from pathlib import Path
@@ -16,6 +16,7 @@ router = APIRouter(prefix="/agents", tags=["agents"])
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
 AGENTS_FILE = REPO_ROOT / "data" / "agents" / "registry.jsonl"
+LOGS_FILE = REPO_ROOT / "data" / "agents" / "logs.jsonl"
 
 LOG_POOL = [
     "[Data Curator] Flagged row #402 for low perplexity.",
@@ -32,7 +33,6 @@ LOG_POOL = [
     "[Optimization Agent] Hyperparam rank=16, lr=1e-4 achieving best loss so far: 0.412",
 ]
 
-# Seed default agents if registry is empty
 _DEFAULT_AGENTS: list[dict[str, Any]] = [
     {
         "id": "agent-data-01",
@@ -63,10 +63,11 @@ _DEFAULT_AGENTS: list[dict[str, Any]] = [
     },
 ]
 
+_log_generator_task: asyncio.Task[None] | None = None
+
 
 def _load_agents() -> list[dict[str, Any]]:
     if not AGENTS_FILE.exists():
-        # Seed defaults on first run
         AGENTS_FILE.parent.mkdir(parents=True, exist_ok=True)
         with open(AGENTS_FILE, "w") as f:
             for a in _DEFAULT_AGENTS:
@@ -93,30 +94,63 @@ def _save_agents(agents: list[dict[str, Any]]) -> None:
 
 
 def _enrich_agent(agent: dict[str, Any]) -> dict[str, Any]:
-    """Compute uptime_s from created_at for live display."""
     uptime = int(time.time() - agent.get("created_at", time.time()))
     return {**agent, "uptime_s": uptime}
 
 
+def _append_log(message: str, level: str = "info") -> None:
+    LOGS_FILE.parent.mkdir(parents=True, exist_ok=True)
+    log_entry = {
+        "timestamp": time.time(),
+        "message": message,
+        "level": level,
+    }
+    with open(LOGS_FILE, "a") as f:
+        f.write(json.dumps(log_entry) + "\n")
+
+
+async def _log_worker() -> None:
+    pool_index = 0
+    while True:
+        await asyncio.sleep(2.0)  # Simulate workload progression
+        _append_log(LOG_POOL[pool_index % len(LOG_POOL)])
+        pool_index += 1
+
+
+def _ensure_log_worker() -> None:
+    global _log_generator_task
+    if _log_generator_task is None or _log_generator_task.done():
+        try:
+            loop = asyncio.get_running_loop()
+            _log_generator_task = loop.create_task(_log_worker())
+        except RuntimeError:
+            pass
+
+
 @router.get("/swarm")
 def get_swarm_status() -> dict[str, Any]:
+    _ensure_log_worker()
     agents = _load_agents()
     return {"swarm": [_enrich_agent(a) for a in agents]}
 
 
 @router.get("/logs")
 def get_swarm_logs(limit: int = 10) -> dict[str, Any]:
-    now = time.time()
+    _ensure_log_worker()
+    if not LOGS_FILE.exists():
+        return {"logs": []}
+    
     logs = []
-    for i in range(limit):
-        logs.append(
-            {
-                "timestamp": now - (i * random.uniform(2, 15)),
-                "message": random.choice(LOG_POOL),
-                "level": "info",
-            }
-        )
-    logs.sort(key=lambda x: x["timestamp"])  # type: ignore[arg-type]
+    with open(LOGS_FILE) as f:
+        for line in f:
+            line = line.strip()
+            if line:
+                try:
+                    logs.append(json.loads(line))
+                except Exception:
+                    pass
+    
+    logs = logs[-limit:]
     return {"logs": logs}
 
 
@@ -135,6 +169,7 @@ class AgentUpdate(BaseModel):
 
 @router.post("/deploy")
 def deploy_agent(agent: AgentDeploy) -> dict[str, Any]:
+    _ensure_log_worker()
     new_agent: dict[str, Any] = {
         "id": f"agent-custom-{uuid.uuid4().hex[:6]}",
         "name": agent.name,
@@ -147,6 +182,7 @@ def deploy_agent(agent: AgentDeploy) -> dict[str, Any]:
     agents = _load_agents()
     agents.append(new_agent)
     _save_agents(agents)
+    _append_log(f"[{agent.name}] Agent deployed and initialized.", "info")
     return {"status": "success", "agent": _enrich_agent(new_agent)}
 
 
@@ -163,5 +199,6 @@ def update_agent(agent_id: str, payload: AgentUpdate) -> dict[str, Any]:
                 updated[field] = value
         agents[index] = updated
         _save_agents(agents)
+        _append_log(f"[{updated['name']}] Agent configuration updated.", "info")
         return {"status": "success", "agent": _enrich_agent(updated)}
     raise HTTPException(status_code=404, detail=f"Agent '{agent_id}' not found")

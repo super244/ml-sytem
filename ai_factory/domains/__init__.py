@@ -15,6 +15,9 @@ Available domains:
 - creative: Creative writing and content generation
 """
 
+from .code_generation import CodeGenerationDomain
+from .factory import DomainFactory, DomainType
+from .interfaces import DomainInterface
 from .mathematics import (
     MathDatasetRegistry,
     MathDomainConfig,
@@ -24,6 +27,10 @@ from .mathematics import (
 from .utils import get_domain_info, list_available_domains
 
 __all__ = [
+    "DomainInterface",
+    "DomainFactory",
+    "DomainType",
+    "CodeGenerationDomain",
     "MathDomainConfig",
     "MathDatasetRegistry",
     "MathEvaluationSuite",
