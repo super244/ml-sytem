@@ -11,12 +11,14 @@ router = APIRouter(prefix="/telemetry", tags=["telemetry"])
 REPO_ROOT = Path(__file__).resolve().parents[3]
 TELEMETRY_DIR = REPO_ROOT / "data" / "telemetry"
 
+
 class FlagTelemetryRequest(BaseModel):
     prompt: str
     assistant_output: str
     expected_output: str
     model_variant: str
     latency_s: float | None = None
+
 
 @router.post("/flag")
 async def flag_telemetry(request: FlagTelemetryRequest) -> dict[str, Any]:

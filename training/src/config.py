@@ -48,9 +48,7 @@ class DataConfig:
     include_verification_tag: bool = True
     max_train_samples: int | None = None
     max_eval_samples: int | None = None
-    system_prompt: str = (
-        "You are an elite competition mathematician. Solve carefully and end with Final Answer: ..."
-    )
+    system_prompt: str = "You are an elite competition mathematician. Solve carefully and end with Final Answer: ..."
     source_weights: dict[str, float] = field(default_factory=dict)
     difficulty_weights: dict[str, float] = field(default_factory=dict)
     failure_replay_boost: float = 1.35
@@ -248,34 +246,34 @@ def _find_project_root(start_path: Path) -> Path:
 
 def _path_exists(path_like: str | None, base_path: str | None = None) -> bool:
     """Check if a path exists, handling relative paths intelligently.
-    
+
     Args:
         path_like: Path to check (relative or absolute)
         base_path: Base config file path for resolving relative paths
-        
+
     Returns:
         True if path exists, False otherwise
     """
     if not path_like:
         return True
-    
+
     path = Path(path_like)
-    
+
     # If absolute, just check existence
     if path.is_absolute():
         return path.exists()
-    
+
     # If no base path provided, check relative to current working directory
     if not base_path:
         return path.exists()
-    
+
     base_dir = Path(base_path).parent
-    
+
     # First try resolving relative to config file directory
     resolved = base_dir / path
     if resolved.exists():
         return True
-    
+
     # For data/ paths, try resolving from project root
     # This handles the case where data files are relative to project root
     # but config files are in subdirectories
@@ -283,24 +281,24 @@ def _path_exists(path_like: str | None, base_path: str | None = None) -> bool:
         # Find project root dynamically
         project_root = _find_project_root(base_dir)
         resolved = project_root / path
-        
+
         # In test environments, be more permissive about data files
         # Check if we're in a test environment
         is_test_env = (
-            'PYTEST_CURRENT_TEST' in os.environ or
-            'TESTING' in os.environ or
-            'pytest' in sys.modules or
-            'test' in Path.cwd().name.lower()
+            "PYTEST_CURRENT_TEST" in os.environ
+            or "TESTING" in os.environ
+            or "pytest" in sys.modules
+            or "test" in Path.cwd().name.lower()
         )
-        
+
         if is_test_env and path_like.startswith("data/processed/"):
             # For test environments, check if the data directory structure exists
             # rather than requiring specific files
             data_dir = project_root / "data" / "processed"
             return data_dir.exists() and data_dir.is_dir()
-        
+
         return resolved.exists()
-    
+
     # Try other common relative patterns
     # Check relative to current working directory as fallback
     return path.exists()

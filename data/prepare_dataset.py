@@ -16,7 +16,12 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--config", type=str, default="data/configs/processing.yaml")
     parser.add_argument("--source", action="append", default=None, help="Extra input file(s), URLs, or dataset specs.")
     parser.add_argument("--failure-log", action="append", default=None, help="Extra failure log(s).")
-    parser.add_argument("--contamination-source", action="append", default=None, help="Holdout/benchmark file(s) for contamination checks.")
+    parser.add_argument(
+        "--contamination-source",
+        action="append",
+        default=None,
+        help="Holdout/benchmark file(s) for contamination checks.",
+    )
     parser.add_argument("--output-dir", type=str, default=None)
     return parser.parse_args()
 

@@ -19,10 +19,7 @@ class PromptPreset:
 
 def load_prompt_presets(path: str | Path) -> dict[str, PromptPreset]:
     payload = yaml.safe_load(Path(path).read_text()) or {}
-    return {
-        item["id"]: PromptPreset(**item)
-        for item in payload.get("presets", [])
-    }
+    return {item["id"]: PromptPreset(**item) for item in payload.get("presets", [])}
 
 
 def build_user_prompt(

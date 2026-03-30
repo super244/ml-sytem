@@ -41,7 +41,6 @@ def get_model(model_id: str) -> dict:
     raise HTTPException(status_code=404, detail=f"Unknown model: {model_id}")
 
 
-
 @router.get("/prompts")
 def list_prompts(limit: int = 12) -> dict:
     return get_metadata_service().prompt_library(limit=limit)

@@ -36,7 +36,9 @@ def generate_odes_optimization_example(
             f"Substitute t = {time_value} to obtain P({time_value}) = {answer}.\n"
             f"Final Answer: {answer}"
         )
-        return make_record(spec, index, difficulty, question, solution, answer, [str(initial), frac_str(rate)], "exponential growth")
+        return make_record(
+            spec, index, difficulty, question, solution, answer, [str(initial), frac_str(rate)], "exponential growth"
+        )
     if mode == "critical_point":
         a, b, c = nz(rng, -4, 4), nz(rng, -4, 4), rng.randint(-5, 5)
         if a == 0:
@@ -45,11 +47,13 @@ def generate_odes_optimization_example(
         question = f"Find the critical point of f(x) = {a}x^2 {b:+d}x {c:+d}."
         answer = frac_str(vertex)
         solution = (
-            f"Differentiate: f'(x) = {2*a}x {b:+d}. "
-            f"Set f'(x) = 0 and solve for x, giving x = {-b}/({2*a}) = {answer}.\n"
+            f"Differentiate: f'(x) = {2 * a}x {b:+d}. "
+            f"Set f'(x) = 0 and solve for x, giving x = {-b}/({2 * a}) = {answer}.\n"
             f"Final Answer: {answer}"
         )
-        return make_record(spec, index, difficulty, question, solution, answer, [f"{2*a}x {b:+d}", answer], "critical point")
+        return make_record(
+            spec, index, difficulty, question, solution, answer, [f"{2 * a}x {b:+d}", answer], "critical point"
+        )
 
     a, b, c = nz(rng, -4, 4), nz(rng, -4, 4), rng.randint(-6, 6)
     left, right = sorted((rng.randint(-3, 0), rng.randint(1, 4)))
@@ -68,8 +72,10 @@ def generate_odes_optimization_example(
     )
     solution = (
         f"Check the endpoints and any critical point in the interval. "
-        f"Since f'(x) = {2*a}x {b:+d}, the interior critical point is x = {frac_str(vertex)}. "
+        f"Since f'(x) = {2 * a}x {b:+d}, the interior critical point is x = {frac_str(vertex)}. "
         f"Comparing endpoint values with the critical value shows the extremum occurs at {answer}.\n"
         f"Final Answer: {answer}"
     )
-    return make_record(spec, index, difficulty, question, solution, answer, [frac_str(vertex), answer], "interval optimization")
+    return make_record(
+        spec, index, difficulty, question, solution, answer, [frac_str(vertex), answer], "interval optimization"
+    )

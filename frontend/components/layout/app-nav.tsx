@@ -7,14 +7,22 @@ import { NAV_ITEMS, ROUTES } from "@/lib/routes";
 
 export function AppNav() {
   const pathname = usePathname();
+
+  function isActivePath(href: (typeof NAV_ITEMS)[number]["href"]): boolean {
+    if (href === ROUTES.dashboard) {
+      return pathname.startsWith(ROUTES.dashboard);
+    }
+    return pathname === href || pathname.startsWith(`${href}/`);
+  }
+
   return (
     <nav className="app-nav">
       <div className="nav-brand-row">
         <Link className="brand-mark" href={ROUTES.solve}>
           <span className="brand-kicker">AI-Factory</span>
-          <strong>Unified AI control center</strong>
+          <strong>Autonomous lab console</strong>
         </Link>
-        <span className="nav-badge">Local-first lifecycle platform</span>
+        <span className="nav-badge">Local-first lab</span>
       </div>
 
       <div className="nav-links">
@@ -22,7 +30,7 @@ export function AppNav() {
           <Link
             key={item.href}
             href={item.href}
-            className={`nav-link${pathname === item.href ? " active" : ""}`}
+            className={`nav-link${isActivePath(item.href) ? " active" : ""}`}
           >
             {item.label}
           </Link>
@@ -31,10 +39,10 @@ export function AppNav() {
 
       <div className="nav-actions">
         <Link className="ghost-button small" href={ROUTES.workspace}>
-          Command Center
+          Workspace
         </Link>
-        <Link className="primary-button small" href={ROUTES.compare}>
-          Compare runs
+        <Link className="primary-button small" href={ROUTES.runs}>
+          Runs
         </Link>
       </div>
     </nav>

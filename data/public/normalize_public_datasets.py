@@ -85,9 +85,7 @@ def main() -> None:
                     num_rows=len(normalized_rows),
                 )
             ],
-            source_lineage=[
-                row.get("lineage") for row in normalized_rows[:20]
-            ],
+            source_lineage=[row.get("lineage") for row in normalized_rows[:20]],
             stats={"num_rows": len(normalized_rows)},
             metadata={
                 "usage": entry.usage,

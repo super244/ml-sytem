@@ -33,10 +33,7 @@ class ModelSpec:
 
 def load_registry_from_yaml(path: str | Path) -> dict[str, ModelSpec]:
     payload = yaml.safe_load(Path(path).read_text()) or {}
-    return {
-        item["name"]: ModelSpec(**item)
-        for item in payload.get("models", [])
-    }
+    return {item["name"]: ModelSpec(**item) for item in payload.get("models", [])}
 
 
 def resolve_dtype(name: str) -> torch.dtype:

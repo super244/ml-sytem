@@ -11,7 +11,7 @@ __all__ = [
     "DeploymentManager",
     "HuggingFaceTarget",
     "OllamaTarget",
-    "LMStudioTarget", 
+    "LMStudioTarget",
     "CustomAPITarget",
-    "EdgeDeviceTarget"
+    "EdgeDeviceTarget",
 ]

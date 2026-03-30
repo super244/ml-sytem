@@ -2,32 +2,84 @@
 
 import { useEffect, useState } from "react";
 import {
+  discardTelemetryRecord,
+  getSynthesisJob,
   getTelemetryBacklog,
+  promoteTelemetryRecord,
   synthesizeDataset,
+  type SynthesisJob,
   type TelemetryRecord,
 } from "@/lib/api";
 
 export default function DatasetsPage() {
   const [telemetry, setTelemetry] = useState<TelemetryRecord[]>([]);
   const [loading, setLoading] = useState(true);
+  const [actioningId, setActioningId] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
 
   // Synthesizer State
   const [seedPrompt, setSeedPrompt] = useState("");
   const [numVariants, setNumVariants] = useState(10);
   const [modelVariant, setModelVariant] = useState("gpt-4o");
   const [synthesizing, setSynthesizing] = useState(false);
-  const [synthJob, setSynthJob] = useState<{ id: string; time: number } | null>(null);
+  const [synthJob, setSynthJob] = useState<SynthesisJob | null>(null);
 
   useEffect(() => {
     getTelemetryBacklog()
       .then(setTelemetry)
-      .catch(() => null)
+      .catch((nextError) => {
+        setError(nextError instanceof Error ? nextError.message : "Failed to load telemetry backlog.");
+      })
       .finally(() => setLoading(false));
   }, []);
+
+  useEffect(() => {
+    if (!synthJob || synthJob.status === "completed") {
+      return;
+    }
+
+    let active = true;
+    const interval = setInterval(() => {
+      getSynthesisJob(synthJob.job_id)
+        .then((job) => {
+          if (active) {
+            setSynthJob(job);
+          }
+        })
+        .catch(() => null);
+    }, 2500);
+
+    return () => {
+      active = false;
+      clearInterval(interval);
+    };
+  }, [synthJob]);
+
+  async function handleTelemetryAction(recordId: string, action: "promote" | "discard") {
+    setActioningId(recordId);
+    setError(null);
+    setNotice(null);
+
+    try {
+      const result =
+        action === "promote"
+          ? await promoteTelemetryRecord(recordId)
+          : await discardTelemetryRecord(recordId);
+      setTelemetry((current) => current.filter((record) => record.id !== recordId));
+      setNotice(result.message ?? `${action}d telemetry record ${recordId}.`);
+    } catch (nextError) {
+      setError(nextError instanceof Error ? nextError.message : `Failed to ${action} telemetry record.`);
+    } finally {
+      setActioningId(null);
+    }
+  }
 
   async function handleSynthesize() {
     if (!seedPrompt.trim() || synthesizing) return;
     setSynthesizing(true);
+    setError(null);
+    setNotice(null);
     setSynthJob(null);
     try {
       const res = await synthesizeDataset({
@@ -35,14 +87,29 @@ export default function DatasetsPage() {
         num_variants: numVariants,
         model_variant: modelVariant,
       });
-      setSynthJob({ id: res.job_id, time: res.estimated_time_s });
+      setNotice(res.message);
+      setSynthJob({
+        job_id: res.job_id,
+        status: "running",
+        seed_prompt: seedPrompt,
+        num_variants: numVariants,
+        model_variant: modelVariant,
+        created_at: Date.now() / 1000,
+        estimated_time_s: res.estimated_time_s,
+        completed_rows: 0,
+        output_path: "",
+      });
       setSeedPrompt("");
-    } catch (e) {
-      console.error(e);
+    } catch (nextError) {
+      setError(nextError instanceof Error ? nextError.message : "Failed to dispatch synthesis job.");
     } finally {
       setSynthesizing(false);
     }
   }
+
+  const synthesisProgress = synthJob
+    ? Math.min(100, Math.round((synthJob.completed_rows / Math.max(synthJob.num_variants, 1)) * 100))
+    : 0;
 
   return (
     <div className="dashboard-content">
@@ -51,18 +118,22 @@ export default function DatasetsPage() {
           <span className="eyebrow">V2 Lab → Datasets</span>
           <h1 className="dash-page-title">Dataset Curator</h1>
           <p className="dash-page-desc">
-            Harvest failed model inferences from Telemetry or synthesize entirely new JSONL variants using autonomous pipelines.
+            Turn production failures into curated training assets and launch new synthetic data jobs without leaving the lab.
           </p>
         </div>
       </div>
 
+      {error && <div className="dash-error-banner panel">⚠ {error}</div>}
+      {notice && <div className="panel state-panel">{notice}</div>}
+
       <div className="workspace-section-grid">
-        
         {/* Left Pane: Telemetry Queue */}
         <div className="panel aside-section">
           <div>
             <h2 className="section-title">Telemetry Queue</h2>
-            <p className="control-label">Flagged failure cases ready for dataset inclusion.</p>
+            <p className="control-label">
+              Review flagged failure cases, then promote them into the curation queue or discard them cleanly.
+            </p>
           </div>
 
           {loading ? (
@@ -74,8 +145,8 @@ export default function DatasetsPage() {
             </div>
           ) : (
             <div className="control-rail" style={{ padding: 0, paddingRight: "0.5rem" }}>
-              {telemetry.map((t, idx) => (
-                <div key={idx} className="resource-card">
+              {telemetry.map((t) => (
+                <div key={t.id} className="resource-card">
                   <div className="model-chip-header" style={{ marginBottom: "0.5rem" }}>
                     <span style={{ fontSize: "0.75rem", opacity: 0.7 }}>Model: {t.model_variant}</span>
                     <span style={{ fontSize: "0.75rem", opacity: 0.7 }}>{new Date(t.timestamp * 1000).toLocaleString()}</span>
@@ -97,8 +168,20 @@ export default function DatasetsPage() {
                   </div>
                   
                   <div className="control-chip-group" style={{ marginTop: "1rem" }}>
-                    <button className="ghost-button small">Discard</button>
-                    <button className="primary-button small">Promote to Dataset</button>
+                    <button
+                      className="ghost-button small"
+                      disabled={actioningId === t.id}
+                      onClick={() => void handleTelemetryAction(t.id, "discard")}
+                    >
+                      {actioningId === t.id ? "Working..." : "Discard"}
+                    </button>
+                    <button
+                      className="primary-button small"
+                      disabled={actioningId === t.id}
+                      onClick={() => void handleTelemetryAction(t.id, "promote")}
+                    >
+                      {actioningId === t.id ? "Working..." : "Promote to Dataset"}
+                    </button>
                   </div>
                 </div>
               ))}
@@ -109,8 +192,8 @@ export default function DatasetsPage() {
         {/* Right Pane: Synthesizer */}
         <div className="panel aside-section">
           <div>
-            <h2 className="section-title">Data Synthesizer (Auto-Prompt)</h2>
-            <p className="control-label">Use an LLM to automatically generate diverse JSONL variations.</p>
+            <h2 className="section-title">Synthetic Expansion</h2>
+            <p className="control-label">Launch a synthesis job and track row-level progress while it runs.</p>
           </div>
 
           <div className="input-group">
@@ -157,11 +240,33 @@ export default function DatasetsPage() {
               <div className="model-chip-header" style={{ marginBottom: "0.5rem" }}>
                 <div style={{display: "flex", alignItems: "center", gap: "0.75rem"}}>
                   <span className="workspace-dot ok" />
-                  <strong style={{ color: "var(--accent)" }}>Synthesis Job Accepted</strong>
+                  <strong style={{ color: "var(--accent)" }}>
+                    {synthJob.status === "completed" ? "Synthesis Job Completed" : "Synthesis Job Running"}
+                  </strong>
                 </div>
               </div>
-              <p style={{ fontSize: "0.85rem", opacity: 0.8, margin: 0 }}>Job ID: <code>{synthJob.id}</code></p>
-              <p style={{ fontSize: "0.85rem", opacity: 0.8, margin: 0 }}>Estimated completion: {synthJob.time.toFixed(1)}s</p>
+              <p style={{ fontSize: "0.85rem", opacity: 0.8, margin: 0 }}>Job ID: <code>{synthJob.job_id}</code></p>
+              <p style={{ fontSize: "0.85rem", opacity: 0.8, margin: 0 }}>
+                Progress: {synthJob.completed_rows}/{synthJob.num_variants} rows
+              </p>
+              <p style={{ fontSize: "0.85rem", opacity: 0.8, margin: 0 }}>
+                Estimated completion: {synthJob.estimated_time_s.toFixed(1)}s
+              </p>
+              <div style={{ marginTop: "0.85rem", height: "10px", background: "rgba(19, 33, 28, 0.08)", borderRadius: "999px", overflow: "hidden" }}>
+                <div
+                  style={{
+                    width: `${synthesisProgress}%`,
+                    height: "100%",
+                    background: "linear-gradient(135deg, var(--accent), var(--accent-strong))",
+                    transition: "width 0.25s ease",
+                  }}
+                />
+              </div>
+              {synthJob.output_path ? (
+                <p style={{ fontSize: "0.8rem", opacity: 0.7, margin: "0.75rem 0 0" }}>
+                  Output: <code>{synthJob.output_path}</code>
+                </p>
+              ) : null}
             </div>
           ) : (
             <button

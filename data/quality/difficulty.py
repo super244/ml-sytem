@@ -50,7 +50,10 @@ def estimate_difficulty(question: str, solution: str | None = None) -> str:
         score += 1
     if len(blob) > 340:
         score += 1
-    if any(token in blob for token in ("prove", "show that", "olympiad", "infinity", "double integral", "functional equation")):
+    if any(
+        token in blob
+        for token in ("prove", "show that", "olympiad", "infinity", "double integral", "functional equation")
+    ):
         score += 1
     if any(token in blob for token in ("aime", "imo", "hard", "contest")):
         score += 1

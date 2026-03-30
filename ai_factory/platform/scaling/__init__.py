@@ -7,8 +7,4 @@ from .cluster import ClusterManager
 from .manager import ScalingManager
 from .resources import ResourceManager
 
-__all__ = [
-    "ScalingManager",
-    "ClusterManager",
-    "ResourceManager"
-]
+__all__ = ["ScalingManager", "ClusterManager", "ResourceManager"]

@@ -1,4 +1,5 @@
 """Agents router — real process detection + durable agent registry."""
+
 from __future__ import annotations
 
 import json
@@ -8,7 +9,7 @@ import uuid
 from pathlib import Path
 from typing import Any
 
-from fastapi import APIRouter
+from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 
 router = APIRouter(prefix="/agents", tags=["agents"])
@@ -108,11 +109,13 @@ def get_swarm_logs(limit: int = 10) -> dict[str, Any]:
     now = time.time()
     logs = []
     for i in range(limit):
-        logs.append({
-            "timestamp": now - (i * random.uniform(2, 15)),
-            "message": random.choice(LOG_POOL),
-            "level": "info",
-        })
+        logs.append(
+            {
+                "timestamp": now - (i * random.uniform(2, 15)),
+                "message": random.choice(LOG_POOL),
+                "level": "info",
+            }
+        )
     logs.sort(key=lambda x: x["timestamp"])  # type: ignore[arg-type]
     return {"logs": logs}
 
@@ -121,6 +124,13 @@ class AgentDeploy(BaseModel):
     name: str
     role: str
     model: str
+
+
+class AgentUpdate(BaseModel):
+    name: str | None = None
+    role: str | None = None
+    model: str | None = None
+    status: str | None = None
 
 
 @router.post("/deploy")
@@ -138,3 +148,20 @@ def deploy_agent(agent: AgentDeploy) -> dict[str, Any]:
     agents.append(new_agent)
     _save_agents(agents)
     return {"status": "success", "agent": _enrich_agent(new_agent)}
+
+
+@router.patch("/{agent_id}")
+def update_agent(agent_id: str, payload: AgentUpdate) -> dict[str, Any]:
+    agents = _load_agents()
+    for index, agent in enumerate(agents):
+        if agent.get("id") != agent_id:
+            continue
+        updated = {**agent}
+        for field in ("name", "role", "model", "status"):
+            value = getattr(payload, field)
+            if value not in (None, ""):
+                updated[field] = value
+        agents[index] = updated
+        _save_agents(agents)
+        return {"status": "success", "agent": _enrich_agent(updated)}
+    raise HTTPException(status_code=404, detail=f"Agent '{agent_id}' not found")

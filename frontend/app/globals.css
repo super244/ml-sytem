@@ -1,4 +1,6 @@
 :root {
+  --font-sans: "Avenir Next", "IBM Plex Sans", "Segoe UI", sans-serif;
+  --font-mono: "IBM Plex Mono", "SFMono-Regular", "SF Mono", monospace;
   --bg: #edf3ef;
   --bg-strong: #e2ece6;
   --surface: rgba(255, 255, 255, 0.8);
@@ -123,16 +125,16 @@ a:focus-visible {
 
 .app-nav {
   display: grid;
-  grid-template-columns: auto 1fr auto;
+  grid-template-columns: minmax(220px, auto) 1fr auto;
   align-items: center;
-  gap: 18px;
-  padding: 14px 18px;
+  gap: 14px;
+  padding: 12px 16px;
   position: sticky;
   top: 12px;
   z-index: 20;
   background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.94), rgba(248, 250, 249, 0.78)),
-    radial-gradient(circle at top left, rgba(15, 122, 97, 0.08), transparent 42%);
+    linear-gradient(180deg, rgba(255, 255, 255, 0.95), rgba(248, 250, 249, 0.82)),
+    radial-gradient(circle at top left, rgba(15, 122, 97, 0.09), transparent 44%);
 }
 
 .nav-brand-row {
@@ -145,7 +147,13 @@ a:focus-visible {
 .brand-mark {
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 2px;
+  min-width: 0;
+}
+
+.brand-mark strong {
+  font-size: 0.95rem;
+  letter-spacing: -0.03em;
 }
 
 .brand-kicker {
@@ -161,8 +169,10 @@ a:focus-visible {
   border: 1px solid var(--line);
   background: rgba(255, 255, 255, 0.9);
   color: var(--muted);
-  padding: 8px 12px;
-  font-size: 0.82rem;
+  padding: 7px 11px;
+  font-size: 0.74rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
 }
 
 .nav-links {
@@ -174,9 +184,10 @@ a:focus-visible {
 
 .nav-link {
   border-radius: 999px;
-  padding: 10px 14px;
+  padding: 8px 12px;
   color: var(--muted);
   border: 1px solid transparent;
+  font-size: 0.86rem;
 }
 
 .nav-link.active,
@@ -190,7 +201,7 @@ a:focus-visible {
   display: flex;
   justify-content: flex-end;
   flex-wrap: wrap;
-  gap: 10px;
+  gap: 8px;
 }
 
 .primary-button,
@@ -1496,7 +1507,7 @@ a:focus-visible {
 .dashboard-content {
   display: flex;
   flex-direction: column;
-  gap: 20px;
+  gap: 18px;
 }
 
 /* Selected instance highlight */
@@ -1523,10 +1534,10 @@ a:focus-visible {
 
 /* Page Header */
 .dash-page-header {
-  padding: 24px 26px;
+  padding: 18px 22px;
   background:
-    linear-gradient(135deg, rgba(15, 122, 97, 0.07), rgba(255,255,255,0.94)),
-    radial-gradient(circle at top right, rgba(37,95,155,0.08), transparent 40%);
+    linear-gradient(135deg, rgba(15, 122, 97, 0.05), rgba(255,255,255,0.96)),
+    radial-gradient(circle at top right, rgba(37,95,155,0.07), transparent 42%);
 }
 
 .dash-page-header-inner {
@@ -1537,18 +1548,19 @@ a:focus-visible {
 }
 
 .dash-page-title {
-  font-size: clamp(1.6rem, 3vw, 2.2rem);
+  font-size: clamp(1.45rem, 2.6vw, 2rem);
   font-weight: 800;
   letter-spacing: -0.04em;
-  margin: 6px 0 8px;
-  line-height: 1.05;
+  margin: 4px 0 6px;
+  line-height: 1.02;
 }
 
 .dash-page-desc {
   color: var(--muted);
   margin: 0;
-  line-height: 1.6;
-  max-width: 640px;
+  line-height: 1.5;
+  max-width: 54ch;
+  font-size: 0.94rem;
 }
 
 .dash-header-actions {
@@ -1570,30 +1582,30 @@ a:focus-visible {
   padding: 0;
   overflow: hidden;
   background:
-    linear-gradient(135deg, rgba(15, 122, 97, 0.1), rgba(37,95,155,0.06)),
-    radial-gradient(circle at bottom right, rgba(15,122,97,0.18), transparent 50%);
+    linear-gradient(135deg, rgba(15, 122, 97, 0.08), rgba(37,95,155,0.05)),
+    radial-gradient(circle at bottom right, rgba(15,122,97,0.14), transparent 52%);
 }
 
 .dash-hero-inner {
   display: grid;
-  grid-template-columns: 1fr auto;
-  gap: 28px;
+  grid-template-columns: minmax(0, 1.35fr) minmax(220px, 320px);
+  gap: 22px;
   align-items: center;
-  padding: 32px 36px;
+  padding: 24px 28px;
 }
 
 .dash-hero-copy {
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 10px;
 }
 
 .dash-hero-title {
-  font-size: clamp(2.2rem, 4vw, 3.4rem);
+  font-size: clamp(1.9rem, 4vw, 2.8rem);
   font-weight: 900;
   letter-spacing: -0.06em;
-  line-height: 1;
-  margin: 6px 0 0;
+  line-height: 1.02;
+  margin: 2px 0 0;
   background: linear-gradient(135deg, var(--ink), var(--accent-strong));
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
@@ -1603,14 +1615,34 @@ a:focus-visible {
 .dash-hero-desc {
   color: var(--muted);
   margin: 0;
-  line-height: 1.6;
-  max-width: 540px;
+  line-height: 1.5;
+  max-width: 48ch;
+  font-size: 0.96rem;
 }
 
 .dash-hero-actions {
   display: flex;
   gap: 10px;
   flex-wrap: wrap;
+}
+
+.dash-command-strip {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 6px;
+}
+
+.dash-command-pill {
+  display: inline-flex;
+  align-items: center;
+  padding: 8px 12px;
+  border-radius: 999px;
+  border: 1px solid rgba(19, 33, 28, 0.08);
+  background: rgba(255, 255, 255, 0.74);
+  color: var(--muted);
+  font-size: 0.8rem;
+  font-weight: 600;
 }
 
 .dash-hero-stats {
@@ -1624,7 +1656,7 @@ a:focus-visible {
   flex-direction: column;
   align-items: center;
   gap: 4px;
-  padding: 16px 20px;
+  padding: 14px 18px;
   border-radius: var(--radius-lg);
   background: rgba(255,255,255,0.8);
   border: 1px solid var(--line);
@@ -1665,7 +1697,7 @@ a:focus-visible {
   display: flex;
   justify-content: space-between;
   align-items: flex-end;
-  gap: 14px;
+  gap: 12px;
 }
 
 .dash-section-title {
@@ -1684,15 +1716,15 @@ a:focus-visible {
 /* Lifecycle Stage Grid */
 .lifecycle-grid {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 14px;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 12px;
 }
 
 .lifecycle-stage-card {
   display: flex;
   align-items: flex-start;
   gap: 14px;
-  padding: 18px 20px;
+  padding: 16px 18px;
   border: 1px solid var(--line);
   border-radius: var(--radius-lg);
   background: rgba(255,255,255,0.84);
@@ -1760,7 +1792,7 @@ a:focus-visible {
 /* Recent Instances */
 .recent-instances-grid {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
   gap: 12px;
 }
 
@@ -1842,7 +1874,7 @@ a:focus-visible {
 /* Workspace Summary */
 .workspace-summary-grid {
   display: grid;
-  grid-template-columns: repeat(6, 1fr);
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
   gap: 10px;
 }
 
@@ -1902,11 +1934,29 @@ a:focus-visible {
   font-weight: 600;
 }
 
+.dash-note-banner {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 14px 18px;
+  background: rgba(37, 95, 155, 0.08);
+  border-color: rgba(37, 95, 155, 0.18);
+  color: var(--secondary);
+  font-weight: 600;
+}
+
 /* ---- TRAINING PAGE ---- */
 .training-launch-grid {
   display: flex;
   flex-direction: column;
   gap: 16px;
+}
+
+.training-remote-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+  margin-top: 14px;
 }
 
 .training-step {
@@ -2821,6 +2871,10 @@ a:focus-visible {
   .learning-mode-grid,
   .user-level-grid {
     grid-template-columns: repeat(2, 1fr);
+  }
+
+  .training-remote-grid {
+    grid-template-columns: 1fr;
   }
 
   .deploy-target-grid {

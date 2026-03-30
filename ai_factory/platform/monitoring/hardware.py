@@ -1,8 +1,7 @@
+import importlib
 import platform
 import subprocess
 from typing import Any
-
-import torch
 
 
 def get_system_ram_gb() -> int:
@@ -19,7 +18,16 @@ def get_system_ram_gb() -> int:
         pass
     return 16  # Fallback
 
+
+def _get_torch():
+    try:
+        return importlib.import_module("torch")
+    except Exception:
+        return None
+
+
 def get_cluster_nodes() -> list[dict[str, Any]]:
+    torch = _get_torch()
     # Local Node Logic
     node_name = "Local Engine"
     memory_str = f"{get_system_ram_gb()}GB"
@@ -27,7 +35,7 @@ def get_cluster_nodes() -> list[dict[str, Any]]:
     hw_type = "CPU"
     status = "online"
 
-    if torch.cuda.is_available():
+    if torch is not None and torch.cuda.is_available():
         hw_type = torch.cuda.get_device_name(0)
         try:
             allocated = torch.cuda.memory_allocated(0)
@@ -38,12 +46,12 @@ def get_cluster_nodes() -> list[dict[str, Any]]:
                 usage_pct = 10
         except Exception:
             pass
-    elif torch.backends.mps.is_available():
+    elif torch is not None and getattr(torch.backends, "mps", None) and torch.backends.mps.is_available():
         hw_type = "MPS (Apple Silicon)"
         try:
             alloc = torch.mps.current_allocated_memory()
             # recommended_max_memory is often around total RAM * 0.7 for Unified memory
-            rec = get_system_ram_gb() * (1024**3) * 0.7 
+            rec = get_system_ram_gb() * (1024**3) * 0.7
             if rec > 0:
                 usage_pct = min(100, int((alloc / rec) * 100))
         except Exception:
@@ -56,9 +64,9 @@ def get_cluster_nodes() -> list[dict[str, Any]]:
         "memory": memory_str,
         "usage": usage_pct,
         "status": status,
-        "activeJobs": 1, 
+        "activeJobs": 1,
     }
-    
+
     # Mocking disconnected/ssh nodes
     remote_node = {
         "id": "remote-cluster-1",
@@ -69,5 +77,5 @@ def get_cluster_nodes() -> list[dict[str, Any]]:
         "status": "idle",
         "activeJobs": 0,
     }
-    
+
     return [local_node, remote_node]

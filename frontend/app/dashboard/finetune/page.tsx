@@ -36,6 +36,7 @@ export default function FinetunePage() {
   const router = useRouter();
   const [sources, setSources] = useState<InstanceSummary[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [selectedSource, setSelectedSource] = useState<string | null>(null);
   const [mode, setMode] = useState<FinetuneMode>("qlora");
   const [sourceModel, setSourceModel] = useState("");
@@ -46,10 +47,13 @@ export default function FinetunePage() {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
+    setLoadError(null);
     getInstances()
       .then((list) => {
         const completed = list.filter(
-          (i) => i.status === "completed" && (i.type === "train" || i.type === "evaluate"),
+          (i) =>
+            i.status === "completed" &&
+            (i.type === "train" || i.type === "evaluate" || i.type === "finetune"),
         );
         setSources(completed);
         if (completed.length > 0) {
@@ -57,7 +61,13 @@ export default function FinetunePage() {
           setSourceModel(completed[0].lifecycle?.source_model ?? "");
         }
       })
-      .catch(() => null)
+      .catch((nextError) =>
+        setLoadError(
+          nextError instanceof Error
+            ? nextError.message
+            : "Completed instances could not be loaded.",
+        ),
+      )
       .finally(() => setLoading(false));
   }, []);
 
@@ -101,6 +111,12 @@ export default function FinetunePage() {
       {error && (
         <div className="dash-error-banner panel">
           <span>⚠</span> {error}
+        </div>
+      )}
+
+      {loadError && (
+        <div className="dash-error-banner panel">
+          <span>⚠</span> {loadError}
         </div>
       )}
 
@@ -237,6 +253,11 @@ export default function FinetunePage() {
           {!sourceModel && !selectedSource && (
             <p className="launch-hint" style={{ color: "var(--danger)" }}>
               Select a source model or completed instance to continue.
+            </p>
+          )}
+          {selectedSource && (
+            <p className="launch-hint">
+              Chaining from a prior finetune keeps lineage intact and preserves the parent branch.
             </p>
           )}
         </div>

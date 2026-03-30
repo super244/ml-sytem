@@ -4,7 +4,7 @@ This package contains domain-specific implementations for different
 AI applications and use cases. Each domain provides:
 
 - Domain-specific datasets and data processing
-- Specialized training configurations  
+- Specialized training configurations
 - Domain-appropriate evaluation metrics
 - Custom inference interfaces
 
@@ -26,7 +26,7 @@ from .utils import get_domain_info, list_available_domains
 __all__ = [
     "MathDomainConfig",
     "MathDatasetRegistry",
-    "MathEvaluationSuite", 
+    "MathEvaluationSuite",
     "MathTrainingProfiles",
     "list_available_domains",
     "get_domain_info",

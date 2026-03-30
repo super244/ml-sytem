@@ -5,7 +5,9 @@ from typing import Any
 from data.quality.difficulty import difficulty_score
 
 
-def select_failure_cases(records: list[dict[str, Any]], min_difficulty: str = "hard", limit: int = 200) -> list[dict[str, Any]]:
+def select_failure_cases(
+    records: list[dict[str, Any]], min_difficulty: str = "hard", limit: int = 200
+) -> list[dict[str, Any]]:
     threshold = difficulty_score(min_difficulty)
     curated: list[dict[str, Any]] = []
     for record in records:

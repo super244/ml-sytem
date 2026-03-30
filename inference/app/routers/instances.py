@@ -38,9 +38,7 @@ def list_instances(
 
 
 @router.post("/instances", response_model=InstanceDetail)
-def create_instance(
-    request: InstanceCreateRequest, background_tasks: BackgroundTasks
-) -> InstanceDetail:
+def create_instance(request: InstanceCreateRequest, background_tasks: BackgroundTasks) -> InstanceDetail:
     service = get_instance_service()
     should_start = request.start
     request.start = False

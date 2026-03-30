@@ -35,7 +35,14 @@ class InstanceService:
         control_service: FactoryControlService | None = None,
     ):
         self.settings = settings
-        self.control = control_service or build_platform_container(artifacts_dir=settings.artifacts_dir).control_service
+        self.repo_root = Path(settings.repo_root).resolve()
+        self.control = (
+            control_service
+            or build_platform_container(
+                repo_root=self.repo_root,
+                artifacts_dir=settings.artifacts_dir,
+            ).control_service
+        )
         self.store = self.control.store
         self.manager = self.control.manager
 
@@ -43,14 +50,13 @@ class InstanceService:
         if not config_path:
             raise HTTPException(status_code=400, detail="config_path is required")
         path = Path(config_path)
-        if not path.exists():
-            raise HTTPException(status_code=404, detail=f"Config not found: {config_path}")
-        return str(path)
+        resolved = path.resolve() if path.is_absolute() else (self.repo_root / path).resolve()
+        if resolved.exists():
+            return str(resolved)
+        raise HTTPException(status_code=404, detail=f"Config not found: {config_path}")
 
     def _detail(self, instance_id: str) -> InstanceDetail:
-        return InstanceDetail.model_validate(
-            self.control.get_instance_detail(instance_id).model_dump(mode="json")
-        )
+        return InstanceDetail.model_validate(self.control.get_instance_detail(instance_id).model_dump(mode="json"))
 
     def list_instances(
         self,
@@ -91,10 +97,7 @@ class InstanceService:
 
     def evaluate_instance(self, instance_id: str, request: InstanceEvaluateRequest | None = None) -> InstanceDetail:
         request = request or InstanceEvaluateRequest()
-        if request.config_path is not None:
-            config_path = self._ensure_config_path(request.config_path)
-        else:
-            config_path = "configs/eval.yaml"
+        config_path = self._ensure_config_path(request.config_path or "configs/eval.yaml")
         manifest = self.control.create_evaluation_instance(
             instance_id,
             config_path=config_path,
@@ -128,10 +131,11 @@ class InstanceService:
 
     def run_instance_action(self, instance_id: str, request: InstanceActionRequest) -> InstanceDetail:
         try:
+            config_path = self._ensure_config_path(request.config_path) if request.config_path else None
             manifest = self.control.execute_action(
                 instance_id,
                 action=request.action,
-                config_path=request.config_path,
+                config_path=config_path,
                 deployment_target=request.deployment_target,
                 start=request.start,
             )
@@ -146,18 +150,14 @@ class InstanceService:
             self.manager.get_instance(instance_id)
         except FileNotFoundError as exc:
             raise HTTPException(status_code=404, detail=str(exc)) from exc
-        return InstanceLogsResponse.model_validate(
-            self.control.get_logs(instance_id).model_dump(mode="json")
-        )
+        return InstanceLogsResponse.model_validate(self.control.get_logs(instance_id).model_dump(mode="json"))
 
     def get_metrics(self, instance_id: str) -> InstanceMetricsResponse:
         try:
             self.manager.get_instance(instance_id)
         except FileNotFoundError as exc:
             raise HTTPException(status_code=404, detail=str(exc)) from exc
-        return InstanceMetricsResponse.model_validate(
-            self.control.get_metrics(instance_id).model_dump(mode="json")
-        )
+        return InstanceMetricsResponse.model_validate(self.control.get_metrics(instance_id).model_dump(mode="json"))
 
     def get_live_snapshot(self, instance_id: str) -> InstanceStreamResponse:
         try:
@@ -213,6 +213,4 @@ class InstanceService:
         return OrchestrationSummaryResponse(summary=self.control.monitoring_summary())
 
     def get_foundation_overview(self) -> FoundationOverviewResponse:
-        return FoundationOverviewResponse.model_validate(
-            self.control.describe_foundation().model_dump(mode="json")
-        )
+        return FoundationOverviewResponse.model_validate(self.control.describe_foundation().model_dump(mode="json"))

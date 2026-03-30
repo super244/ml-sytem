@@ -99,8 +99,7 @@ def _experience_tiers() -> list[ExperienceTier]:
             id="hobbyist",
             label="Hobbyist",
             description=(
-                "Balanced control with common tuning knobs, follow-up workflows, "
-                "and manageable remote options."
+                "Balanced control with common tuning knobs, follow-up workflows, and manageable remote options."
             ),
             visible_controls=["templates", "hyperparameters", "remote profiles", "recommendations"],
             recommended_modes=["single", "local_parallel", "hybrid"],

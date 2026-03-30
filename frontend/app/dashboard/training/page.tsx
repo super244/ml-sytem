@@ -1,6 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import Link from "next/link";
+import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 
 import {
   createManagedInstance,
@@ -9,9 +11,6 @@ import {
   type WorkspaceOrchestrationTemplate,
 } from "@/lib/api";
 import { ROUTES } from "@/lib/routes";
-import { useEffect } from "react";
-import Link from "next/link";
-import { useRouter } from "next/navigation";
 
 type UserLevel = "beginner" | "hobbyist" | "dev";
 
@@ -24,6 +23,12 @@ type LaunchState = {
   configPath: string;
   environment: "local" | "remote" | "cloud";
   instanceName: string;
+  remoteHost: string;
+  remoteUser: string;
+  remotePort: string;
+  remoteKeyPath: string;
+  remoteRepoRoot: string;
+  cloudProfile: string;
 };
 
 const USER_LEVELS: { id: UserLevel; label: string; desc: string; icon: string }[] = [
@@ -71,6 +76,12 @@ const DEFAULT_STATE: LaunchState = {
   configPath: "configs/finetune.yaml",
   environment: "local",
   instanceName: "",
+  remoteHost: "",
+  remoteUser: "",
+  remotePort: "22",
+  remoteKeyPath: "",
+  remoteRepoRoot: "/tmp/ai-factory",
+  cloudProfile: "",
 };
 
 export default function TrainingPage() {
@@ -80,17 +91,33 @@ export default function TrainingPage() {
   const [templates, setTemplates] = useState<WorkspaceOrchestrationTemplate[]>([]);
   const [launching, setLaunching] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [launched, setLaunched] = useState<string | null>(null);
 
   useEffect(() => {
-    getWorkspaceOverview().then((ws) => {
-      setProfiles(ws.training_profiles ?? []);
-      setTemplates(
-        (ws.orchestration_templates ?? []).filter(
-          (t) => t.instance_type === "train" || t.instance_type === "finetune",
-        ),
-      );
-    }).catch(() => null);
+    let active = true;
+    setLoadError(null);
+    getWorkspaceOverview()
+      .then((ws) => {
+        if (!active) return;
+        setProfiles(ws.training_profiles ?? []);
+        setTemplates(
+          (ws.orchestration_templates ?? []).filter(
+            (t) => t.instance_type === "train" || t.instance_type === "finetune",
+          ),
+        );
+      })
+      .catch((nextError) => {
+        if (!active) return;
+        setLoadError(
+          nextError instanceof Error
+            ? nextError.message
+            : "Workspace metadata could not be loaded.",
+        );
+      });
+    return () => {
+      active = false;
+    };
   }, []);
 
   const update = (patch: Partial<LaunchState>) => setForm((f) => ({ ...f, ...patch }));
@@ -99,6 +126,9 @@ export default function TrainingPage() {
     setLaunching(true);
     setError(null);
     try {
+      const isRemote = form.environment !== "local";
+      const remoteHost = form.remoteHost.trim();
+      const remoteProfile = form.cloudProfile.trim();
       const instance = await createManagedInstance({
         config_path: form.configPath,
         start: true,
@@ -108,7 +138,17 @@ export default function TrainingPage() {
           learning_mode: form.learningMode as never,
           source_model: form.sourceModel || null,
         },
-        environment: form.environment === "local" ? { kind: "local" } : { kind: "cloud" },
+        environment: !isRemote
+          ? { kind: "local" }
+          : {
+              kind: "cloud",
+              host: remoteHost || undefined,
+              profile_name: form.environment === "cloud" ? remoteProfile || undefined : undefined,
+              user: form.remoteUser.trim() || undefined,
+              port: Number(form.remotePort) || 22,
+              key_path: form.remoteKeyPath.trim() || undefined,
+              remote_repo_root: form.remoteRepoRoot.trim() || undefined,
+            },
         name: form.instanceName || undefined,
       });
       setLaunched(instance.id);
@@ -119,6 +159,14 @@ export default function TrainingPage() {
       setLaunching(false);
     }
   }
+
+  const needsRemoteDetails = form.environment !== "local";
+  const canLaunch =
+    !launching &&
+    form.configPath.trim().length > 0 &&
+    (!needsRemoteDetails ||
+      form.remoteHost.trim().length > 0 ||
+      (form.environment === "cloud" && form.cloudProfile.trim().length > 0));
 
   return (
     <div className="dashboard-content">
@@ -143,6 +191,13 @@ export default function TrainingPage() {
         <div className="dash-error-banner panel">
           <span className="dash-error-icon">⚠</span>
           <span>{error}</span>
+        </div>
+      )}
+
+      {loadError && (
+        <div className="dash-error-banner panel">
+          <span className="dash-error-icon">⚠</span>
+          <span>{loadError}</span>
         </div>
       )}
 
@@ -258,6 +313,84 @@ export default function TrainingPage() {
               </button>
             ))}
           </div>
+          {needsRemoteDetails && (
+            <div className="training-remote-grid">
+              <div className="input-group">
+                <label className="control-label" htmlFor="remote-host">
+                  {form.environment === "cloud" ? "Cloud host or profile" : "SSH host"}
+                </label>
+                <input
+                  id="remote-host"
+                  type="text"
+                  placeholder="gpu-node.local or 10.0.0.24"
+                  value={form.remoteHost}
+                  onChange={(e) => update({ remoteHost: e.target.value })}
+                />
+              </div>
+              <div className="input-group">
+                <label className="control-label" htmlFor="remote-user">
+                  SSH user
+                </label>
+                <input
+                  id="remote-user"
+                  type="text"
+                  placeholder="ubuntu"
+                  value={form.remoteUser}
+                  onChange={(e) => update({ remoteUser: e.target.value })}
+                />
+              </div>
+              <div className="input-group">
+                <label className="control-label" htmlFor="remote-port">
+                  SSH port
+                </label>
+                <input
+                  id="remote-port"
+                  type="number"
+                  min={1}
+                  value={form.remotePort}
+                  onChange={(e) => update({ remotePort: e.target.value })}
+                />
+              </div>
+              <div className="input-group">
+                <label className="control-label" htmlFor="remote-key-path">
+                  SSH key path
+                </label>
+                <input
+                  id="remote-key-path"
+                  type="text"
+                  placeholder="~/.ssh/id_ed25519"
+                  value={form.remoteKeyPath}
+                  onChange={(e) => update({ remoteKeyPath: e.target.value })}
+                />
+              </div>
+              <div className="input-group control-form-span-2">
+                <label className="control-label" htmlFor="remote-repo-root">
+                  Remote repo root
+                </label>
+                <input
+                  id="remote-repo-root"
+                  type="text"
+                  placeholder="/tmp/ai-factory"
+                  value={form.remoteRepoRoot}
+                  onChange={(e) => update({ remoteRepoRoot: e.target.value })}
+                />
+              </div>
+              {form.environment === "cloud" && (
+                <div className="input-group control-form-span-2">
+                  <label className="control-label" htmlFor="cloud-profile">
+                    Cloud profile name
+                  </label>
+                  <input
+                    id="cloud-profile"
+                    type="text"
+                    placeholder="default"
+                    value={form.cloudProfile}
+                    onChange={(e) => update({ cloudProfile: e.target.value })}
+                  />
+                </div>
+              )}
+            </div>
+          )}
         </div>
 
         {/* Step 5: Configuration */}
@@ -364,11 +497,16 @@ export default function TrainingPage() {
           <button
             type="button"
             className="primary-button launch-btn"
-            disabled={launching}
+            disabled={!canLaunch}
             onClick={() => void launch()}
           >
             {launching ? "⟳ Launching…" : "▲ Launch Training Instance"}
           </button>
+          {needsRemoteDetails && !form.remoteHost.trim() && (
+            <p className="launch-hint" style={{ color: "var(--danger)" }}>
+              Remote and cloud launches need at least a host or profile name.
+            </p>
+          )}
           <p className="launch-hint">
             The instance will be tracked in real-time on the monitoring page.
           </p>

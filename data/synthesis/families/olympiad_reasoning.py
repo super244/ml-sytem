@@ -87,8 +87,8 @@ def generate_olympiad_reasoning_example(
     question = f"Prove that x^2 + {a}x + {b} >= {b - a * a / 4:.2f} for all real x, and identify when equality holds."
     answer = f"x = {-a}/2"
     solution = (
-        f"Complete the square: x^2 + {a}x + {b} = (x + {a}/2)^2 + {b} - {a*a}/4. "
-        f"Since the square term is always nonnegative, the expression is at least {b - a*a/4:.2f}. "
+        f"Complete the square: x^2 + {a}x + {b} = (x + {a}/2)^2 + {b} - {a * a}/4. "
+        f"Since the square term is always nonnegative, the expression is at least {b - a * a / 4:.2f}. "
         f"Equality holds when x + {a}/2 = 0, so x = {-a}/2.\n"
         f"Final Answer: {answer}"
     )

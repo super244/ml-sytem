@@ -70,13 +70,9 @@ def _load_orchestration_templates(repo_root: Path) -> list[dict[str, str]]:
 def build_workspace_overview(root: Path | None = None) -> dict[str, Any]:
     repo_root = (root or REPO_ROOT).resolve()
     catalog = load_catalog(repo_root / "data" / "catalog.json")
-    packs = load_pack_summary(
-        repo_root / "data" / "processed" / "pack_summary.json"
-    ).get("packs", [])
+    packs = load_pack_summary(repo_root / "data" / "processed" / "pack_summary.json").get("packs", [])
     runs = list_training_runs(str(repo_root / "artifacts"))
-    benchmarks = load_benchmark_registry(
-        repo_root / "evaluation" / "benchmarks" / "registry.yaml"
-    )
+    benchmarks = load_benchmark_registry(repo_root / "evaluation" / "benchmarks" / "registry.yaml")
     models = _load_model_catalog(repo_root)
     orchestration_templates = _load_orchestration_templates(repo_root)
     foundation = build_foundation_catalog(repo_root)
@@ -116,14 +112,8 @@ def build_workspace_overview(root: Path | None = None) -> dict[str, Any]:
         {
             "id": "ml-stack",
             "label": "Training and inference stack",
-            "ok": all(
-                _has_package(name)
-                for name in ("torch", "transformers", "datasets", "sympy")
-            ),
-            "detail": (
-                "Covers the heavier packages required for training, evaluation, "
-                "and symbolic verification."
-            ),
+            "ok": all(_has_package(name) for name in ("torch", "transformers", "datasets", "sympy")),
+            "detail": ("Covers the heavier packages required for training, evaluation, and symbolic verification."),
         },
         {
             "id": "frontend-install",
@@ -135,19 +125,13 @@ def build_workspace_overview(root: Path | None = None) -> dict[str, Any]:
             "id": "processed-corpus",
             "label": "Processed corpus",
             "ok": (repo_root / "data" / "processed" / "manifest.json").exists(),
-            "detail": (
-                "Training and dataset browsing expect the processed manifest and "
-                "pack summary outputs."
-            ),
+            "detail": ("Training and dataset browsing expect the processed manifest and pack summary outputs."),
         },
         {
             "id": "benchmark-registry",
             "label": "Benchmark registry",
             "ok": (repo_root / "evaluation" / "benchmarks" / "registry.yaml").exists(),
-            "detail": (
-                "Evaluation routes and comparisons depend on a discoverable "
-                "benchmark registry."
-            ),
+            "detail": ("Evaluation routes and comparisons depend on a discoverable benchmark registry."),
         },
     ]
 
@@ -156,10 +140,7 @@ def build_workspace_overview(root: Path | None = None) -> dict[str, Any]:
         _command_recipe(
             "doctor",
             "Workspace doctor",
-            (
-                "Inspect dependency readiness, dataset state, run discovery, and "
-                "frontend installation in one pass."
-            ),
+            ("Inspect dependency readiness, dataset state, run discovery, and frontend installation in one pass."),
             "python scripts/doctor.py --json",
             "setup",
         ),
@@ -176,10 +157,7 @@ def build_workspace_overview(root: Path | None = None) -> dict[str, Any]:
         _command_recipe(
             "serve-api",
             "Serve API",
-            (
-                "Start the FastAPI layer that powers the solve workspace, compare "
-                "lab, and metadata routes."
-            ),
+            ("Start the FastAPI layer that powers the solve workspace, compare lab, and metadata routes."),
             "uvicorn inference.app.main:app --reload",
             "serve",
         ),
@@ -193,14 +171,8 @@ def build_workspace_overview(root: Path | None = None) -> dict[str, Any]:
         _command_recipe(
             "baseline-dry-run",
             "Baseline dry-run",
-            (
-                "Validate the default local specialist profile without entering a "
-                "full training loop."
-            ),
-            (
-                "python -m training.train --config "
-                "training/configs/profiles/baseline_qlora.yaml --dry-run"
-            ),
+            ("Validate the default local specialist profile without entering a full training loop."),
+            ("python -m training.train --config training/configs/profiles/baseline_qlora.yaml --dry-run"),
             "training",
         ),
         _command_recipe(

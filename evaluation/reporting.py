@@ -31,9 +31,7 @@ def aggregate_metrics(results: list[dict[str, Any]], key: str) -> dict[str, Any]
         "arithmetic_slip_rate": (
             sum(1 for item in entries if item["arithmetic_slip"]) / len(entries) if entries else 0.0
         ),
-        "no_answer_rate": (
-            sum(1 for item in entries if item["no_answer"]) / len(entries) if entries else 0.0
-        ),
+        "no_answer_rate": (sum(1 for item in entries if item["no_answer"]) / len(entries) if entries else 0.0),
         "avg_latency_s": _mean([item["latency_s"] for item in entries]),
         "avg_prompt_tokens": _mean([item["prompt_tokens"] for item in entries]),
         "avg_completion_tokens": _mean([item["completion_tokens"] for item in entries]),

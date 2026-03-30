@@ -131,9 +131,7 @@ def _render_instance_report(manifest: InstanceManifest) -> None:
     if manifest.recommendations:
         _print_section("Recommendations")
         for recommendation in manifest.recommendations[:5]:
-            print(
-                f"  - {recommendation.action} | priority={recommendation.priority} | {recommendation.reason}"
-            )
+            print(f"  - {recommendation.action} | priority={recommendation.priority} | {recommendation.reason}")
     if manifest.error is not None:
         _print_section("Error")
         print(f"  {manifest.error.code}: {manifest.error.message}")
@@ -275,7 +273,7 @@ def _render_compare_summary(left: InstanceManifest, right: InstanceManifest) -> 
 
     _print_section("Metric deltas")
     print(f"  {'metric':<30} {'left':>12} {'right':>12} {'delta':>12}")
-    print(f"  {'-'*30} {'-'*12} {'-'*12} {'-'*12}")
+    print(f"  {'-' * 30} {'-' * 12} {'-' * 12} {'-' * 12}")
     for key in all_keys:
         lv = left.metrics_summary.get(key)
         rv = right.metrics_summary.get(key)
@@ -341,15 +339,11 @@ def _environment_from_args(args: argparse.Namespace) -> EnvironmentSpec | None:
     remote_repo_root = args.remote_repo_root or (
         _prompt("Remote repo root", "/tmp/ai-factory") if interactive else None
     )
-    python_bin = args.python_bin or (
-        _prompt("Remote python", "python3") if interactive else "python3"
-    )
+    python_bin = args.python_bin or (_prompt("Remote python", "python3") if interactive else "python3")
     port_forwards = []
     for raw in getattr(args, "port_forwards", []) or []:
         local_port, remote_port, bind_host = _parse_port_forward(raw)
-        port_forwards.append(
-            PortForward(local_port=local_port, remote_port=remote_port, bind_host=bind_host)
-        )
+        port_forwards.append(PortForward(local_port=local_port, remote_port=remote_port, bind_host=bind_host))
     environment = EnvironmentSpec(
         kind="cloud",
         profile_name=args.cloud_profile,
@@ -369,9 +363,7 @@ def _environment_from_args(args: argparse.Namespace) -> EnvironmentSpec | None:
 def _lifecycle_from_args(args: argparse.Namespace) -> LifecycleProfile | None:
     interactive = _interactive_enabled(args)
     origin = args.origin or (
-        _prompt("Training origin (existing_model/from_scratch)", "existing_model")
-        if interactive
-        else None
+        _prompt("Training origin (existing_model/from_scratch)", "existing_model") if interactive else None
     )
     learning_mode = args.learning_mode or (_prompt("Learning mode", "qlora") if interactive else None)
     architecture_family = args.architecture_family
@@ -838,6 +830,7 @@ def main() -> None:
     if args.command == "domain":
         if args.domain_command == "list":
             from ai_factory.domains import list_available_domains
+
             domains = list_available_domains()
             if args.show_details:
                 _render_payload([domain.model_dump() for domain in domains], as_json=args.json)
@@ -847,6 +840,7 @@ def main() -> None:
 
         if args.domain_command == "info":
             from ai_factory.domains import get_domain_info
+
             domain_info = get_domain_info(args.domain_name)
             _render_payload(domain_info, as_json=args.json)
             return
@@ -854,24 +848,27 @@ def main() -> None:
     if args.command == "platform":
         if args.platform_command == "status":
             from ai_factory.platform import get_platform_status
+
             status = get_platform_status()
             _render_payload(status, as_json=args.json)
             return
 
         if args.platform_command == "scale":
             from ai_factory.platform import scale_platform
+
             result = scale_platform(args.target_nodes)
             _render_payload(result, as_json=args.json)
             return
 
     if args.command == "multi-train":
         from ai_factory.platform import create_multi_domain_training
+
         manifest = create_multi_domain_training(
             domains=args.domains,
             config_path=args.config,
             start=not args.no_start,
             repo_root=args.repo_root,
-            artifacts_dir=args.artifacts_dir
+            artifacts_dir=args.artifacts_dir,
         )
         _render_payload(_manifest_payload(manifest), as_json=args.json)
         return

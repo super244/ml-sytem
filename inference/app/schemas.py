@@ -51,7 +51,7 @@ class Candidate(BaseModel):
 
 class GenerateRequest(BaseModel):
     question: str = Field(..., min_length=3)
-    model_variant: ModelVariant = "finetuned"
+    model_variant: ModelVariant = "base"
     compare_to_base: bool = False
     compare_to_model: str | None = None
     prompt_preset: str = "atlas_rigorous"

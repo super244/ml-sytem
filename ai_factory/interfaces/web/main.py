@@ -25,19 +25,12 @@ class WebInterface:
 
     def run_backend(self, host: str = "127.0.0.1", port: int = 8000, reload: bool = True) -> None:
         """Run the FastAPI backend server."""
-        cmd = [
-            sys.executable,
-            "-m",
-            "uvicorn",
-            "inference.app.main:app",
-            "--host", host,
-            "--port", str(port)
-        ]
+        cmd = [sys.executable, "-m", "uvicorn", "inference.app.main:app", "--host", host, "--port", str(port)]
         if reload:
             cmd.append("--reload")
 
         subprocess.run(cmd, cwd=self.repo_root, check=True)
-    
+
     def run_frontend(self, port: int = 3000) -> None:
         """Run the Next.js frontend development server."""
         frontend_dir = self.repo_root / "frontend"

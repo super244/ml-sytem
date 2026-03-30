@@ -11,7 +11,7 @@ from .training import MathTrainingProfiles
 
 __all__ = [
     "MathDomainConfig",
-    "MathDatasetRegistry", 
+    "MathDatasetRegistry",
     "MathEvaluationSuite",
     "MathTrainingProfiles",
 ]

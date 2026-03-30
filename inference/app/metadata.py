@@ -56,6 +56,7 @@ class MetadataService:
     def _instance_counts(self) -> tuple[int, int]:
         try:
             from inference.app.dependencies import get_instance_service
+
             svc = get_instance_service()
             all_instances = svc.store.list_instances()
             total = len(all_instances)

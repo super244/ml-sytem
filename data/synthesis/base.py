@@ -80,7 +80,7 @@ def poly_str(terms: list[tuple[int, int]], variable: str = "x") -> str:
 def poly_value(terms: list[tuple[int, int]], x_value: int) -> Fraction:
     total = Fraction(0, 1)
     for coeff, power in terms:
-        total += Fraction(coeff * (x_value ** power), 1)
+        total += Fraction(coeff * (x_value**power), 1)
     return total
 
 
@@ -130,7 +130,7 @@ def fractional_poly_str(terms: list[tuple[Fraction, int]], variable: str = "x") 
 def evaluate_antiderivative(terms: list[tuple[Fraction, int]], x_value: int) -> Fraction:
     total = Fraction(0, 1)
     for coeff, power in terms:
-        total += coeff * (x_value ** power)
+        total += coeff * (x_value**power)
     return total
 
 

@@ -114,10 +114,7 @@ def collect_environment_snapshot(
         },
         "environment_variables": {
             key: ("***redacted***" if "TOKEN" in key or "KEY" in key else value)
-            for key, value in (
-                (name, os.getenv(name))
-                for name in IMPORTANT_ENV_VARS
-            )
+            for key, value in ((name, os.getenv(name)) for name in IMPORTANT_ENV_VARS)
             if value is not None
         },
     }

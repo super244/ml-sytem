@@ -25,9 +25,7 @@ from inference.app.prompts import load_prompt_presets  # noqa: E402
 
 
 def parse_args() -> argparse.Namespace:
-    parser = argparse.ArgumentParser(
-        description="Evaluate two Atlas math model configurations side by side."
-    )
+    parser = argparse.ArgumentParser(description="Evaluate two Atlas math model configurations side by side.")
     parser.add_argument("--config", required=True)
     return parser.parse_args()
 

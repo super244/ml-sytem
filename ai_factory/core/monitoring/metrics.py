@@ -16,21 +16,25 @@ def metric_points_from_summary(summary: dict[str, Any], *, stage: str) -> list[M
 
 TrendDirection = Literal["improving", "degrading", "stable", "insufficient_data"]
 
-HIGHER_IS_BETTER = frozenset({
-    "accuracy",
-    "parse_rate",
-    "verifier_agreement_rate",
-    "avg_tokens_per_second",
-    "trainable_ratio",
-})
+HIGHER_IS_BETTER = frozenset(
+    {
+        "accuracy",
+        "parse_rate",
+        "verifier_agreement_rate",
+        "avg_tokens_per_second",
+        "trainable_ratio",
+    }
+)
 
-LOWER_IS_BETTER = frozenset({
-    "eval_loss",
-    "train_loss",
-    "no_answer_rate",
-    "avg_latency_s",
-    "avg_time_to_first_token_s",
-})
+LOWER_IS_BETTER = frozenset(
+    {
+        "eval_loss",
+        "train_loss",
+        "no_answer_rate",
+        "avg_latency_s",
+        "avg_time_to_first_token_s",
+    }
+)
 
 
 def metric_direction(name: str) -> str:
@@ -48,13 +52,10 @@ def detect_trend(
     min_points: int = 3,
     stability_threshold: float = 0.01,
 ) -> TrendDirection:
-    values = [
-        float(p.value) for p in points
-        if p.name == metric_name and isinstance(p.value, (int, float))
-    ]
+    values = [float(p.value) for p in points if p.name == metric_name and isinstance(p.value, (int, float))]
     if len(values) < min_points:
         return "insufficient_data"
-    recent_half = values[len(values) // 2:]
+    recent_half = values[len(values) // 2 :]
     early_half = values[: len(values) // 2]
     if not early_half or not recent_half:
         return "insufficient_data"
@@ -78,10 +79,7 @@ def aggregate_metric_points(
     points: list[MetricPoint],
     metric_name: str,
 ) -> dict[str, Any]:
-    values = [
-        float(p.value) for p in points
-        if p.name == metric_name and isinstance(p.value, (int, float))
-    ]
+    values = [float(p.value) for p in points if p.name == metric_name and isinstance(p.value, (int, float))]
     if not values:
         return {"count": 0, "mean": None, "min": None, "max": None, "latest": None, "stdev": None}
     return {
@@ -116,14 +114,16 @@ def check_metric_health(
         else:
             ok = float(value) <= float(threshold)
             gap = float(threshold) - float(value)
-        checks.append({
-            "metric": metric_name,
-            "value": float(value),
-            "threshold": float(threshold),
-            "bound": bound_type,
-            "ok": ok,
-            "gap": round(gap, 6),
-        })
+        checks.append(
+            {
+                "metric": metric_name,
+                "value": float(value),
+                "threshold": float(threshold),
+                "bound": bound_type,
+                "ok": ok,
+                "gap": round(gap, 6),
+            }
+        )
     return checks
 
 
@@ -150,13 +150,15 @@ def compare_metric_summaries(
             assessment = "improved" if delta < 0 else ("regressed" if delta > 0 else "unchanged")
         else:
             assessment = "changed" if delta != 0 else "unchanged"
-        results.append({
-            "metric": key,
-            left_label: float(lv),
-            right_label: float(rv),
-            "delta": round(delta, 6),
-            "pct_change": round(pct, 6),
-            "direction": direction,
-            "assessment": assessment,
-        })
+        results.append(
+            {
+                "metric": key,
+                left_label: float(lv),
+                right_label: float(rv),
+                "delta": round(delta, 6),
+                "pct_change": round(pct, 6),
+                "direction": direction,
+                "assessment": assessment,
+            }
+        )
     return results

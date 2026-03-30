@@ -77,5 +77,7 @@ def pack_card_text(pack_id: str, description: str, records: list[dict[str, Any]]
 def size_report_markdown(title: str, items: list[dict[str, Any]]) -> str:
     lines = [f"# {title}", "", "| Item | Rows | Size Bytes |", "| --- | --- | --- |"]
     for item in items:
-        lines.append(f"| {item.get('id', item.get('path', 'unknown'))} | {item.get('num_rows', 0)} | {item.get('size_bytes', 0)} |")
+        lines.append(
+            f"| {item.get('id', item.get('path', 'unknown'))} | {item.get('num_rows', 0)} | {item.get('size_bytes', 0)} |"
+        )
     return "\n".join(lines)

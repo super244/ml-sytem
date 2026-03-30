@@ -204,9 +204,7 @@ def check_deployment_readiness(
 
     accuracy = manifest.metrics_summary.get("accuracy")
     if isinstance(accuracy, (int, float)) and accuracy < min_accuracy:
-        blockers.append(
-            f"Accuracy {accuracy:.3f} is below the deployment floor {min_accuracy:.3f}."
-        )
+        blockers.append(f"Accuracy {accuracy:.3f} is below the deployment floor {min_accuracy:.3f}.")
 
     if manifest.decision and manifest.decision.action == "retrain":
         blockers.append("Decision engine recommends retraining before deployment.")
