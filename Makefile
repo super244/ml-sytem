@@ -1,6 +1,7 @@
 PYTHON ?= python3
+COVERAGE_ARGS = --cov=ai_factory --cov=data --cov=training --cov=evaluation --cov=inference --cov-report=term-missing --cov-fail-under=55
 
-.PHONY: doctor refresh-lab latest-run api-smoke generate-datasets prepare-data validate-data audit-data preview-data export-subset dedupe-near benchmark-pack mine-failures train train-dry validate-model serve evaluate analyze-failures notebooks frontend-typecheck frontend-build frontend-dev frontend-install test smoke docker-up docker-down lint format clean install
+.PHONY: doctor refresh-lab latest-run api-smoke generate-datasets prepare-data validate-data audit-data preview-data export-subset dedupe-near benchmark-pack mine-failures train train-dry validate-model serve evaluate analyze-failures notebooks frontend-typecheck frontend-build frontend-check frontend-dev frontend-install test smoke docker-up docker-down lint format clean install
 
 doctor:
 	$(PYTHON) scripts/doctor.py
@@ -71,11 +72,15 @@ frontend-typecheck:
 frontend-build:
 	cd frontend && npm run build
 
+frontend-check:
+	cd frontend && npm run typecheck
+	cd frontend && npm run build
+
 frontend-dev:
 	cd frontend && npm run dev
 
 test:
-	$(PYTHON) -m pytest
+	$(PYTHON) -m pytest $(COVERAGE_ARGS)
 
 smoke:
 	$(PYTHON) -m compileall ai_factory data training inference evaluation

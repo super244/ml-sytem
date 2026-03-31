@@ -4,8 +4,8 @@ import time
 from pathlib import Path
 from typing import Any
 
+from ai_factory.core.datasets import list_sample_prompts, load_catalog, load_dataset_provenance
 from ai_factory.core.discovery import list_training_runs, load_benchmark_registry
-from data.catalog import list_sample_prompts, load_catalog, load_dataset_provenance
 from inference.app.config import AppSettings
 
 _START_TIME = time.monotonic()

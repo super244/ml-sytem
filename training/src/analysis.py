@@ -5,8 +5,8 @@ from pathlib import Path
 from statistics import mean
 from typing import Any
 
+from ai_factory.core.datasets import compute_record_stats
 from ai_factory.core.io import write_json, write_markdown
-from data.quality.stats import compute_record_stats
 from training.src.data import load_jsonl
 
 

@@ -9,12 +9,12 @@ import urllib.request
 from pathlib import Path
 from typing import Any
 
+from ai_factory.core.datasets import load_catalog, load_pack_summary
 from ai_factory.core.discovery import (
     latest_training_run,
     list_training_runs,
     load_benchmark_registry,
 )
-from data.catalog import load_catalog, load_pack_summary
 
 try:
     from rich.console import Console
