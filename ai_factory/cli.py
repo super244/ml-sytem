@@ -688,6 +688,7 @@ def main() -> None:
 
     if args.command in {"doctor", "api-smoke", "latest-run", "refresh-lab"}:
         from ai_factory import cli_scripts
+
         if args.command == "doctor":
             cli_scripts.cmd_doctor(args)
         elif args.command == "api-smoke":
@@ -715,11 +716,8 @@ def main() -> None:
 
     if args.command == "serve":
         import subprocess
-        cmd = [
-            "uvicorn", "inference.app.main:app",
-            "--host", args.host,
-            "--port", str(args.port)
-        ]
+
+        cmd = ["uvicorn", "inference.app.main:app", "--host", args.host, "--port", str(args.port)]
         if args.reload:
             cmd.append("--reload")
         print(f"Starting AI-Factory API server on {args.host}:{args.port}")

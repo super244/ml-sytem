@@ -25,6 +25,7 @@ class MonitoringManager:
         self.alert_manager = AlertManager(config)
         self._running = False
         self._monitoring_task: asyncio.Task | None = None
+        self._metrics_buffer: dict[str, Any] = {}
 
     async def start_monitoring(self) -> None:
         """Start the monitoring service."""
@@ -128,6 +129,9 @@ class MonitoringManager:
 
     async def _store_metrics(self, metrics: dict[str, Any]) -> None:
         """Store metrics in time-series database."""
-        # Implementation would depend on chosen storage backend
-        # For now, just log metrics
-        logger.debug(f"Storing metrics: {len(metrics)} data points")
+        # Store metrics in internal storage for now
+        # Future: integrate with InfluxDB, Prometheus, or similar TSDB
+        self._metrics_buffer.update(metrics)
+        if len(self._metrics_buffer) > 1000:  # Prevent memory bloat
+            self._metrics_buffer.clear()
+        logger.info(f"Stored {len(metrics)} metrics points")

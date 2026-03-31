@@ -54,7 +54,9 @@ async def _experiment_worker(experiment_id: str) -> None:
 class AutonomousExperimentRequest(BaseModel):
     experiment_name: str = Field(..., description="The name of the autonomous experiment")
     goal: str = Field(..., description="The primary goal or objective of the experiment")
-    parameters: dict[str, str | int | float | bool] | None = Field(default=None, description="Optional parameters for the experiment")
+    parameters: dict[str, str | int | float | bool] | None = Field(
+        default=None, description="Optional parameters for the experiment"
+    )
 
 
 class AutonomousExperimentResponse(BaseModel):
@@ -64,27 +66,29 @@ class AutonomousExperimentResponse(BaseModel):
 
 
 @router.post("/run", response_model=AutonomousExperimentResponse, status_code=status.HTTP_202_ACCEPTED)
-async def run_autonomous_experiment(request: AutonomousExperimentRequest, background_tasks: BackgroundTasks) -> AutonomousExperimentResponse:
+async def run_autonomous_experiment(
+    request: AutonomousExperimentRequest, background_tasks: BackgroundTasks
+) -> AutonomousExperimentResponse:
     """
     Start a new autonomous AI-driven experiment.
     """
     experiment_id = f"exp_{uuid.uuid4().hex[:8]}"
-    
+
     exp_data = {
         "experiment_id": experiment_id,
         "experiment_name": request.experiment_name,
         "goal": request.goal,
         "parameters": request.parameters or {},
-        "status": "accepted"
+        "status": "accepted",
     }
     _save_experiment(exp_data)
-    
+
     background_tasks.add_task(_experiment_worker, experiment_id)
-    
+
     return AutonomousExperimentResponse(
         experiment_id=experiment_id,
         status="accepted",
-        message=f"Autonomous experiment '{request.experiment_name}' started successfully."
+        message=f"Autonomous experiment '{request.experiment_name}' started successfully.",
     )
 
 

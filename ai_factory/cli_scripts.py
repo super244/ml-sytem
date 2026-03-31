@@ -304,15 +304,17 @@ def cmd_doctor(args: argparse.Namespace) -> None:
     if args.json:
         from ai_factory.cli import _render_ready_summary
         from inference.app.workspace import build_workspace_overview
+
         workspace_payload = build_workspace_overview(root)
         if args.json:
-             _emit_json({**payload, **workspace_payload})
+            _emit_json({**payload, **workspace_payload})
         else:
-             _emit_json(payload)
+            _emit_json(payload)
         return
 
     from ai_factory.cli import _print_section, _render_ready_summary
     from inference.app.workspace import build_workspace_overview
+
     workspace_payload = build_workspace_overview(root)
 
     if RICH_AVAILABLE:
@@ -320,7 +322,7 @@ def cmd_doctor(args: argparse.Namespace) -> None:
         readiness = workspace_payload.get("readiness_checks") or []
         ready = sum(1 for c in readiness if c.get("ok"))
         total = len(readiness)
-        
+
         console.print(Panel(f"[bold cyan]Workspace readiness: {ready}/{total}[/bold cyan]"))
         table = Table(title="Readiness Checks")
         table.add_column("Status", style="bold")
@@ -331,7 +333,7 @@ def cmd_doctor(args: argparse.Namespace) -> None:
             mark = "[green]OK[/green]" if ok else "[red]MISSING[/red]"
             table.add_row(mark, check.get("label", check.get("id", "?")), check.get("detail", ""))
         console.print(table)
-        
+
         # Display the rest of the doctor information
         pkg_rows = [[pkg, "[green]Yes[/green]" if ok else "[red]No[/red]"] for pkg, ok in packages.items()]
         _print_rich_table("Python Packages", ["Package", "Installed"], pkg_rows)

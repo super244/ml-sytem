@@ -414,10 +414,7 @@ def _build_lineage_summary(records: list[dict[str, Any]]) -> dict[str, Any]:
         metadata = record.get("metadata") if isinstance(record.get("metadata"), dict) else {}
         contamination = record.get("contamination") if isinstance(record.get("contamination"), dict) else {}
         source_id = str(
-            metadata.get("source_spec_id")
-            or lineage.get("dataset_id")
-            or record.get("source")
-            or "unknown"
+            metadata.get("source_spec_id") or lineage.get("dataset_id") or record.get("source") or "unknown"
         )
         loader = str(metadata.get("source_kind") or lineage.get("loader") or "unknown")
         version = metadata.get("source_version")
@@ -469,12 +466,8 @@ def _build_lineage_summary(records: list[dict[str, Any]]) -> dict[str, Any]:
             "contaminated_records": totals["contaminated_records"],
             "failure_cases": totals["failure_cases"],
         },
-        "by_split": {
-            key.split(":", 1)[1]: value for key, value in totals.items() if key.startswith("split:")
-        },
-        "by_loader": {
-            key.split(":", 1)[1]: value for key, value in totals.items() if key.startswith("loader:")
-        },
+        "by_split": {key.split(":", 1)[1]: value for key, value in totals.items() if key.startswith("split:")},
+        "by_loader": {key.split(":", 1)[1]: value for key, value in totals.items() if key.startswith("loader:")},
         "groups": grouped_records,
     }
 

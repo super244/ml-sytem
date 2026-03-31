@@ -1,11 +1,112 @@
-PYTHON ?= python3
+PYTHON ?= python
 COVERAGE_ARGS = --cov=ai_factory --cov=data --cov=training --cov=evaluation --cov=inference --cov-report=term-missing --cov-fail-under=55
 
-.PHONY: doctor refresh-lab latest-run api-smoke titan-status titan-doc generate-datasets prepare-data validate-data audit-data preview-data export-subset dedupe-near benchmark-pack mine-failures train train-dry validate-model serve evaluate analyze-failures notebooks frontend-typecheck frontend-build frontend-check frontend-dev frontend-install test smoke docker-up docker-down lint format clean install
+# Core Development
+.PHONY: install test lint format clean doctor serve
 
+# Data Operations
+.PHONY: data-generate data-prepare data-validate data-audit data-preview
+
+# Training Operations
+.PHONY: train train-dry validate-model
+
+# Evaluation Operations
+.PHONY: evaluate analyze-failures
+
+# Frontend Operations
+.PHONY: frontend-install frontend-dev frontend-build frontend-check
+
+# System Operations
+.PHONY: docker-up docker-down smoke
+
+# Development Setup
+install:
+	pip install -e ".[dev]"
+
+# Code Quality
+test:
+	$(PYTHON) -m pytest $(COVERAGE_ARGS)
+
+lint:
+	ruff check .
+	mypy .
+
+format:
+	ruff format .
+
+clean:
+	find . -type d -name "__pycache__" -exec rm -rf {} + 2>/dev/null || true
+	find . -type d -name "*.egg-info" -exec rm -rf {} + 2>/dev/null || true
+	find . -type f -name "*.pyc" -delete
+	rm -rf build/ dist/ .coverage htmlcov/
+	cd frontend && rm -rf node_modules/.cache
+
+# System Health
 doctor:
 	$(PYTHON) scripts/doctor.py
 
+smoke:
+	$(PYTHON) -m compileall ai_factory data training inference evaluation
+	$(PYTHON) notebooks/build_notebooks.py
+
+serve:
+	uvicorn inference.app.main:app --host 0.0.0.0 --port 8000 --reload
+
+# Data Pipeline
+data-generate:
+	$(PYTHON) data/generator/generate_calculus_datasets.py --config data/configs/generation.yaml
+
+data-prepare:
+	$(PYTHON) data/prepare_dataset.py --config data/configs/processing.yaml
+
+data-validate:
+	$(PYTHON) data/tools/validate_dataset.py --input data/processed/*.jsonl --manifest data/processed/manifest.json
+
+data-audit:
+	$(PYTHON) data/tools/audit_dataset.py --input data/processed/normalized_all.jsonl --output data/processed/audit.json
+
+data-preview:
+	$(PYTHON) data/tools/preview_dataset.py --input data/processed/normalized_all.jsonl --limit 5
+
+# Training Pipeline
+train:
+	$(PYTHON) -m training.train --config training/configs/profiles/failure_aware.yaml
+
+train-dry:
+	$(PYTHON) -m training.train --config training/configs/profiles/failure_aware.yaml --dry-run
+
+validate-model:
+	$(PYTHON) -m training.train --config training/configs/profiles/failure_aware.yaml --dry-run --validate-model-load
+
+# Evaluation Pipeline
+evaluate:
+	$(PYTHON) -m evaluation.evaluate --config evaluation/configs/base_vs_finetuned.yaml
+
+analyze-failures:
+	$(PYTHON) evaluation/analysis/analyze_failures.py --input evaluation/results/latest/per_example.jsonl --output evaluation/results/latest/failure_analysis.json
+
+# Frontend Development
+frontend-install:
+	cd frontend && npm install
+
+frontend-dev:
+	cd frontend && npm run dev
+
+frontend-build:
+	cd frontend && npm run build
+
+frontend-check:
+	cd frontend && npm run typecheck
+	cd frontend && npm run build
+
+# Docker Operations
+docker-up:
+	docker-compose up -d
+
+docker-down:
+	docker-compose down
+
+# Legacy Aliases (for backward compatibility)
 refresh-lab:
 	$(PYTHON) scripts/refresh_lab.py
 
@@ -21,20 +122,15 @@ titan-status:
 titan-doc:
 	$(PYTHON) -m ai_factory.cli titan hardware-doc
 
-generate-datasets:
-	$(PYTHON) data/generator/generate_calculus_datasets.py --config data/configs/generation.yaml
+generate-datasets: data-generate
 
-prepare-data:
-	$(PYTHON) data/prepare_dataset.py --config data/configs/processing.yaml
+prepare-data: data-prepare
 
-validate-data:
-	$(PYTHON) data/tools/validate_dataset.py --input data/processed/*.jsonl --manifest data/processed/manifest.json
+validate-data: data-validate
 
-audit-data:
-	$(PYTHON) data/tools/audit_dataset.py --input data/processed/normalized_all.jsonl --output data/processed/audit.json
+audit-data: data-audit
 
-preview-data:
-	$(PYTHON) data/tools/preview_dataset.py --input data/processed/normalized_all.jsonl --limit 5
+preview-data: data-preview
 
 export-subset:
 	$(PYTHON) data/tools/export_subset.py --input data/processed/normalized_all.jsonl --output data/processed/calculus_hard_preview.jsonl --topic calculus --difficulty hard --limit 64
@@ -48,77 +144,8 @@ benchmark-pack:
 mine-failures:
 	$(PYTHON) data/mine_failure_cases.py --input evaluation/results/latest/per_example.jsonl --output data/raw/failure_cases.jsonl
 
-train:
-	$(PYTHON) -m training.train --config training/configs/profiles/failure_aware.yaml
-
-train-dry:
-	$(PYTHON) -m training.train --config training/configs/profiles/failure_aware.yaml --dry-run
-
-validate-model:
-	$(PYTHON) -m training.train --config training/configs/profiles/failure_aware.yaml --dry-run --validate-model-load
-
-serve:
-	uvicorn inference.app.main:app --host 0.0.0.0 --port 8000 --reload
-
-evaluate:
-	$(PYTHON) -m evaluation.evaluate --config evaluation/configs/base_vs_finetuned.yaml
-
-analyze-failures:
-	$(PYTHON) evaluation/analysis/analyze_failures.py --input evaluation/results/latest/per_example.jsonl --output evaluation/results/latest/failure_analysis.json
-
 notebooks:
 	$(PYTHON) notebooks/build_notebooks.py
 
-frontend-install:
-	cd frontend && npm install
-
 frontend-typecheck:
 	cd frontend && npm run typecheck
-
-frontend-build:
-	cd frontend && npm run build
-
-frontend-check:
-	cd frontend && npm run typecheck
-	cd frontend && npm run build
-
-frontend-dev:
-	cd frontend && npm run dev
-
-test:
-	$(PYTHON) -m pytest $(COVERAGE_ARGS)
-
-smoke:
-	$(PYTHON) -m compileall ai_factory data training inference evaluation
-	$(PYTHON) notebooks/build_notebooks.py
-
-# Development helpers
-install:
-	pip install -e ".[dev]"
-
-lint:
-	ruff check .
-	mypy .
-
-format:
-	ruff format .
-
-clean:
-	find . -type d -name "__pycache__" -exec rm -rf {} + 2>/dev/null || true
-	find . -type d -name "*.egg-info" -exec rm -rf {} + 2>/dev/null || true
-	find . -type f -name "*.pyc" -delete
-	rm -rf build/
-	rm -rf dist/
-	rm -rf .coverage
-	rm -rf htmlcov/
-	cd frontend && rm -rf node_modules/.cache
-
-# Docker helpers
-docker-up:
-	docker-compose up -d
-
-docker-down:
-	docker-compose down
-
-docker-build:
-	docker-compose build

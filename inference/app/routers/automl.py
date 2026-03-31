@@ -62,22 +62,21 @@ class LaunchSweepRequest(BaseModel):
 
 
 async def _sweep_worker(sweep_id: str, num_trials: int, search_space: SearchSpace) -> None:
-    combinations = list(itertools.product(
-        search_space.learning_rate,
-        search_space.batch_size,
-        search_space.warmup_ratio,
-        search_space.lora_rank
-    ))
-    
+    combinations = list(
+        itertools.product(
+            search_space.learning_rate, search_space.batch_size, search_space.warmup_ratio, search_space.lora_rank
+        )
+    )
+
     for i in range(num_trials):
         await asyncio.sleep(1.0)  # Simulate workload progression
-        
+
         sweep = _load_sweeps().get(sweep_id)
         if not sweep:
             break
-            
+
         lr, bs, wr, rank = combinations[i % len(combinations)]
-        
+
         # Deterministic simulation of a trial
         base_loss = 0.8 + (i * 0.01)
         if lr < 1e-4:
@@ -86,7 +85,7 @@ async def _sweep_worker(sweep_id: str, num_trials: int, search_space: SearchSpac
             base_loss -= 0.08
         final_loss = max(0.2, base_loss)
         accuracy = min(0.99, 1.0 - final_loss * 0.6)
-        
+
         trial = {
             "trial_id": f"trial-{i:02d}",
             "status": "completed",
@@ -103,17 +102,17 @@ async def _sweep_worker(sweep_id: str, num_trials: int, search_space: SearchSpac
             },
             "duration_s": 60 + (i * 10),
         }
-        
+
         sweep["trials"].append(trial)
         sweep["completed_trials"] = len(sweep["trials"])
-        
+
         best = sweep.get("best_trial")
         if not best or trial["metrics"]["final_loss"] < best["metrics"]["final_loss"]:
             sweep["best_trial"] = trial
-            
+
         if sweep["completed_trials"] >= sweep["num_trials"]:
             sweep["status"] = "completed"
-            
+
         _persist_sweep(sweep)
 
 
@@ -139,9 +138,9 @@ def launch_sweep(req: LaunchSweepRequest, background_tasks: BackgroundTasks) -> 
         "trials": [],
     }
     _persist_sweep(sweep)
-    
+
     background_tasks.add_task(_sweep_worker, sweep_id, req.num_trials, req.search_space)
-    
+
     return sweep
 
 

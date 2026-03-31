@@ -20,11 +20,11 @@ class DomainInterface(Protocol):
     def execute(self, task: str, **kwargs: Any) -> dict[str, Any]:
         """
         Execute a domain-specific task.
-        
+
         Args:
             task: The specific task identifier to execute.
             **kwargs: Additional parameters for the task.
-            
+
         Returns:
             A dictionary containing the task results.
         """
