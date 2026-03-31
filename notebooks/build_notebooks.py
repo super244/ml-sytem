@@ -54,7 +54,6 @@ def write_notebook(path: Path, metadata: dict[str, Any], cells: list[dict[str, A
 COMMON_SETUP = """
 from __future__ import annotations
 
-import json
 import sys
 from pathlib import Path
 
@@ -131,6 +130,7 @@ df[["id", "kind", "family", "topic", "num_rows", "size_bytes"]].sort_values(["ki
             code_cell(
                 """
 import yaml
+
 from data.synthesis import DatasetSpec, generate_records
 
 config = yaml.safe_load((REPO_ROOT / "data" / "configs" / "generation.yaml").read_text())
@@ -212,12 +212,12 @@ generator.generate(GenerationParameters(question=question, model_variant="base",
                 """
 from ai_factory.core.io import read_jsonl
 
-    rows = read_jsonl(REPO_ROOT / "evaluation" / "results" / "latest" / "per_example.jsonl")
-    win_cases = [
-        row for row in rows
-        if row.get("primary", {}).get("correct") and not row.get("secondary", {}).get("correct")
-    ]
-    len(win_cases), win_cases[:1]
+rows = read_jsonl(REPO_ROOT / "evaluation" / "results" / "latest" / "per_example.jsonl")
+win_cases = [
+    row for row in rows
+    if row.get("primary", {}).get("correct") and not row.get("secondary", {}).get("correct")
+]
+len(win_cases), win_cases[:1]
 """
             ),
         ],
@@ -237,7 +237,6 @@ from ai_factory.core.io import read_jsonl
             code_cell(
                 """
 import pandas as pd
-from pathlib import Path
 import yaml
 
 profile_dir = REPO_ROOT / "training" / "configs" / "profiles"
@@ -427,7 +426,6 @@ select_failure_cases(eval_rows, limit=5)
             code_cell(
                 """
 from training.src.comparison import load_run_summary
-from pathlib import Path
 
 run_dirs = sorted((REPO_ROOT / "artifacts" / "runs").glob("*")) if (REPO_ROOT / "artifacts" / "runs").exists() else []
 load_run_summary(run_dirs[0]) if run_dirs else {"runs": []}

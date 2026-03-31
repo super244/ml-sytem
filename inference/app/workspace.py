@@ -6,9 +6,9 @@ from typing import Any
 
 import yaml
 
+from ai_factory.core.datasets import load_catalog, load_pack_summary
 from ai_factory.core.discovery import list_training_runs, load_benchmark_registry
 from ai_factory.core.foundation import build_foundation_catalog
-from data.catalog import load_catalog, load_pack_summary
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 
