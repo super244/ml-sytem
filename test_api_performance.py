@@ -2,8 +2,9 @@
 """Test API performance and startup times."""
 
 import time
+
 import requests
-from pathlib import Path
+
 
 def test_endpoint(url: str, name: str, timeout: float = 5.0) -> bool:
     """Test a single endpoint and return success status."""

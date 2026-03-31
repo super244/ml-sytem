@@ -3,12 +3,13 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 
-import { getMissionControl, type MissionControlSnapshot } from "@/lib/api";
+import { getMissionControl, getTitanStatus, type MissionControlSnapshot, type TitanStatus } from "@/lib/api";
 import { formatCount } from "@/lib/formatting";
 import { ROUTES } from "@/lib/routes";
 
 type ClusterState = {
   mission: MissionControlSnapshot | null;
+  titan: TitanStatus | null;
   loading: boolean;
   error: string | null;
 };
@@ -26,6 +27,7 @@ function nodeTone(status: string) {
 export default function ClusterPage() {
   const [state, setState] = useState<ClusterState>({
     mission: null,
+    titan: null,
     loading: true,
     error: null,
   });
@@ -35,12 +37,13 @@ export default function ClusterPage() {
 
     async function load() {
       try {
-        const mission = await getMissionControl();
+        const [mission, titan] = await Promise.all([getMissionControl(), getTitanStatus()]);
         if (!active) {
           return;
         }
         setState({
           mission,
+          titan,
           loading: false,
           error: null,
         });
@@ -50,6 +53,7 @@ export default function ClusterPage() {
         }
         setState({
           mission: null,
+          titan: null,
           loading: false,
           error: error instanceof Error ? error.message : "Cluster state could not be loaded.",
         });
@@ -65,6 +69,7 @@ export default function ClusterPage() {
   }, []);
 
   const mission = state.mission;
+  const titan = state.titan;
   const nodes = mission?.watchlist.cluster_nodes ?? [];
   const runningInstances = mission?.watchlist.running_instances ?? [];
 
@@ -91,6 +96,28 @@ export default function ClusterPage() {
       </div>
 
       {state.error ? <div className="dash-error-banner panel">⚠ {state.error}</div> : null}
+
+      {titan ? (
+        <section className="panel aside-section" style={{ marginBottom: "1.5rem" }}>
+          <div className="model-chip-header">
+            <div>
+              <h2 className="section-title">Titan Status</h2>
+              <p className="control-label">
+                {titan.silicon} · {titan.mode} · {titan.bandwidth_gbps ?? "n/a"} GB/s
+              </p>
+            </div>
+            <span className="status-pill">
+              {titan.silent_mode ? `Mac-Silent ${titan.gpu_cap_pct}%` : `GPU Cap ${titan.gpu_cap_pct}%`}
+            </span>
+          </div>
+          <div className="badge-row" style={{ marginTop: "0.75rem" }}>
+            <span className="status-pill">{titan.backend}</span>
+            <span className="status-pill">{titan.scheduler.runtime}</span>
+            <span className="status-pill">{titan.quantization.formats.join(" / ")}</span>
+            <span className="status-pill">{titan.telemetry.bridge}</span>
+          </div>
+        </section>
+      ) : null}
 
       <div className="workspace-summary-grid">
         {[

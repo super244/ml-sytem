@@ -3,7 +3,6 @@ from __future__ import annotations
 import time
 from pathlib import Path
 from typing import Any
-from functools import lru_cache
 
 from ai_factory.core.datasets import list_sample_prompts, load_catalog, load_dataset_provenance
 from ai_factory.core.discovery import list_training_runs, load_benchmark_registry
@@ -31,10 +30,15 @@ class MetadataService:
         self._cached_status = None
         self._status_cache_time = 0
         self._cache_ttl = 5.0  # Cache status for 5 seconds
+        self._dataset_dashboard_cache: dict[str, Any] | None = None
+        self._prompt_library_cache: dict[int, dict[str, Any]] = {}
+        self._benchmark_library_cache: list[dict[str, Any]] | None = None
+        self._runs_cache: list[dict[str, Any]] | None = None
 
-    @lru_cache(maxsize=1)
     def dataset_dashboard(self) -> dict[str, Any]:
         """Get dataset dashboard with error handling and caching."""
+        if self._dataset_dashboard_cache is not None:
+            return self._dataset_dashboard_cache
         try:
             repo_root = self.settings.repo_root
             catalog = load_catalog(Path(repo_root) / "data" / "catalog.json", repo_root=repo_root)
@@ -45,19 +49,22 @@ class MetadataService:
             )
             catalog["packs"] = provenance["pack_summary"].get("packs", [])
             catalog["provenance"] = provenance
-            return catalog
+            self._dataset_dashboard_cache = catalog
         except Exception:
-            return {
+            self._dataset_dashboard_cache = {
                 "generated_at": None,
                 "summary": {"num_datasets": 0, "custom_datasets": 0, "public_datasets": 0},
                 "datasets": [],
                 "packs": [],
                 "provenance": None,
             }
+        return self._dataset_dashboard_cache
 
-    @lru_cache(maxsize=1)
     def prompt_library(self, limit: int = 12) -> dict[str, Any]:
         """Get prompt library with error handling."""
+        cached = self._prompt_library_cache.get(limit)
+        if cached is not None:
+            return cached
         try:
             repo_root = self.settings.repo_root
             presets = [
@@ -69,7 +76,10 @@ class MetadataService:
                 }
                 for preset in self.prompt_presets.values()
             ]
-            return {
+        except Exception:
+            result = {"presets": [], "examples": []}
+        else:
+            result = {
                 "presets": presets,
                 "examples": list_sample_prompts(
                     limit=limit,
@@ -77,24 +87,28 @@ class MetadataService:
                     repo_root=repo_root,
                 ),
             }
-        except Exception:
-            return {"presets": [], "examples": []}
+        self._prompt_library_cache[limit] = result
+        return result
 
-    @lru_cache(maxsize=1)
     def benchmark_library(self) -> list[dict[str, Any]]:
         """Get benchmark library with error handling."""
+        if self._benchmark_library_cache is not None:
+            return self._benchmark_library_cache
         try:
-            return load_benchmark_registry(self.settings.benchmark_registry_path)
+            self._benchmark_library_cache = load_benchmark_registry(self.settings.benchmark_registry_path)
         except Exception:
-            return []
+            self._benchmark_library_cache = []
+        return self._benchmark_library_cache
 
-    @lru_cache(maxsize=1)
     def runs(self) -> list[dict[str, Any]]:
         """Get training runs with error handling."""
+        if self._runs_cache is not None:
+            return self._runs_cache
         try:
-            return list_training_runs(self.settings.artifacts_dir)
+            self._runs_cache = list_training_runs(self.settings.artifacts_dir)
         except Exception:
-            return []
+            self._runs_cache = []
+        return self._runs_cache
 
     def models(self) -> list[dict[str, Any]]:
         """Get models catalog."""
@@ -116,12 +130,11 @@ class MetadataService:
     def status(self) -> dict[str, Any]:
         """Get status with caching to avoid expensive operations."""
         current_time = time.monotonic()
-        
+
         # Return cached status if still valid
-        if (self._cached_status and 
-            current_time - self._status_cache_time < self._cache_ttl):
+        if self._cached_status and current_time - self._status_cache_time < self._cache_ttl:
             return self._cached_status
-        
+
         try:
             instance_count, running_count = self._instance_counts()
             status_data = {
@@ -135,11 +148,11 @@ class MetadataService:
                 "running_count": running_count,
                 "uptime_seconds": round(current_time - self.start_time, 1),
             }
-            
+
             # Cache the result
             self._cached_status = status_data
             self._status_cache_time = current_time
-            
+
             return status_data
         except Exception as exc:
             # Return minimal status on error

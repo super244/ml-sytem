@@ -10,6 +10,7 @@ from typing import Any, Literal
 from pydantic import BaseModel, Field
 
 from ai_factory.platform.monitoring import hardware
+from ai_factory.titan import detect_titan_status
 from inference.app import workspace as workspace_module
 from inference.app.config import AppSettings
 
@@ -62,6 +63,7 @@ class MissionControlSnapshot(BaseModel):
     automl: dict[str, Any] = Field(default_factory=dict)
     cluster: dict[str, Any] = Field(default_factory=dict)
     telemetry: dict[str, Any] = Field(default_factory=dict)
+    titan: dict[str, Any] = Field(default_factory=dict)
     criticality: dict[str, Any] = Field(default_factory=dict)
     recommendations: list[dict[str, Any]] = Field(default_factory=list)
     summary: dict[str, Any] = Field(default_factory=dict)
@@ -326,6 +328,7 @@ class MissionControlService:
         agents = self._agents()
         automl = self._automl()
         telemetry = self._telemetry()
+        titan = detect_titan_status(self.repo_root)
         recent_instances = _recent(instances, "updated_at", limit=12)
         recent_runs = _recent(runs, "updated_at", limit=12)
         running_instances = [item for item in instances if item.get("status") == "running"]
@@ -370,6 +373,8 @@ class MissionControlService:
             "datasets": workspace_summary.get("datasets", 0),
             "training_profiles": workspace_summary.get("training_profiles", 0),
             "open_circuits": len(open_circuits),
+            "titan_backend": titan.get("backend"),
+            "titan_mode": titan.get("mode"),
         }
         return MissionControlSnapshot(
             generated_at=time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
@@ -397,6 +402,7 @@ class MissionControlService:
                 "status_counts": cluster_status_counts,
             },
             telemetry=telemetry,
+            titan=titan,
             criticality={
                 "level": highest_level,
                 "counts": dict(criticality_counts),

@@ -18,6 +18,7 @@ from ai_factory.core.instances.models import (
     PortForward,
 )
 from ai_factory.core.platform.container import build_platform_container
+from ai_factory.titan import detect_titan_status, write_hardware_markdown
 from inference.app.workspace import build_workspace_overview
 
 _STATUS_ICONS = {
@@ -259,6 +260,17 @@ def _render_ready_summary(payload: dict[str, Any]) -> None:
         print("\nAll checks passed. Workspace is ready.")
     else:
         print(f"\n{total - ready} check(s) need attention before full operation.")
+
+
+def _render_titan_status(payload: dict[str, Any]) -> None:
+    print(f"Hardware: {payload['silicon']}")
+    print(f"Mode: {payload['mode']}")
+    print(f"Backend: {payload['backend']}")
+    print(f"Bandwidth: {payload.get('bandwidth_gbps') or 'n/a'} GB/s")
+    print(f"GPU: {payload.get('gpu_name') or 'none'}")
+    print(f"Unified memory: {payload.get('unified_memory_gb') or 'n/a'} GB")
+    print(f"CPU fallback threads: {payload['cpu_fallback_threads']}")
+    print(f"Silent mode cap: {payload['gpu_cap_pct']}%")
 
 
 def _render_compare_summary(left: InstanceManifest, right: InstanceManifest) -> None:
@@ -635,6 +647,13 @@ def parse_args() -> argparse.Namespace:
     multi_train_parser.add_argument("--config", default="configs/multi_domain.yaml")
     multi_train_parser.add_argument("--no-start", action="store_true")
 
+    titan_parser = subparsers.add_parser("titan", parents=[common_json])
+    titan_subparsers = titan_parser.add_subparsers(dest="titan_command", required=True)
+    titan_status_parser = titan_subparsers.add_parser("status", parents=[common_json])
+    titan_status_parser.add_argument("--write-hardware-doc", action="store_true")
+    titan_doc_parser = titan_subparsers.add_parser("hardware-doc", parents=[common_json])
+    titan_doc_parser.add_argument("--path", default="HARDWARE.md")
+
     serve_parser = subparsers.add_parser("serve", parents=[common_json])
     serve_parser.add_argument("--host", default="0.0.0.0")
     serve_parser.add_argument("--port", type=int, default=8000)
@@ -679,9 +698,23 @@ def main() -> None:
             cli_scripts.cmd_refresh_lab(args)
         return
 
+    if args.command == "titan":
+        status = detect_titan_status(args.repo_root)
+        if args.titan_command == "hardware-doc":
+            output_path = write_hardware_markdown(args.path, repo_root=args.repo_root)
+            payload = {"status": "generated", "path": str(output_path), "mode": status["mode"]}
+            _render_payload(payload, as_json=args.json)
+            return
+        if args.write_hardware_doc:
+            write_hardware_markdown(repo_root=args.repo_root)
+        if args.json:
+            _render_payload(status, as_json=True)
+            return
+        _render_titan_status(status)
+        return
+
     if args.command == "serve":
         import subprocess
-        import sys
         cmd = [
             "uvicorn", "inference.app.main:app",
             "--host", args.host,

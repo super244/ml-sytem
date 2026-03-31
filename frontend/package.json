@@ -16,7 +16,8 @@
     "react-dom": "^19.0.0",
     "react-markdown": "^9.0.3",
     "rehype-katex": "^7.0.1",
-    "remark-math": "^6.0.0"
+    "remark-math": "^6.0.0",
+    "zod": "^3.25.76"
   },
   "devDependencies": {
     "@types/node": "^22.13.10",

@@ -62,6 +62,7 @@ def test_instance_service_resolves_relative_config_paths_against_repo_root(tmp_p
 async def test_mission_control_endpoint_aggregates_lab_surfaces(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
     from ai_factory.platform.monitoring import hardware
     from inference.app.routers import lab as lab_router
+    from inference.app.services import mission_control_service
 
     _write(
         tmp_path / "data" / "catalog.json",
@@ -159,6 +160,16 @@ async def test_mission_control_endpoint_aggregates_lab_surfaces(tmp_path: Path, 
     monkeypatch.setattr(lab_router, "get_settings", lambda: settings)
     monkeypatch.setattr(lab_router, "get_instance_service", lambda: instance_service)
     monkeypatch.setattr(
+        mission_control_service,
+        "detect_titan_status",
+        lambda repo_root: {
+            "backend": "metal",
+            "mode": "Metal-Direct",
+            "silicon": "Apple M5 Max",
+            "gpu_cap_pct": 90,
+        },
+    )
+    monkeypatch.setattr(
         hardware,
         "get_cluster_nodes",
         lambda: [
@@ -187,6 +198,8 @@ async def test_mission_control_endpoint_aggregates_lab_surfaces(tmp_path: Path, 
     assert payload["automl"]["count"] == 1
     assert payload["cluster"]["nodes"][0]["id"] == "gpu-1"
     assert payload["telemetry"]["flagged"]["count"] == 1
+    assert payload["titan"]["backend"] == "metal"
+    assert payload["summary"]["titan_mode"] == "Metal-Direct"
     assert payload["telemetry"]["requests"]["by_model"]["finetuned"] == 1
     assert payload["criticality"]["counts"]["warning"] >= 1
     assert any(

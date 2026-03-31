@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from collections.abc import Iterable
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
@@ -17,108 +19,71 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Essential minimal endpoints
+
+def _register_v1_routers(application: FastAPI) -> None:
+    from inference.app.routers.agents import router as agents_router
+    from inference.app.routers.automl import router as automl_router
+    from inference.app.routers.cluster import router as cluster_router
+    from inference.app.routers.datasets import router as datasets_router
+    from inference.app.routers.generation import router as generation_router
+    from inference.app.routers.health import router as health_router
+    from inference.app.routers.instances import router as instances_router
+    from inference.app.routers.lab import router as lab_router
+    from inference.app.routers.metadata import router as metadata_router
+    from inference.app.routers.openai import router as openai_router
+    from inference.app.routers.orchestration import router as orchestration_router
+    from inference.app.routers.telemetry import router as telemetry_router
+    from inference.app.routers.titan import router as titan_router
+    from inference.app.routers.workspace import router as workspace_router
+
+    routers: Iterable = (
+        health_router,
+        workspace_router,
+        metadata_router,
+        generation_router,
+        instances_router,
+        orchestration_router,
+        datasets_router,
+        agents_router,
+        automl_router,
+        cluster_router,
+        telemetry_router,
+        lab_router,
+        openai_router,
+        titan_router,
+    )
+    for router in routers:
+        application.include_router(router, prefix="/v1")
+
+
+_register_v1_routers(app)
+
+
 @app.get("/")
-async def root():
+async def root() -> dict[str, str]:
     return {"message": "AI-Factory API", "status": "running"}
 
+
 @app.get("/health")
-async def health():
+async def health() -> dict[str, str]:
     return {"status": "ok"}
 
+
 @app.get("/status")
-async def status():
+async def status() -> dict[str, str]:
     return {
         "title": settings.title,
         "version": settings.version,
         "status": "running",
-        "uptime": "0s"
+        "uptime": "0s",
     }
 
-# Load routers lazily - only import when endpoint is called
-_router_loaded = {}
 
-def load_router_if_needed(router_name: str):
-    """Load router only on first access."""
-    if router_name in _router_loaded:
-        return _router_loaded[router_name]
-    
-    try:
-        if router_name == "workspace":
-            from inference.app.routers.workspace import router
-            app.include_router(router, prefix="/v1")
-        elif router_name == "metadata":
-            from inference.app.routers.metadata import router
-            app.include_router(router, prefix="/v1")
-        elif router_name == "generation":
-            from inference.app.routers.generation import router
-            app.include_router(router, prefix="/v1")
-        elif router_name == "instances":
-            from inference.app.routers.instances import router
-            app.include_router(router, prefix="/v1")
-        elif router_name == "orchestration":
-            from inference.app.routers.orchestration import router
-            app.include_router(router, prefix="/v1")
-        elif router_name == "datasets":
-            from inference.app.routers.datasets import router
-            app.include_router(router, prefix="/v1")
-        elif router_name == "agents":
-            from inference.app.routers.agents import router
-            app.include_router(router, prefix="/v1")
-        elif router_name == "automl":
-            from inference.app.routers.automl import router
-            app.include_router(router, prefix="/v1")
-        elif router_name == "cluster":
-            from inference.app.routers.cluster import router
-            app.include_router(router, prefix="/v1")
-        elif router_name == "telemetry":
-            from inference.app.routers.telemetry import router
-            app.include_router(router, prefix="/v1")
-        elif router_name == "lab":
-            from inference.app.routers.lab import router
-            app.include_router(router, prefix="/v1")
-        elif router_name == "openai":
-            from inference.app.routers.openai import router
-            app.include_router(router, prefix="/v1")
-        
-        _router_loaded[router_name] = True
-        return True
-    except Exception as e:
-        print(f"Failed to load {router_name} router: {e}")
-        return False
-
-# Lazy loading endpoints
-@app.get("/v1/workspace")
-async def workspace():
-    # Return instant response first
-    from inference.app.workspace_minimal import get_instant_status
-    return get_instant_status()
-
-@app.get("/v1/workspace/full")
-async def workspace_full():
-    """Full workspace with lazy loading - only when explicitly requested."""
-    load_router_if_needed("workspace")
-    from inference.app.routers.workspace import workspace_overview
-    return workspace_overview()
-
-@app.get("/v1/models")
-async def models():
-    load_router_if_needed("metadata")
-    from inference.app.routers.metadata import get_models
-    return {"models": get_models()}
-
-@app.get("/v1/datasets")
-async def datasets():
-    load_router_if_needed("datasets")
-    from inference.app.routers.datasets import get_dataset_dashboard
-    return get_dataset_dashboard()
-
-# Exception handler
 try:
     from inference.app.services.openai_service import OpenAIError
-    
+
     @app.exception_handler(OpenAIError)
-    async def openai_error_handler(_, exc: OpenAIError):
+    async def openai_error_handler(_, exc: OpenAIError) -> JSONResponse:
         return JSONResponse(
             status_code=exc.status_code,
             content={

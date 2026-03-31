@@ -1,11 +1,9 @@
 from __future__ import annotations
 
 import importlib.util
+from functools import lru_cache
 from pathlib import Path
 from typing import Any
-from functools import lru_cache
-import asyncio
-from concurrent.futures import ThreadPoolExecutor
 
 import yaml
 
@@ -219,6 +217,13 @@ def _build_command_recipes() -> list[dict[str, str]]:
             "Launch a child inference instance from an evaluated or finetuned branch.",
             "ai-factory inference <instance-id> --config configs/inference.yaml",
             "control-plane",
+        ),
+        _command_recipe(
+            "titan-status",
+            "Titan hardware status",
+            "Inspect the active Titan backend, unified-memory profile, and fallback mode.",
+            "ai-factory titan status --write-hardware-doc",
+            "hardware",
         ),
     ]
 
