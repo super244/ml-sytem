@@ -1,0 +1,1139 @@
+# AI-Factory: Replit Backend Master Prompt
+
+## 🎯 Mission
+
+You are building the **AI-Factory backend** — the brain, the nervous system, and the data layer of an autonomous AI research operating system. A separate frontend (built in Lovable) will consume everything you produce. Your job is zero UI, pure infrastructure: FastAPI servers, WebSocket telemetry streams, job orchestration, database models, agent logic, and the autonomous training loop.
+
+**The contract is simple:** Lovable renders. You compute. Every API endpoint, WebSocket message type, and data schema defined here maps 1:1 to what Lovable expects to consume. Do not deviate from the interface contracts — they are the seam between the two systems.
+
+---
+
+## 🏗️ Tech Stack (Exact)
+
+```
+Runtime:         Python 3.11+
+API Framework:   FastAPI 0.111+
+ASGI Server:     Uvicorn with Gunicorn workers
+WebSockets:      FastAPI native WebSocket + websockets lib
+Task Queue:      Celery 5.x + Redis 7 (broker + result backend)
+Database:        PostgreSQL 15 (via asyncpg + SQLAlchemy 2.0 async)
+Migrations:      Alembic
+Cache:           Redis (shared with Celery)
+ML Stack:        PyTorch, Transformers, PEFT, Accelerate, TRL, bitsandbytes
+Search/AutoML:   Optuna
+Compute Fabric:  Ray (local cluster), paramiko (remote SSH nodes)
+Config:          Pydantic Settings v2 + YAML
+Validation:      Pydantic v2 (all schemas)
+Type Checking:   Mypy strict
+Linting:         Ruff
+Testing:         Pytest + pytest-asyncio + httpx
+Process Mgmt:    Supervisor (in container) or systemd (on metal)
+Containerization: Docker + Docker Compose
+```
+
+---
+
+## 📁 Project Structure
+
+```
+ai_factory/
+├── main.py                      # FastAPI app factory, lifespan, router mounting
+├── config.py                    # Pydantic Settings — all env vars, secrets, paths
+├── database.py                  # SQLAlchemy async engine, session factory
+├── dependencies.py              # FastAPI dependency injection (db session, auth, etc.)
+│
+├── core/
+│   ├── __init__.py
+│   ├── interfaces.py            # All abstract Protocol definitions (typing)
+│   ├── lineage.py               # Lineage registry: DAG storage and query
+│   ├── events.py                # Internal event bus (publish/subscribe for subsystems)
+│   └── exceptions.py            # Domain exceptions (JobNotFound, ClusterError, etc.)
+│
+├── models/                      # SQLAlchemy ORM models
+│   ├── __init__.py
+│   ├── job.py                   # TrainingJob, JobStatus enum
+│   ├── dataset.py               # Dataset, Pack, PackSummary
+│   ├── model_registry.py        # ModelCheckpoint, EvalResult
+│   ├── cluster.py               # ClusterNode, NodeStatus
+│   ├── automl.py                # AutoMLSearch, AutoMLRun
+│   └── agent.py                 # AgentDecision, AgentStatus
+│
+├── schemas/                     # Pydantic v2 schemas (request/response/websocket)
+│   ├── __init__.py
+│   ├── job.py
+│   ├── dataset.py
+│   ├── model_registry.py
+│   ├── cluster.py
+│   ├── automl.py
+│   ├── agent.py
+│   ├── inference.py
+│   └── websocket.py             # All WebSocket message types (canonical source of truth)
+│
+├── api/                         # FastAPI routers
+│   ├── __init__.py
+│   ├── v1/
+│   │   ├── jobs.py
+│   │   ├── datasets.py
+│   │   ├── models.py
+│   │   ├── cluster.py
+│   │   ├── automl.py
+│   │   ├── agents.py
+│   │   ├── inference.py
+│   │   └── feedback.py
+│   └── websocket.py             # WebSocket endpoint + connection manager
+│
+├── services/                    # Business logic layer
+│   ├── __init__.py
+│   ├── job_service.py           # Job CRUD, dispatch, status management
+│   ├── dataset_service.py       # Pipeline orchestration, packing, quality scoring
+│   ├── model_service.py         # Checkpoint registration, eval storage, lineage
+│   ├── cluster_service.py       # Node discovery, health polling, job dispatch
+│   ├── automl_service.py        # Search tree management, Optuna integration
+│   ├── agent_service.py         # Agent lifecycle, decision logging
+│   └── inference_service.py     # Model loading, generation, telemetry
+│
+├── workers/                     # Celery task definitions
+│   ├── __init__.py
+│   ├── celery_app.py            # Celery app instance + beat schedule
+│   ├── training_tasks.py        # Training job execution tasks
+│   ├── eval_tasks.py            # Benchmark evaluation tasks
+│   ├── data_tasks.py            # Dataset synthesis + packing tasks
+│   ├── cluster_tasks.py         # Node health polling tasks (beat)
+│   └── agent_tasks.py           # Agent loop tasks (beat)
+│
+├── training/
+│   ├── __init__.py
+│   ├── trainer.py               # Core training loop (Accelerate + PEFT)
+│   ├── configs.py               # TrainingConfig Pydantic model
+│   ├── lora.py                  # LoRA/QLoRA setup helpers
+│   ├── dpo.py                   # DPO training loop (TRL)
+│   └── checkpointing.py         # Checkpoint save/load + lineage registration
+│
+├── data/
+│   ├── __init__.py
+│   ├── synthesis/
+│   │   ├── base.py              # SynthesisEngine Protocol
+│   │   ├── math_engine.py       # Math problem + solution generator
+│   │   ├── code_engine.py       # Code task + test suite generator
+│   │   └── reasoning_engine.py  # Chain-of-thought generator
+│   ├── quality/
+│   │   ├── filters.py           # Perplexity, dedup (MinHash), toxicity
+│   │   └── scorer.py            # Composite quality scoring
+│   └── packer.py                # Dataset packing + pack_summary.json writer
+│
+├── evaluation/
+│   ├── __init__.py
+│   ├── runner.py                # Benchmark orchestration
+│   ├── benchmarks/
+│   │   ├── base.py              # Benchmark Protocol
+│   │   ├── mmlu.py
+│   │   ├── humaneval.py
+│   │   ├── gsm8k.py
+│   │   └── mt_bench.py
+│   └── report.py                # EvaluationReport schema + aggregation
+│
+├── cluster/
+│   ├── __init__.py
+│   ├── manager.py               # ClusterManager: node registry + dispatch
+│   ├── drivers/
+│   │   ├── base.py              # NodeDriver Protocol
+│   │   ├── local_gpu.py         # Local Linux GPU node driver
+│   │   ├── apple_silicon.py     # Apple MPS node driver
+│   │   └── ssh_remote.py        # Remote SSH node driver (EC2, Lambda, RunPod)
+│   └── telemetry.py             # nvidia-smi poller, MPS metrics, health aggregator
+│
+├── agents/
+│   ├── __init__.py
+│   ├── orchestrator.py          # Agent swarm coordinator
+│   ├── evaluator.py             # EvaluatorAgent: monitors runs, scores
+│   ├── pruner.py                # PrunerAgent: ASHA/Hyperband, kills bad runs
+│   └── promoter.py              # PromoterAgent: selects winners, escalates to DPO
+│
+└── tests/
+    ├── conftest.py
+    ├── api/
+    ├── services/
+    ├── workers/
+    └── fixtures/
+```
+
+---
+
+## 🔌 The Interface Contract (Lovable ↔ Replit)
+
+This section is **sacred**. These are the exact API routes and WebSocket message types that Lovable is coded against. Every field name, every type, every enum value must match exactly. Changing these requires coordinating with the Lovable frontend.
+
+### REST API Contracts
+
+#### Jobs
+
+```python
+# GET /api/v1/jobs
+# Response: List[JobSummary]
+class JobSummary(BaseModel):
+    id: str                          # UUID
+    name: str                        # "run-2847-bayesian-lr-search"
+    type: Literal["lora_finetune", "dpo", "rlhf", "eval_only", "data_pack"]
+    status: Literal["queued", "running", "completed", "failed", "stopped", "degraded"]
+    base_model: str                  # "meta-llama/Meta-Llama-3.1-8B"
+    progress: float                  # 0.0 - 1.0
+    current_step: int
+    total_steps: int
+    current_loss: float | None
+    loss_delta: float | None         # positive = getting worse, negative = improving
+    eta_seconds: int | None
+    gpu_utilization: list[float]     # per-GPU, 0-100
+    vram_used_gb: float
+    vram_total_gb: float
+    started_at: datetime
+    estimated_completion: datetime | None
+    node_id: str | None              # which cluster node
+
+# GET /api/v1/jobs/{job_id}
+# Response: JobDetail (extends JobSummary)
+class JobDetail(JobSummary):
+    config: dict                     # full training config as JSON
+    dataset_hash: str | None
+    parent_model_id: str | None
+    loss_history: list[float]        # last 200 steps
+    step_history: list[int]          # corresponding steps
+    eval_scores: dict[str, float] | None
+    logs_tail: list[LogLine]         # last 100 log lines
+    lineage_id: str | None
+
+# POST /api/v1/jobs/{job_id}/stop
+# Response: { "status": "stopping", "job_id": str }
+
+# POST /api/v1/jobs
+# Body: JobCreateRequest
+class JobCreateRequest(BaseModel):
+    type: Literal["lora_finetune", "dpo", "rlhf"]
+    base_model: str
+    dataset_id: str
+    config: TrainingConfig
+    node_preference: str | None      # target node id, or null for auto-assign
+    priority: int = 5                # 1-10, higher = dispatched first
+```
+
+#### Cluster
+
+```python
+# GET /api/v1/cluster/nodes
+# Response: List[NodeStatus]
+class NodeStatus(BaseModel):
+    id: str
+    name: str                        # "linux-rig-01"
+    type: Literal["local_gpu", "apple_silicon", "ssh_remote"]
+    status: Literal["online", "offline", "degraded", "maintenance"]
+    gpus: list[GPUMetric]
+    cpu_utilization: float
+    ram_used_gb: float
+    ram_total_gb: float
+    network_rx_mbps: float
+    network_tx_mbps: float
+    active_jobs: list[str]           # job IDs
+    cost_per_hour: float | None      # for cloud nodes
+    last_seen: datetime
+
+class GPUMetric(BaseModel):
+    index: int
+    name: str                        # "NVIDIA A100 80GB"
+    utilization: float               # 0-100
+    vram_used_gb: float
+    vram_total_gb: float
+    temperature_celsius: float
+    power_draw_watts: float
+    memory_bandwidth_gbps: float | None
+```
+
+#### Datasets
+
+```python
+# GET /api/v1/datasets
+# Response: List[DatasetSummary]
+class DatasetSummary(BaseModel):
+    id: str
+    name: str
+    domain: Literal["math", "code", "reasoning", "creative", "mixed"]
+    status: Literal["synthesizing", "filtering", "packing", "ready", "failed"]
+    sample_count: int
+    quality_score_mean: float        # 0.0 - 1.0
+    quality_score_p10: float
+    quality_score_p90: float
+    size_mb: float
+    content_hash: str                # SHA-256 of packed content
+    pipeline_config_hash: str
+    git_sha: str
+    created_at: datetime
+    pack_summary: PackSummary | None
+
+class PackSummary(BaseModel):
+    source_distribution: dict[str, float]   # {"synthetic": 0.7, "curated": 0.3}
+    filter_pass_rates: dict[str, float]     # {"perplexity": 0.92, "dedup": 0.88}
+    quality_histogram: list[float]          # 10 bins, 0-1 range
+    dedup_removed: int
+    toxicity_removed: int
+    total_before_filter: int
+    total_after_filter: int
+
+# GET /api/v1/datasets/{id}/samples?page=0&limit=20
+# Response: { samples: List[Sample], total: int }
+class Sample(BaseModel):
+    id: str
+    content: str
+    quality_score: float
+    perplexity: float
+    domain: str
+    source: str
+```
+
+#### AutoML
+
+```python
+# GET /api/v1/automl/searches
+# Response: List[AutoMLSearchSummary]
+class AutoMLSearchSummary(BaseModel):
+    id: str
+    strategy: Literal["bayesian", "evolutionary", "grid", "random"]
+    status: Literal["running", "paused", "completed", "failed"]
+    total_runs: int
+    completed_runs: int
+    running_runs: int
+    pruned_runs: int
+    promoted_runs: int
+    best_loss: float | None
+    best_config: dict | None
+    created_at: datetime
+
+# GET /api/v1/automl/searches/{id}
+class AutoMLSearchDetail(AutoMLSearchSummary):
+    search_space: dict               # Optuna search space definition
+    runs: list[AutoMLRun]
+
+class AutoMLRun(BaseModel):
+    id: str
+    search_id: str
+    status: Literal["running", "completed", "pruned", "promoted", "failed"]
+    hyperparams: dict                # {"lr": 2.4e-4, "rank": 16, "alpha": 32}
+    eval_loss: float | None
+    composite_score: float | None    # weighted multi-metric score
+    training_minutes: float | None
+    step_pruned: int | None          # which step it was killed at
+    prune_reason: str | None
+    job_id: str | None
+```
+
+#### Agents
+
+```python
+# GET /api/v1/agents
+# Response: List[AgentStatus]
+class AgentStatus(BaseModel):
+    id: str
+    type: Literal["evaluator", "pruner", "promoter"]
+    status: Literal["active", "standby", "paused", "error"]
+    last_action_at: datetime | None
+    decisions_today: int
+    current_target: str | None       # job_id or run_id it's currently watching
+
+# GET /api/v1/agents/decisions?limit=50&agent_id=...
+# Response: List[AgentDecision]
+class AgentDecision(BaseModel):
+    id: str
+    agent_id: str
+    agent_type: Literal["evaluator", "pruner", "promoter"]
+    action: Literal["scored", "pruned", "promoted", "escalated", "flagged"]
+    target_id: str                   # job_id or run_id
+    reasoning: str                   # human-readable explanation
+    metrics_snapshot: dict           # relevant metrics at decision time
+    timestamp: datetime
+```
+
+#### Models
+
+```python
+# GET /api/v1/models
+# Response: List[ModelSummary]
+class ModelSummary(BaseModel):
+    id: str
+    name: str
+    base_model: str
+    training_type: Literal["lora", "dpo", "rlhf", "full_finetune"]
+    eval_scores: dict[str, float]    # {"mmlu": 61.2, "gsm8k": 78.4, "humaneval": 43.8}
+    children_count: int
+    dataset_hash: str
+    parent_model_id: str | None
+    created_at: datetime
+    deployed: bool
+    size_gb: float
+
+# GET /api/v1/models/{id}/lineage
+# Response: LineageGraph
+class LineageGraph(BaseModel):
+    nodes: list[LineageNode]
+    edges: list[LineageEdge]
+
+class LineageNode(BaseModel):
+    id: str
+    type: Literal["dataset", "base_model", "checkpoint", "deployment"]
+    label: str
+    metadata: dict
+
+class LineageEdge(BaseModel):
+    source: str
+    target: str
+    label: str                       # "trained on", "derived from", "deployed to"
+```
+
+#### Inference
+
+```python
+# POST /api/v1/inference/completions
+class CompletionRequest(BaseModel):
+    model_id: str
+    prompt: str
+    max_tokens: int = 512
+    temperature: float = 0.7
+    stream: bool = True
+
+class CompletionResponse(BaseModel):
+    id: str
+    model_id: str
+    prompt: str
+    completion: str
+    tokens_generated: int
+    tokens_per_second: float
+    time_to_first_token_ms: float
+    confidence_score: float          # 0.0 - 1.0, mean token probability
+    finish_reason: Literal["stop", "length", "error"]
+
+# POST /api/v1/feedback/flag
+class FeedbackFlagRequest(BaseModel):
+    completion_id: str
+    reason: Literal["incorrect", "hallucination", "refusal", "low_quality", "other"]
+    notes: str | None
+    add_to_dataset: bool = True      # route to data pipeline as negative example
+```
+
+---
+
+### WebSocket Contract (`/ws/telemetry`)
+
+This is the real-time data highway. Lovable opens a single persistent WebSocket connection on app load and subscribes to message types. **Every message must be valid JSON matching one of these exact schemas.**
+
+```python
+# schemas/websocket.py — THE CANONICAL SOURCE OF TRUTH
+
+from typing import Literal, Union
+from pydantic import BaseModel
+from datetime import datetime
+
+class GPUTelemetryMessage(BaseModel):
+    type: Literal["gpu_telemetry"]
+    node_id: str
+    timestamp: float                 # Unix timestamp (ms)
+    gpus: list[GPUMetric]
+
+class JobUpdateMessage(BaseModel):
+    type: Literal["job_update"]
+    job_id: str
+    timestamp: float
+    progress: float
+    current_step: int
+    current_loss: float | None
+    loss_delta: float | None
+    eta_seconds: int | None
+    status: str
+
+class JobCompleteMessage(BaseModel):
+    type: Literal["job_complete"]
+    job_id: str
+    timestamp: float
+    final_loss: float
+    eval_scores: dict[str, float]
+    checkpoint_path: str
+    model_id: str                    # newly registered model ID
+
+class JobFailedMessage(BaseModel):
+    type: Literal["job_failed"]
+    job_id: str
+    timestamp: float
+    error: str
+    step_failed_at: int | None
+
+class AgentDecisionMessage(BaseModel):
+    type: Literal["agent_decision"]
+    agent_id: str
+    agent_type: str
+    action: str
+    target_id: str
+    reasoning: str
+    timestamp: float
+
+class LogLineMessage(BaseModel):
+    type: Literal["log_line"]
+    source: str                      # "trainer", "evaluator", "agent:pruner-01", etc.
+    level: Literal["DEBUG", "INFO", "WARN", "ERROR", "AGENT", "METRIC"]
+    message: str
+    job_id: str | None
+    timestamp: float
+
+class ClusterUpdateMessage(BaseModel):
+    type: Literal["cluster_update"]
+    nodes: list[NodeStatus]
+    timestamp: float
+
+class AutoMLUpdateMessage(BaseModel):
+    type: Literal["automl_update"]
+    search_id: str
+    run_id: str
+    status: str
+    eval_loss: float | None
+    composite_score: float | None
+    timestamp: float
+
+# Union type for the connection manager dispatcher
+TelemetryMessage = Union[
+    GPUTelemetryMessage,
+    JobUpdateMessage,
+    JobCompleteMessage,
+    JobFailedMessage,
+    AgentDecisionMessage,
+    LogLineMessage,
+    ClusterUpdateMessage,
+    AutoMLUpdateMessage,
+]
+```
+
+**WebSocket broadcast cadences:**
+| Message Type | Frequency |
+|---|---|
+| `gpu_telemetry` | Every 2 seconds per node |
+| `job_update` | Every 5 seconds per running job |
+| `log_line` | As emitted (unbuffered) |
+| `cluster_update` | Every 10 seconds |
+| `agent_decision` | On event (not polled) |
+| `automl_update` | On run status change |
+| `job_complete` / `job_failed` | On event |
+
+---
+
+## 🧠 Core Service Implementations
+
+### Connection Manager (WebSocket)
+
+```python
+# api/websocket.py
+from collections import defaultdict
+from fastapi import WebSocket
+import asyncio, json
+
+class ConnectionManager:
+    def __init__(self):
+        self.active: set[WebSocket] = set()
+        self.subscriptions: dict[str, set[WebSocket]] = defaultdict(set)
+
+    async def connect(self, ws: WebSocket):
+        await ws.accept()
+        self.active.add(ws)
+
+    def disconnect(self, ws: WebSocket):
+        self.active.discard(ws)
+        for subs in self.subscriptions.values():
+            subs.discard(ws)
+
+    async def broadcast(self, message: TelemetryMessage):
+        """Broadcast to all connected clients."""
+        payload = message.model_dump_json()
+        dead = set()
+        for ws in self.active:
+            try:
+                await ws.send_text(payload)
+            except Exception:
+                dead.add(ws)
+        for ws in dead:
+            self.disconnect(ws)
+
+    async def broadcast_to_subscribers(self, topic: str, message: TelemetryMessage):
+        """Broadcast only to clients subscribed to a specific topic (job_id, node_id, etc.)"""
+        payload = message.model_dump_json()
+        for ws in self.subscriptions.get(topic, set()):
+            try:
+                await ws.send_text(payload)
+            except Exception:
+                pass
+
+manager = ConnectionManager()
+```
+
+### Job Service
+
+```python
+# services/job_service.py
+
+class JobService:
+    def __init__(self, db: AsyncSession, manager: ConnectionManager):
+        self.db = db
+        self.manager = manager
+
+    async def create_job(self, request: JobCreateRequest) -> JobDetail:
+        """
+        1. Validate dataset exists and is in 'ready' state
+        2. Validate base model is accessible
+        3. Select target node via ClusterService.select_node()
+        4. Create DB record with status='queued'
+        5. Dispatch Celery task: training_tasks.run_training_job.delay(job_id)
+        6. Register in lineage registry
+        7. Return JobDetail
+        """
+
+    async def stop_job(self, job_id: str) -> None:
+        """
+        1. Fetch job, assert status is 'running' or 'queued'
+        2. Revoke Celery task (terminate=True)
+        3. Send SIGTERM to training process on node
+        4. Update status to 'stopped'
+        5. Broadcast JobFailedMessage with error='User requested stop'
+        6. Trigger checkpoint save if mid-run
+        """
+
+    async def update_progress(self, job_id: str, step: int, loss: float) -> None:
+        """
+        Called by training worker via Celery task update.
+        1. Update DB record
+        2. Append to loss_history (keep last 500 points)
+        3. Calculate ETA from step velocity
+        4. Broadcast JobUpdateMessage via WebSocket
+        5. Notify AgentService for monitoring (non-blocking)
+        """
+
+    async def complete_job(self, job_id: str, checkpoint_path: str) -> str:
+        """
+        1. Update status to 'completed'
+        2. Trigger eval_tasks.run_evaluation.delay(job_id, checkpoint_path)
+        3. Register checkpoint with ModelService
+        4. Broadcast JobCompleteMessage
+        5. Notify AgentService.on_job_complete() for promotion decisions
+        6. Return model_id
+        """
+```
+
+### Cluster Service
+
+```python
+# services/cluster_service.py
+
+class ClusterService:
+    def __init__(self, db: AsyncSession, manager: ConnectionManager):
+        self.db = db
+        self.manager = manager
+        self._drivers: dict[str, NodeDriver] = {}
+
+    async def poll_all_nodes(self) -> None:
+        """
+        Beat task runs this every 10s.
+        For each registered node:
+          1. Call driver.get_health() — catches exceptions, marks node degraded/offline
+          2. Update DB NodeStatus record
+          3. Apply threshold rules:
+             - VRAM > 95% → status = 'degraded', broadcast WARN log line
+             - Temp > 85°C → status = 'degraded', broadcast WARN
+             - No response 3x → status = 'offline'
+          4. Broadcast ClusterUpdateMessage with all node statuses
+        """
+
+    async def select_node(self, job: JobCreateRequest) -> str:
+        """
+        Selects optimal node for a job using:
+        1. Filter: nodes with status='online'
+        2. Filter: nodes with enough free VRAM for job's model
+        3. Score remaining nodes by:
+           - Active job count (fewer = better)
+           - VRAM headroom (more = better)
+           - Job type affinity (apple silicon prefers smaller models)
+        4. Return node_id of winner
+        5. Raise ClusterError if no eligible nodes
+        """
+
+    async def dispatch_to_node(self, node_id: str, job_id: str) -> None:
+        """
+        1. Get driver for node
+        2. For local nodes: Celery task runs in same process space
+        3. For SSH remote nodes: driver.submit_job() — SSH + run training script
+        4. Update job.node_id in DB
+        """
+```
+
+### Agent Orchestrator
+
+```python
+# agents/orchestrator.py
+
+class AgentOrchestrator:
+    """
+    Runs on a Celery beat schedule (every 30s).
+    Coordinates the three agents: Evaluator, Pruner, Promoter.
+    All decisions are logged to DB and broadcast via WebSocket.
+    """
+
+    def __init__(
+        self,
+        evaluator: EvaluatorAgent,
+        pruner: PrunerAgent,
+        promoter: PromoterAgent,
+        job_service: JobService,
+        manager: ConnectionManager,
+    ):
+        ...
+
+    async def tick(self) -> None:
+        """Main loop — called every 30s by Celery beat."""
+        running_jobs = await self.job_service.get_running_jobs()
+
+        # Pruner runs first — kill bad jobs before evaluating
+        for job in running_jobs:
+            prune_decision = await self.pruner.evaluate(job)
+            if prune_decision.should_prune:
+                await self.job_service.stop_job(job.id)
+                await self._log_decision(prune_decision)
+
+        # Evaluator scores completed jobs awaiting scoring
+        unscoред_jobs = await self.job_service.get_completed_unscored()
+        for job in unscored_jobs:
+            eval_result = await self.evaluator.score(job)
+            await self._log_decision(eval_result)
+
+        # Promoter checks scored jobs against promotion threshold
+        promotion_candidates = await self.job_service.get_promotion_candidates()
+        for candidate in promotion_candidates:
+            promotion = await self.promoter.evaluate(candidate)
+            if promotion.should_promote:
+                await self._escalate_to_dpo(candidate, promotion)
+                await self._log_decision(promotion)
+
+    async def _log_decision(self, decision: AgentDecision) -> None:
+        """Save to DB + broadcast AgentDecisionMessage via WebSocket."""
+        await self.db.add(decision)
+        await self.manager.broadcast(AgentDecisionMessage(
+            type="agent_decision",
+            agent_id=decision.agent_id,
+            agent_type=decision.agent_type,
+            action=decision.action,
+            target_id=decision.target_id,
+            reasoning=decision.reasoning,
+            timestamp=datetime.utcnow().timestamp(),
+        ))
+```
+
+### Pruner Agent
+
+```python
+# agents/pruner.py
+
+class PrunerAgent:
+    """
+    Implements ASHA (Asynchronous Successive Halving Algorithm).
+    Kills training runs that are unlikely to converge.
+    """
+
+    PLATEAU_WINDOW = 500          # steps
+    PLATEAU_THRESHOLD = 0.001     # minimum Δloss to not be considered plateaued
+    DIVERGENCE_THRESHOLD = 5.0    # loss > 5x median of cohort → diverged
+    MIN_STEPS_BEFORE_PRUNE = 500  # never prune before 500 steps
+
+    async def evaluate(self, job: JobDetail) -> PruneDecision:
+        if job.current_step < self.MIN_STEPS_BEFORE_PRUNE:
+            return PruneDecision(should_prune=False)
+
+        # Check loss plateau
+        recent_losses = job.loss_history[-self.PLATEAU_WINDOW:]
+        if len(recent_losses) >= self.PLATEAU_WINDOW:
+            delta = max(recent_losses) - min(recent_losses)
+            if delta < self.PLATEAU_THRESHOLD:
+                return PruneDecision(
+                    should_prune=True,
+                    reason=f"Loss plateau: Δloss={delta:.5f} over last {self.PLATEAU_WINDOW} steps",
+                )
+
+        # Check divergence vs cohort median
+        cohort_losses = await self._get_cohort_median_loss(job)
+        if cohort_losses and job.current_loss > self.DIVERGENCE_THRESHOLD * cohort_losses:
+            return PruneDecision(
+                should_prune=True,
+                reason=f"Divergence: loss {job.current_loss:.4f} > {self.DIVERGENCE_THRESHOLD}x cohort median {cohort_losses:.4f}",
+            )
+
+        return PruneDecision(should_prune=False)
+```
+
+### Lineage Registry
+
+```python
+# core/lineage.py
+
+class LineageRegistry:
+    """
+    Directed Acyclic Graph of all artifacts in the system.
+    Nodes: datasets, base models, checkpoints, deployments.
+    Edges: "trained on", "derived from", "evaluated with", "deployed to".
+
+    Stored in PostgreSQL as adjacency list.
+    Queried as full graph for /api/v1/models/{id}/lineage.
+    """
+
+    async def register_dataset(self, pack: PackSummary) -> str:
+        """Register a packed dataset. Returns lineage_node_id."""
+
+    async def register_checkpoint(
+        self,
+        job: TrainingJob,
+        parent_model_id: str | None,
+        dataset_lineage_id: str,
+    ) -> str:
+        """
+        Register a trained checkpoint.
+        Creates edges:
+          checkpoint → "trained on" → dataset
+          checkpoint → "derived from" → parent_model (if exists)
+        """
+
+    async def get_lineage_graph(self, node_id: str, depth: int = 5) -> LineageGraph:
+        """
+        BFS from node_id up to `depth` hops.
+        Returns LineageGraph with all ancestor nodes and their edges.
+        """
+
+    async def get_full_provenance(self, checkpoint_id: str) -> dict:
+        """
+        Returns complete provenance dict:
+        {
+          "checkpoint": {...},
+          "parent_model": {...} | null,
+          "dataset": {pack_summary},
+          "training_config": {...},
+          "eval_results": {...},
+          "git_sha": "...",
+          "reproduced_from": "ai-factory reproduce --checkpoint <id>"
+        }
+        """
+```
+
+---
+
+## ⚙️ Celery Task Definitions
+
+```python
+# workers/training_tasks.py
+
+@celery_app.task(bind=True, max_retries=2, time_limit=86400)
+def run_training_job(self, job_id: str) -> None:
+    """
+    The main training task. Runs inside the Celery worker process.
+
+    Flow:
+    1. Load job config from DB
+    2. Load model + tokenizer (with 4-bit quantization if QLoRA)
+    3. Initialize PEFT LoRA adapter
+    4. Set up Accelerate for multi-GPU if node has >1 GPU
+    5. Training loop:
+       a. Every 10 steps: call job_service.update_progress() (async via asyncio.run)
+       b. Every 50 steps: save checkpoint to disk
+       c. On KeyboardInterrupt / SIGTERM: save emergency checkpoint, mark job stopped
+    6. On completion: call job_service.complete_job()
+    7. On exception: mark job failed, broadcast JobFailedMessage
+    """
+
+@celery_app.task(bind=True, max_retries=1, time_limit=3600)
+def run_evaluation(self, job_id: str, checkpoint_path: str) -> dict:
+    """
+    Run benchmark suite against a checkpoint.
+
+    Flow:
+    1. Load evaluation config (which benchmarks to run)
+    2. For each benchmark: runner.evaluate(checkpoint_path, benchmark)
+    3. Aggregate into EvaluationReport
+    4. Save scores to DB (ModelCheckpoint.eval_scores)
+    5. Broadcast JobCompleteMessage with eval_scores populated
+    6. Notify AgentOrchestrator (publish to internal event bus)
+    """
+
+# workers/cluster_tasks.py
+
+@celery_app.task
+def poll_cluster_health() -> None:
+    """Beat task: runs every 10 seconds. Calls ClusterService.poll_all_nodes()."""
+
+# workers/agent_tasks.py
+
+@celery_app.task
+def run_agent_tick() -> None:
+    """Beat task: runs every 30 seconds. Calls AgentOrchestrator.tick()."""
+
+# workers/data_tasks.py
+
+@celery_app.task(bind=True, time_limit=14400)
+def run_synthesis_pipeline(self, dataset_id: str) -> None:
+    """
+    Executes the full data pipeline for a dataset:
+    1. synthesis_engine.generate(config) → raw samples
+    2. quality.filters.run_all(samples) → filtered samples
+    3. packer.pack(filtered) → write to disk
+    4. Register PackSummary in DB
+    5. Update dataset status to 'ready'
+    6. Register in LineageRegistry
+    """
+```
+
+---
+
+## 🗄️ Database Schema
+
+```python
+# migrations/versions/001_initial.py (via Alembic)
+
+# Key tables — implement as SQLAlchemy 2.0 DeclarativeBase models
+
+class TrainingJob(Base):
+    __tablename__ = "training_jobs"
+    id: Mapped[str] = mapped_column(primary_key=True, default=lambda: str(uuid4()))
+    name: Mapped[str]
+    type: Mapped[str]
+    status: Mapped[str] = mapped_column(default="queued")
+    base_model: Mapped[str]
+    config_json: Mapped[dict] = mapped_column(JSON)
+    dataset_id: Mapped[str | None] = mapped_column(ForeignKey("datasets.id"))
+    node_id: Mapped[str | None]
+    celery_task_id: Mapped[str | None]
+    current_step: Mapped[int] = mapped_column(default=0)
+    total_steps: Mapped[int] = mapped_column(default=0)
+    current_loss: Mapped[float | None]
+    loss_history: Mapped[list] = mapped_column(JSON, default=list)
+    lineage_node_id: Mapped[str | None]
+    started_at: Mapped[datetime | None]
+    completed_at: Mapped[datetime | None]
+    created_at: Mapped[datetime] = mapped_column(default=datetime.utcnow)
+
+class ModelCheckpoint(Base):
+    __tablename__ = "model_checkpoints"
+    id: Mapped[str] = mapped_column(primary_key=True, default=lambda: str(uuid4()))
+    name: Mapped[str]
+    base_model: Mapped[str]
+    training_type: Mapped[str]
+    checkpoint_path: Mapped[str]
+    size_gb: Mapped[float]
+    job_id: Mapped[str] = mapped_column(ForeignKey("training_jobs.id"))
+    parent_model_id: Mapped[str | None] = mapped_column(ForeignKey("model_checkpoints.id"))
+    dataset_hash: Mapped[str | None]
+    eval_scores: Mapped[dict] = mapped_column(JSON, default=dict)
+    lineage_node_id: Mapped[str | None]
+    deployed: Mapped[bool] = mapped_column(default=False)
+    created_at: Mapped[datetime] = mapped_column(default=datetime.utcnow)
+
+class Dataset(Base):
+    __tablename__ = "datasets"
+    id: Mapped[str] = mapped_column(primary_key=True, default=lambda: str(uuid4()))
+    name: Mapped[str]
+    domain: Mapped[str]
+    status: Mapped[str] = mapped_column(default="synthesizing")
+    sample_count: Mapped[int] = mapped_column(default=0)
+    quality_score_mean: Mapped[float | None]
+    quality_score_p10: Mapped[float | None]
+    quality_score_p90: Mapped[float | None]
+    size_mb: Mapped[float | None]
+    content_hash: Mapped[str | None]
+    pipeline_config_hash: Mapped[str | None]
+    git_sha: Mapped[str | None]
+    pack_summary_json: Mapped[dict | None] = mapped_column(JSON)
+    lineage_node_id: Mapped[str | None]
+    created_at: Mapped[datetime] = mapped_column(default=datetime.utcnow)
+
+class AgentDecisionRecord(Base):
+    __tablename__ = "agent_decisions"
+    id: Mapped[str] = mapped_column(primary_key=True, default=lambda: str(uuid4()))
+    agent_id: Mapped[str]
+    agent_type: Mapped[str]
+    action: Mapped[str]
+    target_id: Mapped[str]
+    reasoning: Mapped[str]
+    metrics_snapshot: Mapped[dict] = mapped_column(JSON)
+    timestamp: Mapped[datetime] = mapped_column(default=datetime.utcnow)
+
+class LineageNode(Base):
+    __tablename__ = "lineage_nodes"
+    id: Mapped[str] = mapped_column(primary_key=True, default=lambda: str(uuid4()))
+    type: Mapped[str]      # "dataset" | "base_model" | "checkpoint" | "deployment"
+    label: Mapped[str]
+    metadata_json: Mapped[dict] = mapped_column(JSON)
+
+class LineageEdge(Base):
+    __tablename__ = "lineage_edges"
+    id: Mapped[str] = mapped_column(primary_key=True, default=lambda: str(uuid4()))
+    source_id: Mapped[str] = mapped_column(ForeignKey("lineage_nodes.id"))
+    target_id: Mapped[str] = mapped_column(ForeignKey("lineage_nodes.id"))
+    label: Mapped[str]
+```
+
+---
+
+## 🐳 Docker Compose (Full Stack)
+
+```yaml
+# docker-compose.yml
+version: '3.9'
+
+services:
+  api:
+    build: .
+    command: uvicorn ai_factory.main:app --host 0.0.0.0 --port 8000 --reload
+    ports:
+      - "8000:8000"
+    environment:
+      - DATABASE_URL=postgresql+asyncpg://postgres:postgres@db:5432/aifactory
+      - REDIS_URL=redis://redis:6379/0
+      - ENVIRONMENT=development
+    volumes:
+      - .:/app
+      - model_storage:/data/models
+      - dataset_storage:/data/datasets
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  worker:
+    build: .
+    command: celery -A ai_factory.workers.celery_app worker --loglevel=info --concurrency=2
+    environment:
+      - DATABASE_URL=postgresql+asyncpg://postgres:postgres@db:5432/aifactory
+      - REDIS_URL=redis://redis:6379/0
+    volumes:
+      - .:/app
+      - model_storage:/data/models
+      - dataset_storage:/data/datasets
+    depends_on:
+      - api
+      - redis
+
+  beat:
+    build: .
+    command: celery -A ai_factory.workers.celery_app beat --loglevel=info
+    environment:
+      - REDIS_URL=redis://redis:6379/0
+    depends_on:
+      - redis
+
+  db:
+    image: postgres:15-alpine
+    environment:
+      POSTGRES_DB: aifactory
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  postgres_data:
+  model_storage:
+  dataset_storage:
+```
+
+---
+
+## 🔗 Lovable Integration Checklist
+
+These are the exact things Lovable depends on being correct. Verify each one before declaring the backend ready.
+
+### CORS Configuration
+```python
+# main.py — Lovable dev server runs on localhost:3000
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["http://localhost:3000", "https://*.lovable.app"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+```
+
+### WebSocket CORS
+The WebSocket endpoint at `/ws/telemetry` must accept connections from `localhost:3000` and `*.lovable.app`. FastAPI WebSocket does not use the CORS middleware — handle this manually in the endpoint.
+
+### JSON Field Names
+Lovable uses **camelCase** in TypeScript. All Pydantic models must serialize to **snake_case** (FastAPI default). Lovable's API client handles the conversion via a response interceptor — **do not change field names to camelCase on the backend.**
+
+### Datetime Format
+All `datetime` fields must serialize as **ISO 8601 with UTC timezone**: `"2024-11-15T14:32:01.123Z"`. Set `model_config = ConfigDict(json_encoders={datetime: lambda v: v.isoformat() + "Z"})` on all schemas.
+
+### Null vs Missing Fields
+Lovable checks for `null` explicitly on nullable fields (confidence_score, eta_seconds, parent_model_id, etc.). Never omit these fields from the response — always include them as `null`. Set `model_config = ConfigDict(populate_by_name=True)` and avoid `exclude_none=True` in responses.
+
+### WebSocket Reconnection
+Lovable implements automatic WebSocket reconnection with exponential backoff. The backend must handle rapid reconnections gracefully (no state corruption on disconnect/reconnect cycles). The ConnectionManager's `broadcast()` method already handles this by catching send exceptions.
+
+---
+
+## 📊 Simulation Mode (Development)
+
+When `ENVIRONMENT=development` and no real GPU is present, the system runs in **simulation mode**. This makes the backend fully demonstrable on any machine and allows Lovable to connect to a fully functional data stream.
+
+```python
+# config.py
+class Settings(BaseSettings):
+    environment: str = "development"
+    simulation_mode: bool = True     # auto-set True if no CUDA device found
+
+# workers/cluster_tasks.py — simulation behavior
+if settings.simulation_mode:
+    # Generate synthetic telemetry for 4 fake nodes
+    # Add realistic noise: utilization drifts ±5%, temperature ±2°C
+    # Occasionally spike one GPU to 92% to test warning states
+
+# workers/training_tasks.py — simulation behavior
+if settings.simulation_mode:
+    # Simulate training: generate decreasing loss curve with noise
+    # loss = 2.5 * exp(-step/2000) + random.gauss(0, 0.02)
+    # Emit updates every 5 simulated seconds
+    # Complete after 200 simulated steps
+
+# workers/agent_tasks.py — simulation behavior
+if settings.simulation_mode:
+    # Fire synthetic agent decisions on schedule
+    # Pruner: kills one run every ~3 ticks
+    # Evaluator: scores a run every ~4 ticks
+    # Promoter: promotes one run every ~10 ticks
+```
+
+**Simulation must produce exactly the same WebSocket message types and API response shapes as real mode.** Lovable cannot distinguish — nor should it need to.
+
+---
+
+## ✅ Build Order
+
+Implement in this exact sequence to ensure Lovable always has something to connect to:
+
+1. **FastAPI skeleton** — `main.py`, CORS, health endpoint (`GET /health → {"status": "ok"}`)
+2. **Database + migrations** — all ORM models, Alembic `initial` migration
+3. **Pydantic schemas** — all schemas in `schemas/`, especially `websocket.py`
+4. **WebSocket endpoint** — `ConnectionManager` + `/ws/telemetry` + simulation emitter
+5. **Cluster API** — `GET /api/v1/cluster/nodes` with simulation data
+6. **Jobs API** — `GET /api/v1/jobs`, `GET /api/v1/jobs/{id}`, `POST /api/v1/jobs/{id}/stop`
+7. **Docker Compose** — full stack running: api + worker + beat + db + redis
+8. **Simulation mode** — all beat tasks emitting fake data through WebSocket
+9. **Remaining REST APIs** — datasets, models, automl, agents, inference, feedback
+10. **Real training integration** — swap simulation tasks for real Celery training tasks
+11. **Agent logic** — Pruner, Evaluator, Promoter with real heuristics
+12. **Lineage registry** — DAG storage and `/api/v1/models/{id}/lineage`
