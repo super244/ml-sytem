@@ -1,0 +1,17 @@
+import { ReactNode } from 'react';
+import AppSidebar from './AppSidebar';
+import CommandPalette from './CommandPalette';
+
+const Layout = ({ children }: { children: ReactNode }) => {
+  return (
+    <div className="flex min-h-screen w-full bg-void">
+      <AppSidebar />
+      <main className="flex-1 min-w-0 overflow-auto">
+        {children}
+      </main>
+      <CommandPalette />
+    </div>
+  );
+};
+
+export default Layout;
