@@ -3,13 +3,12 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 
-import { getMissionControl, getTitanStatus, type MissionControlSnapshot, type TitanStatus } from "@/lib/api";
+import { getMissionControl, type MissionControlSnapshot } from "@/lib/api";
 import { formatCount } from "@/lib/formatting";
 import { ROUTES } from "@/lib/routes";
 
 type ClusterState = {
   mission: MissionControlSnapshot | null;
-  titan: TitanStatus | null;
   loading: boolean;
   error: string | null;
 };
@@ -27,7 +26,6 @@ function nodeTone(status: string) {
 export default function ClusterPage() {
   const [state, setState] = useState<ClusterState>({
     mission: null,
-    titan: null,
     loading: true,
     error: null,
   });
@@ -37,13 +35,12 @@ export default function ClusterPage() {
 
     async function load() {
       try {
-        const [mission, titan] = await Promise.all([getMissionControl(), getTitanStatus()]);
+        const mission = await getMissionControl();
         if (!active) {
           return;
         }
         setState({
           mission,
-          titan,
           loading: false,
           error: null,
         });
@@ -53,7 +50,6 @@ export default function ClusterPage() {
         }
         setState({
           mission: null,
-          titan: null,
           loading: false,
           error: error instanceof Error ? error.message : "Cluster state could not be loaded.",
         });
@@ -69,7 +65,7 @@ export default function ClusterPage() {
   }, []);
 
   const mission = state.mission;
-  const titan = state.titan;
+  const titan = mission?.titan;
   const nodes = mission?.watchlist.cluster_nodes ?? [];
   const runningInstances = mission?.watchlist.running_instances ?? [];
 

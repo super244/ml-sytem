@@ -1,0 +1,46 @@
+[package]
+name = "ai_factory_titan"
+version = "0.1.0"
+edition = "2021"
+description = "Titan compute core for AI-Factory with Metal, CUDA, and CPU fallback paths."
+
+[lib]
+name = "ai_factory_titan"
+crate-type = ["rlib", "cdylib"]
+
+[[bin]]
+name = "titan-status"
+path = "src/bin/titan-status.rs"
+
+[features]
+default = []
+metal = ["dep:metal", "dep:objc"]
+cuda = ["dep:cudarc", "cudarc/cuda-12080"]
+python = ["dep:pyo3"]
+
+[dependencies]
+anyhow = "1"
+arrow-array = "54"
+arrow-buffer = "54"
+arrow-schema = "54"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+sys-info = "0.9"
+tokio = { version = "1", features = ["macros", "rt-multi-thread", "sync", "time"] }
+
+[dependencies.cudarc]
+version = "0.13"
+optional = true
+
+[dependencies.metal]
+version = "0.31"
+optional = true
+
+[dependencies.objc]
+version = "0.2"
+optional = true
+
+[dependencies.pyo3]
+version = "0.23"
+features = ["extension-module"]
+optional = true
