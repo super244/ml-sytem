@@ -2,7 +2,7 @@ PYTHON ?= python
 COVERAGE_ARGS = --cov=ai_factory --cov=data --cov=training --cov=evaluation --cov=inference --cov-report=term-missing --cov-fail-under=55
 
 # Core Development
-.PHONY: install test lint format clean doctor serve
+.PHONY: install test lint format check clean doctor serve help
 
 # Data Operations
 .PHONY: data-generate data-prepare data-validate data-audit data-preview
@@ -19,9 +19,31 @@ COVERAGE_ARGS = --cov=ai_factory --cov=data --cov=training --cov=evaluation --co
 # System Operations
 .PHONY: docker-up docker-down smoke
 
+help:
+	@echo "AI-Factory Developer Commands"
+	@echo "============================="
+	@echo "Setup:      make install          Install Python + dev deps"
+	@echo "Quality:    make lint             ruff check + mypy"
+	@echo "            make format           Auto-format with ruff"
+	@echo "            make check            format-check + lint + test"
+	@echo "Testing:    make test             pytest with coverage"
+	@echo "Health:     make doctor           10-point system health check"
+	@echo "            make smoke            Compile all modules + notebooks"
+	@echo "Server:     make serve            Start API server (dev mode)"
+	@echo "Frontend:   make frontend-dev     Start Next.js dev server"
+	@echo "            make frontend-check   Typecheck + build frontend"
+	@echo "Docker:     make docker-up        Start all services"
+	@echo "            make docker-down      Stop all services"
+	@echo "Data:       make data-generate    Generate synthetic datasets"
+	@echo "            make data-prepare     Normalize + pack datasets"
+	@echo "Training:   make train-dry        Dry-run training validation"
+	@echo "            make train            Run full training"
+	@echo "Eval:       make evaluate         Run evaluation pipeline"
+
 # Development Setup
 install:
 	pip install -e ".[dev]"
+	@test -f .env || (cp .env.example .env && echo "Created .env from .env.example")
 
 # Code Quality
 test:
@@ -33,6 +55,12 @@ lint:
 
 format:
 	ruff format .
+
+check:
+	ruff format --check .
+	ruff check .
+	mypy .
+	$(PYTHON) -m pytest $(COVERAGE_ARGS)
 
 clean:
 	find . -type d -name "__pycache__" -exec rm -rf {} + 2>/dev/null || true

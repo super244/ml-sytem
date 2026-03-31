@@ -437,11 +437,18 @@ load_run_summary(run_dirs[0]) if run_dirs else {"runs": []}
 
 
 def main() -> None:
+    import subprocess
+
     NOTEBOOK_DIR.mkdir(parents=True, exist_ok=True)
     for filename, (title, cells) in NOTEBOOK_SPECS.items():
         output_path = NOTEBOOK_DIR / filename
         write_notebook(output_path, notebook_metadata(title), cells)
         print(f"Updated {output_path}")
+    subprocess.run(
+        ["ruff", "format", str(NOTEBOOK_DIR)],
+        check=False,
+        capture_output=True,
+    )
 
 
 if __name__ == "__main__":
