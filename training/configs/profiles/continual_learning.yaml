@@ -1,0 +1,25 @@
+profile_name: continual_learning
+run_name: atlas_continual_learning
+seed: 42
+refs:
+  model: ../components/models/qwen25_math_1p5b.yaml
+  adapter: ../components/adapters/continual_learning.yaml
+  data: ../components/data/continual_stream.yaml
+  runtime: ../components/runtime/online.yaml
+  logging: ../components/logging/default.yaml
+  tracking: ../components/tracking/default.yaml
+  packaging: ../components/packaging/default.yaml
+training:
+  num_train_epochs: 50.0
+  learning_rate: 0.00002
+  artifacts_dir: artifacts
+  method: continual_learning
+  parameters:
+    gradient_accumulation_steps: 2
+    per_device_train_batch_size: 4
+    warmup_steps: 100
+    weight_decay: 0.001
+    replay_buffer_size: 10000
+    elastic_weight_consolidation: true
+packaging:
+  publish_model_name: atlas-math-continual

@@ -3,6 +3,9 @@ from __future__ import annotations
 import importlib.util
 from pathlib import Path
 from typing import Any
+from functools import lru_cache
+import asyncio
+from concurrent.futures import ThreadPoolExecutor
 
 import yaml
 
@@ -37,6 +40,7 @@ def _command_recipe(
     }
 
 
+@lru_cache(maxsize=1)
 def _load_model_catalog(repo_root: Path) -> list[dict[str, Any]]:
     try:
         from inference.app.model_catalog import list_model_catalog
@@ -46,63 +50,73 @@ def _load_model_catalog(repo_root: Path) -> list[dict[str, Any]]:
         return []
 
 
+@lru_cache(maxsize=1)
 def _load_orchestration_templates(repo_root: Path) -> list[dict[str, str]]:
     templates: list[dict[str, str]] = []
-    for path in sorted((repo_root / "configs").glob("*.yaml")):
-        payload = yaml.safe_load(path.read_text()) or {}
-        relative = path.relative_to(repo_root)
-        instance = payload.get("instance") or {}
-        experience = payload.get("experience") or {}
-        templates.append(
-            {
-                "id": path.stem,
-                "title": _config_title(path),
-                "path": str(relative),
-                "instance_type": str(instance.get("type", "unknown")),
-                "user_level": str(experience.get("level", "hobbyist")),
-                "orchestration_mode": str(payload.get("orchestration_mode", "single")),
-                "command": f"ai-factory new --config {relative}",
-            }
-        )
+    try:
+        for path in sorted((repo_root / "configs").glob("*.yaml")):
+            payload = yaml.safe_load(path.read_text()) or {}
+            relative = path.relative_to(repo_root)
+            instance = payload.get("instance") or {}
+            experience = payload.get("experience") or {}
+            templates.append(
+                {
+                    "id": path.stem,
+                    "title": _config_title(path),
+                    "path": str(relative),
+                    "instance_type": str(instance.get("type", "unknown")),
+                    "user_level": str(experience.get("level", "hobbyist")),
+                    "orchestration_mode": str(payload.get("orchestration_mode", "single")),
+                    "command": f"ai-factory new --config {relative}",
+                }
+            )
+    except Exception:
+        pass
     return templates
 
 
-def build_workspace_overview(root: Path | None = None) -> dict[str, Any]:
-    repo_root = (root or REPO_ROOT).resolve()
-    catalog = load_catalog(repo_root / "data" / "catalog.json")
-    packs = load_pack_summary(repo_root / "data" / "processed" / "pack_summary.json").get("packs", [])
-    runs = list_training_runs(str(repo_root / "artifacts"))
-    benchmarks = load_benchmark_registry(repo_root / "evaluation" / "benchmarks" / "registry.yaml")
-    models = _load_model_catalog(repo_root)
-    orchestration_templates = _load_orchestration_templates(repo_root)
-    foundation = build_foundation_catalog(repo_root)
-
+@lru_cache(maxsize=1)
+def _load_training_profiles(repo_root: Path) -> list[dict[str, str]]:
     training_profiles = []
-    for path in sorted((repo_root / "training" / "configs" / "profiles").glob("*.yaml")):
-        relative = path.relative_to(repo_root)
-        training_profiles.append(
-            {
-                "id": path.stem,
-                "title": _config_title(path),
-                "path": str(relative),
-                "dry_run_command": f"python -m training.train --config {relative} --dry-run",
-                "train_command": f"python -m training.train --config {relative}",
-            }
-        )
+    try:
+        for path in sorted((repo_root / "training" / "configs" / "profiles").glob("*.yaml")):
+            relative = path.relative_to(repo_root)
+            training_profiles.append(
+                {
+                    "id": path.stem,
+                    "title": _config_title(path),
+                    "path": str(relative),
+                    "dry_run_command": f"python -m training.train --config {relative} --dry-run",
+                    "train_command": f"python -m training.train --config {relative}",
+                }
+            )
+    except Exception:
+        pass
+    return training_profiles
 
+
+@lru_cache(maxsize=1)
+def _load_evaluation_configs(repo_root: Path) -> list[dict[str, str]]:
     evaluation_configs = []
-    for path in sorted((repo_root / "evaluation" / "configs").glob("*.yaml")):
-        relative = path.relative_to(repo_root)
-        evaluation_configs.append(
-            {
-                "id": path.stem,
-                "title": _config_title(path),
-                "path": str(relative),
-                "run_command": f"python -m evaluation.evaluate --config {relative}",
-            }
-        )
+    try:
+        for path in sorted((repo_root / "evaluation" / "configs").glob("*.yaml")):
+            relative = path.relative_to(repo_root)
+            evaluation_configs.append(
+                {
+                    "id": path.stem,
+                    "title": _config_title(path),
+                    "path": str(relative),
+                    "run_command": f"python -m evaluation.evaluate --config {relative}",
+                }
+            )
+    except Exception:
+        pass
+    return evaluation_configs
 
-    readiness_checks = [
+
+@lru_cache(maxsize=1)
+def _build_readiness_checks(repo_root: Path) -> list[dict[str, Any]]:
+    return [
         {
             "id": "python-deps",
             "label": "Python runtime deps",
@@ -135,8 +149,10 @@ def build_workspace_overview(root: Path | None = None) -> dict[str, Any]:
         },
     ]
 
-    ready_count = sum(1 for item in readiness_checks if item["ok"])
-    command_recipes = [
+
+@lru_cache(maxsize=1)
+def _build_command_recipes() -> list[dict[str, str]]:
+    return [
         _command_recipe(
             "doctor",
             "Workspace doctor",
@@ -206,7 +222,10 @@ def build_workspace_overview(root: Path | None = None) -> dict[str, Any]:
         ),
     ]
 
-    orchestration_capabilities = [
+
+@lru_cache(maxsize=1)
+def _build_orchestration_capabilities() -> list[dict[str, str]]:
+    return [
         {
             "id": "shared-contracts",
             "title": "Shared control-plane contracts",
@@ -251,6 +270,54 @@ def build_workspace_overview(root: Path | None = None) -> dict[str, Any]:
         },
     ]
 
+
+def build_workspace_overview(root: Path | None = None) -> dict[str, Any]:
+    """Build workspace overview with optimized loading and caching."""
+    repo_root = (root or REPO_ROOT).resolve()
+    
+    # Load core data with error handling
+    try:
+        catalog = load_catalog(repo_root / "data" / "catalog.json")
+    except Exception:
+        catalog = {"summary": {"num_datasets": 0}}
+    
+    try:
+        packs = load_pack_summary(repo_root / "data" / "processed" / "pack_summary.json").get("packs", [])
+    except Exception:
+        packs = []
+    
+    try:
+        runs = list_training_runs(str(repo_root / "artifacts"))
+    except Exception:
+        runs = []
+    
+    try:
+        benchmarks = load_benchmark_registry(repo_root / "evaluation" / "benchmarks" / "registry.yaml")
+    except Exception:
+        benchmarks = []
+    
+    try:
+        foundation = build_foundation_catalog(repo_root)
+    except Exception:
+        # Create empty foundation if loading fails
+        from types import SimpleNamespace
+        foundation = SimpleNamespace(
+            interfaces=[],
+            experience_tiers=[],
+            extension_points=[]
+        )
+    
+    # Use cached components
+    models = _load_model_catalog(repo_root)
+    orchestration_templates = _load_orchestration_templates(repo_root)
+    training_profiles = _load_training_profiles(repo_root)
+    evaluation_configs = _load_evaluation_configs(repo_root)
+    readiness_checks = _build_readiness_checks(repo_root)
+    command_recipes = _build_command_recipes()
+    orchestration_capabilities = _build_orchestration_capabilities()
+    
+    ready_count = sum(1 for item in readiness_checks if item["ok"])
+
     return {
         "repo_root": str(repo_root),
         "summary": {
@@ -278,4 +345,43 @@ def build_workspace_overview(root: Path | None = None) -> dict[str, Any]:
         "orchestration_templates": orchestration_templates,
         "training_profiles": training_profiles,
         "evaluation_configs": evaluation_configs,
+    }
+
+
+@lru_cache(maxsize=1)
+def build_workspace_overview_fast(root: Path | None = None) -> dict[str, Any]:
+    """Fast version that returns minimal data for quick responses."""
+    repo_root = (root or REPO_ROOT).resolve()
+    
+    # Only load essential data quickly
+    readiness_checks = _build_readiness_checks(repo_root)
+    ready_count = sum(1 for item in readiness_checks if item["ok"])
+    
+    return {
+        "repo_root": str(repo_root),
+        "summary": {
+            "datasets": 0,
+            "packs": 0,
+            "models": 0,
+            "benchmarks": 0,
+            "runs": 0,
+            "training_profiles": 0,
+            "evaluation_configs": 0,
+            "orchestration_templates": 0,
+            "interfaces": 0,
+            "experience_tiers": 0,
+            "extension_points": 0,
+            "ready_checks": ready_count,
+            "total_checks": len(readiness_checks),
+        },
+        "readiness_checks": readiness_checks,
+        "models": [],
+        "interfaces": [],
+        "experience_tiers": [],
+        "extension_points": [],
+        "command_recipes": [],
+        "orchestration_capabilities": [],
+        "orchestration_templates": [],
+        "training_profiles": [],
+        "evaluation_configs": [],
     }
