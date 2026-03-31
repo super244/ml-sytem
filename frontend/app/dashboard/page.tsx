@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import Link from "next/link";
 
 import { getWorkspaceOverview, type WorkspaceOverview } from "@/lib/api";
 
@@ -75,7 +74,7 @@ export default function Dashboard() {
   const { workspace } = state;
   if (!workspace) return null;
 
-  const readyChecks = workspace.readiness_checks?.filter((check: any) => check.ok) || [];
+  const readyChecks = workspace.readiness_checks?.filter((check: any) => check.ok).length || 0;
   const totalChecks = workspace.readiness_checks?.length || 0;
 
   return (
@@ -118,37 +117,37 @@ export default function Dashboard() {
       <section className="quick-actions">
         <h2>Quick Actions</h2>
         <div className="actions-grid">
-          <Link href="/training" className="action-card">
+          <a href="/training" className="action-card">
             <div className="action-icon">🎯</div>
             <div className="action-content">
               <h3>Start Training</h3>
               <p>Launch a new training experiment</p>
             </div>
-          </Link>
+          </a>
           
-          <Link href="/evaluate" className="action-card">
+          <a href="/evaluate" className="action-card">
             <div className="action-icon">📊</div>
             <div className="action-content">
               <h3>Evaluate Models</h3>
               <p>Run model benchmarks and evaluations</p>
             </div>
-          </Link>
+          </a>
           
-          <Link href="/datasets" className="action-card">
+          <a href="/datasets" className="action-card">
             <div className="action-icon">📚</div>
             <div className="action-content">
               <h3>Manage Datasets</h3>
               <p>Browse and curate training data</p>
             </div>
-          </Link>
+          </a>
           
-          <Link href="/generate" className="action-card">
+          <a href="/generate" className="action-card">
             <div className="action-icon">🤖</div>
             <div className="action-content">
               <h3>Generate Content</h3>
               <p>Test model inference and generation</p>
             </div>
-          </Link>
+          </a>
         </div>
       </section>
 

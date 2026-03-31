@@ -1,8 +1,8 @@
 from __future__ import annotations
 
-from fastapi import APIRouter, HTTPException
 from typing import Any
-from pathlib import Path
+
+from fastapi import APIRouter, HTTPException
 
 from inference.app.workspace import build_workspace_overview, build_workspace_overview_fast
 

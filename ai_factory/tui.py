@@ -10,6 +10,7 @@ from datetime import datetime
 from typing import Any
 
 from ai_factory.core.platform.container import build_platform_container
+from ai_factory.titan import detect_titan_status
 
 locale.setlocale(locale.LC_ALL, "")
 
@@ -27,6 +28,7 @@ class DashboardSnapshot:
     summary: dict[str, Any]
     logs: dict[str, str]
     metrics: dict[str, Any]
+    titan: dict[str, Any]
     selected_stream: str
     loaded_at: float
     available_actions: list[str] = field(default_factory=list)
@@ -144,6 +146,7 @@ class TuiController:
             repo_root=repo_root,
             artifacts_dir=artifacts_dir,
         ).control_service
+        self.titan = detect_titan_status(repo_root)
         self.refresh_seconds = max(refresh_seconds, 0.5)
         self.selected_index = 0
         self.selected_stream = "stdout"
@@ -155,6 +158,7 @@ class TuiController:
             summary={},
             logs={"stdout": "", "stderr": ""},
             metrics={"summary": {}, "points": []},
+            titan=self.titan,
             selected_stream=self.selected_stream,
             loaded_at=0.0,
         )
@@ -181,6 +185,7 @@ class TuiController:
                 summary=self.control.monitoring_summary(),
                 logs=logs,
                 metrics=metrics,
+                titan=self.titan,
                 selected_stream=self.selected_stream,
                 loaded_at=time.time(),
                 available_actions=available_actions,
@@ -191,6 +196,7 @@ class TuiController:
                 summary=self.snapshot.summary,
                 logs=self.snapshot.logs,
                 metrics=self.snapshot.metrics,
+                titan=self.titan,
                 selected_stream=self.selected_stream,
                 loaded_at=time.time(),
                 available_actions=self.snapshot.available_actions,
@@ -260,10 +266,15 @@ def _render_header(screen: Any, snapshot: DashboardSnapshot, width: int) -> int:
 
 def _render_statusbar(screen: Any, height: int, width: int, controller: TuiController) -> None:
     now = time.time()
+    titan = controller.snapshot.titan or {}
+    titan_summary = (
+        f" Titan:{titan.get('mode', 'n/a')} | HW:{titan.get('silicon', 'n/a')} | "
+        f"BW:{titan.get('bandwidth_gbps') or 'n/a'} GB/s"
+    )
     if controller.last_action_msg and (now - controller.last_action_time) < 5.0:
-        msg = f" {controller.last_action_msg}"
+        msg = f" {controller.last_action_msg}{titan_summary}"
     else:
-        msg = " q:quit  j/k:move  tab:stream  r:refresh  e:eval  d:deploy  i:infer  ?:help"
+        msg = f" q:quit  j/k:move  tab:stream  r:refresh  e:eval  d:deploy  i:infer  ?:help{titan_summary}"
     _safe_addstr(screen, height - 1, 0, msg.ljust(width), curses.A_REVERSE)
 
 

@@ -1,7 +1,7 @@
 PYTHON ?= python3
 COVERAGE_ARGS = --cov=ai_factory --cov=data --cov=training --cov=evaluation --cov=inference --cov-report=term-missing --cov-fail-under=55
 
-.PHONY: doctor refresh-lab latest-run api-smoke generate-datasets prepare-data validate-data audit-data preview-data export-subset dedupe-near benchmark-pack mine-failures train train-dry validate-model serve evaluate analyze-failures notebooks frontend-typecheck frontend-build frontend-check frontend-dev frontend-install test smoke docker-up docker-down lint format clean install
+.PHONY: doctor refresh-lab latest-run api-smoke titan-status titan-doc generate-datasets prepare-data validate-data audit-data preview-data export-subset dedupe-near benchmark-pack mine-failures train train-dry validate-model serve evaluate analyze-failures notebooks frontend-typecheck frontend-build frontend-check frontend-dev frontend-install test smoke docker-up docker-down lint format clean install
 
 doctor:
 	$(PYTHON) scripts/doctor.py
@@ -14,6 +14,12 @@ latest-run:
 
 api-smoke:
 	$(PYTHON) scripts/api_smoke.py
+
+titan-status:
+	$(PYTHON) -m ai_factory.cli titan status
+
+titan-doc:
+	$(PYTHON) -m ai_factory.cli titan hardware-doc
 
 generate-datasets:
 	$(PYTHON) data/generator/generate_calculus_datasets.py --config data/configs/generation.yaml

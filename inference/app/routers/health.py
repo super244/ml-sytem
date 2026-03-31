@@ -1,7 +1,8 @@
 from __future__ import annotations
 
+from typing import Any
+
 from fastapi import APIRouter
-from typing import Dict, Any
 
 from inference.app.dependencies import get_metadata_service
 
@@ -9,13 +10,13 @@ router = APIRouter(tags=["health"])
 
 
 @router.get("/health")
-def healthcheck() -> Dict[str, str]:
+def healthcheck() -> dict[str, str]:
     """Lightweight health check that always responds quickly."""
     return {"status": "ok"}
 
 
 @router.get("/status")
-def status() -> Dict[str, Any]:
+def status() -> dict[str, Any]:
     """Get system status with caching to avoid performance issues."""
     try:
         service = get_metadata_service()
@@ -37,7 +38,7 @@ def status() -> Dict[str, Any]:
 
 
 @router.get("/health/detailed")
-def detailed_health() -> Dict[str, Any]:
+def detailed_health() -> dict[str, Any]:
     """Detailed health check for monitoring systems."""
     try:
         from inference.app.workspace import build_workspace_overview_fast

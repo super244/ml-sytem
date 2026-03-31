@@ -1,3 +1,7 @@
+import { titanStatusSchema, type TitanStatus } from "@/lib/titan-schema";
+
+export type { TitanStatus } from "@/lib/titan-schema";
+
 export type ModelVariant = string;
 export type Difficulty = "easy" | "medium" | "hard" | "olympiad";
 export type SolverMode = "rigorous" | "exam" | "concise" | "verification";
@@ -979,6 +983,11 @@ export async function getOrchestrationSummary(): Promise<OrchestrationSummary> {
 
 export async function getMissionControl(): Promise<MissionControlSnapshot> {
   return fetchJson<MissionControlSnapshot>("/v1/lab/mission-control");
+}
+
+export async function getTitanStatus(): Promise<TitanStatus> {
+  const payload = await fetchJson<unknown>("/v1/titan/status");
+  return titanStatusSchema.parse(payload);
 }
 
 export type FlagTelemetryRequest = {
