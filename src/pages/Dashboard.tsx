@@ -9,7 +9,7 @@ import { Square, ArrowDown, ArrowUp, ExternalLink, FileText } from 'lucide-react
 
 const pageVariants = {
   initial: { opacity: 0, y: 12, filter: 'blur(4px)' },
-  animate: { opacity: 1, y: 0, filter: 'blur(0px)', transition: { duration: 0.25, ease: [0.4, 0, 0.2, 1] } },
+  animate: { opacity: 1, y: 0, filter: 'blur(0px)', transition: { duration: 0.25 } },
 };
 
 const kpis = [
