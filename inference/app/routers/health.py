@@ -42,8 +42,9 @@ def detailed_health() -> dict[str, Any]:
     """Detailed health check for monitoring systems."""
     try:
         from inference.app.workspace import build_workspace_overview_fast
+
         workspace_status = build_workspace_overview_fast()
-        
+
         return {
             "status": "healthy",
             "workspace": workspace_status["summary"],

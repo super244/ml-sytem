@@ -139,7 +139,7 @@ def get_swarm_logs(limit: int = 10) -> dict[str, Any]:
     _ensure_log_worker()
     if not LOGS_FILE.exists():
         return {"logs": []}
-    
+
     logs = []
     with open(LOGS_FILE) as f:
         for line in f:
@@ -149,7 +149,7 @@ def get_swarm_logs(limit: int = 10) -> dict[str, Any]:
                     logs.append(json.loads(line))
                 except Exception:
                     pass
-    
+
     logs = logs[-limit:]
     return {"logs": logs}
 

@@ -13,10 +13,10 @@ from ai_factory.core.io import write_json
 
 class InstanceCreationService:
     """Service for creating new instances."""
-    
+
     def __init__(self, store: FileInstanceStore):
         self.store = store
-    
+
     def create_instance(
         self,
         config_path: str,
@@ -33,7 +33,7 @@ class InstanceCreationService:
         # This is a simplified version - the actual creation logic should stay in the manager
         # to avoid duplication and ensure consistency
         instance_id = f"instance-{uuid.uuid4().hex[:12]}"
-        
+
         # Create a minimal manifest that will be properly populated by the manager
         manifest = InstanceManifest(
             id=instance_id,
@@ -46,12 +46,12 @@ class InstanceCreationService:
             artifact_refs={},
             metadata=metadata_updates or {},
         )
-        
+
         # Save the basic manifest
         self.store.save(manifest)
-        
+
         return manifest
-    
+
     def create_evaluation_instance(
         self,
         parent_instance_id: str,
@@ -61,7 +61,7 @@ class InstanceCreationService:
     ) -> InstanceManifest:
         """Create an evaluation instance from a parent."""
         instance_id = f"evaluate-{uuid.uuid4().hex[:12]}"
-        
+
         # Create a minimal manifest
         manifest = InstanceManifest(
             id=instance_id,
@@ -74,16 +74,16 @@ class InstanceCreationService:
             parent_instance_id=parent_instance_id,
             artifact_refs={},
         )
-        
+
         # Save the manifest
         self.store.save(manifest)
-        
+
         # Save config snapshot
         config = load_orchestration_config(config_path)
         write_json(self.store.config_snapshot_path(instance_id), config.model_dump(mode="json"))
-        
+
         return manifest
-    
+
     def create_deployment_instance(
         self,
         parent_instance_id: str,
@@ -94,7 +94,7 @@ class InstanceCreationService:
     ) -> InstanceManifest:
         """Create a deployment instance."""
         instance_id = f"deploy-{uuid.uuid4().hex[:12]}"
-        
+
         # Create a minimal manifest
         manifest = InstanceManifest(
             id=instance_id,
@@ -107,17 +107,17 @@ class InstanceCreationService:
             parent_instance_id=parent_instance_id,
             artifact_refs={},
         )
-        
+
         # Save the manifest
         self.store.save(manifest)
-        
+
         # Save config snapshot
         config = load_orchestration_config(config_path)
         config.subsystem.provider = target
         write_json(self.store.config_snapshot_path(instance_id), config.model_dump(mode="json"))
-        
+
         return manifest
-    
+
     def create_inference_instance(
         self,
         parent_instance_id: str,
@@ -127,7 +127,7 @@ class InstanceCreationService:
     ) -> InstanceManifest:
         """Create an inference instance."""
         instance_id = f"inference-{uuid.uuid4().hex[:12]}"
-        
+
         # Create a minimal manifest
         manifest = InstanceManifest(
             id=instance_id,
@@ -140,12 +140,12 @@ class InstanceCreationService:
             parent_instance_id=parent_instance_id,
             artifact_refs={},
         )
-        
+
         # Save the manifest
         self.store.save(manifest)
-        
+
         # Save config snapshot
         config = load_orchestration_config(config_path)
         write_json(self.store.config_snapshot_path(instance_id), config.model_dump(mode="json"))
-        
+
         return manifest

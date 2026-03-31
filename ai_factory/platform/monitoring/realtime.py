@@ -55,7 +55,10 @@ class WebSocketDashboardStreamer:
 
     def broadcast_update(self, data: dict[str, Any]) -> None:
         """Broadcasts a data payload to all connected WebSocket clients."""
-        logger.debug(f"Broadcasting to {self._connected_clients} clients: {data}")
+        logger.info(f"Broadcasting update to {self._connected_clients} clients")
+        # Log data details only at debug level
+        if logger.isEnabledFor(logging.DEBUG):
+            logger.debug(f"Broadcast data: {data}")
 
     def get_client_count(self) -> int:
         """Returns the number of currently connected clients."""
@@ -133,5 +136,5 @@ class RealTimeMonitoringSystem:
             "components": {
                 "collector_active": self.collector._is_collecting,
                 "connected_clients": self.streamer.get_client_count(),
-            }
+            },
         }

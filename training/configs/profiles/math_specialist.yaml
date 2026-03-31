@@ -1,0 +1,21 @@
+profile_name: math_specialist
+run_name: atlas_math_specialist
+seed: 123
+description: "Specialist model for mathematics with calculus and curriculum focus"
+refs:
+  model: ../components/models/qwen25_math_1p5b.yaml
+  adapter: ../components/adapters/qlora_math.yaml
+  data: ../components/data/calculus_specialist.yaml
+  runtime: ../components/runtime/hybrid_local.yaml
+  logging: ../components/logging/default.yaml
+  tracking: ../components/tracking/default.yaml
+  packaging: ../components/packaging/default.yaml
+training:
+  num_train_epochs: 2.5
+  learning_rate: 0.00012
+  eval_steps: 100
+  save_steps: 100
+  group_by_length: true
+  artifacts_dir: artifacts
+packaging:
+  publish_model_name: atlas-math-specialist

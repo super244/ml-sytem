@@ -147,7 +147,7 @@ async def test_dataset_dashboard_exposes_processed_and_pack_provenance(
     }
   ]
 }
-""".strip()
+""".strip(),
     )
     _write(
         tmp_path / "data" / "processed" / "manifest.json",
@@ -172,7 +172,7 @@ async def test_dataset_dashboard_exposes_processed_and_pack_provenance(
   "outputs": [],
   "source_lineage": []
 }
-""".strip()
+""".strip(),
     )
     _write(
         tmp_path / "data" / "processed" / "lineage_summary.json",
@@ -198,7 +198,7 @@ async def test_dataset_dashboard_exposes_processed_and_pack_provenance(
     }
   ]
 }
-""".strip()
+""".strip(),
     )
     _write(
         tmp_path / "data" / "processed" / "pack_summary.json",
@@ -226,7 +226,7 @@ async def test_dataset_dashboard_exposes_processed_and_pack_provenance(
     }
   ]
 }
-""".strip()
+""".strip(),
     )
     _write(
         tmp_path / "data" / "processed" / "packs" / "core_train_mix" / "manifest.json",
@@ -259,7 +259,7 @@ async def test_dataset_dashboard_exposes_processed_and_pack_provenance(
     "card_path": "data/processed/packs/core_train_mix/card.md"
   }
 }
-""".strip()
+""".strip(),
     )
     _write(
         tmp_path / "data" / "processed" / "packs" / "core_train_mix" / "card.md",

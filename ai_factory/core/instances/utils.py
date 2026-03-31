@@ -10,7 +10,7 @@ from ai_factory.core.instances.models import InstanceManifest
 
 class _SafeTemplateDict(dict[str, Any]):
     """Safe template dictionary that returns placeholder for missing keys."""
-    
+
     def __missing__(self, key: str) -> str:
         return "{" + key + "}"
 

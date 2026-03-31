@@ -75,7 +75,9 @@ def list_sample_prompts(
     return prompts[:limit]
 
 
-def load_pack_summary(path: str | Path = DEFAULT_PACK_SUMMARY_PATH, *, repo_root: str | Path | None = None) -> dict[str, Any]:
+def load_pack_summary(
+    path: str | Path = DEFAULT_PACK_SUMMARY_PATH, *, repo_root: str | Path | None = None
+) -> dict[str, Any]:
     summary = _load_json(path, repo_root=repo_root)
     if not summary:
         return {"packs": []}

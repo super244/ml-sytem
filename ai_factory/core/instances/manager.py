@@ -345,7 +345,7 @@ class InstanceManager:
             execution_updates=execution_updates,
             metadata_updates=metadata_updates,
         )
-        
+
         # Create the base instance using the original manager logic
         manifest = self._base_manifest(
             config,
@@ -353,10 +353,10 @@ class InstanceManager:
             parent_instance_id=parent_instance_id,
             metadata_updates=metadata_updates,
         )
-        
+
         # Save using store
         self.store.create(manifest, config.model_dump(mode="json"))
-        
+
         self.orchestration.ensure_run_for_instance(manifest, config.model_dump(mode="json"))
         manifest = self._project_manifest(manifest)
         self.store.save(manifest)

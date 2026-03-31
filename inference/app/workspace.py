@@ -279,39 +279,36 @@ def _build_orchestration_capabilities() -> list[dict[str, str]]:
 def build_workspace_overview(root: Path | None = None) -> dict[str, Any]:
     """Build workspace overview with optimized loading and caching."""
     repo_root = (root or REPO_ROOT).resolve()
-    
+
     # Load core data with error handling
     try:
         catalog = load_catalog(repo_root / "data" / "catalog.json")
     except Exception:
         catalog = {"summary": {"num_datasets": 0}}
-    
+
     try:
         packs = load_pack_summary(repo_root / "data" / "processed" / "pack_summary.json").get("packs", [])
     except Exception:
         packs = []
-    
+
     try:
         runs = list_training_runs(str(repo_root / "artifacts"))
     except Exception:
         runs = []
-    
+
     try:
         benchmarks = load_benchmark_registry(repo_root / "evaluation" / "benchmarks" / "registry.yaml")
     except Exception:
         benchmarks = []
-    
+
     try:
         foundation = build_foundation_catalog(repo_root)
     except Exception:
         # Create empty foundation if loading fails
         from types import SimpleNamespace
-        foundation = SimpleNamespace(
-            interfaces=[],
-            experience_tiers=[],
-            extension_points=[]
-        )
-    
+
+        foundation = SimpleNamespace(interfaces=[], experience_tiers=[], extension_points=[])
+
     # Use cached components
     models = _load_model_catalog(repo_root)
     orchestration_templates = _load_orchestration_templates(repo_root)
@@ -320,7 +317,7 @@ def build_workspace_overview(root: Path | None = None) -> dict[str, Any]:
     readiness_checks = _build_readiness_checks(repo_root)
     command_recipes = _build_command_recipes()
     orchestration_capabilities = _build_orchestration_capabilities()
-    
+
     ready_count = sum(1 for item in readiness_checks if item["ok"])
 
     return {
@@ -357,11 +354,11 @@ def build_workspace_overview(root: Path | None = None) -> dict[str, Any]:
 def build_workspace_overview_fast(root: Path | None = None) -> dict[str, Any]:
     """Fast version that returns minimal data for quick responses."""
     repo_root = (root or REPO_ROOT).resolve()
-    
+
     # Only load essential data quickly
     readiness_checks = _build_readiness_checks(repo_root)
     ready_count = sum(1 for item in readiness_checks if item["ok"])
-    
+
     return {
         "repo_root": str(repo_root),
         "summary": {

@@ -5,6 +5,7 @@ from typing import Any
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 
+
 def get_instant_status() -> dict[str, Any]:
     """Return instant workspace status without any file I/O."""
     return {

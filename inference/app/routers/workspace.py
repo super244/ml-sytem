@@ -32,10 +32,11 @@ def workspace_status() -> dict[str, Any]:
     """Get workspace status without heavy operations."""
     try:
         from inference.app.workspace import REPO_ROOT, _build_readiness_checks
+
         repo_root = REPO_ROOT
         readiness_checks = _build_readiness_checks(repo_root)
         ready_count = sum(1 for item in readiness_checks if item["ok"])
-        
+
         return {
             "status": "ready" if ready_count == len(readiness_checks) else "partial",
             "repo_root": str(repo_root),
