@@ -1,187 +1,597 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { useEffect, useMemo, useState, useTransition } from "react";
 
-import { getWorkspaceOverview, type WorkspaceOverview } from "@/lib/api";
+import {
+  createManagedInstance,
+  getMissionControl,
+  runManagedInstanceAction,
+  type FeedbackRecommendation,
+  type InstanceSummary,
+  type MissionControlSnapshot,
+} from "@/lib/api";
+import { formatCount } from "@/lib/formatting";
+import { ROUTES } from "@/lib/routes";
 
 type DashboardState = {
-  workspace: WorkspaceOverview | null;
+  mission: MissionControlSnapshot | null;
   loading: boolean;
   error: string | null;
 };
 
+const DEFAULT_SOURCE_MODEL = "Qwen/Qwen2.5-Math-1.5B-Instruct";
+
+function topRecommendation(recommendations?: FeedbackRecommendation[]): FeedbackRecommendation | null {
+  if (!recommendations || recommendations.length === 0) {
+    return null;
+  }
+  return recommendations.reduce((best, current) => (current.priority > best.priority ? current : best));
+}
+
+function formatTimestamp(value?: string | null): string {
+  if (!value) {
+    return "n/a";
+  }
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) {
+    return value;
+  }
+  return parsed.toLocaleString();
+}
+
+function progressLabel(instance: InstanceSummary): string {
+  if (typeof instance.progress?.percent === "number") {
+    return `${(instance.progress.percent * 100).toFixed(0)}%`;
+  }
+  return instance.progress?.stage ?? instance.status;
+}
+
+function latestLifecycleSource(instances: InstanceSummary[]): InstanceSummary | null {
+  const completed = instances
+    .filter(
+      (instance) =>
+        instance.status === "completed" &&
+        ["train", "finetune", "evaluate", "deploy"].includes(instance.type),
+    )
+    .sort((left, right) => String(right.updated_at).localeCompare(String(left.updated_at)));
+  return completed[0] ?? null;
+}
+
 export default function Dashboard() {
+  const router = useRouter();
+  const [isNavigating, startTransition] = useTransition();
   const [state, setState] = useState<DashboardState>({
-    workspace: null,
+    mission: null,
     loading: true,
     error: null,
   });
+  const [busyAction, setBusyAction] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
 
   useEffect(() => {
-    let mounted = true;
-    
-    async function loadWorkspace() {
+    let active = true;
+
+    async function loadMission() {
       try {
-        setState(prev => ({ ...prev, loading: true, error: null }));
-        
-        // Try instant workspace first, then load full data
-        const workspace = await getWorkspaceOverview();
-        
-        if (mounted) {
-          setState({ workspace, loading: false, error: null });
+        const mission = await getMissionControl();
+        if (!active) {
+          return;
         }
-      } catch (err) {
-        if (mounted) {
-          setState({ 
-            workspace: null, 
-            loading: false, 
-            error: err instanceof Error ? err.message : "Failed to load workspace" 
-          });
+        setState({
+          mission,
+          loading: false,
+          error: null,
+        });
+      } catch (error) {
+        if (!active) {
+          return;
         }
+        setState({
+          mission: null,
+          loading: false,
+          error: error instanceof Error ? error.message : "Mission control is unavailable.",
+        });
       }
     }
 
-    loadWorkspace();
-    
-    return () => { mounted = false; };
+    void loadMission();
+    const interval = setInterval(() => void loadMission(), 7_500);
+    return () => {
+      active = false;
+      clearInterval(interval);
+    };
   }, []);
 
-  if (state.loading) {
+  const mission = state.mission;
+  const instances = mission?.control_plane.instances ?? [];
+  const runningInstances = mission?.watchlist.running_instances ?? [];
+  const latestSource = useMemo(() => latestLifecycleSource(instances), [instances]);
+
+  async function launchTrainingBranch(): Promise<void> {
+    setBusyAction("launch:train");
+    setNotice(null);
+    try {
+      const detail = await createManagedInstance({
+        config_path: "configs/train.yaml",
+        start: true,
+        user_level: "hobbyist",
+        lifecycle: {
+          stage: "train",
+          origin: "existing_model",
+          learning_mode: "qlora",
+          source_model: latestSource?.lifecycle.source_model ?? DEFAULT_SOURCE_MODEL,
+          deployment_targets: ["ollama"],
+        },
+        metadata: {
+          source: "dashboard_overview",
+          action: "launch_train",
+        },
+      });
+      setNotice(`Training branch ${detail.name} launched.`);
+      startTransition(() => router.push(`/runs/${detail.id}`));
+    } catch (error) {
+      setNotice(error instanceof Error ? error.message : "Training launch failed.");
+    } finally {
+      setBusyAction(null);
+    }
+  }
+
+  async function launchFinetuneBranch(source: InstanceSummary): Promise<void> {
+    setBusyAction(`launch:finetune:${source.id}`);
+    setNotice(null);
+    try {
+      const detail = await createManagedInstance({
+        config_path: "configs/finetune.yaml",
+        start: true,
+        parent_instance_id: source.id,
+        user_level: "hobbyist",
+        lifecycle: {
+          stage: "finetune",
+          origin: "existing_model",
+          learning_mode: "qlora",
+          source_model: source.lifecycle.source_model ?? DEFAULT_SOURCE_MODEL,
+          deployment_targets: ["ollama"],
+        },
+        metadata: {
+          source: "dashboard_overview",
+          action: "launch_finetune",
+        },
+      });
+      setNotice(`Finetune branch ${detail.name} launched from ${source.name}.`);
+      startTransition(() => router.push(`/runs/${detail.id}`));
+    } catch (error) {
+      setNotice(error instanceof Error ? error.message : "Finetune launch failed.");
+    } finally {
+      setBusyAction(null);
+    }
+  }
+
+  async function triggerAction(
+    instance: InstanceSummary,
+    action: "evaluate" | "open_inference" | "deploy",
+    options: {
+      configPath: string;
+      deploymentTarget?: "ollama";
+    },
+  ): Promise<void> {
+    const actionKey = `${instance.id}:${action}`;
+    setBusyAction(actionKey);
+    setNotice(null);
+    try {
+      const detail = await runManagedInstanceAction(instance.id, {
+        action,
+        config_path: options.configPath,
+        deployment_target: options.deploymentTarget,
+        start: true,
+      });
+      setNotice(`${action} launched from ${instance.name}.`);
+      startTransition(() => router.push(`/runs/${detail.id}`));
+    } catch (error) {
+      setNotice(error instanceof Error ? error.message : `${action} failed.`);
+    } finally {
+      setBusyAction(null);
+    }
+  }
+
+  async function dispatchRecommendation(instance: InstanceSummary, recommendation: FeedbackRecommendation): Promise<void> {
+    const actionKey = `${instance.id}:${recommendation.action}`;
+    setBusyAction(actionKey);
+    setNotice(null);
+    try {
+      const detail = await runManagedInstanceAction(instance.id, {
+        action: recommendation.action,
+        config_path: recommendation.config_path ?? undefined,
+        deployment_target: recommendation.deployment_target ?? undefined,
+        start: true,
+      });
+      setNotice(`${recommendation.action} launched from ${instance.name}.`);
+      startTransition(() => router.push(`/runs/${detail.id}`));
+    } catch (error) {
+      setNotice(error instanceof Error ? error.message : "Recommended action failed.");
+    } finally {
+      setBusyAction(null);
+    }
+  }
+
+  if (state.loading && !mission) {
     return (
-      <div className="dashboard-container">
-        <div className="loading-spinner">
-          <div className="spinner"></div>
-          <p>Loading AI-Factory...</p>
+      <div className="dashboard-content">
+        <div className="dash-loading panel">
+          <span>⟳</span>
+          <span>Loading mission control…</span>
         </div>
       </div>
     );
   }
 
-  if (state.error) {
+  if (state.error && !mission) {
     return (
-      <div className="dashboard-container">
-        <div className="error-container">
-          <h2>Connection Error</h2>
-          <p>{state.error}</p>
-          <button onClick={() => window.location.reload()} className="primary-button">
-            Retry
-          </button>
+      <div className="dashboard-content">
+        <div className="dash-error-banner panel">
+          <span>⚠</span>
+          <span>{state.error}</span>
         </div>
       </div>
     );
   }
 
-  const { workspace } = state;
-  if (!workspace) return null;
+  if (!mission) {
+    return null;
+  }
 
-  const readyChecks = workspace.readiness_checks?.filter((check: any) => check.ok).length || 0;
-  const totalChecks = workspace.readiness_checks?.length || 0;
+  const latestRecommendationSource = runningInstances[0] ?? latestSource;
 
   return (
-    <div className="dashboard-container">
-      {/* Header */}
-      <header className="dashboard-header">
-        <div className="header-content">
-          <h1>AI-Factory Dashboard</h1>
-          <div className="status-indicator">
-            <span className={`status-dot ${readyChecks === totalChecks ? 'ready' : 'partial'}`}></span>
-            <span>{readyChecks}/{totalChecks} systems ready</span>
+    <div className="dashboard-content">
+      <div className="dash-page-header panel">
+        <div className="dash-page-header-inner">
+          <div>
+            <span className="eyebrow">Lifecycle + Lab</span>
+            <h1 className="dash-page-title">Mission Control</h1>
+            <p className="dash-page-desc">
+              Launch managed training branches, promote completed runs into finetune or deploy flows,
+              and monitor the autonomous lab from a single responsive control surface.
+            </p>
+          </div>
+          <div className="dash-header-actions">
+            <Link href={ROUTES.runs} className="secondary-button small">
+              Open Runs
+            </Link>
+            <Link href={ROUTES.monitoring} className="primary-button small">
+              Live Monitor
+            </Link>
           </div>
         </div>
-      </header>
+      </div>
 
-      {/* Quick Stats */}
-      <section className="quick-stats">
-        <h2>System Overview</h2>
-        <div className="stats-grid">
-          <div className="stat-card">
-            <div className="stat-value">{workspace.summary?.datasets || 0}</div>
-            <div className="stat-label">Datasets</div>
-          </div>
-          <div className="stat-card">
-            <div className="stat-value">{workspace.summary?.models || 0}</div>
-            <div className="stat-label">Models</div>
-          </div>
-          <div className="stat-card">
-            <div className="stat-value">{workspace.summary?.runs || 0}</div>
-            <div className="stat-label">Training Runs</div>
-          </div>
-          <div className="stat-card">
-            <div className="stat-value">{workspace.summary?.benchmarks || 0}</div>
-            <div className="stat-label">Benchmarks</div>
-          </div>
-        </div>
-      </section>
+      {state.error ? <div className="dash-error-banner panel">⚠ {state.error}</div> : null}
+      {notice ? <div className="dash-note-banner panel">◎ {notice}</div> : null}
 
-      {/* Quick Actions */}
-      <section className="quick-actions">
-        <h2>Quick Actions</h2>
-        <div className="actions-grid">
-          <a href="/training" className="action-card">
-            <div className="action-icon">🎯</div>
-            <div className="action-content">
-              <h3>Start Training</h3>
-              <p>Launch a new training experiment</p>
-            </div>
-          </a>
-          
-          <a href="/evaluate" className="action-card">
-            <div className="action-icon">📊</div>
-            <div className="action-content">
-              <h3>Evaluate Models</h3>
-              <p>Run model benchmarks and evaluations</p>
-            </div>
-          </a>
-          
-          <a href="/datasets" className="action-card">
-            <div className="action-icon">📚</div>
-            <div className="action-content">
-              <h3>Manage Datasets</h3>
-              <p>Browse and curate training data</p>
-            </div>
-          </a>
-          
-          <a href="/generate" className="action-card">
-            <div className="action-icon">🤖</div>
-            <div className="action-content">
-              <h3>Generate Content</h3>
-              <p>Test model inference and generation</p>
-            </div>
-          </a>
-        </div>
-      </section>
+      <div className="workspace-summary-grid">
+        {[
+          { label: "Ready Checks", value: `${mission.summary.ready_checks}/${mission.summary.total_checks}` },
+          { label: "Managed Instances", value: formatCount(mission.summary.instances) },
+          { label: "Running", value: formatCount(mission.summary.running_instances) },
+          { label: "AutoML Sweeps", value: formatCount(mission.summary.running_sweeps) },
+          { label: "Telemetry Backlog", value: formatCount(mission.summary.telemetry_backlog) },
+          { label: "Titan Mode", value: mission.titan.mode },
+        ].map((item) => (
+          <div key={item.label} className="workspace-summary-card panel">
+            <span className="workspace-summary-value">{item.value}</span>
+            <span className="workspace-summary-label">{item.label}</span>
+          </div>
+        ))}
+      </div>
 
-      {/* System Status */}
-      <section className="system-status">
-        <h2>System Status</h2>
-        <div className="status-list">
-          {workspace.readiness_checks?.map((check: any) => (
-            <div key={check.id} className={`status-item ${check.ok ? 'ok' : 'error'}`}>
-              <span className={`status-indicator ${check.ok ? 'ok' : 'error'}`}></span>
-              <div className="status-content">
-                <div className="status-title">{check.label}</div>
-                <div className="status-detail">{check.detail}</div>
+      <div className="workspace-section-grid">
+        <section className="panel aside-section">
+          <div className="model-chip-header">
+            <div>
+              <h2 className="section-title">Lifecycle Controls</h2>
+              <p className="control-label">
+                Each action posts into the managed instance API and routes execution through the same
+                orchestration layer used by the CLI and TUI.
+              </p>
+            </div>
+            <span className="status-pill">
+              {mission.titan.backend} · {mission.titan.remote_execution ? "cloud-aware" : "local-first"}
+            </span>
+          </div>
+
+          <div className="resource-list">
+            <article className="resource-card">
+              <div className="model-chip-header">
+                <strong>Start training</strong>
+                <span>{mission.titan.mode}</span>
               </div>
-            </div>
-          )) || []}
-        </div>
-      </section>
-
-      {/* Available Commands */}
-      {workspace.command_recipes && workspace.command_recipes.length > 0 && (
-        <section className="recent-activity">
-          <h2>Available Commands</h2>
-          <div className="commands-grid">
-            {workspace.command_recipes.slice(0, 6).map((recipe: any) => (
-              <div key={recipe.id} className="command-card">
-                <div className="command-title">{recipe.title}</div>
-                <div className="command-description">{recipe.description}</div>
-                <code className="command-code">{recipe.command}</code>
+              <p>Launch `configs/train.yaml` with a managed QLoRA-first training branch.</p>
+              <div className="workspace-actions">
+                <button
+                  type="button"
+                  className="primary-button small"
+                  disabled={busyAction === "launch:train" || isNavigating}
+                  onClick={() => void launchTrainingBranch()}
+                >
+                  {busyAction === "launch:train" ? "Working..." : "Launch training"}
+                </button>
               </div>
-            ))}
+            </article>
+
+            <article className="resource-card">
+              <div className="model-chip-header">
+                <strong>Start finetune</strong>
+                <span>{latestSource ? latestSource.name : "needs source"}</span>
+              </div>
+              <p>Spawn `configs/finetune.yaml` from the latest completed managed branch.</p>
+              <div className="workspace-actions">
+                <button
+                  type="button"
+                  className="primary-button small"
+                  disabled={!latestSource || busyAction === `launch:finetune:${latestSource?.id}` || isNavigating}
+                  onClick={() => latestSource && void launchFinetuneBranch(latestSource)}
+                >
+                  {busyAction === `launch:finetune:${latestSource?.id}` ? "Working..." : "Launch finetune"}
+                </button>
+              </div>
+            </article>
+
+            <article className="resource-card">
+              <div className="model-chip-header">
+                <strong>Evaluate latest</strong>
+                <span>{latestSource ? latestSource.type : "needs source"}</span>
+              </div>
+              <p>Queue `configs/eval.yaml` against the current best completed lifecycle source.</p>
+              <div className="workspace-actions">
+                <button
+                  type="button"
+                  className="secondary-button small"
+                  disabled={!latestSource || busyAction === `${latestSource?.id}:evaluate` || isNavigating}
+                  onClick={() =>
+                    latestSource &&
+                    void triggerAction(latestSource, "evaluate", { configPath: "configs/eval.yaml" })
+                  }
+                >
+                  {busyAction === `${latestSource?.id}:evaluate` ? "Working..." : "Evaluate"}
+                </button>
+              </div>
+            </article>
+
+            <article className="resource-card">
+              <div className="model-chip-header">
+                <strong>Inference sandbox</strong>
+                <span>{latestSource ? latestSource.name : "needs source"}</span>
+              </div>
+              <p>Open a managed inference branch from the latest completed train, finetune, or deploy run.</p>
+              <div className="workspace-actions">
+                <button
+                  type="button"
+                  className="secondary-button small"
+                  disabled={!latestSource || busyAction === `${latestSource?.id}:open_inference` || isNavigating}
+                  onClick={() =>
+                    latestSource &&
+                    void triggerAction(latestSource, "open_inference", { configPath: "configs/inference.yaml" })
+                  }
+                >
+                  {busyAction === `${latestSource?.id}:open_inference` ? "Working..." : "Open inference"}
+                </button>
+              </div>
+            </article>
+
+            <article className="resource-card">
+              <div className="model-chip-header">
+                <strong>Deploy latest</strong>
+                <span>{latestSource ? latestSource.name : "needs source"}</span>
+              </div>
+              <p>Queue `configs/deploy.yaml` to the default Ollama deployment path.</p>
+              <div className="workspace-actions">
+                <button
+                  type="button"
+                  className="secondary-button small"
+                  disabled={!latestSource || busyAction === `${latestSource?.id}:deploy` || isNavigating}
+                  onClick={() =>
+                    latestSource &&
+                    void triggerAction(latestSource, "deploy", {
+                      configPath: "configs/deploy.yaml",
+                      deploymentTarget: "ollama",
+                    })
+                  }
+                >
+                  {busyAction === `${latestSource?.id}:deploy` ? "Working..." : "Deploy"}
+                </button>
+              </div>
+            </article>
           </div>
         </section>
-      )}
+
+        <section className="panel aside-section">
+          <div className="model-chip-header">
+            <div>
+              <h2 className="section-title">Titan Runtime</h2>
+              <p className="control-label">
+                Backend selection follows the same Titan probe used by the CLI, API, and generated hardware contract.
+              </p>
+            </div>
+            <span className="status-pill">{mission.titan.preferred_training_backend}</span>
+          </div>
+          <div className="badge-row">
+            <span className="status-pill">{mission.titan.silicon}</span>
+            <span className="status-pill">{mission.titan.bandwidth_gbps ?? "n/a"} GB/s</span>
+            <span className="status-pill">
+              {mission.titan.supports_cuda
+                ? mission.titan.cuda_compute_capability ?? "cuda-ready"
+                : "metal-first"}
+            </span>
+            <span className="status-pill">
+              {mission.titan.remote_execution
+                ? mission.titan.cloud_provider ?? "remote-execution"
+                : "on-device"}
+            </span>
+          </div>
+        </section>
+      </div>
+
+      <div className="workspace-section-grid">
+        <section className="panel aside-section">
+          <div>
+            <h2 className="section-title">Running Branches</h2>
+            <p className="control-label">
+              Live managed instances with direct jump-off actions for the next lifecycle step.
+            </p>
+          </div>
+
+          {runningInstances.length === 0 ? (
+            <div className="dash-empty" style={{ padding: "2rem 1rem" }}>
+              <p>No running branches right now.</p>
+            </div>
+          ) : (
+            <div className="resource-list">
+              {runningInstances.slice(0, 6).map((instance) => {
+                const recommendation = topRecommendation(instance.recommendations);
+                const actionKey = recommendation ? `${instance.id}:${recommendation.action}` : null;
+                return (
+                  <article key={instance.id} className="resource-card">
+                    <div className="model-chip-header">
+                      <strong>{instance.name}</strong>
+                      <span>{instance.type}</span>
+                    </div>
+                    <p>
+                      {instance.lifecycle.learning_mode ?? "managed"} · {instance.environment.kind} · {progressLabel(instance)}
+                    </p>
+                    <div className="badge-row">
+                      <span className="status-pill">{instance.status}</span>
+                      <span className="status-pill">{instance.lifecycle.stage ?? "queued"}</span>
+                    </div>
+                    <div className="workspace-actions">
+                      <Link href={`/runs/${instance.id}`} className="secondary-button small">
+                        Inspect
+                      </Link>
+                      {recommendation && latestRecommendationSource ? (
+                        <button
+                          type="button"
+                          className="primary-button small"
+                          disabled={busyAction === actionKey || isNavigating}
+                          onClick={() => void dispatchRecommendation(instance, recommendation)}
+                        >
+                          {busyAction === actionKey ? "Working..." : recommendation.action}
+                        </button>
+                      ) : null}
+                    </div>
+                  </article>
+                );
+              })}
+            </div>
+          )}
+        </section>
+
+        <section className="panel aside-section">
+          <div>
+            <h2 className="section-title">Completed Sources</h2>
+            <p className="control-label">
+              Promote completed training and finetune outputs into evaluation, inference, deployment, or another finetune pass.
+            </p>
+          </div>
+
+          {instances.filter((instance) => instance.status === "completed").length === 0 ? (
+            <div className="dash-empty" style={{ padding: "2rem 1rem" }}>
+              <p>No completed sources available yet.</p>
+            </div>
+          ) : (
+            <div className="resource-list">
+              {instances
+                .filter((instance) => instance.status === "completed")
+                .sort((left, right) => String(right.updated_at).localeCompare(String(left.updated_at)))
+                .slice(0, 6)
+                .map((instance) => (
+                  <article key={instance.id} className="resource-card">
+                    <div className="model-chip-header">
+                      <strong>{instance.name}</strong>
+                      <span>{instance.type}</span>
+                    </div>
+                    <p>{formatTimestamp(instance.updated_at)}</p>
+                    <div className="badge-row">
+                      <span className="status-pill">{instance.lifecycle.learning_mode ?? "n/a"}</span>
+                      <span className="status-pill">{instance.environment.kind}</span>
+                    </div>
+                    <div className="workspace-actions" style={{ flexWrap: "wrap" }}>
+                      <button
+                        type="button"
+                        className="secondary-button small"
+                        disabled={busyAction === `${instance.id}:evaluate` || isNavigating}
+                        onClick={() => void triggerAction(instance, "evaluate", { configPath: "configs/eval.yaml" })}
+                      >
+                        {busyAction === `${instance.id}:evaluate` ? "Working..." : "Evaluate"}
+                      </button>
+                      <button
+                        type="button"
+                        className="secondary-button small"
+                        disabled={busyAction === `launch:finetune:${instance.id}` || isNavigating}
+                        onClick={() => void launchFinetuneBranch(instance)}
+                      >
+                        {busyAction === `launch:finetune:${instance.id}` ? "Working..." : "Finetune"}
+                      </button>
+                      <button
+                        type="button"
+                        className="secondary-button small"
+                        disabled={busyAction === `${instance.id}:open_inference` || isNavigating}
+                        onClick={() => void triggerAction(instance, "open_inference", { configPath: "configs/inference.yaml" })}
+                      >
+                        {busyAction === `${instance.id}:open_inference` ? "Working..." : "Inference"}
+                      </button>
+                      <button
+                        type="button"
+                        className="secondary-button small"
+                        disabled={busyAction === `${instance.id}:deploy` || isNavigating}
+                        onClick={() =>
+                          void triggerAction(instance, "deploy", {
+                            configPath: "configs/deploy.yaml",
+                            deploymentTarget: "ollama",
+                          })
+                        }
+                      >
+                        {busyAction === `${instance.id}:deploy` ? "Working..." : "Deploy"}
+                      </button>
+                    </div>
+                  </article>
+                ))}
+            </div>
+          )}
+        </section>
+      </div>
+
+      <section className="panel aside-section">
+        <div>
+          <h2 className="section-title">Lab Recommendations</h2>
+          <p className="control-label">
+            Prioritized operational guidance from telemetry backlog, orchestration health, agents, and cluster state.
+          </p>
+        </div>
+        <div className="resource-list">
+          {mission.recommendations.map((recommendation) => (
+            <article key={recommendation.id} className="resource-card">
+              <div className="model-chip-header">
+                <strong>{recommendation.title}</strong>
+                <span>{recommendation.severity}</span>
+              </div>
+              <p>{recommendation.detail}</p>
+              <div className="badge-row">
+                {recommendation.metric_label && recommendation.metric_value ? (
+                  <span className="status-pill">
+                    {recommendation.metric_label}: {recommendation.metric_value}
+                  </span>
+                ) : null}
+                <span className="status-pill">{recommendation.surface}</span>
+              </div>
+              <div className="workspace-actions">
+                <a href={recommendation.href} className="secondary-button small">
+                  Open surface
+                </a>
+              </div>
+            </article>
+          ))}
+        </div>
+      </section>
     </div>
   );
 }

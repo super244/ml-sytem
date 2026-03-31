@@ -688,6 +688,7 @@ export type MissionControlSnapshot = {
   repo_root: string;
   workspace: WorkspaceOverview;
   orchestration: OrchestrationSummary;
+  titan: TitanStatus;
   criticality: {
     level: "critical" | "warning" | "opportunity" | "info";
     counts: Record<string, number>;
@@ -758,6 +759,8 @@ export type MissionControlSnapshot = {
     datasets: number;
     training_profiles: number;
     open_circuits: number;
+    titan_backend?: string;
+    titan_mode?: string;
   };
 };
 
