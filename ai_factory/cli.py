@@ -635,6 +635,11 @@ def parse_args() -> argparse.Namespace:
     multi_train_parser.add_argument("--config", default="configs/multi_domain.yaml")
     multi_train_parser.add_argument("--no-start", action="store_true")
 
+    serve_parser = subparsers.add_parser("serve", parents=[common_json])
+    serve_parser.add_argument("--host", default="0.0.0.0")
+    serve_parser.add_argument("--port", type=int, default=8000)
+    serve_parser.add_argument("--reload", action="store_true", default=True)
+
     return parser.parse_args()
 
 
@@ -672,6 +677,20 @@ def main() -> None:
             cli_scripts.cmd_latest_run(args)
         elif args.command == "refresh-lab":
             cli_scripts.cmd_refresh_lab(args)
+        return
+
+    if args.command == "serve":
+        import subprocess
+        import sys
+        cmd = [
+            "uvicorn", "inference.app.main:app",
+            "--host", args.host,
+            "--port", str(args.port)
+        ]
+        if args.reload:
+            cmd.append("--reload")
+        print(f"Starting AI-Factory API server on {args.host}:{args.port}")
+        subprocess.run(cmd)
         return
 
     control = _build_control_service(args)
