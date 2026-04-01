@@ -3,6 +3,8 @@ import { BrowserRouter, Route, Routes, Navigate } from "react-router-dom";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
+import { defaultQueryFn } from "@/lib/api";
+import { WebSocketProvider } from "@/hooks/useWebSocket";
 import Dashboard from "./pages/Dashboard";
 import Monitoring from "./pages/Monitoring";
 import ModelRegistry from "./pages/ModelRegistry";
@@ -15,30 +17,41 @@ import Solve from "./pages/Solve";
 import SettingsPage from "./pages/SettingsPage";
 import NotFound from "./pages/NotFound";
 
-const queryClient = new QueryClient();
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      queryFn: defaultQueryFn,
+      refetchInterval: 30000,
+      retry: 1,
+      staleTime: 10000,
+    },
+  },
+});
 
 const App = () => (
   <QueryClientProvider client={queryClient}>
-    <TooltipProvider>
-      <Toaster />
-      <Sonner />
-      <BrowserRouter>
-        <Routes>
-          <Route path="/" element={<Navigate to="/dashboard" replace />} />
-          <Route path="/dashboard" element={<Dashboard />} />
-          <Route path="/dashboard/monitoring" element={<Monitoring />} />
-          <Route path="/models" element={<ModelRegistry />} />
-          <Route path="/inference" element={<InferenceChat />} />
-          <Route path="/lab/datasets" element={<DatasetStudio />} />
-          <Route path="/lab/automl" element={<AutoMLExplorer />} />
-          <Route path="/lab/agents" element={<AgentMonitor />} />
-          <Route path="/lab/cluster" element={<ClusterPage />} />
-          <Route path="/solve" element={<Solve />} />
-          <Route path="/settings" element={<SettingsPage />} />
-          <Route path="*" element={<NotFound />} />
-        </Routes>
-      </BrowserRouter>
-    </TooltipProvider>
+    <WebSocketProvider>
+      <TooltipProvider>
+        <Toaster />
+        <Sonner />
+        <BrowserRouter>
+          <Routes>
+            <Route path="/" element={<Navigate to="/dashboard" replace />} />
+            <Route path="/dashboard" element={<Dashboard />} />
+            <Route path="/dashboard/monitoring" element={<Monitoring />} />
+            <Route path="/models" element={<ModelRegistry />} />
+            <Route path="/inference" element={<InferenceChat />} />
+            <Route path="/lab/datasets" element={<DatasetStudio />} />
+            <Route path="/lab/automl" element={<AutoMLExplorer />} />
+            <Route path="/lab/agents" element={<AgentMonitor />} />
+            <Route path="/lab/cluster" element={<ClusterPage />} />
+            <Route path="/solve" element={<Solve />} />
+            <Route path="/settings" element={<SettingsPage />} />
+            <Route path="*" element={<NotFound />} />
+          </Routes>
+        </BrowserRouter>
+      </TooltipProvider>
+    </WebSocketProvider>
   </QueryClientProvider>
 );
 

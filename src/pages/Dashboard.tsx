@@ -1,33 +1,79 @@
 import { motion } from 'framer-motion';
+import { useQuery } from '@tanstack/react-query';
 import Layout from '@/components/factory/Layout';
 import PageHeader from '@/components/factory/PageHeader';
 import GlassCard from '@/components/factory/GlassCard';
 import StatusDot from '@/components/factory/StatusDot';
 import CountUp from '@/components/factory/CountUp';
-import { trainingJobs, logLines, timelineEntries } from '@/data/mockData';
-import { Square, ArrowDown, ArrowUp, ExternalLink, FileText } from 'lucide-react';
+import { LoadingSkeleton, ErrorState } from '@/components/factory/LoadingState';
+import { useWebSocket } from '@/hooks/useWebSocket';
+import { trainingJobs as mockJobs, logLines as mockLogs, timelineEntries as mockTimeline } from '@/data/mockData';
+import type { TrainingJob, LogLine } from '@/data/mockData';
+import { ExternalLink, FileText } from 'lucide-react';
 
 const pageVariants = {
   initial: { opacity: 0, y: 12, filter: 'blur(4px)' },
   animate: { opacity: 1, y: 0, filter: 'blur(0px)', transition: { duration: 0.25 } },
 };
 
-const kpis = [
-  { label: 'ACTIVE TRAINING JOBS', value: 3, glow: 'green' as const, change: '↑ 2 from last hour' },
-  { label: 'MODELS TRAINED', value: 47, glow: 'blue' as const, change: '↑ 3 today' },
-  { label: 'GPU FLEET', value: 4, glow: 'none' as const, change: '3/4 nodes active', suffix: ' nodes' },
-  { label: 'DATASET VOLUME', value: 205, glow: 'none' as const, change: '50K new samples', suffix: 'K samples' },
-];
-
 const Dashboard = () => {
+  const { gpuTelemetry, isConnected } = useWebSocket();
+
+  const { data: jobs, isLoading: jobsLoading, error: jobsError, refetch: refetchJobs } = useQuery<TrainingJob[]>({
+    queryKey: ['/jobs'],
+  });
+
+  const { data: nodes, isLoading: nodesLoading } = useQuery<any[]>({
+    queryKey: ['/cluster/nodes'],
+  });
+
+  const trainingJobs = jobs || mockJobs;
+  const clusterNodes = nodes || [];
+  const logLines = mockLogs;
+  const timelineEntries = mockTimeline;
+
+  const wsTelemetry = gpuTelemetry as any;
+
+  const allGpus = clusterNodes.flatMap((n: any) =>
+    (n.gpus || []).map((g: any, i: number) => ({
+      label: `GPU-${i}`,
+      util: g.util,
+      vram: g.vram,
+      temp: g.temp,
+    }))
+  );
+  const defaultGpus = [
+    { label: 'GPU-0', util: 91, vram: 74, temp: 79 },
+    { label: 'GPU-1', util: 88, vram: 71, temp: 76 },
+    { label: 'GPU-2', util: 38, vram: 31, temp: 58 },
+    { label: 'GPU-3', util: 82, vram: 18, temp: 71 },
+  ];
+  const wsGpus = wsTelemetry?.gpus?.map?.((g: any, i: number) => ({
+    label: g.label || `GPU-${i}`,
+    util: g.util ?? g.utilization ?? 0,
+    vram: g.vram ?? g.memory_used ?? 0,
+    temp: g.temp ?? g.temperature ?? 0,
+  }));
+  const gpuList = (wsGpus || (allGpus.length > 0 ? allGpus : null) || defaultGpus).slice(0, 4);
+
+  const activeJobs = trainingJobs.filter(j => j.status === 'running').length;
+  const nodeCount = clusterNodes.length || 4;
+  const activeNodes = clusterNodes.filter((n: any) => n.status !== 'offline').length || 3;
+
+  const kpis = [
+    { label: 'ACTIVE TRAINING JOBS', value: activeJobs || 3, glow: 'green' as const, change: `${activeJobs} running` },
+    { label: 'MODELS TRAINED', value: 47, glow: 'blue' as const, change: '↑ 3 today' },
+    { label: 'GPU FLEET', value: nodeCount, glow: 'none' as const, change: `${activeNodes}/${nodeCount} nodes active`, suffix: ' nodes' },
+    { label: 'DATASET VOLUME', value: 205, glow: 'none' as const, change: '50K new samples', suffix: 'K samples' },
+  ];
+
   return (
     <Layout>
       <motion.div variants={pageVariants} initial="initial" animate="animate">
         <PageHeader title="Mission Control" subtitle={new Date().toLocaleString()} />
 
         <div className="p-6 space-y-6">
-          {/* KPI Row */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4" data-testid="kpi-row">
             {kpis.map(kpi => (
               <GlassCard key={kpi.label} glow={kpi.glow} hover>
                 <div className="section-label mb-3">{kpi.label}</div>
@@ -39,25 +85,28 @@ const Dashboard = () => {
             ))}
           </div>
 
-          {/* Active Operations + System Health */}
           <div className="grid grid-cols-1 lg:grid-cols-5 gap-4">
             <div className="lg:col-span-3 space-y-3">
               <div className="section-label px-1">ACTIVE OPERATIONS</div>
-              {trainingJobs.filter(j => j.status === 'running' || j.status === 'queued').map(job => (
-                <JobCard key={job.id} job={job} />
-              ))}
+              {jobsLoading ? (
+                <LoadingSkeleton rows={3} />
+              ) : jobsError ? (
+                <ErrorState message={(jobsError as Error).message} onRetry={() => refetchJobs()} />
+              ) : (
+                trainingJobs.filter(j => j.status === 'running' || j.status === 'queued').map(job => (
+                  <JobCard key={job.id} job={job} />
+                ))
+              )}
             </div>
 
             <div className="lg:col-span-2">
-              <div className="section-label px-1 mb-3">SYSTEM HEALTH</div>
+              <div className="section-label px-1 mb-3">
+                SYSTEM HEALTH
+                {isConnected && <span className="ml-2 text-neon-green text-[10px]">● LIVE</span>}
+              </div>
               <GlassCard>
                 <div className="grid grid-cols-2 gap-6">
-                  {[
-                    { label: 'GPU-0', util: 91, vram: 74, temp: 79 },
-                    { label: 'GPU-1', util: 88, vram: 71, temp: 76 },
-                    { label: 'GPU-2', util: 38, vram: 31, temp: 58 },
-                    { label: 'GPU-3', util: 82, vram: 18, temp: 71 },
-                  ].map(gpu => (
+                  {gpuList.map((gpu: any) => (
                     <div key={gpu.label} className="text-center">
                       <GaugeRing value={gpu.util} size={72} />
                       <div className="text-[10px] font-mono text-muted-foreground mt-1">{gpu.label}</div>
@@ -76,7 +125,6 @@ const Dashboard = () => {
             </div>
           </div>
 
-          {/* Experiment Timeline */}
           <div>
             <div className="section-label px-1 mb-3">EXPERIMENT TIMELINE — LAST 24H</div>
             <GlassCard>
@@ -102,7 +150,6 @@ const Dashboard = () => {
             </GlassCard>
           </div>
 
-          {/* Recent Models + Log Stream */}
           <div className="grid grid-cols-1 lg:grid-cols-5 gap-4">
             <div className="lg:col-span-2">
               <div className="section-label px-1 mb-3">RECENT MODELS</div>
@@ -127,7 +174,7 @@ const Dashboard = () => {
               <div className="section-label px-1 mb-3">LIVE LOG STREAM</div>
               <GlassCard className="max-h-64 overflow-y-auto">
                 <div className="space-y-0.5">
-                  {logLines.map(log => (
+                  {logLines.map((log: LogLine) => (
                     <div key={log.id} className="flex gap-2 text-xs font-mono py-0.5">
                       <span className="text-muted-foreground shrink-0">{log.timestamp}</span>
                       <span className={`shrink-0 w-14 ${
@@ -150,8 +197,8 @@ const Dashboard = () => {
   );
 };
 
-const JobCard = ({ job }: { job: typeof trainingJobs[0] }) => (
-  <GlassCard glow={job.status === 'running' ? 'green' : 'none'} hover>
+const JobCard = ({ job }: { job: TrainingJob }) => (
+  <GlassCard glow={job.status === 'running' ? 'green' : 'none'} hover data-testid={`card-job-${job.id}`}>
     <div className="flex items-center gap-2 mb-2">
       <StatusDot status={job.status} size="md" />
       <span className="text-xs font-mono uppercase text-neon-green">{job.status}</span>
@@ -177,11 +224,11 @@ const JobCard = ({ job }: { job: typeof trainingJobs[0] }) => (
             {job.gpuUtil.map((u, i) => `GPU-${i}: ${u}%`).join(' · ')} VRAM: {job.vram}
           </div>
           <div className="flex gap-2">
-            <button className="text-[10px] font-mono px-2 py-1 rounded bg-neon-red/20 text-neon-red border border-neon-red/30 hover:bg-neon-red/30 transition-colors">■ Stop</button>
-            <button className="text-[10px] font-mono px-2 py-1 rounded bg-raised text-muted-foreground border border-border hover:bg-overlay transition-colors flex items-center gap-1">
+            <button data-testid={`button-stop-${job.id}`} className="text-[10px] font-mono px-2 py-1 rounded bg-neon-red/20 text-neon-red border border-neon-red/30 hover:bg-neon-red/30 transition-colors">■ Stop</button>
+            <button data-testid={`button-details-${job.id}`} className="text-[10px] font-mono px-2 py-1 rounded bg-raised text-muted-foreground border border-border hover:bg-overlay transition-colors flex items-center gap-1">
               <ExternalLink className="w-3 h-3" /> Details
             </button>
-            <button className="text-[10px] font-mono px-2 py-1 rounded bg-raised text-muted-foreground border border-border hover:bg-overlay transition-colors flex items-center gap-1">
+            <button data-testid={`button-logs-${job.id}`} className="text-[10px] font-mono px-2 py-1 rounded bg-raised text-muted-foreground border border-border hover:bg-overlay transition-colors flex items-center gap-1">
               <FileText className="w-3 h-3" /> Logs
             </button>
           </div>
