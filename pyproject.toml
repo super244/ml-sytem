@@ -97,25 +97,16 @@ python_version = "3.10"
 ignore_missing_imports = true
 warn_return_any = false
 warn_no_return = false
-disallow_untyped_defs = false
+disallow_untyped_defs = true
 
 [[tool.mypy.overrides]]
 module = [
-    "ai_factory.core.orchestration.*",
-    "ai_factory.core.control.*",
-    "ai_factory.core.plugins.*",
-    "ai_factory.core.decisions.*",
-    "ai_factory.core.monitoring.*",
-    "ai_factory.core.instances.*",
-    "ai_factory.core.state.*",
-    "ai_factory.core.platform.*",
-    "ai_factory.core.config.*",
-    "ai_factory.platform.*",
-    "ai_factory.cli",
     "data.*",
     "evaluation.*",
     "training.*",
-    "inference.*"
+    "inference.*",
+    "ai_factory.interfaces.*",
+    "ai_factory.cli"
 ]
 ignore_errors = true
 warn_unused_ignores = true
