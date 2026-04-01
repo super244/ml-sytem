@@ -6,6 +6,11 @@ import time
 from pathlib import Path
 from typing import Any
 
+from ai_factory.core.discovery import latest_training_run, list_training_runs
+from ai_factory.core.instances.models import InstanceManifest, MetricPoint, ProgressSnapshot
+from ai_factory.core.io import load_json, read_jsonl
+from ai_factory.core.monitoring.metrics import metric_points_from_summary
+
 # ---------------------------------------------------------------------------
 # GPU snapshot cache – avoid running nvidia-smi on every list_instances call.
 # ---------------------------------------------------------------------------
@@ -13,11 +18,6 @@ _GPU_CACHE_TTL_S: float = 30.0
 _gpu_cache: tuple[float, dict[str, Any] | None] | None = None  # (monotonic_ts, payload)
 _NVIDIA_SMI_AVAILABLE: bool | None = None  # lazily determined
 _TITAN_SMI_AVAILABLE: bool | None = None  # lazily determined
-
-from ai_factory.core.discovery import latest_training_run, list_training_runs
-from ai_factory.core.instances.models import InstanceManifest, MetricPoint, ProgressSnapshot
-from ai_factory.core.io import load_json, read_jsonl
-from ai_factory.core.monitoring.metrics import metric_points_from_summary
 
 
 def _prepare_output_dir(snapshot: dict[str, Any]) -> Path:

@@ -174,6 +174,13 @@ def detect_titan_status(repo_root: str | Path | None = None) -> dict[str, Any]:
             gpu_count = 1
             supports_metal = True
             supports_mlx = True
+            try:
+                import torch
+
+                if torch.backends.mps.is_available():
+                    supports_metal = True
+            except ImportError:
+                pass
 
     nvidia_gpu = _detect_nvidia_gpu()
     if nvidia_gpu["count"] > 0:

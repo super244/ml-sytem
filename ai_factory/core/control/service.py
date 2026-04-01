@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import asyncio
 from collections.abc import AsyncIterator
-from typing import Any, TypeVar
+from typing import TYPE_CHECKING, Any, TypeVar
 
 from ai_factory.core.control.models import (
     FoundationInterface,
@@ -14,7 +14,15 @@ from ai_factory.core.control.models import (
     ManagedInstanceDetail,
 )
 from ai_factory.core.instances.models import InstanceManifest, utc_now_iso
+from ai_factory.core.lineage.models import LineageRecord
 from ai_factory.core.plugins.base import PluginDescriptor
+
+if TYPE_CHECKING:
+    from ai_factory.core.instances.manager import InstanceManager
+    from ai_factory.core.instances.store import FileInstanceStore
+    from ai_factory.core.lineage.registry import LineageRegistry
+    from ai_factory.core.platform.settings import PlatformSettings
+    from ai_factory.core.plugins.registry import PluginRegistry
 
 
 def _tail_text(value: str, max_chars: int | None) -> tuple[str, bool]:
@@ -33,11 +41,32 @@ def _tail_list(values: list[T], limit: int | None) -> tuple[list[T], bool]:
 
 
 class FactoryControlService:
-    def __init__(self, *, manager, store, settings, plugin_registry):
+    def __init__(
+        self,
+        *,
+        manager: InstanceManager,
+        store: FileInstanceStore,
+        settings: PlatformSettings,
+        plugin_registry: PluginRegistry,
+        lineage_registry: LineageRegistry,
+    ) -> None:
         self.manager = manager
         self.store = store
         self.settings = settings
         self.plugin_registry = plugin_registry
+        self.lineage_registry = lineage_registry
+
+    def record_lineage(self, record: LineageRecord) -> None:
+        """Register a new lineage record."""
+        self.lineage_registry.record_lineage(record)
+
+    def get_lineage(self, record_id: str) -> LineageRecord | None:
+        """Fetch a lineage record."""
+        return self.lineage_registry.get_lineage(record_id)
+
+    def list_lineage(self, *, limit: int = 50) -> list[LineageRecord]:
+        """List lineage records."""
+        return self.lineage_registry.list_lineage(limit=limit)
 
     def create_instance(self, *args, **kwargs) -> InstanceManifest:
         return self.manager.create_instance(*args, **kwargs)
