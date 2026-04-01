@@ -1,16 +1,11 @@
 import { useState, useEffect, useRef, useCallback, createContext, useContext } from 'react';
 
-export interface WsTelemetryMessage {
-  type: 'gpu_telemetry' | 'job_progress' | 'agent_decision' | 'cluster_status' | 'log_line';
-  data: unknown;
-}
-
 interface WebSocketState {
-  gpuTelemetry: unknown | null;
-  jobProgress: unknown | null;
-  agentDecision: unknown | null;
-  clusterStatus: unknown | null;
-  logLine: unknown | null;
+  gpuTelemetry: any | null;
+  jobProgress: any | null;
+  agentDecision: any | null;
+  clusterStatus: any | null;
+  logLine: any | null;
   isConnected: boolean;
 }
 
@@ -51,19 +46,24 @@ export function WebSocketProvider({ children }: { children: React.ReactNode }) {
 
       ws.onmessage = (event) => {
         try {
-          const msg: WsTelemetryMessage = JSON.parse(event.data);
+          const msg = JSON.parse(event.data);
           setState(prev => {
             switch (msg.type) {
               case 'gpu_telemetry':
-                return { ...prev, gpuTelemetry: msg.data };
-              case 'job_progress':
-                return { ...prev, jobProgress: msg.data };
+                return { ...prev, gpuTelemetry: msg };
+              case 'job_update':
+                return { ...prev, jobProgress: msg };
+              case 'job_complete':
+              case 'job_failed':
+                return { ...prev, jobProgress: msg };
               case 'agent_decision':
-                return { ...prev, agentDecision: msg.data };
-              case 'cluster_status':
-                return { ...prev, clusterStatus: msg.data };
+                return { ...prev, agentDecision: msg };
+              case 'cluster_update':
+                return { ...prev, clusterStatus: msg };
               case 'log_line':
-                return { ...prev, logLine: msg.data };
+                return { ...prev, logLine: msg };
+              case 'automl_update':
+                return prev;
               default:
                 return prev;
             }

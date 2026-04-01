@@ -9,6 +9,7 @@ import { LoadingSkeleton } from '@/components/factory/LoadingState';
 import { useWebSocket } from '@/hooks/useWebSocket';
 import { clusterNodes as mockNodes } from '@/data/mockData';
 import type { ClusterNode } from '@/data/mockData';
+import { transformNodes } from '@/lib/transforms';
 import { Plus } from 'lucide-react';
 
 const pageVariants = {
@@ -20,11 +21,11 @@ const Monitoring = () => {
   const [selectedNode, setSelectedNode] = useState<string | null>(null);
   const { gpuTelemetry, isConnected } = useWebSocket();
 
-  const { data: nodes, isLoading } = useQuery<ClusterNode[]>({
+  const { data: rawNodes, isLoading } = useQuery<any[]>({
     queryKey: ['/cluster/nodes'],
   });
 
-  const clusterNodes = nodes || mockNodes;
+  const clusterNodes = rawNodes ? transformNodes(rawNodes) : mockNodes;
   const selected = clusterNodes.find(n => n.id === selectedNode);
 
   return (

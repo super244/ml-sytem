@@ -7,6 +7,7 @@ import GlassCard from '@/components/factory/GlassCard';
 import { LoadingSkeleton } from '@/components/factory/LoadingState';
 import { models as mockModels } from '@/data/mockData';
 import type { ModelEntry } from '@/data/mockData';
+import { transformModels } from '@/lib/transforms';
 import { Grid, List, Rocket, GitBranch } from 'lucide-react';
 
 const pageVariants = {
@@ -19,7 +20,7 @@ const ModelRegistry = () => {
   const [filter, setFilter] = useState('');
   const [lineageModelId, setLineageModelId] = useState<string | null>(null);
 
-  const { data: apiModels, isLoading } = useQuery<ModelEntry[]>({
+  const { data: rawModels, isLoading } = useQuery<any[]>({
     queryKey: ['/models'],
   });
 
@@ -28,7 +29,7 @@ const ModelRegistry = () => {
     enabled: !!lineageModelId,
   });
 
-  const models = apiModels || mockModels;
+  const models = rawModels ? transformModels(rawModels) : mockModels;
   const filtered = models.filter(m => m.name.toLowerCase().includes(filter.toLowerCase()));
 
   return (

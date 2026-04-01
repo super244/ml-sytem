@@ -35,7 +35,9 @@ A full-stack AI operations dashboard (Mission Control) for monitoring and managi
 ## API Integration
 - **API Client**: `src/lib/api.ts` — shared fetch wrapper with configurable base URL (stored in localStorage)
 - **Default Query Function**: Configured in QueryClient to automatically route React Query calls to `/api/v1/*` endpoints
-- **WebSocket**: `src/hooks/useWebSocket.tsx` — connects to `/ws/telemetry` for real-time GPU telemetry, job progress, agent decisions, cluster status, and log lines
+- **Transform Layer**: `src/lib/transforms.ts` — converts backend snake_case responses (utilization, vram_used_gb, temperature_celsius) to frontend camelCase shapes (util, vram, temp)
+- **WebSocket**: `src/hooks/useWebSocket.tsx` — Context-based provider connecting to `/ws/telemetry` for real-time GPU telemetry, job progress, agent decisions, cluster status, and log lines. Backend sends flat JSON messages (no `data` envelope).
+- **Inference API**: Frontend sends `{model_id, prompt, max_tokens, temperature, stream}` matching `CompletionRequest` schema; parses `CompletionResponse` fields (completion, confidence_score, tokens_generated, tokens_per_second, time_to_first_token_ms)
 - **Vite Proxy**: Routes `/api` → `http://0.0.0.0:8000` and `/ws` → `ws://0.0.0.0:8000` for local development
 - **Fallback**: All pages fall back to mock data from `src/data/mockData.ts` when the API is unavailable
 - **Settings**: API Base URL is configurable from the Settings page
