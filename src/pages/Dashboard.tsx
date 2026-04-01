@@ -9,6 +9,7 @@ import { LoadingSkeleton, ErrorState } from '@/components/factory/LoadingState';
 import { useWebSocket } from '@/hooks/useWebSocket';
 import { trainingJobs as mockJobs, logLines as mockLogs, timelineEntries as mockTimeline } from '@/data/mockData';
 import type { TrainingJob, LogLine } from '@/data/mockData';
+import { transformJobs, transformNodes } from '@/lib/transforms';
 import { ExternalLink, FileText } from 'lucide-react';
 
 const pageVariants = {
@@ -19,16 +20,16 @@ const pageVariants = {
 const Dashboard = () => {
   const { gpuTelemetry, isConnected } = useWebSocket();
 
-  const { data: jobs, isLoading: jobsLoading, error: jobsError, refetch: refetchJobs } = useQuery<TrainingJob[]>({
+  const { data: rawJobs, isLoading: jobsLoading, error: jobsError, refetch: refetchJobs } = useQuery<any[]>({
     queryKey: ['/jobs'],
   });
 
-  const { data: nodes, isLoading: nodesLoading } = useQuery<any[]>({
+  const { data: rawNodes, isLoading: nodesLoading } = useQuery<any[]>({
     queryKey: ['/cluster/nodes'],
   });
 
-  const trainingJobs = jobs || mockJobs;
-  const clusterNodes = nodes || [];
+  const trainingJobs = rawJobs ? transformJobs(rawJobs) : mockJobs;
+  const clusterNodes = rawNodes ? transformNodes(rawNodes) : [];
   const logLines = mockLogs;
   const timelineEntries = mockTimeline;
 
@@ -36,7 +37,7 @@ const Dashboard = () => {
 
   const allGpus = clusterNodes.flatMap((n: any) =>
     (n.gpus || []).map((g: any, i: number) => ({
-      label: `GPU-${i}`,
+      label: `${n.name?.split('-')[0] || 'GPU'}-${i}`,
       util: g.util,
       vram: g.vram,
       temp: g.temp,
@@ -49,10 +50,10 @@ const Dashboard = () => {
     { label: 'GPU-3', util: 82, vram: 18, temp: 71 },
   ];
   const wsGpus = wsTelemetry?.gpus?.map?.((g: any, i: number) => ({
-    label: g.label || `GPU-${i}`,
-    util: g.util ?? g.utilization ?? 0,
-    vram: g.vram ?? g.memory_used ?? 0,
-    temp: g.temp ?? g.temperature ?? 0,
+    label: g.name || g.label || `GPU-${i}`,
+    util: Math.round(g.utilization ?? g.util ?? 0),
+    vram: Math.round(g.vram_used_gb ?? g.vram ?? 0),
+    temp: Math.round(g.temperature_celsius ?? g.temp ?? 0),
   }));
   const gpuList = (wsGpus || (allGpus.length > 0 ? allGpus : null) || defaultGpus).slice(0, 4);
 

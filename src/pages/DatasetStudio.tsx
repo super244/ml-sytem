@@ -7,6 +7,7 @@ import GlassCard from '@/components/factory/GlassCard';
 import { LoadingSkeleton } from '@/components/factory/LoadingState';
 import { datasetPacks as mockPacks } from '@/data/mockData';
 import type { DatasetPack } from '@/data/mockData';
+import { transformDatasets } from '@/lib/transforms';
 import { Plus, Package } from 'lucide-react';
 
 const pageVariants = {
@@ -22,11 +23,11 @@ const pipelineStages = [
 ];
 
 const DatasetStudio = () => {
-  const { data: apiPacks, isLoading } = useQuery<DatasetPack[]>({
+  const { data: rawPacks, isLoading } = useQuery<any[]>({
     queryKey: ['/datasets'],
   });
 
-  const datasetPacks = apiPacks || mockPacks;
+  const datasetPacks = rawPacks ? transformDatasets(rawPacks) : mockPacks;
   const [selectedPack, setSelectedPack] = useState<DatasetPack | null>(null);
   const activePack = selectedPack || datasetPacks[0] || null;
 

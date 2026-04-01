@@ -9,6 +9,7 @@ import { LoadingSkeleton } from '@/components/factory/LoadingState';
 import { useWebSocket } from '@/hooks/useWebSocket';
 import { agentDecisions as mockDecisions } from '@/data/mockData';
 import type { AgentDecision } from '@/data/mockData';
+import { transformAgentDecisions } from '@/lib/transforms';
 import { Pause } from 'lucide-react';
 
 const pageVariants = {
@@ -23,17 +24,27 @@ const AgentMonitor = () => {
     queryKey: ['/agents'],
   });
 
-  const { data: decisionsData, isLoading: decisionsLoading } = useQuery<AgentDecision[]>({
-    queryKey: ['/agents', undefined, 'decisions'],
+  const { data: rawDecisions, isLoading: decisionsLoading } = useQuery<any[]>({
+    queryKey: ['/agents/decisions'],
   });
 
-  const agents = agentsData || [
-    { id: 'evaluator-01', type: 'EVALUATOR', status: 'running' as const, detail: 'Monitoring 3 runs', lastAction: '2s ago' },
-    { id: 'pruner-01', type: 'PRUNER', status: 'running' as const, detail: 'Pruned 14 runs today', lastAction: '4m ago' },
-    { id: 'promoter-01', type: 'PROMOTER', status: 'idle' as const, detail: 'Waiting for eval completion', lastAction: '23m ago' },
-  ];
+  const agents = (agentsData || []).map((a: any) => ({
+    id: a.id,
+    type: a.type?.toUpperCase() || a.type,
+    status: a.status === 'active' ? 'running' as const : a.status === 'standby' ? 'idle' as const : a.status as any,
+    detail: a.current_target ? `Watching ${a.current_target}` : 'Idle',
+    lastAction: a.last_action_at ? `${a.decisions_today} decisions today` : 'No actions yet',
+  }));
 
-  const agentDecisions = decisionsData || mockDecisions;
+  if (agents.length === 0) {
+    agents.push(
+      { id: 'evaluator-01', type: 'EVALUATOR', status: 'running' as const, detail: 'Monitoring 3 runs', lastAction: '2s ago' },
+      { id: 'pruner-01', type: 'PRUNER', status: 'running' as const, detail: 'Pruned 14 runs today', lastAction: '4m ago' },
+      { id: 'promoter-01', type: 'PROMOTER', status: 'idle' as const, detail: 'Waiting for eval completion', lastAction: '23m ago' },
+    );
+  }
+
+  const agentDecisions = rawDecisions ? transformAgentDecisions(rawDecisions) : mockDecisions;
   const [selectedDecision, setSelectedDecision] = useState<AgentDecision | null>(null);
   const activeDecision = selectedDecision || agentDecisions[0] || null;
 

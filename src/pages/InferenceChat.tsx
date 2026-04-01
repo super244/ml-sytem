@@ -52,19 +52,22 @@ const InferenceChat = () => {
       const response = await apiRequest<any>('/inference/completions', {
         method: 'POST',
         body: JSON.stringify({
-          model,
-          messages: [...messages, userMsg].map(m => ({ role: m.role, content: m.content })),
+          model_id: model,
+          prompt: input,
+          max_tokens: 512,
+          temperature: 0.7,
+          stream: false,
         }),
       });
 
       const assistantMsg: Message = {
-        id: (Date.now() + 1).toString(),
+        id: response?.id || (Date.now() + 1).toString(),
         role: 'assistant',
-        content: response?.choices?.[0]?.message?.content || response?.content || response?.text || String(response),
-        confidence: response?.confidence,
-        tokens: response?.usage?.total_tokens || response?.tokens,
-        tps: response?.tps,
-        ttft: response?.ttft,
+        content: response?.completion || response?.content || response?.text || String(response),
+        confidence: response?.confidence_score,
+        tokens: response?.tokens_generated,
+        tps: response?.tokens_per_second,
+        ttft: response?.time_to_first_token_ms,
       };
       setMessages(prev => [...prev, assistantMsg]);
     } catch {

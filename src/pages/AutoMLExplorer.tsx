@@ -7,6 +7,7 @@ import GlassCard from '@/components/factory/GlassCard';
 import { LoadingSkeleton } from '@/components/factory/LoadingState';
 import { automlRuns as mockRuns } from '@/data/mockData';
 import type { AutoMLRun } from '@/data/mockData';
+import { transformAutoMLSearchToRuns } from '@/lib/transforms';
 import { Plus, Play } from 'lucide-react';
 
 const pageVariants = {
@@ -18,11 +19,11 @@ const AutoMLExplorer = () => {
   const [hoveredRun, setHoveredRun] = useState<string | null>(null);
   const [sortKey, setSortKey] = useState<'loss' | 'lr' | 'rank'>('loss');
 
-  const { data: apiSearches, isLoading } = useQuery<any>({
+  const { data: apiSearches, isLoading } = useQuery<any[]>({
     queryKey: ['/automl/searches'],
   });
 
-  const automlRuns: AutoMLRun[] = apiSearches?.runs || apiSearches || mockRuns;
+  const automlRuns: AutoMLRun[] = apiSearches ? transformAutoMLSearchToRuns(apiSearches) : mockRuns;
 
   const bestRun = useMemo(
     () => automlRuns.filter(r => r.status === 'promoted').sort((a, b) => a.loss - b.loss)[0],
