@@ -12,6 +12,7 @@ from typing import Any
 _GPU_CACHE_TTL_S: float = 30.0
 _gpu_cache: tuple[float, dict[str, Any] | None] | None = None  # (monotonic_ts, payload)
 _NVIDIA_SMI_AVAILABLE: bool | None = None  # lazily determined
+_TITAN_SMI_AVAILABLE: bool | None = None  # lazily determined
 
 from ai_factory.core.discovery import latest_training_run, list_training_runs
 from ai_factory.core.instances.models import InstanceManifest, MetricPoint, ProgressSnapshot
@@ -381,6 +382,46 @@ def _gpu_snapshot() -> dict[str, Any] | None:
     return payload
 
 
+def _titan_snapshot() -> dict[str, Any] | None:
+    """Return hardware snapshot from ai-factory-titan binary."""
+    global _gpu_cache, _TITAN_SMI_AVAILABLE
+
+    now = time.monotonic()
+
+    # Reuse cache if still fresh.
+    if _gpu_cache is not None:
+        cached_ts, cached_payload = _gpu_cache
+        if now - cached_ts < _GPU_CACHE_TTL_S:
+            return cached_payload
+
+    if _TITAN_SMI_AVAILABLE is None:
+        # Check if the binary is built and available.
+        # We look for it in the target directory.
+        titan_bin = Path("ai_factory_titan/target/debug/titan-status")
+        _TITAN_SMI_AVAILABLE = titan_bin.exists()
+
+    if not _TITAN_SMI_AVAILABLE:
+        return None
+
+    try:
+        result = subprocess.run(
+            ["ai_factory_titan/target/debug/titan-status"],
+            capture_output=True,
+            text=True,
+            timeout=2.0,
+        )
+        if result.returncode == 0:
+            import json
+
+            payload = json.loads(result.stdout)
+            _gpu_cache = (now, payload)
+            return payload
+    except Exception:
+        pass
+
+    return None
+
+
 def collect_metrics_for_instance(
     manifest: InstanceManifest,
     snapshot: dict[str, Any],
@@ -401,6 +442,8 @@ def collect_metrics_for_instance(
         summary, points, refs = _deploy_metrics(manifest)
     if collect_gpu:
         gpu = _gpu_snapshot()
+        if not gpu:
+            gpu = _titan_snapshot()
         if gpu:
             summary["gpu"] = gpu
     return summary, points, refs
