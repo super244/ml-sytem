@@ -1,3 +1,4 @@
+# Python
 __pycache__/
 *.py[cod]
 .pytest_cache/
@@ -22,14 +23,35 @@ env/
 ENV/
 artifacts/
 logs/
-node_modules/
-.next/
-dist/
-build/
-coverage/
 __pypackages__/
 *.tsbuildinfo
 evaluation/results/*
 !evaluation/results/.gitkeep
 data/processed/*.jsonl
 data/processed/*.json
+
+# Node.js/Frontend
+node_modules/
+.next/
+dist/
+build/
+coverage/
+
+# Logs
+logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+# Editor directories and files
+.vscode/*
+!.vscode/extensions.json
+.idea
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?

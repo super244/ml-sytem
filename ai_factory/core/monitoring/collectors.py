@@ -1,8 +1,17 @@
 from __future__ import annotations
 
+import shutil
 import subprocess
+import time
 from pathlib import Path
 from typing import Any
+
+# ---------------------------------------------------------------------------
+# GPU snapshot cache – avoid running nvidia-smi on every list_instances call.
+# ---------------------------------------------------------------------------
+_GPU_CACHE_TTL_S: float = 30.0
+_gpu_cache: tuple[float, dict[str, Any] | None] | None = None  # (monotonic_ts, payload)
+_NVIDIA_SMI_AVAILABLE: bool | None = None  # lazily determined
 
 from ai_factory.core.discovery import latest_training_run, list_training_runs
 from ai_factory.core.instances.models import InstanceManifest, MetricPoint, ProgressSnapshot
@@ -300,6 +309,36 @@ def _report_progress(snapshot: dict[str, Any]) -> ProgressSnapshot:
 
 
 def _gpu_snapshot() -> dict[str, Any] | None:
+    """Return GPU utilisation snapshot from nvidia-smi, with caching and a timeout.
+
+    • Checks ``shutil.which`` once so we skip the subprocess entirely on
+      Apple-Silicon / CPU-only machines where ``nvidia-smi`` is absent.
+    • Results are cached for ``_GPU_CACHE_TTL_S`` seconds to avoid running a
+      subprocess on every ``list_instances`` call.
+    • A 2-second ``timeout`` prevents the call from blocking indefinitely.
+    """
+    global _gpu_cache, _NVIDIA_SMI_AVAILABLE
+
+    # Fast path: we already know nvidia-smi is not on this machine.
+    if _NVIDIA_SMI_AVAILABLE is False:
+        return None
+
+    now = time.monotonic()
+
+    # Return from cache if still fresh.
+    if _gpu_cache is not None:
+        cached_ts, cached_payload = _gpu_cache
+        if now - cached_ts < _GPU_CACHE_TTL_S:
+            return cached_payload
+
+    # First call or cache expired – probe availability.
+    if _NVIDIA_SMI_AVAILABLE is None:
+        _NVIDIA_SMI_AVAILABLE = shutil.which("nvidia-smi") is not None
+
+    if not _NVIDIA_SMI_AVAILABLE:
+        _gpu_cache = (now, None)
+        return None
+
     try:
         result = subprocess.run(
             [
@@ -310,25 +349,36 @@ def _gpu_snapshot() -> dict[str, Any] | None:
             check=True,
             capture_output=True,
             text=True,
+            timeout=2.0,  # Never block the main thread for more than 2 s
         )
     except Exception:
+        _gpu_cache = (now, None)
         return None
+
     lines = [line.strip() for line in result.stdout.splitlines() if line.strip()]
     if not lines:
+        _gpu_cache = (now, None)
         return None
+
     gpu_rows: list[dict[str, int]] = []
     for line in lines:
         parts = [part.strip() for part in line.split(",")]
         if len(parts) != 3:
             continue
-        gpu_rows.append(
-            {
-                "utilization_gpu": int(parts[0]),
-                "memory_used_mb": int(parts[1]),
-                "memory_total_mb": int(parts[2]),
-            }
-        )
-    return {"gpus": gpu_rows} if gpu_rows else None
+        try:
+            gpu_rows.append(
+                {
+                    "utilization_gpu": int(parts[0]),
+                    "memory_used_mb": int(parts[1]),
+                    "memory_total_mb": int(parts[2]),
+                }
+            )
+        except (ValueError, IndexError):
+            continue
+
+    payload = {"gpus": gpu_rows} if gpu_rows else None
+    _gpu_cache = (now, payload)
+    return payload
 
 
 def collect_metrics_for_instance(
