@@ -28,9 +28,17 @@ A full-stack AI operations dashboard (Mission Control) for monitoring and managi
 ### Frontend
 - `src/pages/` — Route-level page components (Dashboard, Monitoring, ModelRegistry, InferenceChat, DatasetStudio, AutoMLExplorer, AgentMonitor, ClusterPage, Solve, SettingsPage)
 - `src/components/` — Shared UI components
-- `src/hooks/` — Custom React hooks
-- `src/lib/` — Utility functions
-- `src/data/` — Static/mock data
+- `src/hooks/` — Custom React hooks (useWebSocket for real-time telemetry)
+- `src/lib/` — Utility functions (api.ts for API client + default query function)
+- `src/data/` — Static/mock data (kept as fallback when API is unavailable)
+
+## API Integration
+- **API Client**: `src/lib/api.ts` — shared fetch wrapper with configurable base URL (stored in localStorage)
+- **Default Query Function**: Configured in QueryClient to automatically route React Query calls to `/api/v1/*` endpoints
+- **WebSocket**: `src/hooks/useWebSocket.tsx` — connects to `/ws/telemetry` for real-time GPU telemetry, job progress, agent decisions, cluster status, and log lines
+- **Vite Proxy**: Routes `/api` → `http://0.0.0.0:8000` and `/ws` → `ws://0.0.0.0:8000` for local development
+- **Fallback**: All pages fall back to mock data from `src/data/mockData.ts` when the API is unavailable
+- **Settings**: API Base URL is configurable from the Settings page
 
 ### Backend (`ai_factory/`)
 - `ai_factory/main.py` — FastAPI app factory, lifespan, router mounting

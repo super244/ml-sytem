@@ -1,10 +1,14 @@
 import { useState } from 'react';
 import { motion } from 'framer-motion';
+import { useQuery } from '@tanstack/react-query';
 import Layout from '@/components/factory/Layout';
 import PageHeader from '@/components/factory/PageHeader';
 import GlassCard from '@/components/factory/GlassCard';
 import StatusDot from '@/components/factory/StatusDot';
-import { clusterNodes } from '@/data/mockData';
+import { LoadingSkeleton } from '@/components/factory/LoadingState';
+import { useWebSocket } from '@/hooks/useWebSocket';
+import { clusterNodes as mockNodes } from '@/data/mockData';
+import type { ClusterNode } from '@/data/mockData';
 import { Plus } from 'lucide-react';
 
 const pageVariants = {
@@ -14,6 +18,13 @@ const pageVariants = {
 
 const Monitoring = () => {
   const [selectedNode, setSelectedNode] = useState<string | null>(null);
+  const { gpuTelemetry, isConnected } = useWebSocket();
+
+  const { data: nodes, isLoading } = useQuery<ClusterNode[]>({
+    queryKey: ['/cluster/nodes'],
+  });
+
+  const clusterNodes = nodes || mockNodes;
   const selected = clusterNodes.find(n => n.id === selectedNode);
 
   return (
@@ -21,63 +32,66 @@ const Monitoring = () => {
       <motion.div variants={pageVariants} initial="initial" animate="animate">
         <PageHeader
           title="Cluster Fleet"
-          subtitle={`${clusterNodes.filter(n => n.status !== 'offline').length} nodes online`}
+          subtitle={`${clusterNodes.filter(n => n.status !== 'offline').length} nodes online${isConnected ? ' · LIVE' : ''}`}
           actions={
-            <button className="text-xs font-mono px-3 py-1.5 rounded-lg bg-raised border border-border text-muted-foreground hover:text-foreground transition-colors flex items-center gap-1.5">
+            <button data-testid="button-add-node" className="text-xs font-mono px-3 py-1.5 rounded-lg bg-raised border border-border text-muted-foreground hover:text-foreground transition-colors flex items-center gap-1.5">
               <Plus className="w-3 h-3" /> Add Node
             </button>
           }
         />
         <div className="p-6 space-y-6">
-          {/* Fleet Map */}
           <div>
             <div className="section-label px-1 mb-3">FLEET MAP</div>
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-              {clusterNodes.map(node => (
-                <GlassCard
-                  key={node.id}
-                  glow={node.status === 'running' ? 'green' : node.status === 'warning' ? 'orange' : node.status === 'critical' ? 'red' : 'none'}
-                  hover
-                  className="cursor-pointer"
-                  onClick={() => setSelectedNode(node.id)}
-                >
-                  <div className="flex items-center gap-2 mb-3">
-                    <StatusDot status={node.status} size="md" />
-                    <span className="text-sm font-display font-medium text-foreground">{node.name}</span>
-                  </div>
-                  {node.gpus.map((gpu, i) => (
-                    <div key={i} className="mb-2">
-                      <div className="flex items-center justify-between text-[10px] font-mono text-muted-foreground mb-1">
-                        <span>{gpu.name}</span>
-                        <span>{gpu.util}% util</span>
-                      </div>
-                      <div className="h-1.5 bg-raised rounded-full overflow-hidden">
-                        <div
-                          className="h-full rounded-full progress-bar-transition"
-                          style={{
-                            width: `${gpu.util}%`,
-                            backgroundColor: gpu.util >= 90 ? 'hsl(348,100%,50%)' : gpu.util >= 75 ? 'hsl(18,100%,57%)' : 'hsl(155,100%,50%)',
-                          }}
-                        />
-                      </div>
-                      <div className="flex justify-between text-[10px] font-mono text-muted-foreground mt-1">
-                        <span>VRAM: {gpu.vram}/{gpu.vramTotal}GB</span>
-                        <span className={gpu.temp >= 80 ? 'text-neon-orange' : ''}>{gpu.temp}°C</span>
-                      </div>
+            {isLoading && !clusterNodes.length ? (
+              <LoadingSkeleton rows={2} />
+            ) : (
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                {clusterNodes.map(node => (
+                  <GlassCard
+                    key={node.id}
+                    glow={node.status === 'running' ? 'green' : node.status === 'warning' ? 'orange' : node.status === 'critical' ? 'red' : 'none'}
+                    hover
+                    className="cursor-pointer"
+                    onClick={() => setSelectedNode(node.id)}
+                    data-testid={`card-node-${node.id}`}
+                  >
+                    <div className="flex items-center gap-2 mb-3">
+                      <StatusDot status={node.status} size="md" />
+                      <span className="text-sm font-display font-medium text-foreground">{node.name}</span>
                     </div>
-                  ))}
-                  {node.costPerHour > 0 && (
-                    <div className="text-[10px] font-mono text-muted-foreground mt-2">Cost: ${node.costPerHour.toFixed(2)}/hr</div>
-                  )}
-                  {node.status === 'idle' && (
-                    <div className="text-xs font-mono text-muted-foreground mt-1">IDLE · $0.00/hr</div>
-                  )}
-                </GlassCard>
-              ))}
-            </div>
+                    {node.gpus.map((gpu, i) => (
+                      <div key={i} className="mb-2">
+                        <div className="flex items-center justify-between text-[10px] font-mono text-muted-foreground mb-1">
+                          <span>{gpu.name}</span>
+                          <span>{gpu.util}% util</span>
+                        </div>
+                        <div className="h-1.5 bg-raised rounded-full overflow-hidden">
+                          <div
+                            className="h-full rounded-full progress-bar-transition"
+                            style={{
+                              width: `${gpu.util}%`,
+                              backgroundColor: gpu.util >= 90 ? 'hsl(348,100%,50%)' : gpu.util >= 75 ? 'hsl(18,100%,57%)' : 'hsl(155,100%,50%)',
+                            }}
+                          />
+                        </div>
+                        <div className="flex justify-between text-[10px] font-mono text-muted-foreground mt-1">
+                          <span>VRAM: {gpu.vram}/{gpu.vramTotal}GB</span>
+                          <span className={gpu.temp >= 80 ? 'text-neon-orange' : ''}>{gpu.temp}°C</span>
+                        </div>
+                      </div>
+                    ))}
+                    {node.costPerHour > 0 && (
+                      <div className="text-[10px] font-mono text-muted-foreground mt-2">Cost: ${node.costPerHour.toFixed(2)}/hr</div>
+                    )}
+                    {node.status === 'idle' && (
+                      <div className="text-xs font-mono text-muted-foreground mt-1">IDLE · $0.00/hr</div>
+                    )}
+                  </GlassCard>
+                ))}
+              </div>
+            )}
           </div>
 
-          {/* Selected Node Detail */}
           {selected && (
             <div>
               <div className="section-label px-1 mb-3">NODE DETAIL — {selected.name.toUpperCase()}</div>
@@ -97,7 +111,6 @@ const Monitoring = () => {
             </div>
           )}
 
-          {/* Telemetry Charts (simulated) */}
           <div>
             <div className="section-label px-1 mb-3">TELEMETRY</div>
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">

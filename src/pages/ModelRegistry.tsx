@@ -1,9 +1,12 @@
 import { useState } from 'react';
 import { motion } from 'framer-motion';
+import { useQuery } from '@tanstack/react-query';
 import Layout from '@/components/factory/Layout';
 import PageHeader from '@/components/factory/PageHeader';
 import GlassCard from '@/components/factory/GlassCard';
-import { models } from '@/data/mockData';
+import { LoadingSkeleton } from '@/components/factory/LoadingState';
+import { models as mockModels } from '@/data/mockData';
+import type { ModelEntry } from '@/data/mockData';
 import { Grid, List, Rocket, GitBranch } from 'lucide-react';
 
 const pageVariants = {
@@ -14,7 +17,18 @@ const pageVariants = {
 const ModelRegistry = () => {
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
   const [filter, setFilter] = useState('');
+  const [lineageModelId, setLineageModelId] = useState<string | null>(null);
 
+  const { data: apiModels, isLoading } = useQuery<ModelEntry[]>({
+    queryKey: ['/models'],
+  });
+
+  const { data: lineageData, isLoading: lineageLoading } = useQuery({
+    queryKey: ['/models', lineageModelId, 'lineage'],
+    enabled: !!lineageModelId,
+  });
+
+  const models = apiModels || mockModels;
   const filtered = models.filter(m => m.name.toLowerCase().includes(filter.toLowerCase()));
 
   return (
@@ -28,17 +42,20 @@ const ModelRegistry = () => {
                 value={filter}
                 onChange={e => setFilter(e.target.value)}
                 placeholder="Filter models..."
+                data-testid="input-filter-models"
                 className="text-xs font-mono bg-raised border border-border rounded-lg px-3 py-1.5 text-foreground placeholder:text-muted-foreground outline-none focus:ring-1 focus:ring-neon-green/30 w-48"
               />
               <div className="flex border border-border rounded-lg overflow-hidden">
                 <button
                   onClick={() => setViewMode('grid')}
+                  data-testid="button-view-grid"
                   className={`p-1.5 ${viewMode === 'grid' ? 'bg-raised text-foreground' : 'text-muted-foreground'}`}
                 >
                   <Grid className="w-3.5 h-3.5" />
                 </button>
                 <button
                   onClick={() => setViewMode('list')}
+                  data-testid="button-view-list"
                   className={`p-1.5 ${viewMode === 'list' ? 'bg-raised text-foreground' : 'text-muted-foreground'}`}
                 >
                   <List className="w-3.5 h-3.5" />
@@ -48,10 +65,12 @@ const ModelRegistry = () => {
           }
         />
         <div className="p-6">
-          {viewMode === 'grid' ? (
+          {isLoading && !filtered.length ? (
+            <LoadingSkeleton rows={4} />
+          ) : viewMode === 'grid' ? (
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
               {filtered.map(model => (
-                <GlassCard key={model.id} hover>
+                <GlassCard key={model.id} hover data-testid={`card-model-${model.id}`}>
                   <div className="flex items-center justify-between mb-3">
                     <span className="text-sm font-display font-semibold text-foreground">{model.name}</span>
                     <span className="text-[10px] font-mono bg-raised text-muted-foreground px-2 py-0.5 rounded">{model.size}</span>
@@ -77,13 +96,30 @@ const ModelRegistry = () => {
                     {model.children} children · {model.createdAt}
                   </div>
                   <div className="flex gap-2">
-                    <button className="flex-1 text-[10px] font-mono px-2 py-1.5 rounded-lg bg-neon-green/20 border border-neon-green/30 text-neon-green hover:bg-neon-green/30 transition-colors flex items-center justify-center gap-1">
+                    <button data-testid={`button-deploy-${model.id}`} className="flex-1 text-[10px] font-mono px-2 py-1.5 rounded-lg bg-neon-green/20 border border-neon-green/30 text-neon-green hover:bg-neon-green/30 transition-colors flex items-center justify-center gap-1">
                       <Rocket className="w-3 h-3" /> Deploy
                     </button>
-                    <button className="flex-1 text-[10px] font-mono px-2 py-1.5 rounded-lg bg-raised border border-border text-muted-foreground hover:text-foreground transition-colors flex items-center justify-center gap-1">
+                    <button
+                      data-testid={`button-lineage-${model.id}`}
+                      onClick={() => setLineageModelId(lineageModelId === model.id ? null : model.id)}
+                      className="flex-1 text-[10px] font-mono px-2 py-1.5 rounded-lg bg-raised border border-border text-muted-foreground hover:text-foreground transition-colors flex items-center justify-center gap-1"
+                    >
                       <GitBranch className="w-3 h-3" /> Lineage
                     </button>
                   </div>
+                  {lineageModelId === model.id && (
+                    <div className="mt-3 pt-3 border-t border-border">
+                      {lineageLoading ? (
+                        <div className="text-xs font-mono text-muted-foreground animate-pulse">Loading lineage...</div>
+                      ) : lineageData ? (
+                        <div className="text-xs font-mono text-foreground/80">
+                          <pre className="whitespace-pre-wrap">{JSON.stringify(lineageData, null, 2)}</pre>
+                        </div>
+                      ) : (
+                        <div className="text-xs font-mono text-muted-foreground">No lineage data available</div>
+                      )}
+                    </div>
+                  )}
                 </GlassCard>
               ))}
             </div>
@@ -99,7 +135,7 @@ const ModelRegistry = () => {
                 </thead>
                 <tbody>
                   {filtered.map(m => (
-                    <tr key={m.id} className="border-b border-border/50 hover:bg-raised/50 transition-colors">
+                    <tr key={m.id} className="border-b border-border/50 hover:bg-raised/50 transition-colors" data-testid={`row-model-${m.id}`}>
                       <td className="py-2 px-3 text-foreground font-medium">{m.name}</td>
                       <td className="py-2 px-3 text-muted-foreground">{m.base}</td>
                       <td className="py-2 px-3"><span className="bg-neon-blue/20 text-neon-blue px-1.5 py-0.5 rounded">{m.method}</span></td>

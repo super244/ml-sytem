@@ -1,9 +1,12 @@
 import { useState } from 'react';
 import { motion } from 'framer-motion';
+import { useQuery } from '@tanstack/react-query';
 import Layout from '@/components/factory/Layout';
 import PageHeader from '@/components/factory/PageHeader';
 import GlassCard from '@/components/factory/GlassCard';
-import { datasetPacks } from '@/data/mockData';
+import { LoadingSkeleton } from '@/components/factory/LoadingState';
+import { datasetPacks as mockPacks } from '@/data/mockData';
+import type { DatasetPack } from '@/data/mockData';
 import { Plus, Package } from 'lucide-react';
 
 const pageVariants = {
@@ -19,7 +22,13 @@ const pipelineStages = [
 ];
 
 const DatasetStudio = () => {
-  const [selectedPack, setSelectedPack] = useState(datasetPacks[0]);
+  const { data: apiPacks, isLoading } = useQuery<DatasetPack[]>({
+    queryKey: ['/datasets'],
+  });
+
+  const datasetPacks = apiPacks || mockPacks;
+  const [selectedPack, setSelectedPack] = useState<DatasetPack | null>(null);
+  const activePack = selectedPack || datasetPacks[0] || null;
 
   return (
     <Layout>
@@ -28,17 +37,16 @@ const DatasetStudio = () => {
           title="Dataset Studio"
           actions={
             <div className="flex gap-2">
-              <button className="text-xs font-mono px-3 py-1.5 rounded-lg bg-raised border border-border text-muted-foreground hover:text-foreground transition-colors flex items-center gap-1.5">
+              <button data-testid="button-new-pipeline" className="text-xs font-mono px-3 py-1.5 rounded-lg bg-raised border border-border text-muted-foreground hover:text-foreground transition-colors flex items-center gap-1.5">
                 <Plus className="w-3 h-3" /> New Pipeline
               </button>
-              <button className="text-xs font-mono px-3 py-1.5 rounded-lg bg-neon-green/20 border border-neon-green/30 text-neon-green hover:bg-neon-green/30 transition-colors flex items-center gap-1.5">
+              <button data-testid="button-pack" className="text-xs font-mono px-3 py-1.5 rounded-lg bg-neon-green/20 border border-neon-green/30 text-neon-green hover:bg-neon-green/30 transition-colors flex items-center gap-1.5">
                 <Package className="w-3 h-3" /> Pack
               </button>
             </div>
           }
         />
         <div className="p-6 space-y-6">
-          {/* Pipeline DAG */}
           <div>
             <div className="section-label px-1 mb-3">PIPELINE DAG</div>
             <GlassCard>
@@ -66,56 +74,59 @@ const DatasetStudio = () => {
             </GlassCard>
           </div>
 
-          {/* Registry + Detail */}
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
             <div>
               <div className="section-label px-1 mb-3">DATASET REGISTRY</div>
-              <div className="space-y-2">
-                {datasetPacks.map(pack => (
-                  <GlassCard
-                    key={pack.id}
-                    hover
-                    className={`cursor-pointer ${selectedPack?.id === pack.id ? 'glow-green' : ''}`}
-                    onClick={() => setSelectedPack(pack)}
-                  >
-                    <div className="flex items-center justify-between mb-1">
-                      <span className="text-sm font-display font-medium text-foreground">{pack.name}</span>
-                      <span className="text-[10px] font-mono bg-raised text-muted-foreground px-2 py-0.5 rounded">{pack.domain}</span>
-                    </div>
-                    <div className="text-xs font-mono text-muted-foreground mb-2">
-                      {pack.samples.toLocaleString()} samples · {pack.createdAt}
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <span className="text-[10px] font-mono text-muted-foreground">Quality: {pack.quality}%</span>
-                      <div className="flex-1 h-1 bg-raised rounded-full overflow-hidden">
-                        <div className="h-full bg-neon-green rounded-full progress-bar-transition" style={{ width: `${pack.quality}%` }} />
+              {isLoading && !datasetPacks.length ? (
+                <LoadingSkeleton rows={3} />
+              ) : (
+                <div className="space-y-2">
+                  {datasetPacks.map(pack => (
+                    <GlassCard
+                      key={pack.id}
+                      hover
+                      className={`cursor-pointer ${activePack?.id === pack.id ? 'glow-green' : ''}`}
+                      onClick={() => setSelectedPack(pack)}
+                      data-testid={`card-dataset-${pack.id}`}
+                    >
+                      <div className="flex items-center justify-between mb-1">
+                        <span className="text-sm font-display font-medium text-foreground">{pack.name}</span>
+                        <span className="text-[10px] font-mono bg-raised text-muted-foreground px-2 py-0.5 rounded">{pack.domain}</span>
                       </div>
-                    </div>
-                  </GlassCard>
-                ))}
-              </div>
+                      <div className="text-xs font-mono text-muted-foreground mb-2">
+                        {pack.samples.toLocaleString()} samples · {pack.createdAt}
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <span className="text-[10px] font-mono text-muted-foreground">Quality: {pack.quality}%</span>
+                        <div className="flex-1 h-1 bg-raised rounded-full overflow-hidden">
+                          <div className="h-full bg-neon-green rounded-full progress-bar-transition" style={{ width: `${pack.quality}%` }} />
+                        </div>
+                      </div>
+                    </GlassCard>
+                  ))}
+                </div>
+              )}
             </div>
 
             <div>
               <div className="section-label px-1 mb-3">PACK DETAIL</div>
-              {selectedPack && (
+              {activePack && (
                 <GlassCard>
-                  <div className="text-lg font-display font-semibold text-foreground mb-4">{selectedPack.name}</div>
+                  <div className="text-lg font-display font-semibold text-foreground mb-4">{activePack.name}</div>
                   <div className="space-y-3">
-                    <DetailRow label="Pack ID" value={selectedPack.id} />
-                    <DetailRow label="Samples" value={selectedPack.samples.toLocaleString()} />
-                    <DetailRow label="Quality" value={`${selectedPack.quality}%`} />
-                    <DetailRow label="Created" value={selectedPack.createdAt} />
+                    <DetailRow label="Pack ID" value={activePack.id} />
+                    <DetailRow label="Samples" value={activePack.samples.toLocaleString()} />
+                    <DetailRow label="Quality" value={`${activePack.quality}%`} />
+                    <DetailRow label="Created" value={activePack.createdAt} />
                     <div>
                       <div className="text-[10px] font-mono text-muted-foreground mb-2">SOURCE BREAKDOWN</div>
-                      {selectedPack.sources.map(s => (
+                      {activePack.sources.map(s => (
                         <div key={s.name} className="flex items-center justify-between py-1 text-xs font-mono">
                           <span className="text-foreground/80">{s.name}</span>
                           <span className="text-muted-foreground">{s.count.toLocaleString()}</span>
                         </div>
                       ))}
                     </div>
-                    {/* Quality Distribution */}
                     <div>
                       <div className="text-[10px] font-mono text-muted-foreground mb-2">QUALITY DISTRIBUTION</div>
                       <div className="flex items-end gap-[2px] h-12">
@@ -126,7 +137,7 @@ const DatasetStudio = () => {
                         })}
                       </div>
                     </div>
-                    <button className="w-full text-xs font-mono px-3 py-2 rounded-lg bg-neon-blue/20 border border-neon-blue/30 text-neon-blue hover:bg-neon-blue/30 transition-colors">
+                    <button data-testid="button-inspect-samples" className="w-full text-xs font-mono px-3 py-2 rounded-lg bg-neon-blue/20 border border-neon-blue/30 text-neon-blue hover:bg-neon-blue/30 transition-colors">
                       Inspect Samples
                     </button>
                   </div>
