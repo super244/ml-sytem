@@ -1,16 +1,21 @@
 from __future__ import annotations
 
+from typing import Any
+
 from torch.nn import CrossEntropyLoss
 from torch.utils.data import DataLoader, SequentialSampler
 from transformers import Trainer
+from trl import DPOConfig, DPOTrainer, ORPOConfig, ORPOTrainer
 
 
 class MathTrainer(Trainer):
+    """Custom trainer for math tasks with weighted loss for curriculum learning."""
+
     def __init__(self, *args, sequential_training: bool = False, **kwargs):
         super().__init__(*args, **kwargs)
         self.sequential_training = sequential_training
 
-    def compute_loss(self, model, inputs, return_outputs=False, **kwargs):
+    def compute_loss(self, model: Any, inputs: dict[str, Any], return_outputs: bool = False, **kwargs: Any) -> Any:
         sample_weight = inputs.pop("sample_weight", None)
         labels = inputs.get("labels")
         outputs = model(**inputs)
@@ -48,3 +53,62 @@ class MathTrainer(Trainer):
             num_workers=self.args.dataloader_num_workers,
             pin_memory=self.args.dataloader_pin_memory,
         )
+
+
+def build_ultimate_trainer(
+    config: Any,
+    model: Any,
+    args: Any,
+    train_dataset: Any,
+    eval_dataset: Any,
+    data_collator: Any,
+    tokenizer: Any,
+    callbacks: list[Any],
+) -> Any:
+    """Builds the appropriate trainer (SFT, DPO, ORPO) based on experiment config."""
+    if not config.preference.enabled:
+        return MathTrainer(
+            model=model,
+            args=args,
+            train_dataset=train_dataset,
+            eval_dataset=eval_dataset,
+            data_collator=data_collator,
+            tokenizer=tokenizer,
+            sequential_training=(config.data.curriculum_learning and config.data.sequential_curriculum),
+            callbacks=callbacks,
+        )
+
+    # Preference Optimization (DPO/ORPO)
+    if config.preference.loss_type == "orpo":
+        orpo_args = ORPOConfig(
+            **args.to_dict(),
+            beta=config.preference.beta,
+            max_prompt_length=config.preference.max_prompt_length,
+            max_length=config.preference.max_prompt_length + config.preference.max_target_length,
+        )
+        return ORPOTrainer(
+            model=model,
+            args=orpo_args,
+            train_dataset=train_dataset,
+            eval_dataset=eval_dataset,
+            tokenizer=tokenizer,
+            callbacks=callbacks,
+        )
+
+    # Default to DPO
+    dpo_args = DPOConfig(
+        **args.to_dict(),
+        beta=config.preference.beta,
+        loss_type=config.preference.loss_type,
+        max_prompt_length=config.preference.max_prompt_length,
+        max_length=config.preference.max_prompt_length + config.preference.max_target_length,
+        label_smoothing=config.preference.label_smoothing,
+    )
+    return DPOTrainer(
+        model=model,
+        args=dpo_args,
+        train_dataset=train_dataset,
+        eval_dataset=eval_dataset,
+        tokenizer=tokenizer,
+        callbacks=callbacks,
+    )
