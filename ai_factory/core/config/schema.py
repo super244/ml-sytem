@@ -108,7 +108,7 @@ class SubAgentConfig(BaseModel):
             "finetune": "optimization_feedback",
             "publish": "deployment",
         }
-        self.agent_roles = [mapping[item] for item in self.workloads if item in mapping]
+        self.agent_roles = cast(list[AgentType], [mapping[item] for item in self.workloads if item in mapping])
         return self
 
 

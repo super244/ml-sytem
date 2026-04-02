@@ -3,7 +3,7 @@ from __future__ import annotations
 from ai_factory import titan
 
 
-def test_detect_titan_status_prefers_remote_cuda_when_configured(monkeypatch):
+def test_detect_titan_status_prefers_remote_cuda_when_configured(monkeypatch) -> None:
     monkeypatch.setenv("AI_FACTORY_TITAN_REMOTE_EXECUTION", "1")
     monkeypatch.setenv("AI_FACTORY_TITAN_REMOTE_GPU_NAME", "NVIDIA H100")
     monkeypatch.setenv("AI_FACTORY_TITAN_REMOTE_GPU_COUNT", "4")

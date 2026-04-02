@@ -18,11 +18,11 @@ _import_or_skip("inference.app.routers.instances")
 _import_or_skip("inference.app.routers.orchestration")
 
 
-def test_cli_module_exposes_main():
+def test_cli_module_exposes_main() -> None:
     assert hasattr(ai_factory_cli, "main")
 
 
-def test_cli_parse_args_supports_orchestration_commands(monkeypatch):
+def test_cli_parse_args_supports_orchestration_commands(monkeypatch) -> None:
     monkeypatch.setattr(
         "sys.argv",
         ["ai-factory", "tasks", "instance-001"],
@@ -40,7 +40,7 @@ def test_cli_parse_args_supports_orchestration_commands(monkeypatch):
     assert args.timeout == 5.0
 
 
-def test_cli_parse_args_supports_shared_backend_overrides(monkeypatch):
+def test_cli_parse_args_supports_shared_backend_overrides(monkeypatch) -> None:
     monkeypatch.setattr(
         "sys.argv",
         ["ai-factory", "--artifacts-dir", "/tmp/ai-factory", "--repo-root", "/workspace", "list"],
@@ -51,7 +51,7 @@ def test_cli_parse_args_supports_shared_backend_overrides(monkeypatch):
     assert args.repo_root == "/workspace"
 
 
-def test_cli_parse_args_supports_tui_command(monkeypatch):
+def test_cli_parse_args_supports_tui_command(monkeypatch) -> None:
     monkeypatch.setattr("sys.argv", ["ai-factory", "tui", "--refresh-seconds", "1.5"])
     args = ai_factory_cli.parse_args()
     assert args.command == "tui"
@@ -63,7 +63,7 @@ def test_cli_parse_args_supports_tui_command(monkeypatch):
     assert args.root == "/tmp/project"
 
 
-def test_cli_parse_args_supports_control_center_new_and_inference(monkeypatch):
+def test_cli_parse_args_supports_control_center_new_and_inference(monkeypatch) -> None:
     monkeypatch.setattr(
         "sys.argv",
         [
