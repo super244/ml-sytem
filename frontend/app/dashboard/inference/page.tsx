@@ -2,24 +2,71 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 import {
-  generateAnswer,
-  getModels,
-  getInstances,
-  startManagedInference,
+  compareModels,
   flagTelemetry,
-  type ModelInfo,
+  generateAnswer,
+  getInstances,
+  getModels,
+  startManagedInference,
   type InstanceSummary,
+  type ModelInfo,
 } from "@/lib/api";
 
-type Message = {
-  role: "user" | "assistant";
+type AssistantVariant = {
+  model: string;
+  label: string;
   content: string;
   latency?: number;
   flagged?: boolean;
 };
+
+type ChatMessage =
+  | {
+      role: "user";
+      content: string;
+    }
+  | {
+      role: "assistant";
+      variants: AssistantVariant[];
+    };
+
+type FlagTarget = {
+  messageIndex: number;
+  variantIndex: number;
+} | null;
+
+const QUICK_PROMPTS = [
+  {
+    label: "Derivatives",
+    prompt: "Differentiate f(x) = (3x^2 - 5x + 2)e^(2x). Show the steps and end with Final Answer.",
+  },
+  {
+    label: "Integrals",
+    prompt: "Evaluate integral from 0 to 1 of (4x^3 - 2x + 1) dx. Explain every step.",
+  },
+  {
+    label: "Proof",
+    prompt: "Prove that the derivative of ln(x) is 1/x for x > 0.",
+  },
+  {
+    label: "Olympiad",
+    prompt: "Solve the system x + y = 7 and x^2 + y^2 = 29. Show reasoning carefully.",
+  },
+];
+
+function averageLatency(messages: ChatMessage[]): number | null {
+  const latencies = messages
+    .flatMap((message) => (message.role === "assistant" ? message.variants : []))
+    .map((variant) => variant.latency)
+    .filter((value): value is number => typeof value === "number");
+  if (!latencies.length) {
+    return null;
+  }
+  return latencies.reduce((sum, value) => sum + value, 0) / latencies.length;
+}
 
 export default function InferencePage() {
   const router = useRouter();
@@ -28,8 +75,10 @@ export default function InferencePage() {
   const [models, setModels] = useState<ModelInfo[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
-  const [selectedModel, setSelectedModel] = useState<string>("finetuned");
-  const [messages, setMessages] = useState<Message[]>([]);
+  const [selectedModel, setSelectedModel] = useState("finetuned");
+  const [secondaryModel, setSecondaryModel] = useState("base");
+  const [compareMode, setCompareMode] = useState(false);
+  const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState("");
   const [generating, setGenerating] = useState(false);
   const [temperature, setTemperature] = useState(0.7);
@@ -37,11 +86,9 @@ export default function InferencePage() {
   const [launchingId, setLaunchingId] = useState<string | null>(null);
   const [launching, setLaunching] = useState(false);
   const [launchNotice, setLaunchNotice] = useState<string | null>(null);
-  const bottomRef = useRef<HTMLDivElement>(null);
-  
-  // V2 Telemetry Flag State
-  const [flagModalIdx, setFlagModalIdx] = useState<number | null>(null);
+  const [flagTarget, setFlagTarget] = useState<FlagTarget>(null);
   const [flagReason, setFlagReason] = useState("");
+  const bottomRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     let active = true;
@@ -57,16 +104,16 @@ export default function InferencePage() {
         const list = instancesResult.value;
         setInstances(
           list.filter(
-            (i) =>
-              (i.type === "inference" && i.status === "running") ||
-              (i.type === "deploy" && i.status === "completed"),
+            (instance) =>
+              (instance.type === "inference" && instance.status === "running") ||
+              (instance.type === "deploy" && instance.status === "completed"),
           ),
         );
         setLaunchSources(
           list.filter(
-            (i) =>
-              i.status === "completed" &&
-              (i.type === "train" || i.type === "finetune" || i.type === "deploy"),
+            (instance) =>
+              instance.status === "completed" &&
+              (instance.type === "train" || instance.type === "finetune" || instance.type === "deploy"),
           ),
         );
       } else {
@@ -78,12 +125,18 @@ export default function InferencePage() {
       }
 
       if (modelsResult.status === "fulfilled") {
-        setModels(modelsResult.value);
-        const nextModel =
-          modelsResult.value.find((model) => model.name === "finetuned")?.name ??
-          modelsResult.value[0]?.name ??
+        const nextModels = modelsResult.value;
+        setModels(nextModels);
+        const primary =
+          nextModels.find((model) => model.name === "finetuned")?.name ??
+          nextModels[0]?.name ??
           "finetuned";
-        setSelectedModel(nextModel);
+        const secondary =
+          nextModels.find((model) => model.name !== primary)?.name ??
+          nextModels[0]?.name ??
+          "base";
+        setSelectedModel(primary);
+        setSecondaryModel(secondary);
       } else {
         errors.push(
           modelsResult.reason instanceof Error
@@ -103,52 +156,179 @@ export default function InferencePage() {
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages]);
+  }, [messages, generating]);
+
+  useEffect(() => {
+    if (selectedModel === secondaryModel) {
+      const fallback = models.find((model) => model.name !== selectedModel)?.name;
+      if (fallback) {
+        setSecondaryModel(fallback);
+      }
+    }
+  }, [models, secondaryModel, selectedModel]);
+
+  const modelLabelLookup = useMemo(
+    () => new Map(models.map((model) => [model.name, model.label ?? model.name])),
+    [models],
+  );
+  const flaggedCount = useMemo(
+    () =>
+      messages.reduce((count, message) => {
+        if (message.role !== "assistant") {
+          return count;
+        }
+        return count + message.variants.filter((variant) => variant.flagged).length;
+      }, 0),
+    [messages],
+  );
+  const sessionAverageLatency = useMemo(() => averageLatency(messages), [messages]);
+
+  function findPromptForMessage(messageIndex: number): string {
+    for (let index = messageIndex - 1; index >= 0; index -= 1) {
+      const candidate = messages[index];
+      if (candidate?.role === "user") {
+        return candidate.content;
+      }
+    }
+    return "";
+  }
 
   async function send() {
-    if (!input.trim() || generating) return;
-    const userMsg: Message = { role: "user", content: input };
-    setMessages((m) => [...m, userMsg]);
+    if (!input.trim() || generating) {
+      return;
+    }
+
+    const question = input.trim();
+    setMessages((current) => [...current, { role: "user", content: question }]);
     setInput("");
     setGenerating(true);
-    const t0 = Date.now();
+    const startedAt = Date.now();
+
     try {
-      const result = await generateAnswer({
-        question: input,
-        model_variant: selectedModel,
-        compare_to_base: false,
-        prompt_preset: "atlas_rigorous",
-        temperature,
-        top_p: 0.95,
-        max_new_tokens: maxTokens,
-        show_reasoning: false,
-        difficulty_target: "medium",
-        num_samples: 1,
-        use_calculator: false,
-        solver_mode: "concise",
-        output_format: "text",
-        use_cache: false,
-      });
-      const latency = (Date.now() - t0) / 1000;
-      setMessages((m) => [
-        ...m,
+      if (compareMode && secondaryModel && secondaryModel !== selectedModel) {
+        const result = await compareModels({
+          question,
+          primary_model: selectedModel,
+          secondary_model: secondaryModel,
+          prompt_preset: "atlas_rigorous",
+          temperature,
+          top_p: 0.95,
+          max_new_tokens: maxTokens,
+          show_reasoning: false,
+          difficulty_target: "medium",
+          num_samples: 1,
+          use_calculator: false,
+          solver_mode: "concise",
+          output_format: "text",
+          use_cache: false,
+        });
+        setMessages((current) => [
+          ...current,
+          {
+            role: "assistant",
+            variants: [
+              {
+                model: selectedModel,
+                label: modelLabelLookup.get(selectedModel) ?? selectedModel,
+                content: result.primary.answer || result.primary.raw_text,
+                latency: result.primary.latency_s ?? (Date.now() - startedAt) / 1000,
+              },
+              {
+                model: secondaryModel,
+                label: modelLabelLookup.get(secondaryModel) ?? secondaryModel,
+                content: result.secondary.answer || result.secondary.raw_text,
+                latency: result.secondary.latency_s ?? (Date.now() - startedAt) / 1000,
+              },
+            ],
+          },
+        ]);
+      } else {
+        const result = await generateAnswer({
+          question,
+          model_variant: selectedModel,
+          compare_to_base: false,
+          prompt_preset: "atlas_rigorous",
+          temperature,
+          top_p: 0.95,
+          max_new_tokens: maxTokens,
+          show_reasoning: false,
+          difficulty_target: "medium",
+          num_samples: 1,
+          use_calculator: false,
+          solver_mode: "concise",
+          output_format: "text",
+          use_cache: false,
+        });
+        setMessages((current) => [
+          ...current,
+          {
+            role: "assistant",
+            variants: [
+              {
+                model: selectedModel,
+                label: modelLabelLookup.get(selectedModel) ?? selectedModel,
+                content: result.answer || result.raw_text,
+                latency: result.latency_s ?? (Date.now() - startedAt) / 1000,
+              },
+            ],
+          },
+        ]);
+      }
+    } catch (error) {
+      setMessages((current) => [
+        ...current,
         {
           role: "assistant",
-          content: result.answer || result.raw_text,
-          latency,
-        },
-      ]);
-    } catch (e) {
-      setMessages((m) => [
-        ...m,
-        {
-          role: "assistant",
-          content: `Error: ${e instanceof Error ? e.message : "Inference failed"}`,
+          variants: [
+            {
+              model: selectedModel,
+              label: "System",
+              content: `Error: ${error instanceof Error ? error.message : "Inference failed"}`,
+            },
+          ],
         },
       ]);
     } finally {
       setGenerating(false);
     }
+  }
+
+  async function submitFlag() {
+    if (!flagTarget) {
+      return;
+    }
+    const targetMessage = messages[flagTarget.messageIndex];
+    if (targetMessage?.role !== "assistant") {
+      return;
+    }
+    const targetVariant = targetMessage.variants[flagTarget.variantIndex];
+    if (!targetVariant) {
+      return;
+    }
+
+    await flagTelemetry({
+      prompt: findPromptForMessage(flagTarget.messageIndex),
+      assistant_output: targetVariant.content,
+      expected_output: flagReason,
+      model_variant: targetVariant.model,
+      latency_s: targetVariant.latency,
+    });
+
+    setMessages((current) =>
+      current.map((message, messageIndex) => {
+        if (message.role !== "assistant" || messageIndex !== flagTarget.messageIndex) {
+          return message;
+        }
+        return {
+          ...message,
+          variants: message.variants.map((variant, variantIndex) =>
+            variantIndex === flagTarget.variantIndex ? { ...variant, flagged: true } : variant,
+          ),
+        };
+      }),
+    );
+    setFlagReason("");
+    setFlagTarget(null);
   }
 
   async function launchInference(instanceId: string) {
@@ -170,10 +350,10 @@ export default function InferencePage() {
       <div className="dash-page-header panel">
         <div>
           <span className="eyebrow">Lifecycle → Inference</span>
-          <h1 className="dash-page-title">Inference</h1>
+          <h1 className="dash-page-title">Inference Studio</h1>
           <p className="dash-page-desc">
-            Chat with your trained and deployed models. Built-in inference UI with
-            configurable temperature and token limits.
+            Ollama-style chat workspace for live prompting, model comparison, launch control,
+            and telemetry capture from the same AI-Factory dashboard.
           </p>
         </div>
       </div>
@@ -191,17 +371,30 @@ export default function InferencePage() {
       )}
 
       <div className="inference-layout">
-        {/* Sidebar: Model & Settings */}
         <div className="inference-sidebar">
-          {/* Model Selection */}
           <div className="panel inference-settings-panel">
-            <h2 className="section-title">Model</h2>
+            <h2 className="section-title">Session Cockpit</h2>
             <div className="input-group">
-              <label className="control-label" htmlFor="model-select">Active model</label>
+              <label className="control-label" htmlFor="response-mode">
+                Response mode
+              </label>
               <select
-                id="model-select"
+                id="response-mode"
+                value={compareMode ? "compare" : "single"}
+                onChange={(event) => setCompareMode(event.target.value === "compare")}
+              >
+                <option value="single">Single model</option>
+                <option value="compare">Compare two models</option>
+              </select>
+            </div>
+            <div className="input-group">
+              <label className="control-label" htmlFor="primary-model">
+                Primary model
+              </label>
+              <select
+                id="primary-model"
                 value={selectedModel}
-                onChange={(e) => setSelectedModel(e.target.value)}
+                onChange={(event) => setSelectedModel(event.target.value)}
               >
                 {models.length > 0 ? (
                   models.map((model) => (
@@ -210,30 +403,64 @@ export default function InferencePage() {
                     </option>
                   ))
                 ) : (
-                  <>
-                    <option value="finetuned">Finetuned</option>
-                    <option value="base">Base model</option>
-                  </>
+                  <option value="finetuned">Finetuned</option>
                 )}
               </select>
-              {models.length > 0 && (
-                <p className="control-label" style={{ marginTop: "0.5rem" }}>
-                  Registry synced: {models.length} models available.
-                </p>
-              )}
             </div>
-
-            {instances.length > 0 && (
-              <>
-                <p className="control-label">Live inference instances</p>
-                {instances.map((inst) => (
-                  <div key={inst.id} className="inference-instance-chip">
-                    <span className={`monitor-status-dot status-${inst.status}`} />
-                    <span className="inference-chip-name">{inst.name}</span>
-                  </div>
-                ))}
-              </>
+            {compareMode && (
+              <div className="input-group">
+                <label className="control-label" htmlFor="secondary-model">
+                  Comparison model
+                </label>
+                <select
+                  id="secondary-model"
+                  value={secondaryModel}
+                  onChange={(event) => setSecondaryModel(event.target.value)}
+                >
+                  {models
+                    .filter((model) => model.name !== selectedModel)
+                    .map((model) => (
+                      <option key={model.name} value={model.name}>
+                        {model.label ?? model.name}
+                      </option>
+                    ))}
+                </select>
+              </div>
             )}
+
+            <div className="inference-stat-grid">
+              <div className="inference-stat-card">
+                <span className="inference-stat-label">Turns</span>
+                <strong>{messages.filter((message) => message.role === "assistant").length}</strong>
+              </div>
+              <div className="inference-stat-card">
+                <span className="inference-stat-label">Avg latency</span>
+                <strong>{sessionAverageLatency ? `${sessionAverageLatency.toFixed(2)}s` : "—"}</strong>
+              </div>
+              <div className="inference-stat-card">
+                <span className="inference-stat-label">Flagged</span>
+                <strong>{flaggedCount}</strong>
+              </div>
+            </div>
+          </div>
+
+          <div className="panel inference-settings-panel">
+            <h2 className="section-title">Quick Prompts</h2>
+            <div className="prompt-chip-list">
+              {QUICK_PROMPTS.map((prompt) => (
+                <button
+                  key={prompt.label}
+                  type="button"
+                  className="prompt-chip"
+                  onClick={() => setInput(prompt.prompt)}
+                >
+                  {prompt.label}
+                </button>
+              ))}
+            </div>
+            <p className="control-label">
+              Tap a prompt to preload the composer with a structured task.
+            </p>
           </div>
 
           <div className="panel inference-settings-panel">
@@ -269,7 +496,7 @@ export default function InferencePage() {
                     }
                   }}
                 >
-                  {launching ? "⟳ Launching…" : launchingId ? "◎ Launch inference branch" : "Select a source to launch"}
+                  {launching ? "⟳ Launching…" : launchingId ? "◎ Launch inference branch" : "Select a source"}
                 </button>
               </>
             ) : (
@@ -277,9 +504,8 @@ export default function InferencePage() {
             )}
           </div>
 
-          {/* Settings */}
           <div className="panel inference-settings-panel">
-            <h2 className="section-title">Settings</h2>
+            <h2 className="section-title">Runtime Settings</h2>
             <div className="input-group">
               <label className="control-label" htmlFor="temperature">
                 Temperature: {temperature.toFixed(1)}
@@ -291,7 +517,7 @@ export default function InferencePage() {
                 max={2}
                 step={0.1}
                 value={temperature}
-                onChange={(e) => setTemperature(Number(e.target.value))}
+                onChange={(event) => setTemperature(Number(event.target.value))}
               />
             </div>
             <div className="input-group">
@@ -305,118 +531,131 @@ export default function InferencePage() {
                 max={2048}
                 step={64}
                 value={maxTokens}
-                onChange={(e) => setMaxTokens(Number(e.target.value))}
+                onChange={(event) => setMaxTokens(Number(event.target.value))}
               />
             </div>
+            {instances.length > 0 && (
+              <>
+                <p className="control-label">Live inference instances</p>
+                {instances.map((instance) => (
+                  <div key={instance.id} className="inference-instance-chip">
+                    <span className={`monitor-status-dot status-${instance.status}`} />
+                    <span className="inference-chip-name">{instance.name}</span>
+                  </div>
+                ))}
+              </>
+            )}
           </div>
 
-          {/* Quick Launch */}
-          {!loading && instances.length === 0 && (
-            <div className="panel inference-settings-panel">
-              <h2 className="section-title">No Active Instances</h2>
-              <p className="control-label">
-                Start an inference instance from a completed training run.
-              </p>
-              <Link href="/dashboard/deploy" className="secondary-button small">
-                ⬆ Deploy a Model
-              </Link>
+          <div className="panel inference-settings-panel">
+            <h2 className="section-title">Model Catalog</h2>
+            <div className="model-catalog">
+              {models.slice(0, 6).map((model) => (
+                <button
+                  key={model.name}
+                  type="button"
+                  className={`model-catalog-item ${selectedModel === model.name ? "active" : ""}`}
+                  onClick={() => setSelectedModel(model.name)}
+                >
+                  <strong>{model.label ?? model.name}</strong>
+                  <span>{model.description ?? "Local registry model"}</span>
+                </button>
+              ))}
             </div>
-          )}
+            {!loading && models.length === 0 && (
+              <Link href="/dashboard/deploy" className="secondary-button small">
+                ⬆ Deploy a model
+              </Link>
+            )}
+          </div>
 
           {messages.length > 0 && (
-            <button
-              type="button"
-              className="ghost-button"
-              onClick={() => setMessages([])}
-            >
-              Clear chat
+            <button type="button" className="ghost-button" onClick={() => setMessages([])}>
+              Clear session
             </button>
           )}
         </div>
 
-        {/* Chat Window */}
         <div className="panel inference-chat-panel">
+          <div className="inference-chat-header">
+            <div>
+              <span className="eyebrow">Prompt Console</span>
+              <h2 className="section-title">Live session</h2>
+            </div>
+            <div className="inference-chat-status">
+              <span>{modelLabelLookup.get(selectedModel) ?? selectedModel}</span>
+              {compareMode && secondaryModel && <span>vs {modelLabelLookup.get(secondaryModel) ?? secondaryModel}</span>}
+            </div>
+          </div>
+
           <div className="inference-messages">
             {messages.length === 0 && (
               <div className="inference-empty-state">
                 <span className="inference-empty-icon">◎</span>
-                <p>Start a conversation with your model.</p>
+                <p>Start a conversation with your model stack.</p>
                 <p className="inference-empty-hint">
-                  Model: <strong>{selectedModel}</strong>
+                  Mode: <strong>{compareMode ? "Compare" : "Single"}</strong> · Primary model:{" "}
+                  <strong>{modelLabelLookup.get(selectedModel) ?? selectedModel}</strong>
                 </p>
               </div>
             )}
-            {messages.map((msg, idx) => (
-              <div key={idx} className={`inference-message ${msg.role}`}>
-                <div className="inference-message-role" style={{ display: "flex", justifyContent: "space-between" }}>
-                  <span>{msg.role === "user" ? "You" : "Model"}</span>
-                  {msg.role === "assistant" && (
-                    <button
-                      type="button"
-                      className="ghost-button small"
-                      style={{ padding: "0 0.5rem", height: "auto", fontSize: "0.75rem", opacity: msg.flagged ? 1 : 0.6 }}
-                      onClick={() => setFlagModalIdx(flagModalIdx === idx ? null : idx)}
-                      disabled={msg.flagged}
-                    >
-                      {msg.flagged ? "✓ Flagged for dataset" : "👎 Flag as failure"}
-                    </button>
+
+            {messages.map((message, messageIndex) =>
+              message.role === "user" ? (
+                <div key={messageIndex} className="inference-message user">
+                  <div className="inference-message-role">You</div>
+                  <div className="inference-message-content">{message.content}</div>
+                </div>
+              ) : (
+                <div key={messageIndex} className="inference-message assistant">
+                  <div className="inference-message-role">Model</div>
+                  {message.variants.length > 1 ? (
+                    <div className="inference-compare-grid">
+                      {message.variants.map((variant, variantIndex) => (
+                        <div key={`${variant.model}-${variantIndex}`} className="inference-compare-card">
+                          <div className="inference-compare-header">
+                            <strong>{variant.label}</strong>
+                            <button
+                              type="button"
+                              className="ghost-button small"
+                              disabled={variant.flagged}
+                              onClick={() => setFlagTarget({ messageIndex, variantIndex })}
+                            >
+                              {variant.flagged ? "✓ Flagged" : "Flag"}
+                            </button>
+                          </div>
+                          <div className="inference-message-content">{variant.content}</div>
+                          <div className="inference-message-meta">
+                            {variant.latency != null ? `${variant.latency.toFixed(2)}s` : "No latency"}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    message.variants.map((variant, variantIndex) => (
+                      <div key={`${variant.model}-${variantIndex}`} className="inference-single-output">
+                        <div className="inference-output-actions">
+                          <strong>{variant.label}</strong>
+                          <button
+                            type="button"
+                            className="ghost-button small"
+                            disabled={variant.flagged}
+                            onClick={() => setFlagTarget({ messageIndex, variantIndex })}
+                          >
+                            {variant.flagged ? "✓ Flagged for dataset" : "Flag as failure"}
+                          </button>
+                        </div>
+                        <div className="inference-message-content">{variant.content}</div>
+                        {variant.latency != null && (
+                          <div className="inference-message-meta">{variant.latency.toFixed(2)}s</div>
+                        )}
+                      </div>
+                    ))
                   )}
                 </div>
-                <div className="inference-message-content" style={{ whiteSpace: "pre-wrap" }}>{msg.content}</div>
-                
-                {flagModalIdx === idx && (
-                  <div className="panel" style={{ marginTop: "1rem", padding: "1rem", background: "rgba(255,255,255,0.02)", border: "1px solid var(--line)" }}>
-                    <p style={{ fontSize: "0.8rem", marginBottom: "0.5rem", opacity: 0.8 }}>
-                      What went wrong? This pairs the prompt with your correction for the V2 synthetics pipeline.
-                    </p>
-                    <textarea 
-                      value={flagReason} 
-                      onChange={(e) => setFlagReason(e.target.value)}
-                      placeholder="Expected output or reason for failure..."
-                      style={{ width: "100%", background: "transparent", color: "inherit", border: "1px solid var(--line)", borderRadius: "4px", padding: "0.5rem", minHeight: "60px", fontSize: "0.85rem", marginBottom: "0.5rem" }}
-                    />
-                    <div style={{ display: "flex", gap: "0.5rem" }}>
-                      <button 
-                        className="primary-button small"
-                        onClick={() => {
-                          const newMessages = [...messages];
-                          newMessages[idx].flagged = true;
-                          setMessages(newMessages);
-                          
-                          let promptText = "";
-                          for (let i = idx - 1; i >= 0; i--) {
-                            if (messages[i].role === "user") {
-                              promptText = messages[i].content;
-                              break;
-                            }
-                          }
+              ),
+            )}
 
-                          void flagTelemetry({
-                            prompt: promptText,
-                            assistant_output: msg.content,
-                            expected_output: flagReason,
-                            model_variant: selectedModel,
-                            latency_s: msg.latency
-                          });
-
-                          setFlagModalIdx(null);
-                          setFlagReason("");
-                        }}
-                      >
-                        Submit to Telemetry
-                      </button>
-                      <button className="ghost-button small" onClick={() => setFlagModalIdx(null)}>Cancel</button>
-                    </div>
-                  </div>
-                )}
-
-                {msg.latency != null && (
-                  <div className="inference-message-meta">
-                    {msg.latency.toFixed(2)}s
-                  </div>
-                )}
-              </div>
-            ))}
             {generating && (
               <div className="inference-message assistant">
                 <div className="inference-message-role">Model</div>
@@ -430,16 +669,44 @@ export default function InferencePage() {
             <div ref={bottomRef} />
           </div>
 
+          {flagTarget && (
+            <div className="inference-flag-sheet">
+              <div className="inference-flag-copy">
+                Capture this response as a failure case for future dataset synthesis or replay training.
+              </div>
+              <textarea
+                value={flagReason}
+                onChange={(event) => setFlagReason(event.target.value)}
+                placeholder="Expected answer or what failed..."
+                className="inference-input"
+                rows={3}
+              />
+              <div className="inference-flag-actions">
+                <button
+                  type="button"
+                  className="primary-button small"
+                  disabled={!flagReason.trim()}
+                  onClick={() => void submitFlag()}
+                >
+                  Submit to telemetry
+                </button>
+                <button type="button" className="ghost-button small" onClick={() => setFlagTarget(null)}>
+                  Cancel
+                </button>
+              </div>
+            </div>
+          )}
+
           <div className="inference-composer">
             <textarea
               className="inference-input"
               placeholder="Ask your model anything…"
               value={input}
               rows={3}
-              onChange={(e) => setInput(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === "Enter" && !e.shiftKey) {
-                  e.preventDefault();
+              onChange={(event) => setInput(event.target.value)}
+              onKeyDown={(event) => {
+                if (event.key === "Enter" && !event.shiftKey) {
+                  event.preventDefault();
                   void send();
                 }
               }}
@@ -450,7 +717,7 @@ export default function InferencePage() {
               disabled={generating || !input.trim()}
               onClick={() => void send()}
             >
-              {generating ? "⟳" : "Send →"}
+              {generating ? "⟳" : compareMode ? "Compare →" : "Send →"}
             </button>
           </div>
         </div>

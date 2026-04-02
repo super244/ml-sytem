@@ -9,14 +9,14 @@ from training.src.environment import collect_environment_snapshot
 from training.src.tracking import build_tracker
 
 
-def test_profile_config_loads_tracking_component():
+def test_profile_config_loads_tracking_component() -> None:
     config = load_experiment_config("training/configs/profiles/baseline_qlora.yaml")
     assert config.tracking.provider == "none"
     assert config.tracking.capture_environment is True
     assert config.tracking.log_summary_artifact is True
 
 
-def test_environment_snapshot_writes_runtime_metadata(tmp_path):
+def test_environment_snapshot_writes_runtime_metadata(tmp_path) -> None:
     config = load_experiment_config("training/configs/profiles/baseline_qlora.yaml")
     config.training.artifacts_dir = str(tmp_path)
     config.tracking.capture_installed_packages = False
@@ -32,7 +32,7 @@ def test_environment_snapshot_writes_runtime_metadata(tmp_path):
     assert snapshot["files"]["config"]["exists"] is True
 
 
-def test_json_tracker_writes_context_events_and_summary(tmp_path):
+def test_json_tracker_writes_context_events_and_summary(tmp_path) -> None:
     config = load_experiment_config("training/configs/profiles/baseline_qlora.yaml")
     config.training.artifacts_dir = str(tmp_path)
     layout = prepare_run_layout(tmp_path, "unit-tracker")
@@ -55,7 +55,7 @@ def test_json_tracker_writes_context_events_and_summary(tmp_path):
     assert summary["summary"]["eval_loss"] == 0.2
 
 
-def test_find_latest_checkpoint_prefers_highest_step(tmp_path):
+def test_find_latest_checkpoint_prefers_highest_step(tmp_path) -> None:
     base = tmp_path / "checkpoints"
     (base / "checkpoint-4").mkdir(parents=True)
     (base / "checkpoint-10").mkdir()

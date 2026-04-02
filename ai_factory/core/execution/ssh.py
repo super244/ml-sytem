@@ -9,10 +9,10 @@ from pathlib import Path
 from typing import Any
 
 from ai_factory.core.execution.base import BaseExecutor, CommandSpec, RunnerPayload, decode_payload, encode_payload
-from ai_factory.core.instances.models import ExecutionHandle, InstanceManifest
+from ai_factory.core.instances.models import EnvironmentSpec, ExecutionHandle, InstanceManifest
 
 
-def _ssh_target(environment) -> str:
+def _ssh_target(environment: EnvironmentSpec) -> str:
     if not environment.host or not environment.user:
         raise ValueError("SSH execution requires environment.host and environment.user")
     return f"{environment.user}@{environment.host}"
@@ -48,7 +48,7 @@ def _port_forward_args(metadata: dict[str, Any]) -> list[str]:
     return argv
 
 
-def _build_ssh_argv(environment, metadata: dict[str, Any]) -> list[str]:
+def _build_ssh_argv(environment: EnvironmentSpec, metadata: dict[str, Any]) -> list[str]:
     argv = ["ssh", "-p", str(environment.port)]
     if environment.key_path:
         argv.extend(["-i", environment.key_path])
@@ -56,7 +56,7 @@ def _build_ssh_argv(environment, metadata: dict[str, Any]) -> list[str]:
     return argv
 
 
-def _stream_pipe(pipe, path: Path) -> None:
+def _stream_pipe(pipe: Any, path: Path) -> None:
     with path.open("a") as handle:
         for line in iter(pipe.readline, ""):
             handle.write(line)
@@ -64,7 +64,9 @@ def _stream_pipe(pipe, path: Path) -> None:
     pipe.close()
 
 
-def _heartbeat_loop(manager, instance_id: str, attempt_id: str, stop_event: threading.Event, interval_s: int) -> None:
+def _heartbeat_loop(
+    manager: Any, instance_id: str, attempt_id: str, stop_event: threading.Event, interval_s: int
+) -> None:
     while not stop_event.wait(interval_s):
         try:
             manager.heartbeat_instance_attempt(instance_id, attempt_id)

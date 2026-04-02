@@ -26,7 +26,6 @@ from training.src.environment import collect_environment_snapshot
 from training.src.modeling import load_model_for_training, load_tokenizer, trainable_parameter_report
 from training.src.packaging import publish_model_artifacts, write_run_manifest, write_training_summary
 from training.src.tracking import build_tracker
-from training.src.trainer import MathTrainer
 from training.src.validation import run_dry_validation
 
 # Set up structured logging
@@ -383,14 +382,16 @@ def main() -> None:
 
         data_collator = WeightedDataCollator(tokenizer=tokenizer, label_pad_token_id=-100, pad_to_multiple_of=8)
 
-        trainer = MathTrainer(
+        from training.src.trainer import build_ultimate_trainer
+
+        trainer = build_ultimate_trainer(
+            config=config,
             model=model,
             args=build_training_arguments(config, layout),
             train_dataset=train_dataset,
             eval_dataset=eval_dataset,
             data_collator=data_collator,
             tokenizer=tokenizer,
-            sequential_training=(config.data.curriculum_learning and config.data.sequential_curriculum),
             callbacks=[
                 JsonlMetricsCallback(layout.logs_dir / config.logging.jsonl_metrics_filename),
                 TrackerCallback(tracker),
@@ -409,6 +410,25 @@ def main() -> None:
         logger.info("Publishing artifacts.")
         published = publish_model_artifacts(layout, config, trainer, tokenizer)
         trainer.save_state()
+
+        # Automatic Lineage Registration
+        try:
+            from ai_factory.core.lineage.models import LineageRecord
+            from ai_factory.core.platform.container import build_platform_container
+
+            container = build_platform_container(repo_root=Path.cwd())
+            record = LineageRecord(
+                id=layout.run_id,
+                base_model=config.model.base_model_name,
+                dataset_hash=config.data.pack_manifest or "unspecified",
+                training_config=config.to_dict(),
+                metrics={k: float(v) for k, v in metrics.items() if isinstance(v, (int, float))},
+                tags=config.tracking.tags + [config.adapter.method],
+            )
+            container.control_service.record_lineage(record)
+            logger.info(f"Model lineage registered: {layout.run_id}")
+        except Exception as e:
+            logger.warning(f"Lineage registration failed: {e}")
 
         summary = {
             "run_name": config.run_name,

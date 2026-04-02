@@ -60,7 +60,7 @@ def _prime_orchestration_packages(monkeypatch: pytest.MonkeyPatch) -> None:
     _stub_package(monkeypatch, "ai_factory.core.decisions", repo_root / "ai_factory" / "core" / "decisions")
 
 
-def test_orchestration_config_loads_and_resolves_refs(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
+def test_orchestration_config_loads_and_resolves_refs(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     _prime_orchestration_packages(monkeypatch)
     loader = importlib.import_module("ai_factory.core.config.loader")
 
@@ -93,7 +93,7 @@ def test_orchestration_config_loads_and_resolves_refs(tmp_path: Path, monkeypatc
     assert config.resolved_subsystem_config["run_name"] == "baseline-run"
 
 
-def test_repository_prepare_template_loads(monkeypatch: pytest.MonkeyPatch):
+def test_repository_prepare_template_loads(monkeypatch: pytest.MonkeyPatch) -> None:
     _prime_orchestration_packages(monkeypatch)
     loader = importlib.import_module("ai_factory.core.config.loader")
 
@@ -151,7 +151,7 @@ def test_save_cloud_profile_uses_nested_store_and_secure_permissions(
         assert stat.S_IMODE(saved_path.stat().st_mode) == 0o600
 
 
-def test_file_instance_store_round_trip(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
+def test_file_instance_store_round_trip(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     _prime_orchestration_packages(monkeypatch)
     models = importlib.import_module("ai_factory.core.instances.models")
     store_mod = importlib.import_module("ai_factory.core.instances.store")
@@ -195,7 +195,7 @@ def test_file_instance_store_round_trip(tmp_path: Path, monkeypatch: pytest.Monk
     assert store.read_recommendations_report("finetune-001")[0]["action"] == "evaluate"
 
 
-def test_decision_rules_cover_deploy_finetune_and_retrain(monkeypatch: pytest.MonkeyPatch):
+def test_decision_rules_cover_deploy_finetune_and_retrain(monkeypatch: pytest.MonkeyPatch) -> None:
     _prime_orchestration_packages(monkeypatch)
     schema = importlib.import_module("ai_factory.core.config.schema")
     rules = importlib.import_module("ai_factory.core.decisions.rules")
@@ -226,7 +226,7 @@ def test_decision_rules_cover_deploy_finetune_and_retrain(monkeypatch: pytest.Mo
     assert retrain.action == "retrain"
 
 
-def test_command_builder_covers_instance_types(monkeypatch: pytest.MonkeyPatch):
+def test_command_builder_covers_instance_types(monkeypatch: pytest.MonkeyPatch) -> None:
     _prime_orchestration_packages(monkeypatch)
     schema = importlib.import_module("ai_factory.core.config.schema")
     models = importlib.import_module("ai_factory.core.instances.models")
@@ -360,7 +360,7 @@ def test_command_builder_covers_instance_types(monkeypatch: pytest.MonkeyPatch):
     assert train_cmd.env["AI_FACTORY_ORCHESTRATION_MODE"] == "hybrid"
 
 
-def test_experience_guardrails_strip_unsafe_overrides(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
+def test_experience_guardrails_strip_unsafe_overrides(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     _prime_orchestration_packages(monkeypatch)
     loader = importlib.import_module("ai_factory.core.config.loader")
 

@@ -6,7 +6,7 @@ import sys
 from pathlib import Path
 
 
-def run_command(cmd, description):
+def run_command(cmd: str, description: str) -> bool:
     """Run a command and return success status."""
     print(f"Checking {description}...")
     try:
@@ -18,7 +18,7 @@ def run_command(cmd, description):
         return False
 
 
-def main():
+def main() -> int:
     """Run system health checks."""
     print("🏭 AI-Factory System Health Check")
     print("=" * 40)

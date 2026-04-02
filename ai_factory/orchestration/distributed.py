@@ -24,7 +24,7 @@ class DistributedTrainingOrchestrator:
     Manages multi-node/multi-GPU training runs using torchrun.
     """
 
-    def __init__(self, config: DistributedConfig):
+    def __init__(self, config: DistributedConfig) -> None:
         self.config = config
         self.world_size = self.config.num_nodes * self.config.num_gpus_per_node
 

@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+import shutil
 import subprocess
+import time
 from pathlib import Path
 from typing import Any
 
@@ -8,6 +10,14 @@ from ai_factory.core.discovery import latest_training_run, list_training_runs
 from ai_factory.core.instances.models import InstanceManifest, MetricPoint, ProgressSnapshot
 from ai_factory.core.io import load_json, read_jsonl
 from ai_factory.core.monitoring.metrics import metric_points_from_summary
+
+# ---------------------------------------------------------------------------
+# GPU snapshot cache – avoid running nvidia-smi on every list_instances call.
+# ---------------------------------------------------------------------------
+_GPU_CACHE_TTL_S: float = 30.0
+_gpu_cache: tuple[float, dict[str, Any] | None] | None = None  # (monotonic_ts, payload)
+_NVIDIA_SMI_AVAILABLE: bool | None = None  # lazily determined
+_TITAN_SMI_AVAILABLE: bool | None = None  # lazily determined
 
 
 def _prepare_output_dir(snapshot: dict[str, Any]) -> Path:
@@ -20,8 +30,8 @@ def _prepare_metrics(snapshot: dict[str, Any]) -> tuple[dict[str, Any], list[Met
     manifest = load_json(output_dir / "manifest.json", default={}) or {}
     stats = load_json(output_dir / "stats.json", default={}) or {}
     pack_summary = load_json(output_dir / "pack_summary.json", default={}) or {}
-    manifest_stats = manifest.get("stats") if isinstance(manifest.get("stats"), dict) else {}
-    summary = {
+    manifest_stats: dict[str, Any] = cast(dict[str, Any], manifest.get("stats")) if isinstance(manifest.get("stats"), dict) else {}
+    summary: dict[str, Any] = {
         "records": (manifest_stats.get("num_records") or stats.get("num_records") or stats.get("records_total")),
         "train_rows": stats.get("train_rows"),
         "eval_rows": stats.get("eval_rows"),
@@ -87,7 +97,7 @@ def _training_metrics(
         for key, value in row.items():
             if key in {"step", "epoch"} or not isinstance(value, (int, float)):
                 continue
-            tags = {"stage": manifest.type}
+            tags: dict[str, str] = {"stage": str(manifest.type)}
             if step is not None:
                 tags["step"] = str(step)
             points.append(MetricPoint(name=key, value=value, tags=tags))
@@ -134,7 +144,7 @@ def _training_progress(manifest: InstanceManifest, snapshot: dict[str, Any]) -> 
     step = latest.get("step")
     total_steps = training.get("max_steps")
     try:
-        total_steps = int(total_steps) if total_steps not in (None, "", -1) else None
+        total_steps = int(total_steps) if total_steps and str(total_steps).strip() not in ("", "-1") else None
     except (TypeError, ValueError):
         total_steps = None
     percent = None
@@ -215,9 +225,9 @@ def _inference_metrics(snapshot: dict[str, Any]) -> tuple[dict[str, Any], list[M
     ]
     ttft_values = [row.get("ttft_s") for row in rows if isinstance(row.get("ttft_s"), (int, float))]
     cache_hits = sum(1 for row in rows if row.get("cache_hit"))
-    total_prompt_tokens = sum(prompt_tokens)
-    total_completion_tokens = sum(completion_tokens)
-    total_latency_s = sum(latencies) if latencies else None
+    total_prompt_tokens = sum(t for t in prompt_tokens if t is not None)
+    total_completion_tokens = sum(t for t in completion_tokens if t is not None)
+    total_latency_s = sum(t for t in latencies if t is not None) if latencies else None
     summary = {
         "requests": len(rows),
         "cache_hits": cache_hits,
@@ -227,7 +237,7 @@ def _inference_metrics(snapshot: dict[str, Any]) -> tuple[dict[str, Any], list[M
         "avg_tokens_per_second": (
             total_completion_tokens / total_latency_s if total_completion_tokens and total_latency_s else None
         ),
-        "avg_time_to_first_token_s": (sum(ttft_values) / len(ttft_values)) if ttft_values else None,
+        "avg_time_to_first_token_s": (sum(t for t in ttft_values if t is not None) / len(ttft_values)) if ttft_values else None,
     }
     refs = {"telemetry": telemetry_path}
     return summary, metric_points_from_summary(summary, stage="inference"), refs
@@ -242,8 +252,8 @@ def _inference_progress(snapshot: dict[str, Any]) -> ProgressSnapshot | None:
     completion_tokens = [
         row.get("completion_tokens") for row in rows if isinstance(row.get("completion_tokens"), (int, float))
     ]
-    total_latency_s = sum(latencies) if latencies else None
-    total_completion_tokens = sum(completion_tokens)
+    total_latency_s = sum(t for t in latencies if t is not None) if latencies else None
+    total_completion_tokens = sum(t for t in completion_tokens if t is not None)
     summary = {
         "requests": len(rows),
         "cache_hits": sum(1 for row in rows if row.get("cache_hit")),
@@ -300,6 +310,36 @@ def _report_progress(snapshot: dict[str, Any]) -> ProgressSnapshot:
 
 
 def _gpu_snapshot() -> dict[str, Any] | None:
+    """Return GPU utilisation snapshot from nvidia-smi, with caching and a timeout.
+
+    • Checks ``shutil.which`` once so we skip the subprocess entirely on
+      Apple-Silicon / CPU-only machines where ``nvidia-smi`` is absent.
+    • Results are cached for ``_GPU_CACHE_TTL_S`` seconds to avoid running a
+      subprocess on every ``list_instances`` call.
+    • A 2-second ``timeout`` prevents the call from blocking indefinitely.
+    """
+    global _gpu_cache, _NVIDIA_SMI_AVAILABLE
+
+    # Fast path: we already know nvidia-smi is not on this machine.
+    if _NVIDIA_SMI_AVAILABLE is False:
+        return None
+
+    now = time.monotonic()
+
+    # Return from cache if still fresh.
+    if _gpu_cache is not None:
+        cached_ts, cached_payload = _gpu_cache
+        if now - cached_ts < _GPU_CACHE_TTL_S:
+            return cached_payload
+
+    # First call or cache expired – probe availability.
+    if _NVIDIA_SMI_AVAILABLE is None:
+        _NVIDIA_SMI_AVAILABLE = shutil.which("nvidia-smi") is not None
+
+    if not _NVIDIA_SMI_AVAILABLE:
+        _gpu_cache = (now, None)
+        return None
+
     try:
         result = subprocess.run(
             [
@@ -310,25 +350,76 @@ def _gpu_snapshot() -> dict[str, Any] | None:
             check=True,
             capture_output=True,
             text=True,
+            timeout=2.0,  # Never block the main thread for more than 2 s
         )
     except Exception:
+        _gpu_cache = (now, None)
         return None
+
     lines = [line.strip() for line in result.stdout.splitlines() if line.strip()]
     if not lines:
+        _gpu_cache = (now, None)
         return None
+
     gpu_rows: list[dict[str, int]] = []
     for line in lines:
         parts = [part.strip() for part in line.split(",")]
         if len(parts) != 3:
             continue
-        gpu_rows.append(
-            {
-                "utilization_gpu": int(parts[0]),
-                "memory_used_mb": int(parts[1]),
-                "memory_total_mb": int(parts[2]),
-            }
+        try:
+            gpu_rows.append(
+                {
+                    "utilization_gpu": int(parts[0]),
+                    "memory_used_mb": int(parts[1]),
+                    "memory_total_mb": int(parts[2]),
+                }
+            )
+        except (ValueError, IndexError):
+            continue
+
+    payload = {"gpus": gpu_rows} if gpu_rows else None
+    _gpu_cache = (now, payload)
+    return payload
+
+
+def _titan_snapshot() -> dict[str, Any] | None:
+    """Return hardware snapshot from ai-factory-titan binary."""
+    global _gpu_cache, _TITAN_SMI_AVAILABLE
+
+    now = time.monotonic()
+
+    # Reuse cache if still fresh.
+    if _gpu_cache is not None:
+        cached_ts, cached_payload = _gpu_cache
+        if now - cached_ts < _GPU_CACHE_TTL_S:
+            return cached_payload
+
+    if _TITAN_SMI_AVAILABLE is None:
+        # Check if the binary is built and available.
+        # We look for it in the target directory.
+        titan_bin = Path("ai_factory_titan/target/debug/titan-status")
+        _TITAN_SMI_AVAILABLE = titan_bin.exists()
+
+    if not _TITAN_SMI_AVAILABLE:
+        return None
+
+    try:
+        result = subprocess.run(
+            ["ai_factory_titan/target/debug/titan-status"],
+            capture_output=True,
+            text=True,
+            timeout=2.0,
         )
-    return {"gpus": gpu_rows} if gpu_rows else None
+        if result.returncode == 0:
+            import json
+
+            payload = json.loads(result.stdout)
+            _gpu_cache = (now, payload)
+            return payload
+    except Exception:
+        pass
+
+    return None
 
 
 def collect_metrics_for_instance(
@@ -351,6 +442,8 @@ def collect_metrics_for_instance(
         summary, points, refs = _deploy_metrics(manifest)
     if collect_gpu:
         gpu = _gpu_snapshot()
+        if not gpu:
+            gpu = _titan_snapshot()
         if gpu:
             summary["gpu"] = gpu
     return summary, points, refs

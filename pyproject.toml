@@ -19,6 +19,7 @@ dependencies = [
   "sympy>=1.13.3",
   "torch>=2.5.1",
   "transformers>=4.47.1",
+  "trl>=0.12.0",
   "tqdm>=4.67.1",
   "uvicorn[standard]>=0.34.0",
 ]
@@ -52,16 +53,18 @@ packages = [
   "ai_factory.core.platform",
   "ai_factory.core.plugins",
   "ai_factory.domains",
+  "ai_factory.domains.code_generation",
   "ai_factory.domains.mathematics",
   "ai_factory.interfaces",
   "ai_factory.interfaces.cli",
+  "ai_factory.interfaces.desktop",
   "ai_factory.interfaces.tui",
   "ai_factory.interfaces.web",
-  "ai_factory.interfaces.desktop",
+  "ai_factory.orchestration",
   "ai_factory.platform",
-  "ai_factory.platform.scaling",
-  "ai_factory.platform.monitoring",
   "ai_factory.platform.deployment",
+  "ai_factory.platform.monitoring",
+  "ai_factory.platform.scaling",
   "training",
   "training.src",
   "inference",
@@ -95,25 +98,16 @@ python_version = "3.10"
 ignore_missing_imports = true
 warn_return_any = false
 warn_no_return = false
-disallow_untyped_defs = false
+disallow_untyped_defs = true
 
 [[tool.mypy.overrides]]
 module = [
-    "ai_factory.core.orchestration.*",
-    "ai_factory.core.control.*",
-    "ai_factory.core.plugins.*",
-    "ai_factory.core.decisions.*",
-    "ai_factory.core.monitoring.*",
-    "ai_factory.core.instances.*",
-    "ai_factory.core.state.*",
-    "ai_factory.core.platform.*",
-    "ai_factory.core.config.*",
-    "ai_factory.platform.*",
-    "ai_factory.cli",
     "data.*",
     "evaluation.*",
     "training.*",
-    "inference.*"
+    "inference.*",
+    "ai_factory.interfaces.*",
+    "ai_factory.cli"
 ]
 ignore_errors = true
 warn_unused_ignores = true

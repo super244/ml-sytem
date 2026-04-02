@@ -30,7 +30,7 @@ def decide_next_step(summary: dict, policy: DecisionPolicy) -> DecisionResult:
         return DecisionResult(
             action="re_evaluate",
             rule="missing_evaluation_signals",
-            thresholds=thresholds,
+            thresholds=cast(dict[str, float | int | None], thresholds),
             summary=summary,
             explanation=(
                 "The evaluation summary is missing the primary signals needed for a stable decision: "
@@ -48,7 +48,7 @@ def decide_next_step(summary: dict, policy: DecisionPolicy) -> DecisionResult:
             return DecisionResult(
                 action="open_inference",
                 rule="needs_interactive_validation",
-                thresholds=thresholds,
+                thresholds=cast(dict[str, float | int | None], thresholds),
                 summary=summary,
                 explanation=(
                     "Quality metrics are strong, but the serving/latency picture is incomplete or above target. "
@@ -58,7 +58,7 @@ def decide_next_step(summary: dict, policy: DecisionPolicy) -> DecisionResult:
         return DecisionResult(
             action="deploy",
             rule="meets_deploy_thresholds",
-            thresholds=thresholds,
+            thresholds=cast(dict[str, float | int | None], thresholds),
             summary=summary,
             explanation="The evaluation metrics clear the deployment thresholds.",
         )
@@ -66,14 +66,14 @@ def decide_next_step(summary: dict, policy: DecisionPolicy) -> DecisionResult:
         return DecisionResult(
             action="finetune",
             rule="needs_iteration",
-            thresholds=thresholds,
+            thresholds=cast(dict[str, float | int | None], thresholds),
             summary=summary,
             explanation="The model shows signal worth iterating on, but is not deployment-ready yet.",
         )
     return DecisionResult(
         action="retrain",
         rule="below_iteration_floor",
-        thresholds=thresholds,
+        thresholds=cast(dict[str, float | int | None], thresholds),
         summary=summary,
         explanation="The metrics are below the iteration floor, so a broader retraining pass is recommended.",
     )
