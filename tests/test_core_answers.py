@@ -6,15 +6,15 @@ from ai_factory.core.answers import (
 )
 
 
-def test_extract_final_answer():
+def test_extract_final_answer() -> None:
     assert extract_final_answer("Work\nFinal Answer: 3/2") == "3/2"
 
 
-def test_answers_equivalent_symbolically():
+def test_answers_equivalent_symbolically() -> None:
     assert answers_equivalent("1/2", "0.5")
 
 
-def test_step_correctness_uses_typed_checks():
+def test_step_correctness_uses_typed_checks() -> None:
     score = compute_step_correctness(
         "We use u = x^2 and then compute Final Answer: 1",
         [{"kind": "substring", "value": "u = x^2", "weight": 2.0}],
@@ -22,7 +22,7 @@ def test_step_correctness_uses_typed_checks():
     assert score == 1.0
 
 
-def test_choose_best_candidate_prefers_consensus():
+def test_choose_best_candidate_prefers_consensus() -> None:
     winner = choose_best_candidate(
         [
             {"text": "Final Answer: 2", "final_answer": "2", "verification_score": 1.0},

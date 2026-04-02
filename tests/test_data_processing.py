@@ -9,7 +9,7 @@ from data.builders.pack_registry import build_derived_packs
 from data.tools.preview_dataset import preview_rows
 
 
-def test_normalize_record_accepts_legacy_step_strings():
+def test_normalize_record_accepts_legacy_step_strings() -> None:
     normalized = normalize_record(
         {
             "question": "Evaluate int_0^1 x dx.",
@@ -24,7 +24,7 @@ def test_normalize_record_accepts_legacy_step_strings():
     assert len(normalized["step_checks"]) == 2
 
 
-def test_build_derived_packs(tmp_path: Path):
+def test_build_derived_packs(tmp_path: Path) -> None:
     rows = [
         {
             "id": "a",
@@ -50,7 +50,7 @@ def test_build_derived_packs(tmp_path: Path):
     assert manifest["metadata"]["card_path"].endswith("card.md")
 
 
-def test_coerce_source_specs_flattens_composite_ratios():
+def test_coerce_source_specs_flattens_composite_ratios() -> None:
     specs = coerce_source_specs(
         [
             {"kind": "local", "path": "data/examples/math_reasoning_examples.jsonl", "sample_ratio": 0.5},
@@ -71,7 +71,7 @@ def test_coerce_source_specs_flattens_composite_ratios():
     assert specs[1].version == "bundle-v1"
 
 
-def test_build_corpus_tracks_source_versions_and_ratios(tmp_path: Path, monkeypatch):
+def test_build_corpus_tracks_source_versions_and_ratios(tmp_path: Path, monkeypatch) -> None:
     source_a = tmp_path / "source_a.jsonl"
     source_b = tmp_path / "source_b.jsonl"
     write_jsonl(
@@ -129,7 +129,7 @@ def test_build_corpus_tracks_source_versions_and_ratios(tmp_path: Path, monkeypa
     assert lineage_summary["groups"][0]["record_count"] == 2
 
 
-def test_web_source_loader_reads_jsonl_payload(monkeypatch):
+def test_web_source_loader_reads_jsonl_payload(monkeypatch) -> None:
     payload = '{"id":"web-1","question":"Q","solution":"S","difficulty":"hard","topic":"calculus"}\n'
 
     class FakeHeaders:
@@ -169,7 +169,7 @@ def test_web_source_loader_reads_jsonl_payload(monkeypatch):
     assert loaded[0][1]["id"] == "web-1"
 
 
-def test_optional_source_load_failure_is_skipped(monkeypatch):
+def test_optional_source_load_failure_is_skipped(monkeypatch) -> None:
     def raise_runtime(spec):
         raise RuntimeError("missing dependency")
 
@@ -184,7 +184,7 @@ def test_optional_source_load_failure_is_skipped(monkeypatch):
     assert warnings and "Skipped optional source" in warnings[0]
 
 
-def test_preview_rows_includes_tokenization_preview():
+def test_preview_rows_includes_tokenization_preview() -> None:
     class FakeTokenizer:
         def tokenize(self, text: str):
             return text.replace("?", " ?").split()

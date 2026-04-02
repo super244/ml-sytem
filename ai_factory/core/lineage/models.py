@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from datetime import datetime, timezone
-from typing import Any
+from typing import Any, cast, Iterable
 
 from pydantic import BaseModel, Field
 
@@ -20,7 +20,7 @@ class LineageRecord(BaseModel):
 
     # Configuration snapshots
     training_config: dict[str, Any] = Field(default_factory=dict)
-    model_config: dict[str, Any] = Field(default_factory=dict)
+    snapshot_config: dict[str, Any] = Field(default_factory=dict)
 
     # Outcomes
     metrics: dict[str, float] = Field(default_factory=dict)

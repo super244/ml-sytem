@@ -4,7 +4,7 @@ from ai_factory.interfaces.desktop import main as desktop_main
 from ai_factory.interfaces.desktop.main import DesktopInterface
 
 
-def test_desktop_interface_prefers_native_shell_when_requested(tmp_path, monkeypatch):
+def test_desktop_interface_prefers_native_shell_when_requested(tmp_path, monkeypatch) -> None:
     native_dir = tmp_path / "desktop" / "macos" / "AIFactoryNative"
     native_dir.mkdir(parents=True)
 

@@ -15,7 +15,7 @@ def anyio_backend():
 
 
 @pytest.mark.anyio
-async def test_titan_status_route_returns_probe_payload(monkeypatch: pytest.MonkeyPatch, tmp_path: Path):
+async def test_titan_status_route_returns_probe_payload(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     from inference.app.routers import titan as titan_router
 
     settings = AppSettings(
@@ -54,7 +54,7 @@ async def test_titan_status_route_returns_probe_payload(monkeypatch: pytest.Monk
 
 
 @pytest.mark.anyio
-async def test_titan_hardware_doc_route_returns_generated_path(monkeypatch: pytest.MonkeyPatch, tmp_path: Path):
+async def test_titan_hardware_doc_route_returns_generated_path(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     from inference.app.routers import titan as titan_router
 
     settings = AppSettings(

@@ -9,7 +9,7 @@ from evaluation.generated_benchmark import create_temp_model_registry, generate_
 from training.src import workflows
 
 
-def test_normalize_huggingface_dataset_reference_accepts_url():
+def test_normalize_huggingface_dataset_reference_accepts_url() -> None:
     payload = workflows.normalize_huggingface_dataset_reference(
         "https://huggingface.co/datasets/openai/gsm8k?split=test&revision=main"
     )
@@ -19,7 +19,7 @@ def test_normalize_huggingface_dataset_reference_accepts_url():
     assert payload["revision"] == "main"
 
 
-def test_discover_private_categories_from_custom_root(tmp_path: Path):
+def test_discover_private_categories_from_custom_root(tmp_path: Path) -> None:
     write_jsonl(
         tmp_path / "custom_alpha.jsonl",
         [{"question": "Q1", "solution": "S1", "difficulty": "easy", "topic": "calculus"}],
@@ -35,7 +35,7 @@ def test_discover_private_categories_from_custom_root(tmp_path: Path):
     assert categories == ["custom_alpha", "custom_beta"]
 
 
-def test_build_workflow_corpus_uses_private_categories(tmp_path: Path, monkeypatch):
+def test_build_workflow_corpus_uses_private_categories(tmp_path: Path, monkeypatch) -> None:
     custom_root = tmp_path / "custom"
     custom_root.mkdir()
     source_a = custom_root / "custom_alpha.jsonl"
@@ -79,7 +79,7 @@ def test_build_workflow_corpus_uses_private_categories(tmp_path: Path, monkeypat
     assert [item["id"] for item in result["source_specs"]] == ["custom_alpha", "custom_beta"]
 
 
-def test_build_training_config_payload_adjusts_training_mode():
+def test_build_training_config_payload_adjusts_training_mode() -> None:
     qlora_payload = workflows.build_training_config_payload(
         workflow_name="supervised",
         run_name="qlora-run",
@@ -108,7 +108,7 @@ def test_build_training_config_payload_adjusts_training_mode():
     assert full_payload["adapter"]["method"] == "full"
 
 
-def test_generate_benchmark_records_returns_requested_count():
+def test_generate_benchmark_records_returns_requested_count() -> None:
     records = generate_benchmark_records(question_count=24, seed=5)
 
     assert len(records) == 24
@@ -116,7 +116,7 @@ def test_generate_benchmark_records_returns_requested_count():
     assert all(record["final_answer"] for record in records)
 
 
-def test_create_temp_model_registry_writes_yaml(tmp_path: Path):
+def test_create_temp_model_registry_writes_yaml(tmp_path: Path) -> None:
     registry_path = create_temp_model_registry(
         tmp_path / "registry.yaml",
         model_name="eval_model",

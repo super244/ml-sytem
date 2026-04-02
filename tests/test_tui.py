@@ -35,7 +35,7 @@ class _FakeControlService:
         return self._summary
 
 
-def test_parse_args_supports_shared_backend_overrides():
+def test_parse_args_supports_shared_backend_overrides() -> None:
     args = tui.parse_args(["--repo-root", "/workspace", "--artifacts-dir", "/tmp/artifacts", "--refresh-seconds", "5"])
 
     assert args.repo_root == "/workspace"
@@ -43,7 +43,7 @@ def test_parse_args_supports_shared_backend_overrides():
     assert args.refresh_seconds == 5.0
 
 
-def test_controller_refresh_loads_instances_logs_metrics_and_summary(monkeypatch):
+def test_controller_refresh_loads_instances_logs_metrics_and_summary(monkeypatch) -> None:
     manifest = InstanceManifest(
         id="train-002",
         type="train",
@@ -71,7 +71,7 @@ def test_controller_refresh_loads_instances_logs_metrics_and_summary(monkeypatch
     assert controller.snapshot.summary["tasks"] == 4
 
 
-def test_controller_move_and_toggle_stream(monkeypatch):
+def test_controller_move_and_toggle_stream(monkeypatch) -> None:
     manifest = InstanceManifest(
         id="deploy-001",
         type="deploy",
@@ -96,7 +96,7 @@ def test_controller_move_and_toggle_stream(monkeypatch):
     assert controller.selected_stream == "stderr"
 
 
-def test_run_tui_uses_curses_wrapper(monkeypatch):
+def test_run_tui_uses_curses_wrapper(monkeypatch) -> None:
     manifest = InstanceManifest(
         id="deploy-001",
         type="deploy",

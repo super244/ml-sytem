@@ -30,8 +30,8 @@ def _prepare_metrics(snapshot: dict[str, Any]) -> tuple[dict[str, Any], list[Met
     manifest = load_json(output_dir / "manifest.json", default={}) or {}
     stats = load_json(output_dir / "stats.json", default={}) or {}
     pack_summary = load_json(output_dir / "pack_summary.json", default={}) or {}
-    manifest_stats = manifest.get("stats") if isinstance(manifest.get("stats"), dict) else {}
-    summary = {
+    manifest_stats: dict[str, Any] = cast(dict[str, Any], manifest.get("stats")) if isinstance(manifest.get("stats"), dict) else {}
+    summary: dict[str, Any] = {
         "records": (manifest_stats.get("num_records") or stats.get("num_records") or stats.get("records_total")),
         "train_rows": stats.get("train_rows"),
         "eval_rows": stats.get("eval_rows"),
@@ -97,7 +97,7 @@ def _training_metrics(
         for key, value in row.items():
             if key in {"step", "epoch"} or not isinstance(value, (int, float)):
                 continue
-            tags = {"stage": manifest.type}
+            tags: dict[str, str] = {"stage": str(manifest.type)}
             if step is not None:
                 tags["step"] = str(step)
             points.append(MetricPoint(name=key, value=value, tags=tags))
@@ -144,7 +144,7 @@ def _training_progress(manifest: InstanceManifest, snapshot: dict[str, Any]) -> 
     step = latest.get("step")
     total_steps = training.get("max_steps")
     try:
-        total_steps = int(total_steps) if total_steps not in (None, "", -1) else None
+        total_steps = int(total_steps) if total_steps and str(total_steps).strip() not in ("", "-1") else None
     except (TypeError, ValueError):
         total_steps = None
     percent = None
@@ -225,9 +225,9 @@ def _inference_metrics(snapshot: dict[str, Any]) -> tuple[dict[str, Any], list[M
     ]
     ttft_values = [row.get("ttft_s") for row in rows if isinstance(row.get("ttft_s"), (int, float))]
     cache_hits = sum(1 for row in rows if row.get("cache_hit"))
-    total_prompt_tokens = sum(prompt_tokens)
-    total_completion_tokens = sum(completion_tokens)
-    total_latency_s = sum(latencies) if latencies else None
+    total_prompt_tokens = sum(t for t in prompt_tokens if t is not None)
+    total_completion_tokens = sum(t for t in completion_tokens if t is not None)
+    total_latency_s = sum(t for t in latencies if t is not None) if latencies else None
     summary = {
         "requests": len(rows),
         "cache_hits": cache_hits,
@@ -237,7 +237,7 @@ def _inference_metrics(snapshot: dict[str, Any]) -> tuple[dict[str, Any], list[M
         "avg_tokens_per_second": (
             total_completion_tokens / total_latency_s if total_completion_tokens and total_latency_s else None
         ),
-        "avg_time_to_first_token_s": (sum(ttft_values) / len(ttft_values)) if ttft_values else None,
+        "avg_time_to_first_token_s": (sum(t for t in ttft_values if t is not None) / len(ttft_values)) if ttft_values else None,
     }
     refs = {"telemetry": telemetry_path}
     return summary, metric_points_from_summary(summary, stage="inference"), refs
@@ -252,8 +252,8 @@ def _inference_progress(snapshot: dict[str, Any]) -> ProgressSnapshot | None:
     completion_tokens = [
         row.get("completion_tokens") for row in rows if isinstance(row.get("completion_tokens"), (int, float))
     ]
-    total_latency_s = sum(latencies) if latencies else None
-    total_completion_tokens = sum(completion_tokens)
+    total_latency_s = sum(t for t in latencies if t is not None) if latencies else None
+    total_completion_tokens = sum(t for t in completion_tokens if t is not None)
     summary = {
         "requests": len(rows),
         "cache_hits": sum(1 for row in rows if row.get("cache_hit")),

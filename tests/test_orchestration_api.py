@@ -21,7 +21,7 @@ def anyio_backend():
 
 
 @pytest.mark.anyio
-async def test_orchestration_routes_expose_runs_tasks_and_summary(tmp_path: Path, monkeypatch):
+async def test_orchestration_routes_expose_runs_tasks_and_summary(tmp_path: Path, monkeypatch) -> None:
     from inference.app.routers import orchestration as orchestration_router
 
     _write(
@@ -87,7 +87,7 @@ async def test_orchestration_routes_expose_runs_tasks_and_summary(tmp_path: Path
 
 
 @pytest.mark.anyio
-async def test_instance_routes_support_control_center_creation_and_inference(tmp_path: Path, monkeypatch):
+async def test_instance_routes_support_control_center_creation_and_inference(tmp_path: Path, monkeypatch) -> None:
     from inference.app.routers import instances as instances_router
 
     _write(
@@ -184,7 +184,7 @@ async def test_instance_routes_support_control_center_creation_and_inference(tmp
 
 
 @pytest.mark.anyio
-async def test_instance_live_stream_and_foundation_routes(tmp_path: Path, monkeypatch):
+async def test_instance_live_stream_and_foundation_routes(tmp_path: Path, monkeypatch) -> None:
     from inference.app.routers import instances as instances_router
 
     _write(
@@ -245,7 +245,7 @@ async def test_instance_live_stream_and_foundation_routes(tmp_path: Path, monkey
 
 
 @pytest.mark.anyio
-async def test_instance_action_route_supports_generic_follow_up_actions(tmp_path: Path, monkeypatch):
+async def test_instance_action_route_supports_generic_follow_up_actions(tmp_path: Path, monkeypatch) -> None:
     from inference.app.routers import instances as instances_router
 
     _write(

@@ -9,7 +9,7 @@ from ai_factory.core.instances.models import EnvironmentSpec, InstanceManifest
 from ai_factory.core.plugins.registry import build_default_plugin_registry
 
 
-def test_plugin_registry_can_load_external_modules(tmp_path: Path, monkeypatch):
+def test_plugin_registry_can_load_external_modules(tmp_path: Path, monkeypatch) -> None:
     plugin_path = tmp_path / "ai_factory_test_plugin.py"
     plugin_path.write_text(
         "\n".join(

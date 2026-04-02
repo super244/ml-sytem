@@ -8,7 +8,7 @@ def _write(path: Path, body: str) -> None:
     path.write_text(body)
 
 
-def test_build_workspace_overview_discovers_profiles_and_commands(tmp_path: Path):
+def test_build_workspace_overview_discovers_profiles_and_commands(tmp_path: Path) -> None:
     _write(tmp_path / "data" / "catalog.json", '{"summary": {"num_datasets": 2}}')
     _write(
         tmp_path / "data" / "processed" / "pack_summary.json",
