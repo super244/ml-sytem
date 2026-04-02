@@ -38,7 +38,7 @@ def _stable_hash(parts: list[str]) -> str:
 
 
 class OrchestrationService:
-    def __init__(self, control_plane, settings: PlatformSettings):
+    def __init__(self, control_plane: Any, settings: PlatformSettings) -> None:
         self.control_plane = control_plane
         self.settings = settings
         self.registry = AgentRegistry()
@@ -123,13 +123,13 @@ class OrchestrationService:
             id=task_id,
             run_id=run.id,
             legacy_instance_id=manifest.id,
-            task_type=manifest.type,
-            agent_type=self._agent_for_manifest(manifest),
+            task_type=cast(TaskType, manifest.type),
+            agent_type=cast(AgentType, self._agent_for_manifest(manifest)),
             status="queued",
-            resource_class=self._resource_for_manifest(manifest),
+            resource_class=cast(ResourceClass, self._resource_for_manifest(manifest)),
             retry_policy=self._retry_policy_for_manifest(manifest, snapshot),
             input=TaskInputEnvelope(
-                task_type=manifest.type,
+                task_type=cast(TaskType, manifest.type),
                 legacy_instance_id=manifest.id,
                 config_path=manifest.config_path,
                 payload={
@@ -139,7 +139,7 @@ class OrchestrationService:
                 environment=manifest.environment.model_dump(mode="json"),
                 labels=list((snapshot.get("subsystem") or {}).get("labels") or []),
                 idempotency_key=(snapshot.get("metadata") or {}).get("idempotency_key"),
-                resource_class=self._resource_for_manifest(manifest),
+                resource_class=cast(ResourceClass, self._resource_for_manifest(manifest)),
             ),
             metadata={
                 "agent_capabilities": [
@@ -201,7 +201,7 @@ class OrchestrationService:
             resource_class=descriptor.capability().resource_classes[0],
             retry_policy=descriptor.retry_policy,
             input=TaskInputEnvelope(
-                task_type=task_type,
+                task_type=cast(TaskType, task_type),
                 legacy_instance_id=legacy_instance_id,
                 payload=input_payload or {},
                 idempotency_key=idempotency_key,
@@ -507,7 +507,7 @@ class OrchestrationService:
         jitter = random.uniform(0, policy.jitter_s) if policy.jitter_s > 0 else 0.0
         return max(int(round(bounded + jitter)), 0)
 
-    def record_agent_failure(self, agent_type: str, message: str) -> CircuitState:
+    def record_agent_failure(self, agent_type: AgentType, message: str) -> CircuitState:
         circuit = self.control_plane.get_circuit(agent_type) or CircuitState(agent_type=agent_type)
         circuit.failure_count += 1
         if circuit.failure_count >= 3:
@@ -518,7 +518,7 @@ class OrchestrationService:
         circuit.updated_at = utc_now_iso()
         return self.control_plane.upsert_circuit(circuit)
 
-    def record_agent_success(self, agent_type: str) -> CircuitState:
+    def record_agent_success(self, agent_type: AgentType) -> CircuitState:
         circuit = self.control_plane.get_circuit(agent_type) or CircuitState(agent_type=agent_type)
         circuit.status = "closed"
         circuit.failure_count = 0

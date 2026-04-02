@@ -7,7 +7,7 @@ def _clear_modules(*names: str) -> None:
         sys.modules.pop(name, None)
 
 
-def test_generation_parameters_import_is_lightweight():
+def test_generation_parameters_import_is_lightweight() -> None:
     _clear_modules("inference.app.parameters", "inference.app.prompts")
 
     importlib.import_module("inference.app.parameters")
@@ -15,7 +15,7 @@ def test_generation_parameters_import_is_lightweight():
     assert "inference.app.prompts" not in sys.modules
 
 
-def test_dependencies_import_is_lightweight():
+def test_dependencies_import_is_lightweight() -> None:
     _clear_modules(
         "inference.app.dependencies",
         "inference.app.generation",
@@ -32,7 +32,7 @@ def test_dependencies_import_is_lightweight():
     assert "inference.app.prompts" not in sys.modules
 
 
-def test_orchestration_service_import_is_lightweight():
+def test_orchestration_service_import_is_lightweight() -> None:
     _clear_modules(
         "ai_factory.core.orchestration.service",
         "torch",
@@ -45,7 +45,7 @@ def test_orchestration_service_import_is_lightweight():
     assert "transformers" not in sys.modules
 
 
-def test_tui_import_is_lightweight():
+def test_tui_import_is_lightweight() -> None:
     _clear_modules(
         "ai_factory.tui",
         "torch",

@@ -33,7 +33,7 @@ def _write_run(base, *, run_name, eval_loss, accuracy):
     _write_json(base / "metrics" / "tracking_summary.json", {"status": "completed"})
 
 
-def test_compare_runs_reports_winner_and_markdown(tmp_path):
+def test_compare_runs_reports_winner_and_markdown(tmp_path) -> None:
     left = tmp_path / "left"
     right = tmp_path / "right"
     _write_run(left, run_name="left-run", eval_loss=0.42, accuracy=0.81)

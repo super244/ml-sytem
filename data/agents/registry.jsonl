@@ -1,0 +1,3 @@
+{"id": "agent-data-01", "name": "Data Curator", "role": "Synthesizes and filters noisy dataset rows. Promotes flagged telemetry to training data.", "model": "gpt-4o", "status": "active", "created_at": 1775002022.654274, "tokens_used": 145000}
+{"id": "agent-train-01", "name": "Optimization Agent", "role": "Monitors loss curves and triggers hyperparameter sweeps when plateaus are detected.", "model": "claude-3-sonnet", "status": "sleeping", "created_at": 1774919222.6542752, "tokens_used": 45000}
+{"id": "agent-eval-01", "name": "Red-Team Evaluator", "role": "Adversarially attacks the model to find failure modes and generate hard benchmarks.", "model": "qwen-2-72b", "status": "active", "created_at": 1775004422.6542752, "tokens_used": 89000}

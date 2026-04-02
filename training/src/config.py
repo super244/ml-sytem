@@ -26,6 +26,8 @@ class ModelConfig:
     bnb_compute_dtype: str = "bfloat16"
     double_quant: bool = True
     gradient_checkpointing: bool = True
+    use_flash_attention: bool = True
+    device_map: str = "auto"
     input_cost_per_million: float | None = None
     output_cost_per_million: float | None = None
 
@@ -155,6 +157,18 @@ class PackagingConfig:
 
 
 @dataclass
+class PreferenceConfig:
+    enabled: bool = False
+    beta: float = 0.1
+    loss_type: str = "sigmoid"
+    max_prompt_length: int = 1024
+    max_target_length: int = 1024
+    label_smoothing: float = 0.0
+    ipo_alpha: float = 1.0
+    orpo_alpha: float = 0.1
+
+
+@dataclass
 class ExperimentConfig:
     run_name: str
     seed: int
@@ -163,10 +177,11 @@ class ExperimentConfig:
     data: DataConfig
     training: TrainingConfig
     adapter: AdapterConfig
-    runtime: RuntimeConfig
-    logging: LoggingConfig
-    tracking: TrackingConfig
-    packaging: PackagingConfig
+    preference: PreferenceConfig = field(default_factory=PreferenceConfig)
+    runtime: RuntimeConfig = field(default_factory=RuntimeConfig)
+    logging: LoggingConfig = field(default_factory=LoggingConfig)
+    tracking: TrackingConfig = field(default_factory=TrackingConfig)
+    packaging: PackagingConfig = field(default_factory=PackagingConfig)
     config_path: str | None = None
 
     @property
@@ -554,6 +569,7 @@ def load_experiment_config(path: str) -> ExperimentConfig:
         data=_construct(DataConfig, merged.get("data")),
         training=_construct(TrainingConfig, merged.get("training")),
         adapter=_construct(AdapterConfig, merged.get("adapter")),
+        preference=_construct(PreferenceConfig, merged.get("preference")),
         runtime=_construct(RuntimeConfig, merged.get("runtime")),
         logging=_construct(LoggingConfig, merged.get("logging")),
         tracking=_construct(TrackingConfig, merged.get("tracking")),

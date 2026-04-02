@@ -19,7 +19,7 @@ def get_system_ram_gb() -> int:
     return 16  # Fallback
 
 
-def _get_torch():
+def _get_torch() -> Any:
     try:
         return importlib.import_module("torch")
     except Exception:

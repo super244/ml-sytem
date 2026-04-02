@@ -60,9 +60,10 @@ def load_model_for_training(config: ExperimentConfig) -> Any:
         config.model.base_model_name,
         trust_remote_code=config.model.trust_remote_code,
         quantization_config=quantization_config,
-        device_map="auto",
+        device_map=config.model.device_map,
         torch_dtype=dtype,
         low_cpu_mem_usage=config.runtime.low_cpu_mem_usage,
+        attn_implementation="flash_attention_2" if config.model.use_flash_attention else None,
     )
     model.config.use_cache = False
     if config.model.gradient_checkpointing:

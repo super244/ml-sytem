@@ -118,7 +118,7 @@ def anyio_backend():
 
 
 @pytest.mark.anyio
-async def test_openai_chat_completions_streams_sse(monkeypatch):
+async def test_openai_chat_completions_streams_sse(monkeypatch) -> None:
     from inference.app.routers import openai as openai_router
 
     monkeypatch.setattr(openai_router, "get_openai_service", lambda: DummyOpenAIService())
@@ -143,7 +143,7 @@ async def test_openai_chat_completions_streams_sse(monkeypatch):
 
 
 @pytest.mark.anyio
-async def test_openai_chat_completions_returns_usage(monkeypatch):
+async def test_openai_chat_completions_returns_usage(monkeypatch) -> None:
     from inference.app.routers import openai as openai_router
 
     monkeypatch.setattr(openai_router, "get_openai_service", lambda: DummyOpenAIService())
@@ -164,7 +164,7 @@ async def test_openai_chat_completions_returns_usage(monkeypatch):
     assert body["usage"]["total_tokens"] == 15
 
 
-def test_openai_service_auth_and_rate_limit():
+def test_openai_service_auth_and_rate_limit() -> None:
     settings = get_settings()
     settings.openai_api_keys = ["secret"]
     settings.openai_rate_limit_requests_per_minute = 1
@@ -185,7 +185,7 @@ def test_openai_service_auth_and_rate_limit():
         limit_service.authorize_request(first_request)
 
 
-def test_openai_service_tracks_usage():
+def test_openai_service_tracks_usage() -> None:
     settings = get_settings()
     settings.openai_api_keys = []
     settings.openai_rate_limit_requests_per_minute = 0
@@ -205,7 +205,7 @@ def test_openai_service_tracks_usage():
     assert snapshot["by_model"]["finetuned"]["requests"] == 1
 
 
-def test_openai_service_tracks_stream_usage():
+def test_openai_service_tracks_stream_usage() -> None:
     settings = get_settings()
     settings.openai_api_keys = []
     settings.openai_rate_limit_requests_per_minute = 0

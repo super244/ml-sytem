@@ -23,7 +23,7 @@ def _write_run_manifest(run_dir: Path, *, run_id: str, run_name: str, created_at
     )
 
 
-def test_list_training_runs_surfaces_created_at(tmp_path: Path):
+def test_list_training_runs_surfaces_created_at(tmp_path: Path) -> None:
     run_dir = tmp_path / "runs" / "baseline-run"
     _write_run_manifest(
         run_dir,
@@ -37,7 +37,7 @@ def test_list_training_runs_surfaces_created_at(tmp_path: Path):
     assert runs[0]["created_at"] == "2026-03-24T12:00:00+00:00"
 
 
-def test_latest_training_run_prefers_manifest_created_at_over_output_dir(tmp_path: Path):
+def test_latest_training_run_prefers_manifest_created_at_over_output_dir(tmp_path: Path) -> None:
     _write_run_manifest(
         tmp_path / "runs" / "zeta-old",
         run_id="zeta-20260324-100000",
@@ -57,7 +57,7 @@ def test_latest_training_run_prefers_manifest_created_at_over_output_dir(tmp_pat
     assert latest["run_name"] == "alpha-new"
 
 
-def test_latest_training_run_falls_back_to_run_id_timestamp(tmp_path: Path):
+def test_latest_training_run_falls_back_to_run_id_timestamp(tmp_path: Path) -> None:
     _write_run_manifest(
         tmp_path / "runs" / "zeta-newer-id",
         run_id="zeta-20260324-120000",
@@ -77,7 +77,7 @@ def test_latest_training_run_falls_back_to_run_id_timestamp(tmp_path: Path):
     assert latest["run_name"] == "zeta-newer-id"
 
 
-def test_latest_training_run_parses_embedded_timestamp_in_run_id(tmp_path: Path):
+def test_latest_training_run_parses_embedded_timestamp_in_run_id(tmp_path: Path) -> None:
     _write_run_manifest(
         tmp_path / "runs" / "zeta-release-20260324-120000-build-7",
         run_id="zeta-release-20260324-120000-build-7",
@@ -97,7 +97,7 @@ def test_latest_training_run_parses_embedded_timestamp_in_run_id(tmp_path: Path)
     assert latest["run_name"] == "zeta-release"
 
 
-def test_list_training_runs_skips_invalid_manifests(tmp_path: Path):
+def test_list_training_runs_skips_invalid_manifests(tmp_path: Path) -> None:
     good_run = tmp_path / "runs" / "good-run"
     _write_run_manifest(
         good_run,
@@ -116,7 +116,7 @@ def test_list_training_runs_skips_invalid_manifests(tmp_path: Path):
     assert runs[0]["run_name"] == "good-run"
 
 
-def test_importing_ai_factory_core_stays_light_without_sympy(monkeypatch):
+def test_importing_ai_factory_core_stays_light_without_sympy(monkeypatch) -> None:
     original_import = builtins.__import__
 
     def guarded_import(name, globals=None, locals=None, fromlist=(), level=0):

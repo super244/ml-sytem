@@ -21,7 +21,7 @@ def anyio_backend():
     return "asyncio"
 
 
-def test_instance_service_resolves_relative_config_paths_against_repo_root(tmp_path: Path):
+def test_instance_service_resolves_relative_config_paths_against_repo_root(tmp_path: Path) -> None:
     _write(
         tmp_path / "training" / "configs" / "profiles" / "baseline_qlora.yaml",
         "run_name: demo\ntraining:\n  artifacts_dir: artifacts\n",
@@ -59,7 +59,7 @@ def test_instance_service_resolves_relative_config_paths_against_repo_root(tmp_p
 
 
 @pytest.mark.anyio
-async def test_mission_control_endpoint_aggregates_lab_surfaces(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
+async def test_mission_control_endpoint_aggregates_lab_surfaces(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     from ai_factory.platform.monitoring import hardware
     from inference.app.routers import lab as lab_router
     from inference.app.services import mission_control_service

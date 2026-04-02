@@ -2770,6 +2770,72 @@ a:focus-visible {
   overflow: hidden;
 }
 
+.inference-chat-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  padding: 18px 20px;
+  border-bottom: 1px solid var(--line);
+  background: linear-gradient(180deg, rgba(248,250,249,0.94), rgba(248,250,249,0.72));
+}
+
+.inference-chat-status {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: flex-end;
+  font-size: 0.78rem;
+  color: var(--muted);
+}
+
+.inference-stat-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.inference-stat-card {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  background: rgba(255,255,255,0.78);
+}
+
+.inference-stat-label {
+  font-size: 0.68rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--muted);
+  font-weight: 700;
+}
+
+.prompt-chip-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.prompt-chip {
+  border: 1px solid rgba(15,122,97,0.16);
+  background: rgba(15,122,97,0.08);
+  color: var(--foreground);
+  border-radius: 999px;
+  padding: 8px 12px;
+  font-size: 0.78rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.14s ease;
+}
+
+.prompt-chip:hover {
+  background: rgba(15,122,97,0.12);
+  border-color: rgba(15,122,97,0.24);
+}
+
 .inference-messages {
   flex: 1;
   overflow-y: auto;
@@ -2822,6 +2888,43 @@ a:focus-visible {
   line-height: 1.6;
   font-size: 0.92rem;
   white-space: pre-wrap;
+}
+
+.inference-single-output {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.inference-output-actions {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+}
+
+.inference-compare-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+  width: min(100%, 920px);
+}
+
+.inference-compare-card {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px;
+  border-radius: 18px;
+  border: 1px solid var(--line);
+  background: rgba(255,255,255,0.88);
+}
+
+.inference-compare-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
 }
 
 .inference-message.user .inference-message-content {
@@ -2891,6 +2994,57 @@ a:focus-visible {
   padding: 12px 18px;
 }
 
+.inference-flag-sheet {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 14px 18px;
+  border-top: 1px solid var(--line);
+  background: rgba(251,248,239,0.78);
+}
+
+.inference-flag-copy {
+  font-size: 0.84rem;
+  color: var(--muted);
+}
+
+.inference-flag-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.model-catalog {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.model-catalog-item {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 10px 12px;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--line);
+  background: rgba(255,255,255,0.76);
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: all 0.14s ease;
+}
+
+.model-catalog-item span {
+  font-size: 0.78rem;
+  color: var(--muted);
+  line-height: 1.4;
+}
+
+.model-catalog-item.active,
+.model-catalog-item:hover {
+  border-color: rgba(15,122,97,0.24);
+  background: rgba(15,122,97,0.08);
+}
+
 /* Responsive */
 @media (max-width: 1100px) {
   .dashboard-body {
@@ -2944,6 +3098,16 @@ a:focus-visible {
   }
 
   .inference-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .inference-chat-header {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .inference-stat-grid,
+  .inference-compare-grid {
     grid-template-columns: 1fr;
   }
 

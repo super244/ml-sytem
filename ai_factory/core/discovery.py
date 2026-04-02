@@ -62,7 +62,7 @@ def _run_recency_key(run: dict[str, Any]) -> tuple[int, datetime, str]:
     return (1, modified_at, str(output_dir))
 
 
-def list_training_runs(artifacts_dir: str = "artifacts") -> list[dict[str, Any]]:
+def list_training_runs(artifacts_dir: str | Path = "artifacts") -> list[dict[str, Any]]:
     base_dir = Path(artifacts_dir) / "runs"
     if not base_dir.exists():
         return []

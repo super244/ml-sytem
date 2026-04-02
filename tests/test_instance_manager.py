@@ -59,7 +59,7 @@ def _prime_manager_packages(monkeypatch: pytest.MonkeyPatch) -> None:
         monkeypatch.setitem(sys.modules, name, module)
 
 
-def test_manager_creates_runs_and_finalizes_instances(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
+def test_manager_creates_runs_and_finalizes_instances(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     _prime_manager_packages(monkeypatch)
     models = importlib.import_module("ai_factory.core.instances.models")
     store_mod = importlib.import_module("ai_factory.core.instances.store")
@@ -141,7 +141,7 @@ def test_manager_creates_runs_and_finalizes_instances(tmp_path: Path, monkeypatc
     assert manager.list_instances(parent_instance_id=created.id)[0].type == "evaluate"
 
 
-def test_manager_can_create_evaluation_children(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
+def test_manager_can_create_evaluation_children(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     _prime_manager_packages(monkeypatch)
     models = importlib.import_module("ai_factory.core.instances.models")
     store_mod = importlib.import_module("ai_factory.core.instances.store")
@@ -336,7 +336,7 @@ def test_manager_applies_lifecycle_overrides_to_created_instances(
     assert snapshot["subsystem"]["labels"] == ["control_center"]
 
 
-def test_manager_projects_live_training_state_from_artifacts(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
+def test_manager_projects_live_training_state_from_artifacts(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     _prime_manager_packages(monkeypatch)
     store_mod = importlib.import_module("ai_factory.core.instances.store")
     manager_mod = importlib.import_module("ai_factory.core.instances.manager")
@@ -392,7 +392,7 @@ def test_manager_projects_live_training_state_from_artifacts(tmp_path: Path, mon
     assert metrics["points"][0]["name"] == "loss"
 
 
-def test_manager_exposes_recommendation_backed_actions(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
+def test_manager_exposes_recommendation_backed_actions(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     _prime_manager_packages(monkeypatch)
     models = importlib.import_module("ai_factory.core.instances.models")
     store_mod = importlib.import_module("ai_factory.core.instances.store")
@@ -443,7 +443,7 @@ def test_manager_exposes_recommendation_backed_actions(tmp_path: Path, monkeypat
     assert ("report", "report") in action_ids
 
 
-def test_manager_can_create_inference_children(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
+def test_manager_can_create_inference_children(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     _prime_manager_packages(monkeypatch)
     models = importlib.import_module("ai_factory.core.instances.models")
     store_mod = importlib.import_module("ai_factory.core.instances.store")

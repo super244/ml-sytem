@@ -37,7 +37,7 @@ def _prime_monitoring_packages(monkeypatch: pytest.MonkeyPatch) -> None:
         monkeypatch.setitem(sys.modules, name, module)
 
 
-def test_collect_metrics_for_training_instance(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
+def test_collect_metrics_for_training_instance(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     _prime_monitoring_packages(monkeypatch)
     models = importlib.import_module("ai_factory.core.instances.models")
     collectors = importlib.import_module("ai_factory.core.monitoring.collectors")
@@ -78,7 +78,7 @@ def test_collect_metrics_for_training_instance(tmp_path: Path, monkeypatch: pyte
     assert progress.metrics["loss"] == 1.0
 
 
-def test_collect_metrics_for_evaluation_instance(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
+def test_collect_metrics_for_evaluation_instance(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     _prime_monitoring_packages(monkeypatch)
     models = importlib.import_module("ai_factory.core.instances.models")
     collectors = importlib.import_module("ai_factory.core.monitoring.collectors")

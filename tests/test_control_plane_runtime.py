@@ -12,7 +12,7 @@ def _write(path: Path, body: str) -> None:
     path.write_text(body)
 
 
-def test_control_plane_tracks_attempts_retries_and_projection(tmp_path: Path):
+def test_control_plane_tracks_attempts_retries_and_projection(tmp_path: Path) -> None:
     profile_dir = tmp_path / "training" / "configs" / "profiles"
     profile_dir.mkdir(parents=True)
     (profile_dir / "baseline_qlora.yaml").write_text("run_name: demo-run\ntraining:\n  artifacts_dir: artifacts\n")
@@ -59,7 +59,7 @@ def test_control_plane_tracks_attempts_retries_and_projection(tmp_path: Path):
     assert active_task.run_id == run.id
 
 
-def test_control_plane_dependency_resolution_and_circuit_breaking(tmp_path: Path):
+def test_control_plane_dependency_resolution_and_circuit_breaking(tmp_path: Path) -> None:
     store = FileInstanceStore(tmp_path)
     manager = InstanceManager(store)
     manifest = InstanceManifest(
