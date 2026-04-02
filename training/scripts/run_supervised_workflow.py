@@ -20,7 +20,9 @@ from training.src.workflows import (  # noqa: E402
 
 
 def parse_args() -> argparse.Namespace:
-    parser = argparse.ArgumentParser(description="Prepare and launch supervised training over public and/or private datasets.")
+    parser = argparse.ArgumentParser(
+        description="Prepare and launch supervised training over public and/or private datasets."
+    )
     parser.add_argument("--run-name", default="supervised-workflow")
     parser.add_argument("--base-model", default=DEFAULT_BASE_MODEL)
     parser.add_argument("--method", choices=["qlora", "lora", "full"], default="qlora")
@@ -48,9 +50,7 @@ def prompt_for_dataset_selection(args: argparse.Namespace) -> tuple[list[str], l
 
     source_mode = input("Choose dataset source [public/private/mixed]: ").strip().lower() or "private"
     if source_mode in {"public", "mixed"}:
-        public = parse_csv_values(
-            input("Enter Hugging Face dataset URLs or ids separated by commas: ").strip()
-        )
+        public = parse_csv_values(input("Enter Hugging Face dataset URLs or ids separated by commas: ").strip())
     if source_mode in {"private", "mixed"}:
         categories = ", ".join(discover_private_categories(args.custom_root))
         print(f"Available private categories: {categories}")
@@ -108,4 +108,3 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
-

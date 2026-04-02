@@ -26,7 +26,6 @@ from training.src.environment import collect_environment_snapshot
 from training.src.modeling import load_model_for_training, load_tokenizer, trainable_parameter_report
 from training.src.packaging import publish_model_artifacts, write_run_manifest, write_training_summary
 from training.src.tracking import build_tracker
-from training.src.trainer import MathTrainer
 from training.src.validation import run_dry_validation
 
 # Set up structured logging

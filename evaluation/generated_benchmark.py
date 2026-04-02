@@ -10,13 +10,13 @@ import yaml
 from tqdm import tqdm
 
 from ai_factory.core.io import write_json, write_jsonl
+from data.synthesis import GENERATOR_MAP, DatasetSpec
+from data.synthesis.base import choose_weighted
 from evaluation.metrics import score_prediction
 from inference.app.generation import MathGenerator
 from inference.app.model_loader import MathModelRegistry, load_registry_from_yaml
 from inference.app.parameters import GenerationParameters
 from inference.app.prompts import load_prompt_presets
-from data.synthesis import DatasetSpec, GENERATOR_MAP
-from data.synthesis.base import choose_weighted
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_GENERATION_CONFIG = REPO_ROOT / "data" / "configs" / "generation.yaml"
@@ -93,7 +93,9 @@ def create_temp_model_registry(
     return path
 
 
-def build_generator(registry_path: str | Path, *, prompt_library_path: str | Path = DEFAULT_PROMPT_LIBRARY) -> MathGenerator:
+def build_generator(
+    registry_path: str | Path, *, prompt_library_path: str | Path = DEFAULT_PROMPT_LIBRARY
+) -> MathGenerator:
     model_registry = MathModelRegistry(load_registry_from_yaml(registry_path))
     prompt_presets = load_prompt_presets(prompt_library_path)
     return MathGenerator(model_registry, prompt_presets=prompt_presets)
@@ -217,4 +219,3 @@ def write_evaluation_bundle(
     write_jsonl(directory / "questions.jsonl", questions)
     write_jsonl(directory / "results.jsonl", results)
     write_json(directory / "summary.json", summary)
-

@@ -1,8 +1,6 @@
 from __future__ import annotations
 
-import json
 from pathlib import Path
-from typing import Any
 
 from ai_factory.core.io import load_json, write_json
 from ai_factory.core.lineage.models import LineageGraph, LineageRecord
