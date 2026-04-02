@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from ai_factory.core.config.schema import OrchestrationConfig
-from ai_factory.core.execution.base import CommandSpec, UnsupportedInstanceTypeError
+from ai_factory.core.execution.base import CommandSpec
 from ai_factory.core.instances.models import InstanceManifest
 from ai_factory.core.plugins.registry import PluginRegistry, build_default_plugin_registry
 

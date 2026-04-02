@@ -43,7 +43,13 @@ def test_build_workflow_corpus_uses_private_categories(tmp_path: Path, monkeypat
     write_jsonl(
         source_a,
         [
-            {"id": f"a-{idx}", "question": f"QA{idx}", "solution": f"SA{idx}", "difficulty": "hard", "topic": "calculus"}
+            {
+                "id": f"a-{idx}",
+                "question": f"QA{idx}",
+                "solution": f"SA{idx}",
+                "difficulty": "hard",
+                "topic": "calculus",
+            }
             for idx in range(8)
         ],
     )

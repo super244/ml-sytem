@@ -54,11 +54,7 @@ def resolve_custom_data_root(explicit_root: str | Path | None = None) -> Path:
 
 def discover_private_categories(custom_root: str | Path | None = None) -> list[str]:
     root = resolve_custom_data_root(custom_root)
-    return sorted(
-        path.stem
-        for path in root.glob("*.jsonl")
-        if path.is_file()
-    )
+    return sorted(path.stem for path in root.glob("*.jsonl") if path.is_file())
 
 
 def resolve_private_category_paths(
@@ -405,4 +401,3 @@ def launch_training(
     if validate_model_load:
         command.append("--validate-model-load")
     return subprocess.run(command, cwd=REPO_ROOT, check=True, text=True)
-
