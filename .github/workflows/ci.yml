@@ -109,8 +109,8 @@ jobs:
 
       - name: Docker: Build Readiness Check
         run: |
-          docker build -t ai-factory-inference:test ./inference
-          docker build -t ai-factory-trainer:test -f training/Dockerfile . || echo "Trainer Dockerfile not found, skipping"
+          docker build -t ai-factory-inference:test -f inference/Dockerfile .
+          docker build -t ai-factory-trainer:test -f training/Dockerfile .
 
       - name: Safety: Dependency Vulnerability Check
         run: |
@@ -165,5 +165,5 @@ jobs:
 
       - name: Run Full System Diagnosis
         run: |
-          pip install -e .
+          python -m pip install -e ".[dev]"
           python scripts/doctor.py
