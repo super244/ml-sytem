@@ -93,6 +93,20 @@ async def test_agent_routes_support_updating_registered_agents(
     from inference.app.routers import agents as agents_router
 
     registry = tmp_path / "data" / "agents" / "registry.jsonl"
+    _write_jsonl(
+        registry,
+        [
+            {
+                "id": "agent-data-01",
+                "name": "Data Curator",
+                "role": "Curates rows and promotes telemetry examples.",
+                "model": "gpt-4o",
+                "status": "active",
+                "created_at": 10.0,
+                "tokens_used": 123,
+            }
+        ],
+    )
     monkeypatch.setattr(agents_router, "AGENTS_FILE", registry)
 
     transport = httpx.ASGITransport(app=app)
@@ -117,6 +131,62 @@ async def test_agent_routes_support_updating_registered_agents(
 
     refreshed = refreshed_response.json()["swarm"]
     assert any(item["id"] == agent["id"] and item["status"] == "sleeping" for item in refreshed)
+
+
+@pytest.mark.anyio
+async def test_automl_routes_expose_persisted_sweeps_without_demo_mode(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+):
+    from inference.app.routers import automl as automl_router
+
+    sweeps_file = tmp_path / "data" / "automl" / "sweeps.jsonl"
+    _write_jsonl(
+        sweeps_file,
+        [
+            {
+                "id": "sweep-001",
+                "name": "Baseline Sweep",
+                "base_model": "base",
+                "strategy": "bayesian",
+                "status": "running",
+                "num_trials": 4,
+                "completed_trials": 2,
+                "created_at": 10.0,
+                "best_trial": {
+                    "trial_id": "trial-01",
+                    "status": "completed",
+                    "params": {
+                        "learning_rate": 0.0001,
+                        "batch_size": 8,
+                        "warmup_ratio": 0.03,
+                        "lora_rank": 8,
+                    },
+                    "metrics": {
+                        "final_loss": 0.42,
+                        "accuracy": 0.88,
+                        "perplexity": 1.52,
+                    },
+                    "duration_s": 120,
+                },
+                "trials": [],
+            }
+        ],
+    )
+    monkeypatch.setattr(automl_router, "SWEEPS_FILE", sweeps_file)
+
+    transport = httpx.ASGITransport(app=app)
+    async with httpx.AsyncClient(transport=transport, base_url="http://testserver") as client:
+        list_response = await client.get("/v1/automl/sweeps")
+        detail_response = await client.get("/v1/automl/sweeps/sweep-001")
+
+    assert list_response.status_code == 200
+    list_payload = list_response.json()
+    assert list_payload["write_enabled"] is False
+    assert list_payload["sweeps"][0]["id"] == "sweep-001"
+
+    assert detail_response.status_code == 200
+    assert detail_response.json()["name"] == "Baseline Sweep"
 
 
 @pytest.mark.anyio

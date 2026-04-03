@@ -22,17 +22,21 @@ struct MenuBarStatusView: View {
         HStack(spacing: 10) {
             Image(systemName: "cpu.fill")
                 .font(.system(size: 18, weight: .semibold))
-                .foregroundStyle(store.apiReachable ? .green : .red)
+                .foregroundStyle(store.apiReachable ? (store.apiDegraded ? .orange : .green) : .red)
             VStack(alignment: .leading, spacing: 2) {
                 Text("AI-Factory")
                     .font(.system(size: 13, weight: .bold, design: .rounded))
-                Text(store.apiReachable ? "Backend online · v\(store.apiVersion)" : "Backend unreachable")
+                Text(
+                    store.apiReachable
+                        ? (store.apiDegraded ? "Backend degraded · v\(store.apiVersion)" : "Backend online · v\(store.apiVersion)")
+                        : "Backend unreachable"
+                )
                     .font(.system(size: 11, weight: .regular, design: .rounded))
                     .foregroundStyle(.secondary)
             }
             Spacer()
             Circle()
-                .fill(store.apiReachable ? Color.green : Color.red)
+                .fill(store.apiReachable ? (store.apiDegraded ? Color.orange : Color.green) : Color.red)
                 .frame(width: 8, height: 8)
         }
         .padding(.horizontal, 14)

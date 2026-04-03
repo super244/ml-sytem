@@ -1,6 +1,5 @@
 """Deployment targets for AI-Factory models."""
 
-import asyncio
 import logging
 from abc import ABC, abstractmethod
 from typing import Any
@@ -13,10 +12,10 @@ logger = logging.getLogger(__name__)
 class DeploymentTarget(ABC):
     """Base class for deployment targets."""
 
-    def __init__(self):
+    def __init__(self) -> None:
         self.name = self.__class__.__name__
         self.description = "Base deployment target"
-        self.capabilities = []
+        self.capabilities: list[str] = []
 
     @abstractmethod
     async def prepare_model(self, model: ModelArtifact, spec: DeploymentSpec) -> ModelArtifact:
@@ -45,13 +44,21 @@ class DeploymentTarget(ABC):
 
     async def get_target_status(self) -> dict[str, Any]:
         """Get target status."""
-        return {"name": self.name, "status": "available", "capabilities": self.capabilities}
+        return {
+            "name": self.name,
+            "status": "degraded",
+            "capabilities": self.capabilities,
+            "errors": [
+                "Legacy platform deployment targets are informational only. "
+                "Use managed deployment instances for production publishing."
+            ],
+        }
 
 
 class HuggingFaceTarget(DeploymentTarget):
     """HuggingFace Hub deployment target."""
 
-    def __init__(self):
+    def __init__(self) -> None:
         super().__init__()
         self.name = "HuggingFace"
         self.description = "Deploy models to HuggingFace Hub"
@@ -64,16 +71,19 @@ class HuggingFaceTarget(DeploymentTarget):
 
     async def deploy(self, model: ModelArtifact, spec: DeploymentSpec) -> dict[str, Any]:
         """Deploy model to HuggingFace Hub."""
-        logger.info(f"Deploying {model.name} to HuggingFace Hub")
-        return {
-            "deployment_id": f"hf_{model.name}_{int(asyncio.get_event_loop().time())}",
-            "repository_url": f"https://huggingface.co/{spec.config.get('repository', model.name)}",
-            "status": "deployed",
-        }
+        del spec
+        raise RuntimeError(
+            f"HuggingFaceTarget is not wired to a live publisher for model '{model.name}'. "
+            "Use a managed deploy instance instead."
+        )
 
     async def get_deployment_status(self, deployment_id: str) -> dict[str, Any]:
         """Get HuggingFace deployment status."""
-        return {"deployment_id": deployment_id, "status": "deployed", "url": "https://huggingface.co/models"}
+        return {
+            "deployment_id": deployment_id,
+            "status": "degraded",
+            "errors": ["Legacy HuggingFace deployment tracking is unavailable."],
+        }
 
     async def cancel_deployment(self, deployment_id: str) -> bool:
         """Cancel HuggingFace deployment."""
@@ -91,7 +101,7 @@ class HuggingFaceTarget(DeploymentTarget):
 class OllamaTarget(DeploymentTarget):
     """Ollama deployment target."""
 
-    def __init__(self):
+    def __init__(self) -> None:
         super().__init__()
         self.name = "Ollama"
         self.description = "Deploy models to Ollama local registry"
@@ -105,16 +115,19 @@ class OllamaTarget(DeploymentTarget):
 
     async def deploy(self, model: ModelArtifact, spec: DeploymentSpec) -> dict[str, Any]:
         """Deploy model to Ollama."""
-        logger.info(f"Deploying {model.name} to Ollama")
-        return {
-            "deployment_id": f"ollama_{model.name}_{int(asyncio.get_event_loop().time())}",
-            "model_name": model.name,
-            "status": "deployed",
-        }
+        del spec
+        raise RuntimeError(
+            f"OllamaTarget is not wired to a live publisher for model '{model.name}'. "
+            "Use a managed deploy instance instead."
+        )
 
     async def get_deployment_status(self, deployment_id: str) -> dict[str, Any]:
         """Get Ollama deployment status."""
-        return {"deployment_id": deployment_id, "status": "running", "endpoint": "http://localhost:11434"}
+        return {
+            "deployment_id": deployment_id,
+            "status": "degraded",
+            "errors": ["Legacy Ollama deployment tracking is unavailable."],
+        }
 
     async def cancel_deployment(self, deployment_id: str) -> bool:
         """Cancel Ollama deployment."""
@@ -129,7 +142,7 @@ class OllamaTarget(DeploymentTarget):
 class LMStudioTarget(DeploymentTarget):
     """LM Studio deployment target."""
 
-    def __init__(self):
+    def __init__(self) -> None:
         super().__init__()
         self.name = "LM Studio"
         self.description = "Export models for LM Studio import"
@@ -142,16 +155,19 @@ class LMStudioTarget(DeploymentTarget):
 
     async def deploy(self, model: ModelArtifact, spec: DeploymentSpec) -> dict[str, Any]:
         """Export model for LM Studio."""
-        logger.info(f"Exporting {model.name} for LM Studio")
-        return {
-            "deployment_id": f"lmstudio_{model.name}_{int(asyncio.get_event_loop().time())}",
-            "export_path": f"/tmp/{model.name}_lmstudio.gguf",
-            "status": "exported",
-        }
+        del spec
+        raise RuntimeError(
+            f"LMStudioTarget is not wired to a live exporter for model '{model.name}'. "
+            "Use a managed deploy instance instead."
+        )
 
     async def get_deployment_status(self, deployment_id: str) -> dict[str, Any]:
         """Get LM Studio deployment status."""
-        return {"deployment_id": deployment_id, "status": "exported"}
+        return {
+            "deployment_id": deployment_id,
+            "status": "degraded",
+            "errors": ["Legacy LM Studio deployment tracking is unavailable."],
+        }
 
     async def cancel_deployment(self, deployment_id: str) -> bool:
         """Cancel LM Studio deployment."""
@@ -166,7 +182,7 @@ class LMStudioTarget(DeploymentTarget):
 class CustomAPITarget(DeploymentTarget):
     """Custom API deployment target."""
 
-    def __init__(self):
+    def __init__(self) -> None:
         super().__init__()
         self.name = "Custom API"
         self.description = "Deploy models to custom API endpoints"
@@ -179,16 +195,19 @@ class CustomAPITarget(DeploymentTarget):
 
     async def deploy(self, model: ModelArtifact, spec: DeploymentSpec) -> dict[str, Any]:
         """Deploy model to custom API."""
-        logger.info(f"Deploying {model.name} to custom API")
-        return {
-            "deployment_id": f"api_{model.name}_{int(asyncio.get_event_loop().time())}",
-            "endpoint": spec.config.get("endpoint", "https://api.example.com"),
-            "status": "deployed",
-        }
+        del spec
+        raise RuntimeError(
+            f"CustomAPITarget is not wired to a live publisher for model '{model.name}'. "
+            "Use a managed deploy instance instead."
+        )
 
     async def get_deployment_status(self, deployment_id: str) -> dict[str, Any]:
         """Get custom API deployment status."""
-        return {"deployment_id": deployment_id, "status": "running", "health": "healthy"}
+        return {
+            "deployment_id": deployment_id,
+            "status": "degraded",
+            "errors": ["Legacy custom API deployment tracking is unavailable."],
+        }
 
     async def cancel_deployment(self, deployment_id: str) -> bool:
         """Cancel custom API deployment."""
@@ -206,7 +225,7 @@ class CustomAPITarget(DeploymentTarget):
 class EdgeDeviceTarget(DeploymentTarget):
     """Edge device deployment target."""
 
-    def __init__(self):
+    def __init__(self) -> None:
         super().__init__()
         self.name = "Edge Device"
         self.description = "Deploy models to edge devices"
@@ -220,16 +239,19 @@ class EdgeDeviceTarget(DeploymentTarget):
 
     async def deploy(self, model: ModelArtifact, spec: DeploymentSpec) -> dict[str, Any]:
         """Deploy model to edge device."""
-        logger.info(f"Deploying {model.name} to edge device")
-        return {
-            "deployment_id": f"edge_{model.name}_{int(asyncio.get_event_loop().time())}",
-            "device_id": spec.config.get("device_id", "default"),
-            "status": "deployed",
-        }
+        del spec
+        raise RuntimeError(
+            f"EdgeDeviceTarget is not wired to a live publisher for model '{model.name}'. "
+            "Use a managed deploy instance instead."
+        )
 
     async def get_deployment_status(self, deployment_id: str) -> dict[str, Any]:
         """Get edge deployment status."""
-        return {"deployment_id": deployment_id, "status": "running", "device_status": "online"}
+        return {
+            "deployment_id": deployment_id,
+            "status": "degraded",
+            "errors": ["Legacy edge deployment tracking is unavailable."],
+        }
 
     async def cancel_deployment(self, deployment_id: str) -> bool:
         """Cancel edge deployment."""

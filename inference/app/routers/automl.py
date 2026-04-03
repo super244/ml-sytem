@@ -14,10 +14,20 @@ from typing import Any
 from fastapi import APIRouter, BackgroundTasks, HTTPException
 from pydantic import BaseModel
 
+from inference.app.config import get_settings
+
 router = APIRouter(prefix="/automl", tags=["automl"])
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
 SWEEPS_FILE = REPO_ROOT / "data" / "automl" / "sweeps.jsonl"
+
+
+def _ensure_demo_mode() -> None:
+    if not get_settings().demo_mode:
+        raise HTTPException(
+            status_code=503,
+            detail="AutoML sweep simulation is disabled outside AI_FACTORY_DEMO_MODE=1.",
+        )
 
 
 def _load_sweeps() -> dict[str, dict[str, Any]]:
@@ -118,11 +128,17 @@ async def _sweep_worker(sweep_id: str, num_trials: int, search_space: SearchSpac
 
 @router.get("/sweeps")
 def list_sweeps() -> dict[str, Any]:
-    return {"sweeps": list(_load_sweeps().values())}
+    sweeps = sorted(_load_sweeps().values(), key=lambda item: float(item.get("created_at", 0.0)), reverse=True)
+    return {
+        "status": "available",
+        "write_enabled": get_settings().demo_mode,
+        "sweeps": sweeps,
+    }
 
 
 @router.post("/sweeps")
 def launch_sweep(req: LaunchSweepRequest, background_tasks: BackgroundTasks) -> dict[str, Any]:
+    _ensure_demo_mode()
     sweep_id = f"sweep-{uuid.uuid4().hex[:8]}"
 
     sweep: dict[str, Any] = {

@@ -92,7 +92,15 @@ export function useLabMetadata() {
           runs: resolveResult(runsResult, [], "runs"),
           status: resolveResult(statusResult, null, "status"),
           loading: false,
-          error: errors.length ? errors.join(" | ") : null,
+          error: [
+            ...errors,
+            ...(statusResult.status === "fulfilled" && statusResult.value?.status === "degraded"
+              ? statusResult.value.errors ?? ["status metadata is degraded"]
+              : []),
+            ...(promptLibraryResult.status === "fulfilled" && promptLibraryResult.value?.status === "degraded"
+              ? promptLibraryResult.value.errors ?? ["prompt metadata is degraded"]
+              : []),
+          ].join(" | ") || null,
         });
       } catch (error) {
         if (!active) {

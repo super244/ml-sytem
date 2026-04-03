@@ -3,11 +3,13 @@ from __future__ import annotations
 from typing import Any
 
 from ai_factory.core.instances.models import InstanceManifest
+from ai_factory.core.instances.store import FileInstanceStore
 from ai_factory.core.monitoring.collectors import collect_metrics_for_instance, collect_progress_for_instance
+from ai_factory.core.orchestration.service import OrchestrationService
 
 
 class LifecycleStateManager:
-    def __init__(self, store, orchestration):
+    def __init__(self, store: FileInstanceStore, orchestration: OrchestrationService) -> None:
         self.store = store
         self.orchestration = orchestration
 

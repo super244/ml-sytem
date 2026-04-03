@@ -1,8 +1,15 @@
 from __future__ import annotations
 
-from typing import Any, Literal, Protocol
+from typing import TYPE_CHECKING, Any, Literal, Protocol
 
 from pydantic import BaseModel, Field
+
+from ai_factory.core.execution.base import CommandSpec
+from ai_factory.core.instances.models import InstanceManifest
+
+if TYPE_CHECKING:
+    from ai_factory.core.config.schema import OrchestrationConfig
+    from ai_factory.core.plugins.registry import PluginRegistry
 
 PluginKind = Literal["instance_handler", "deployment_provider"]
 
@@ -20,7 +27,12 @@ class InstanceHandlerPlugin(Protocol):
     descriptor: PluginDescriptor
     instance_types: tuple[str, ...]
 
-    def build_command(self, config, manifest, registry) -> object:
+    def build_command(
+        self,
+        config: OrchestrationConfig,
+        manifest: InstanceManifest,
+        registry: PluginRegistry,
+    ) -> CommandSpec:
         raise NotImplementedError
 
 
@@ -28,5 +40,10 @@ class DeploymentProviderPlugin(Protocol):
     descriptor: PluginDescriptor
     provider_names: tuple[str, ...]
 
-    def build_command(self, config, manifest, registry) -> object:
+    def build_command(
+        self,
+        config: OrchestrationConfig,
+        manifest: InstanceManifest,
+        registry: PluginRegistry,
+    ) -> CommandSpec:
         raise NotImplementedError

@@ -1,10 +1,34 @@
 import Charts
 import SwiftUI
 
+private let desktopMetricsDemoModeEnabled =
+    ProcessInfo.processInfo.environment["AI_FACTORY_DESKTOP_DEMO_MODE"] == "1" ||
+    ProcessInfo.processInfo.environment["AI_FACTORY_DEMO_MODE"] == "1"
+
 struct MetricSample: Identifiable {
     let id = UUID()
     let timestamp: Date
     let value: Double
+}
+
+struct FlexibleMetricValue: Decodable {
+    let value: Double
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.singleValueContainer()
+        if let doubleValue = try? container.decode(Double.self) {
+            value = doubleValue
+            return
+        }
+        if let intValue = try? container.decode(Int.self) {
+            value = Double(intValue)
+            return
+        }
+        throw DecodingError.typeMismatch(
+            Double.self,
+            DecodingError.Context(codingPath: decoder.codingPath, debugDescription: "Expected numeric metric value")
+        )
+    }
 }
 
 struct MetricSeries {
@@ -29,15 +53,17 @@ struct MetricSeries {
 
 @MainActor
 final class MetricsStore: ObservableObject {
-    @Published var cpu = MetricSeries(label: "CPU", unit: "%", color: .blue)
-    @Published var memory = MetricSeries(label: "Memory", unit: "MB", color: .purple)
-    @Published var throughput = MetricSeries(label: "Throughput", unit: "req/s", color: .green)
-    @Published var errorRate = MetricSeries(label: "Errors", unit: "err/s", color: .red)
+    @Published var accuracy = MetricSeries(label: "Accuracy", unit: "%", color: .blue)
+    @Published var latency = MetricSeries(label: "Latency", unit: "s", color: .purple)
+    @Published var throughput = MetricSeries(label: "Tokens/s", unit: "tok/s", color: .green)
+    @Published var activity = MetricSeries(label: "Activity", unit: "count", color: .red)
     @Published var isLive = false
     @Published var fetchError: String? = nil
+    @Published var targetInstanceName: String = "No instance selected"
 
     private var timer: Timer?
     private let apiURL: URL
+    private let demoMode = desktopMetricsDemoModeEnabled
 
     init(apiURL: URL) {
         self.apiURL = apiURL
@@ -62,57 +88,83 @@ final class MetricsStore: ObservableObject {
     }
 
     func fetchMetrics() async {
-        let endpoint = apiURL.appendingPathComponent("v1/metrics")
-        var req = URLRequest(url: endpoint)
-        req.timeoutInterval = 4
         do {
+            let instanceID = try await resolveTargetInstanceID()
+            let endpoint = apiURL.appendingPathComponent("v1/instances/\(instanceID)/metrics")
+            var req = URLRequest(url: endpoint)
+            req.timeoutInterval = 4
             let (data, resp) = try await URLSession.shared.data(for: req)
             guard let http = resp as? HTTPURLResponse, http.statusCode == 200 else {
                 fetchError = "HTTP \((resp as? HTTPURLResponse)?.statusCode ?? 0)"
-                seedSimulated()
+                if demoMode { seedSimulated() }
                 return
             }
-            let decoded = try JSONDecoder().decode(APIMetricsResponse.self, from: data)
-            cpu.append(decoded.cpu_percent ?? Double.random(in: 10...90))
-            memory.append(decoded.memory_mb ?? Double.random(in: 200...2000))
-            throughput.append(decoded.requests_per_second ?? Double.random(in: 0...50))
-            errorRate.append(decoded.errors_per_second ?? Double.random(in: 0...5))
+            let decoded = try JSONDecoder().decode(InstanceMetricsResponse.self, from: data)
+            let summary = decoded.numericSummary
+            if let accuracyValue = summary["accuracy"] ?? summary["parse_rate"] {
+                accuracy.append(accuracyValue * 100)
+            }
+            if let latencyValue = summary["avg_latency_s"] {
+                latency.append(latencyValue)
+            }
+            if let throughputValue = summary["avg_tokens_per_second"] {
+                throughput.append(throughputValue)
+            }
+            if let activityValue = summary["requests"] ?? summary["latest_step"] ?? summary["records"] {
+                activity.append(activityValue)
+            }
             fetchError = nil
         } catch {
             fetchError = error.localizedDescription
-            seedSimulated()
+            if demoMode { seedSimulated() }
         }
     }
 
     private func seedSimulated() {
-        cpu.append(Double.random(in: 10...90))
-        memory.append(Double.random(in: 200...2000))
-        throughput.append(Double.random(in: 0...50))
-        errorRate.append(Double.random(in: 0...5))
+        accuracy.append(Double.random(in: 40...95))
+        latency.append(Double.random(in: 0.1...3.0))
+        throughput.append(Double.random(in: 1...80))
+        activity.append(Double.random(in: 1...500))
+    }
+
+    private func resolveTargetInstanceID() async throws -> String {
+        var request = URLRequest(url: apiURL.appendingPathComponent("v1/instances"))
+        request.timeoutInterval = 4
+        let (data, response) = try await URLSession.shared.data(for: request)
+        guard let http = response as? HTTPURLResponse, http.statusCode == 200 else {
+            throw URLError(.badServerResponse)
+        }
+        let decoded = try JSONDecoder().decode(APIInstancesResponse.self, from: data)
+        guard let target = decoded.instances.first(where: { $0.status == "running" }) ?? decoded.instances.first else {
+            throw NSError(domain: "AIFactoryNative", code: 404, userInfo: [NSLocalizedDescriptionKey: "No instances are available for metrics."])
+        }
+        targetInstanceName = target.name
+        return target.id
     }
 }
 
-struct APIMetricsResponse: Decodable {
-    let cpu_percent: Double?
-    let memory_mb: Double?
-    let requests_per_second: Double?
-    let errors_per_second: Double?
+struct InstanceMetricsResponse: Decodable {
+    let summary: [String: FlexibleMetricValue]
+
+    var numericSummary: [String: Double] {
+        Dictionary(uniqueKeysWithValues: summary.map { ($0.key, $0.value.value) })
+    }
 }
 
 struct MetricsChartView: View {
     @StateObject private var metrics: MetricsStore
-    @State private var selectedSeries: String = "CPU"
+    @State private var selectedSeries: String = "Accuracy"
 
     init(apiURL: URL) {
         _metrics = StateObject(wrappedValue: MetricsStore(apiURL: apiURL))
     }
 
     private var allSeries: [MetricSeries] {
-        [metrics.cpu, metrics.memory, metrics.throughput, metrics.errorRate]
+        [metrics.accuracy, metrics.latency, metrics.throughput, metrics.activity]
     }
 
     private var activeSeries: MetricSeries {
-        allSeries.first { $0.label == selectedSeries } ?? metrics.cpu
+        allSeries.first { $0.label == selectedSeries } ?? metrics.accuracy
     }
 
     var body: some View {
@@ -132,7 +184,7 @@ struct MetricsChartView: View {
             VStack(alignment: .leading, spacing: 4) {
                 Text("Live Metrics")
                     .font(.system(size: 28, weight: .bold, design: .rounded))
-                Text("Sampled every 3 seconds · last \(metrics.cpu.samples.count) points")
+                Text("\(metrics.targetInstanceName) · sampled every 3 seconds · last \(metrics.accuracy.samples.count) points")
                     .font(.system(size: 13, weight: .regular, design: .rounded))
                     .foregroundStyle(.secondary)
             }

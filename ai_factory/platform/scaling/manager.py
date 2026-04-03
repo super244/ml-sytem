@@ -4,7 +4,7 @@ import logging
 from pathlib import Path
 from typing import Any
 
-from ai_factory.core.schemas import ScalingConfig, TrainingJob
+from ai_factory.core.schemas import ResourceSpec, ScalingConfig, TrainingJob
 
 from .cluster import ClusterManager
 from .resources import ResourceManager
@@ -26,14 +26,15 @@ class ScalingManager:
         """Schedule a training job across available resources."""
         # Check resource requirements
         required_resources = job.resource_requirements
+        resource_spec = ResourceSpec.model_validate(required_resources)
 
         # Find suitable nodes
-        suitable_nodes = await self.cluster_manager.find_suitable_nodes(required_resources)
+        suitable_nodes = await self.cluster_manager.find_suitable_nodes(resource_spec)
         if not suitable_nodes:
             raise ValueError("No suitable nodes available for job")
 
         # Select primary node based on availability and performance
-        primary_node = self.resource_manager.select_optimal_node(suitable_nodes, required_resources)
+        primary_node = self.resource_manager.select_optimal_node(suitable_nodes, resource_spec)
 
         # Schedule the job
         job_id = await self.cluster_manager.schedule_job(job, primary_node)
