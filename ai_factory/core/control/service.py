@@ -217,9 +217,9 @@ class FactoryControlService:
 
     def describe_foundation(self) -> FoundationOverview:
         return FoundationOverview(
-            repo_root=self.settings.repo_root,
-            artifacts_dir=self.settings.artifacts_dir,
-            control_db_path=self.settings.control_db_path,
+            repo_root=str(self.settings.repo_root),
+            artifacts_dir=str(self.settings.artifacts_dir),
+            control_db_path=str(self.settings.control_db_path),
             interfaces=[
                 FoundationInterface(
                     id="cli",

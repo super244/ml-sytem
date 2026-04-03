@@ -6,6 +6,7 @@ import platform
 import shutil
 import subprocess
 from dataclasses import asdict, dataclass
+from importlib.util import find_spec
 from pathlib import Path
 from typing import Any
 
@@ -148,6 +149,15 @@ def _rust_core_manifest(repo_root: Path) -> dict[str, Any]:
     }
 
 
+def _detect_pyo3_bridge_support() -> bool:
+    if _env_flag("AI_FACTORY_TITAN_ENABLE_PYO3_BRIDGE"):
+        return True
+    try:
+        return find_spec("ai_factory_titan_py") is not None
+    except (ImportError, ValueError):
+        return False
+
+
 def detect_titan_status(repo_root: str | Path | None = None) -> dict[str, Any]:
     resolved_root = Path(repo_root or Path(__file__).resolve().parents[1]).resolve()
     system = platform.system()
@@ -174,13 +184,6 @@ def detect_titan_status(repo_root: str | Path | None = None) -> dict[str, Any]:
             gpu_count = 1
             supports_metal = True
             supports_mlx = True
-            try:
-                import torch
-
-                if torch.backends.mps.is_available():
-                    supports_metal = True
-            except ImportError:
-                pass
 
     nvidia_gpu = _detect_nvidia_gpu()
     if nvidia_gpu["count"] > 0:
@@ -252,7 +255,7 @@ def detect_titan_status(repo_root: str | Path | None = None) -> dict[str, Any]:
         supports_metal=supports_metal,
         supports_cuda=supports_cuda,
         supports_mlx=supports_mlx,
-        supports_pyo3_bridge=True,
+        supports_pyo3_bridge=_detect_pyo3_bridge_support(),
         remote_execution=remote_execution,
         cloud_provider=cloud_provider,
         cuda_compute_capability=cuda_compute_capability,
