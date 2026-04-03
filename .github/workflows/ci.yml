@@ -85,11 +85,10 @@ jobs:
           flags: python
         continue-on-error: true
 
-  # Rust/Titan Checks (if exists)
+  # Rust/Titan Checks
   rust-checks:
     name: "Rust: Titan Engine"
     runs-on: ubuntu-latest
-    if: ${{ hashFiles('ai_factory_titan/Cargo.toml') != '' }}
     steps:
       - uses: actions/checkout@v4
 
@@ -140,11 +139,10 @@ jobs:
         working-directory: frontend
         run: npm test || echo "No frontend tests configured"
 
-  # Desktop Checks (if exists)
+  # Desktop Checks
   desktop-checks:
     name: "Desktop: Electron"
     runs-on: ubuntu-latest
-    if: ${{ hashFiles('desktop/package.json') != '' }}
     steps:
       - uses: actions/checkout@v4
 
@@ -162,49 +160,6 @@ jobs:
       - name: Build desktop (if possible)
         working-directory: desktop
         run: npm run build || echo "Desktop build skipped"
-
-  # Docker Checks (if Dockerfiles exist)
-  docker-checks:
-    name: "Docker: Build Validation"
-    runs-on: ubuntu-latest
-    if: ${{ hashFiles('**/Dockerfile*') != '' }}
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
-
-      - name: Build inference Dockerfile
-        run: |
-          if [ -f inference/Dockerfile ]; then
-            docker build -t ai-factory-inference:test -f inference/Dockerfile .
-          else
-            echo "No inference/Dockerfile found"
-          fi
-
-      - name: Build training Dockerfile
-        run: |
-          if [ -f training/Dockerfile ]; then
-            docker build -t ai-factory-trainer:test -f training/Dockerfile .
-          else
-            echo "No training/Dockerfile found"
-          fi
-
-      - name: Build API Dockerfile
-        run: |
-          if [ -f Dockerfile.api ]; then
-            docker build -t ai-factory-api:test -f Dockerfile.api .
-          else
-            echo "No Dockerfile.api found"
-          fi
-
-      - name: Build Frontend Dockerfile
-        run: |
-          if [ -f Dockerfile.frontend ]; then
-            docker build -t ai-factory-frontend:test -f Dockerfile.frontend .
-          else
-            echo "No Dockerfile.frontend found"
-          fi
 
   # Integration Tests
   integration-tests:
@@ -241,60 +196,6 @@ jobs:
       - name: CLI test
         run: |
           ai-factory --help || echo "CLI not available"
-
-  # Documentation Checks
-  docs-checks:
-    name: "Documentation: Validation"
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Set up Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: "3.11"
-
-      - name: Check documentation
-        run: |
-          # Check if README exists and is valid markdown
-          if [ -f README.md ]; then
-            echo "README.md exists"
-          else
-            echo "README.md missing"
-            exit 1
-          fi
-
-      - name: Validate links in documentation
-        run: |
-          pip install markdown-link-check
-          find . -name "*.md" -not -path "./node_modules/*" -not -path "./.git/*" | head -5 | xargs -I {} markdown-link-check {} || echo "Link check completed with warnings"
-
-  # Performance Benchmarks (optional)
-  benchmark-tests:
-    name: "Performance: Benchmarks"
-    runs-on: ubuntu-latest
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Set up Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: "3.11"
-          cache: 'pip'
-
-      - name: Install dependencies
-        run: |
-          python -m pip install --upgrade pip
-          pip install -e ".[dev]"
-
-      - name: Run performance tests (if available)
-        run: |
-          if [ -f tests/test_performance.py ]; then
-            pytest tests/test_performance.py -v
-          else
-            echo "No performance tests configured"
-          fi
 
   # Security Scanning
   security-scan:

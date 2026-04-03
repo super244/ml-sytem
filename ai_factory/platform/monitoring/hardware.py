@@ -1,28 +1,39 @@
 import importlib
+import logging
 import platform
 import subprocess
 from typing import Any
+
+logger = logging.getLogger(__name__)
 
 
 def get_system_ram_gb() -> int:
     try:
         if platform.system() == "Darwin":
-            res = subprocess.run(["sysctl", "-n", "hw.memsize"], capture_output=True, text=True)
+            res = subprocess.run(  # nosec B603
+                ["/usr/sbin/sysctl", "-n", "hw.memsize"],
+                check=True,
+                capture_output=True,
+                text=True,
+            )
             return int(res.stdout.strip()) // (1024**3)
         elif platform.system() == "Linux":
-            with open("/proc/meminfo") as f:
+            with open("/proc/meminfo", encoding="utf-8") as f:
                 for line in f:
                     if line.startswith("MemTotal:"):
                         return int(line.split()[1]) // (1024**2)
-    except Exception:
-        pass
+    except (OSError, ValueError, RuntimeError, subprocess.SubprocessError) as exc:
+        logger.debug("unable to read system memory: %s", exc)
     return 16  # Fallback
 
 
 def _get_torch() -> Any:
     try:
         return importlib.import_module("torch")
-    except Exception:
+    except ImportError:
+        return None
+    except RuntimeError as exc:
+        logger.debug("torch import failed: %s", exc)
         return None
 
 
@@ -44,8 +55,8 @@ def get_cluster_nodes() -> list[dict[str, Any]]:
                 usage_pct = int((allocated / reserved) * 100)
             else:
                 usage_pct = 10
-        except Exception:
-            pass
+        except (AttributeError, RuntimeError, ValueError) as exc:
+            logger.debug("cuda memory probe failed: %s", exc)
     elif torch is not None and getattr(torch.backends, "mps", None) and torch.backends.mps.is_available():
         hw_type = "MPS (Apple Silicon)"
         try:
@@ -54,8 +65,8 @@ def get_cluster_nodes() -> list[dict[str, Any]]:
             rec = get_system_ram_gb() * (1024**3) * 0.7
             if rec > 0:
                 usage_pct = min(100, int((alloc / rec) * 100))
-        except Exception:
-            pass
+        except (AttributeError, RuntimeError, ValueError) as exc:
+            logger.debug("mps memory probe failed: %s", exc)
 
     local_node = {
         "id": "local-primary",

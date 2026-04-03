@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import os
+import shutil
 import subprocess
 import sys
 from pathlib import Path
@@ -29,17 +30,26 @@ class DesktopInterface:
             os.environ.get("AI_FACTORY_DESKTOP_NATIVE") == "1" and sys.platform == "darwin" and self.native_available()
         )
 
+    @staticmethod
+    def _resolve_tool(name: str) -> str:
+        executable = shutil.which(name)
+        if executable is None:
+            raise FileNotFoundError(f"Required executable '{name}' not found in PATH")
+        return executable
+
     def build_native(self) -> None:
         if not self.native_available():
             raise FileNotFoundError(f"Native macOS scaffold not found: {self.native_dir}")
-        subprocess.run(["swift", "build"], cwd=self.native_dir, check=True)
+        swift_bin = self._resolve_tool("swift")
+        subprocess.run([swift_bin, "build"], cwd=self.native_dir, check=True)  # nosec B603 - fixed internal command
 
     def run_native(self) -> None:
         if sys.platform != "darwin":
             raise RuntimeError("The native macOS desktop shell can only run on macOS.")
         if not self.native_available():
             raise FileNotFoundError(f"Native macOS scaffold not found: {self.native_dir}")
-        subprocess.run(["swift", "run"], cwd=self.native_dir, check=True)
+        swift_bin = self._resolve_tool("swift")
+        subprocess.run([swift_bin, "run"], cwd=self.native_dir, check=True)  # nosec B603 - fixed internal command
 
     def run(self) -> None:
         """Run the desktop application.
@@ -56,15 +66,17 @@ class DesktopInterface:
             return
 
         node_modules = self.desktop_dir / "node_modules"
+        npm_bin = self._resolve_tool("npm")
         if not node_modules.exists():
             print("Installing desktop dependencies...")
-            subprocess.run(["npm", "install"], cwd=self.desktop_dir, check=True)
+            subprocess.run([npm_bin, "install"], cwd=self.desktop_dir, check=True)  # nosec B603 - fixed internal command
 
-        subprocess.run(["npm", "start"], cwd=self.desktop_dir, check=True)
+        subprocess.run([npm_bin, "start"], cwd=self.desktop_dir, check=True)  # nosec B603 - fixed internal command
 
     def build(self) -> None:
         """Build the desktop application for distribution."""
         if not self.desktop_dir.exists():
             raise FileNotFoundError(f"Desktop directory not found: {self.desktop_dir}")
 
-        subprocess.run(["npm", "run", "build"], cwd=self.desktop_dir, check=True)
+        npm_bin = self._resolve_tool("npm")
+        subprocess.run([npm_bin, "run", "build"], cwd=self.desktop_dir, check=True)  # nosec B603 - fixed internal command

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import argparse
 import shlex
+import shutil
 import subprocess
 import sys
 import threading
@@ -49,7 +50,10 @@ def _port_forward_args(metadata: dict[str, Any]) -> list[str]:
 
 
 def _build_ssh_argv(environment: EnvironmentSpec, metadata: dict[str, Any]) -> list[str]:
-    argv = ["ssh", "-p", str(environment.port)]
+    ssh_bin = shutil.which("ssh")
+    if ssh_bin is None:
+        raise FileNotFoundError("ssh executable not found in PATH")
+    argv = [ssh_bin, "-p", str(environment.port)]
     if environment.key_path:
         argv.extend(["-i", environment.key_path])
     argv.extend(_port_forward_args(metadata))
@@ -93,7 +97,7 @@ class SshExecutor(BaseExecutor):
             manifest_metadata=manifest.metadata,
             command=command,
         )
-        process = subprocess.Popen(
+        process = subprocess.Popen(  # nosec B603 - internal runner bootstrap with explicit argv
             [
                 sys.executable,
                 "-m",
@@ -117,7 +121,7 @@ class SshExecutor(BaseExecutor):
         target = _ssh_target(manifest.environment)
         argv = _build_ssh_argv(manifest.environment, manifest.metadata)
         argv.extend([target, f"cat {shlex.quote(path)}"])
-        result = subprocess.run(argv, capture_output=True, text=True, check=True)
+        result = subprocess.run(argv, capture_output=True, text=True, check=True)  # nosec B603 - ssh argv with shell=False
         return result.stdout
 
 
@@ -134,7 +138,7 @@ def _run_payload(payload: RunnerPayload) -> int:
     ssh_command = _build_ssh_argv(payload.environment, payload.manifest_metadata)
     ssh_command.extend([_ssh_target(payload.environment), _build_remote_command(payload)])
 
-    process = subprocess.Popen(
+    process = subprocess.Popen(  # nosec B603 - ssh command constructed from validated environment and argv
         ssh_command,
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,

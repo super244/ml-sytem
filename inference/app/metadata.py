@@ -204,8 +204,8 @@ class MetadataService:
         errors = [
             *model_errors,
             *prompt_errors,
-            *( [self._benchmark_error] if self._benchmark_error else [] ),
-            *( [self._runs_error] if self._runs_error else [] ),
+            *([self._benchmark_error] if self._benchmark_error else []),
+            *([self._runs_error] if self._runs_error else []),
             *instance_errors,
         ]
         status_data = {

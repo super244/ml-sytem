@@ -1040,7 +1040,9 @@ class InstanceManager:
                     "id": Path(str(snapshot.get("resolved_subsystem_config_path") or config_path)).stem,
                     "label": source.name,
                     "benchmark_config": str(snapshot.get("resolved_subsystem_config_path") or config_path),
-                    "compare_to_models": [str(primary_model)] if isinstance(primary_model := models_payload.get("primary_model"), str) else [],
+                    "compare_to_models": [str(primary_model)]
+                    if isinstance(primary_model := models_payload.get("primary_model"), str)
+                    else [],
                 },
             ),
         )

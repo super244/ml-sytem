@@ -145,7 +145,6 @@ class TaskAttempt(BaseModel):
     metadata: dict[str, Any] = Field(default_factory=dict)
 
 
-
 class TaskLease(BaseModel):
     task_id: str
     attempt_id: str
