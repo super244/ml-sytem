@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from typing import cast
+
 from ai_factory.core.config.schema import DecisionPolicy
 from ai_factory.core.instances.models import DecisionResult, FeedbackRecommendation
 

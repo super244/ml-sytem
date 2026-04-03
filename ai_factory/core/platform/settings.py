@@ -7,10 +7,10 @@ from pathlib import Path
 
 @dataclass(frozen=True)
 class PlatformSettings:
-    repo_root: str
-    artifacts_dir: str
-    control_plane_dir: str
-    control_db_path: str
+    repo_root: Path
+    artifacts_dir: Path
+    control_plane_dir: Path
+    control_db_path: Path
     worker_concurrency: int
     heartbeat_interval_s: int
     stale_after_s: int
@@ -55,10 +55,10 @@ def get_platform_settings(
         str(control_plane_dir / "events.jsonl"),
     )
     return PlatformSettings(
-        repo_root=str(resolved_repo_root),
-        artifacts_dir=str(resolved_artifacts_dir),
-        control_plane_dir=str(control_plane_dir),
-        control_db_path=str(control_db_path),
+        repo_root=resolved_repo_root,
+        artifacts_dir=resolved_artifacts_dir,
+        control_plane_dir=control_plane_dir,
+        control_db_path=control_db_path,
         worker_concurrency=max(_int_env("AI_FACTORY_WORKER_CONCURRENCY", 4), 1),
         heartbeat_interval_s=max(_int_env("AI_FACTORY_HEARTBEAT_INTERVAL_S", 5), 1),
         stale_after_s=max(_int_env("AI_FACTORY_TASK_STALE_AFTER_S", 60), 5),
