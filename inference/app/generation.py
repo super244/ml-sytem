@@ -161,7 +161,7 @@ class MathGenerator:
             "raw_text": winner["text"],
             "final_answer": winner.get("final_answer"),
             "reasoning_steps": [line.strip() for line in winner.get("reasoning", "").splitlines() if line.strip()],
-            "selected_score": winner["score"],
+            "selected_score": winner["verification_score"],
             "candidates": candidates,
             "verification": verification,
             "structured": structured if params.output_format == "json" else None,
