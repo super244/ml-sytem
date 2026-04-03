@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 import shutil
 import subprocess
 import time
@@ -11,12 +12,15 @@ from ai_factory.core.instances.models import InstanceManifest, MetricPoint, Prog
 from ai_factory.core.io import load_json, read_jsonl
 from ai_factory.core.monitoring.metrics import metric_points_from_summary
 
+logger = logging.getLogger(__name__)
+
 # ---------------------------------------------------------------------------
 # GPU snapshot cache – avoid running nvidia-smi on every list_instances call.
 # ---------------------------------------------------------------------------
 _GPU_CACHE_TTL_S: float = 30.0
 _gpu_cache: tuple[float, dict[str, Any] | None] | None = None  # (monotonic_ts, payload)
 _NVIDIA_SMI_AVAILABLE: bool | None = None  # lazily determined
+_NVIDIA_SMI_PATH: str | None = None
 _TITAN_SMI_AVAILABLE: bool | None = None  # lazily determined
 
 
@@ -30,7 +34,9 @@ def _prepare_metrics(snapshot: dict[str, Any]) -> tuple[dict[str, Any], list[Met
     manifest = load_json(output_dir / "manifest.json", default={}) or {}
     stats = load_json(output_dir / "stats.json", default={}) or {}
     pack_summary = load_json(output_dir / "pack_summary.json", default={}) or {}
-    manifest_stats: dict[str, Any] = cast(dict[str, Any], manifest.get("stats")) if isinstance(manifest.get("stats"), dict) else {}
+    manifest_stats: dict[str, Any] = (
+        cast(dict[str, Any], manifest.get("stats")) if isinstance(manifest.get("stats"), dict) else {}
+    )
     summary: dict[str, Any] = {
         "records": (manifest_stats.get("num_records") or stats.get("num_records") or stats.get("records_total")),
         "train_rows": stats.get("train_rows"),
@@ -239,7 +245,9 @@ def _inference_metrics(snapshot: dict[str, Any]) -> tuple[dict[str, Any], list[M
         "avg_tokens_per_second": (
             total_completion_tokens / total_latency_s if total_completion_tokens and total_latency_s else None
         ),
-        "avg_time_to_first_token_s": (sum(t for t in ttft_values if t is not None) / len(ttft_values)) if ttft_values else None,
+        "avg_time_to_first_token_s": (sum(t for t in ttft_values if t is not None) / len(ttft_values))
+        if ttft_values
+        else None,
     }
     refs = {"telemetry": telemetry_path}
     return summary, metric_points_from_summary(summary, stage="inference"), refs
@@ -320,7 +328,7 @@ def _gpu_snapshot() -> dict[str, Any] | None:
       subprocess on every ``list_instances`` call.
     • A 2-second ``timeout`` prevents the call from blocking indefinitely.
     """
-    global _gpu_cache, _NVIDIA_SMI_AVAILABLE
+    global _gpu_cache, _NVIDIA_SMI_AVAILABLE, _NVIDIA_SMI_PATH
 
     # Fast path: we already know nvidia-smi is not on this machine.
     if _NVIDIA_SMI_AVAILABLE is False:
@@ -336,16 +344,18 @@ def _gpu_snapshot() -> dict[str, Any] | None:
 
     # First call or cache expired – probe availability.
     if _NVIDIA_SMI_AVAILABLE is None:
-        _NVIDIA_SMI_AVAILABLE = shutil.which("nvidia-smi") is not None
+        _NVIDIA_SMI_PATH = shutil.which("nvidia-smi")
+        _NVIDIA_SMI_AVAILABLE = _NVIDIA_SMI_PATH is not None
 
     if not _NVIDIA_SMI_AVAILABLE:
         _gpu_cache = (now, None)
         return None
 
+    nvidia_smi = _NVIDIA_SMI_PATH or "nvidia-smi"
     try:
-        result = subprocess.run(
+        result = subprocess.run(  # nosec B603
             [
-                "nvidia-smi",
+                nvidia_smi,
                 "--query-gpu=utilization.gpu,memory.used,memory.total",
                 "--format=csv,noheader,nounits",
             ],
@@ -354,7 +364,8 @@ def _gpu_snapshot() -> dict[str, Any] | None:
             text=True,
             timeout=2.0,  # Never block the main thread for more than 2 s
         )
-    except Exception:
+    except (OSError, subprocess.SubprocessError) as exc:
+        logger.debug("nvidia-smi probe failed: %s", exc)
         _gpu_cache = (now, None)
         return None
 
@@ -405,9 +416,10 @@ def _titan_snapshot() -> dict[str, Any] | None:
     if not _TITAN_SMI_AVAILABLE:
         return None
 
+    titan_command = ["ai_factory_titan/target/debug/titan-status"]
     try:
-        result = subprocess.run(
-            ["ai_factory_titan/target/debug/titan-status"],
+        result = subprocess.run(  # nosec B603
+            titan_command,
             capture_output=True,
             text=True,
             timeout=2.0,
@@ -418,8 +430,8 @@ def _titan_snapshot() -> dict[str, Any] | None:
             payload = json.loads(result.stdout)
             _gpu_cache = (now, payload)
             return payload
-    except Exception:
-        pass
+    except (OSError, subprocess.SubprocessError, ValueError) as exc:
+        logger.debug("titan status probe failed: %s", exc)
 
     return None
 

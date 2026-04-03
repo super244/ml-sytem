@@ -9,8 +9,8 @@ def approximate_token_count(text: str | None, tokenizer: Any | None = None) -> i
     if tokenizer is not None:
         try:
             return len(tokenizer(text, add_special_tokens=False)["input_ids"])
-        except Exception:
-            pass
+        except (KeyError, TypeError, ValueError):
+            return max(1, int(len(text.split()) * 1.35))
     return max(1, int(len(text.split()) * 1.35))
 
 

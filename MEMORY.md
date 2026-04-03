@@ -1,0 +1,6 @@
+- [GEMINI.md](GEMINI.md) — Concise platform overview for AI agents
+- [AGENTS.md](AGENTS.md) — Agent orchestration patterns and lifecycle
+- [CHANGELOG.md](CHANGELOG.md) — v2 release notes
+- [reports/audit-final.md](reports/audit-final.md) — Comprehensive audit report
+- [docs/architecture.md](docs/architecture.md) — Updated core modules
+- [docs/data-system.md](docs/data-system.md) — Cache integration notes

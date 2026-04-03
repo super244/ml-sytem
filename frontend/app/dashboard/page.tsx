@@ -13,6 +13,7 @@ import {
   type MissionControlSnapshot,
 } from "@/lib/api";
 import { formatCount } from "@/lib/formatting";
+import { performanceMonitor } from "@/lib/performance";
 import { ROUTES } from "@/lib/routes";
 
 type DashboardState = {
@@ -102,6 +103,10 @@ export default function Dashboard() {
       active = false;
       clearInterval(interval);
     };
+  }, []);
+
+  useEffect(() => {
+    performanceMonitor.start();
   }, []);
 
   const mission = state.mission;

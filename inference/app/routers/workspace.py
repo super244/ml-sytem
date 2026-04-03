@@ -38,7 +38,9 @@ def workspace_status() -> dict[str, Any]:
         ready_count = sum(1 for item in readiness_checks if item["ok"])
 
         return {
-            "status": "ready" if payload.get("status") == "available" and ready_count == len(readiness_checks) else "degraded",
+            "status": "ready"
+            if payload.get("status") == "available" and ready_count == len(readiness_checks)
+            else "degraded",
             "errors": payload.get("errors", []),
             "repo_root": str(REPO_ROOT),
             "ready_checks": ready_count,

@@ -8,6 +8,7 @@ import urllib.error
 import urllib.request
 from pathlib import Path
 from typing import Any
+from urllib.parse import urlparse
 
 from ai_factory.core.datasets import load_catalog, load_pack_summary
 from ai_factory.core.discovery import (
@@ -61,25 +62,34 @@ def run_step(label: str, command: list[str], cwd: Path | None = None) -> None:
             transient=True,
         ) as progress:
             progress.add_task(description=f"Running {label}...", total=None)
-            subprocess.run(command, cwd=str(cwd or Path.cwd()), check=True)
+            subprocess.run(command, cwd=str(cwd or Path.cwd()), check=True)  # nosec B603 - internal argv execution
         console.print(f"[green]✓[/green] {label}")
     else:
         print(f"[ai-factory] {label}: {rendered}")
-        subprocess.run(command, cwd=str(cwd or Path.cwd()), check=True)
+        subprocess.run(command, cwd=str(cwd or Path.cwd()), check=True)  # nosec B603 - internal argv execution
 
 
 def has_package(name: str) -> bool:
     return importlib.util.find_spec(name) is not None
 
 
+def _validate_http_url(url: str) -> None:
+    parsed = urlparse(url)
+    if parsed.scheme not in {"http", "https"}:
+        raise ValueError(f"unsupported URL scheme: {parsed.scheme!r}")
+    if not parsed.netloc:
+        raise ValueError("URL must include a host")
+
+
 def _request_json(method: str, url: str, payload: dict[str, Any] | None = None) -> dict[str, Any]:
+    _validate_http_url(url)
     data = None
     headers: dict[str, str] = {}
     if payload is not None:
         data = json.dumps(payload).encode("utf-8")
         headers["Content-Type"] = "application/json"
     request = urllib.request.Request(url, data=data, headers=headers, method=method)
-    with urllib.request.urlopen(request, timeout=15) as response:
+    with urllib.request.urlopen(request, timeout=15) as response:  # nosec B310
         body = response.read().decode("utf-8")
     return json.loads(body) if body else {}
 
@@ -313,10 +323,12 @@ def cmd_doctor(args: argparse.Namespace) -> None:
         return
 
     from ai_factory.cli import _print_section, _render_ready_summary
+
     try:
         from inference.app.workspace import build_workspace_overview
     except ImportError:
         from inference.app.workspace_minimal import get_instant_status
+
         # Fallback: build minimal workspace payload
         workspace_payload = {"readiness_checks": get_instant_status()["readiness_checks"]}
     else:

@@ -1,7 +1,5 @@
 """Test mathematics domain configuration."""
 
-import pytest
-
 from ai_factory.domains.mathematics.config import MathDomainConfig
 
 

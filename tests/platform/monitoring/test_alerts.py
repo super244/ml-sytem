@@ -1,7 +1,8 @@
 """Test platform monitoring alerts."""
 
+from datetime import UTC, datetime
+
 import pytest
-from datetime import datetime
 
 from ai_factory.core.schemas import Alert, MonitoringConfig
 from ai_factory.platform.monitoring.alerts import AlertManager
@@ -101,7 +102,7 @@ async def test_store_alert(alert_manager):
         severity="warning",
         message="Test alert",
         source="test",
-        timestamp=datetime.utcnow(),
+        timestamp=datetime.now(UTC),
     )
 
     await alert_manager.store_alert(alert)
@@ -118,7 +119,7 @@ async def test_get_active_alerts(alert_manager):
         severity="warning",
         message="Test alert",
         source="test",
-        timestamp=datetime.utcnow(),
+        timestamp=datetime.now(UTC),
     )
 
     await alert_manager.store_alert(alert)
@@ -136,7 +137,7 @@ async def test_get_alert_history(alert_manager):
         severity="info",
         message="Test alert",
         source="test",
-        timestamp=datetime.utcnow(),
+        timestamp=datetime.now(UTC),
     )
 
     await alert_manager.store_alert(alert)

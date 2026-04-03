@@ -52,9 +52,15 @@ class TitanStatus:
 
 
 def _run_command(args: list[str]) -> str | None:
+    if not args:
+        return None
+    executable = shutil.which(args[0])
+    if executable is None:
+        return None
+    safe_args = [executable, *args[1:]]
     try:
-        completed = subprocess.run(
-            args,
+        completed = subprocess.run(  # nosec B603 - fixed hardware probe commands with absolute executable path
+            safe_args,
             capture_output=True,
             check=False,
             text=True,
