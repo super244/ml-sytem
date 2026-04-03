@@ -5,20 +5,23 @@ import hashlib
 import random
 import uuid
 from datetime import datetime, timedelta, timezone
-from typing import Any
+from typing import Any, cast
 
 from ai_factory.core.instances.models import InstanceManifest
 from ai_factory.core.orchestration.agents import AgentRegistry
 from ai_factory.core.orchestration.models import (
+    AgentType,
     CircuitState,
     OrchestrationEvent,
     OrchestrationRun,
     OrchestrationTask,
+    ResourceClass,
     RetryPolicy,
     TaskAttempt,
     TaskDependency,
     TaskInputEnvelope,
     TaskOutputEnvelope,
+    TaskType,
     utc_now_iso,
 )
 from ai_factory.core.platform.settings import PlatformSettings

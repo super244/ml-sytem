@@ -4,7 +4,7 @@ import shutil
 import subprocess
 import time
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 from ai_factory.core.discovery import latest_training_run, list_training_runs
 from ai_factory.core.instances.models import InstanceManifest, MetricPoint, ProgressSnapshot

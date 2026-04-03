@@ -1,7 +1,8 @@
 from __future__ import annotations
 
+from collections.abc import Iterable
 from dataclasses import dataclass, field
-from typing import Any, cast, Iterable
+from typing import Any, cast
 
 from ai_factory.core.orchestration.models import AgentCapability, AgentType, RetryPolicy
 
@@ -16,7 +17,7 @@ class AgentDescriptor:
     retry_policy: RetryPolicy = field(default_factory=RetryPolicy)
 
     def capability(self) -> AgentCapability:
-        from ai_factory.core.orchestration.models import TaskType, ResourceClass
+        from ai_factory.core.orchestration.models import ResourceClass, TaskType
         return AgentCapability(
             agent_type=self.agent_type,
             task_types=cast(Iterable[TaskType], list(self.supported_task_types)),
@@ -101,7 +102,6 @@ class DeploymentAgent(BaseAsyncAgent):
 
 class AgentRegistry:
     def __init__(self) -> None:
-        from ai_factory.core.orchestration.models import AgentType
         self._agents: dict[AgentType, AgentDescriptor] = {
             descriptor.agent_type: descriptor
             for descriptor in (
