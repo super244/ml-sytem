@@ -3,12 +3,13 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from pathlib import Path
 from threading import Lock
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 import torch
 import yaml
-from peft import PeftModel
-from transformers import AutoModelForCausalLM, AutoTokenizer, BitsAndBytesConfig
+
+if TYPE_CHECKING:
+    from transformers import BitsAndBytesConfig
 
 
 @dataclass
@@ -46,6 +47,8 @@ def resolve_dtype(name: str) -> torch.dtype:
 
 
 def build_quant_config(spec: ModelSpec) -> BitsAndBytesConfig | None:
+    from transformers import BitsAndBytesConfig
+
     if spec.load_in_4bit:
         return BitsAndBytesConfig(
             load_in_4bit=True,
@@ -83,6 +86,9 @@ class MathModelRuntime:
                 raise FileNotFoundError(
                     f"Adapter path for model '{self.spec.name}' was not found: {self.spec.adapter_path}"
                 )
+            from peft import PeftModel
+            from transformers import AutoModelForCausalLM, AutoTokenizer
+
             tokenizer = AutoTokenizer.from_pretrained(
                 self.spec.base_model,
                 trust_remote_code=self.spec.trust_remote_code,

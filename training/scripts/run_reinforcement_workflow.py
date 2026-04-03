@@ -4,13 +4,13 @@ import argparse
 import json
 import random
 import sys
+from importlib import import_module
 from pathlib import Path
 
 if __package__ in {None, ""}:
     sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 
 from ai_factory.core.io import read_jsonl, write_json, write_jsonl  # noqa: E402
-from evaluation.generated_benchmark import create_temp_model_registry, evaluate_records  # noqa: E402
 from training.src.workflows import (  # noqa: E402
     DEFAULT_BASE_MODEL,
     build_training_config_payload,
@@ -20,6 +20,11 @@ from training.src.workflows import (  # noqa: E402
     parse_csv_values,
     write_training_config,
 )
+
+
+def _load_evaluation_helpers():
+    module = import_module("evaluation.generated_benchmark")
+    return module.create_temp_model_registry, module.evaluate_records
 
 
 def parse_args() -> argparse.Namespace:
@@ -81,6 +86,7 @@ def build_rollout_records(
 
 def main() -> None:
     args = parse_args()
+    create_temp_model_registry, evaluate_records = _load_evaluation_helpers()
     public_datasets = parse_csv_values(args.public_datasets)
     private_categories = parse_csv_values(args.private_categories)
     local_datasets = parse_csv_values(args.local_datasets)

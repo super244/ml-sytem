@@ -1,51 +1,101 @@
 """Utility functions for platform management."""
 
+import asyncio
+from collections import Counter
 from pathlib import Path
 from typing import Any
 
+from ai_factory.core.platform.container import PlatformContainer, build_platform_container
 from ai_factory.core.schemas import ScalingConfig
 
 from .scaling.manager import ScalingManager
 
 
-def get_platform_status() -> dict[str, Any]:
-    """Get current platform status."""
+def _build_container(
+    repo_root: str | Path | None = None,
+    artifacts_dir: str | Path | None = None,
+) -> PlatformContainer:
+    return build_platform_container(
+        repo_root=Path(repo_root) if repo_root is not None else None,
+        artifacts_dir=Path(artifacts_dir) if artifacts_dir is not None else None,
+    )
+
+
+def _run_async(coro: Any) -> Any:
+    return asyncio.run(coro)
+
+
+def get_platform_status(
+    *,
+    repo_root: str | Path | None = None,
+    artifacts_dir: str | Path | None = None,
+) -> dict[str, Any]:
+    """Get live platform status from the shared control plane."""
+    container = _build_container(repo_root=repo_root, artifacts_dir=artifacts_dir)
+    instances = container.control_service.list_instances()
+    status_counts = Counter(instance.status for instance in instances)
+    type_counts = Counter(instance.type for instance in instances)
+    orchestration = container.control_service.monitoring_summary()
+
     return {
-        "scaling": {"enabled": True, "active_nodes": 4, "max_nodes": 10, "cluster_type": "local"},
-        "monitoring": {"enabled": True, "collection_interval": 5.0, "active_alerts": 0, "system_health": "healthy"},
-        "deployment": {"enabled": True, "available_targets": 5, "active_deployments": 2},
+        "foundation": container.control_service.describe_foundation().model_dump(mode="json"),
+        "instances": {
+            "total": len(instances),
+            "status_counts": dict(status_counts),
+            "type_counts": dict(type_counts),
+        },
+        "orchestration": orchestration,
+        "paths": {
+            "repo_root": str(container.settings.repo_root),
+            "artifacts_dir": str(container.settings.artifacts_dir),
+            "control_db_path": str(container.settings.control_db_path),
+        },
     }
 
 
-async def scale_platform(target_nodes: int) -> dict[str, Any]:
-    """Scale platform to target number of nodes."""
-    scaling_config = ScalingConfig(max_nodes=target_nodes)
-    scaling_manager = ScalingManager(scaling_config, Path.cwd())
+def scale_platform(
+    target_nodes: int,
+    *,
+    repo_root: str | Path | None = None,
+    artifacts_dir: str | Path | None = None,
+) -> dict[str, Any]:
+    """Scale the cluster and report the observed cluster metrics."""
+    container = _build_container(repo_root=repo_root, artifacts_dir=artifacts_dir)
+    scaling_config = ScalingConfig(max_nodes=max(target_nodes, 1))
+    scaling_manager = ScalingManager(scaling_config, container.settings.repo_root)
 
-    success = await scaling_manager.scale_cluster(target_nodes)
+    success = _run_async(scaling_manager.scale_cluster(target_nodes))
+    cluster_metrics = _run_async(scaling_manager.get_cluster_metrics())
 
-    return {"success": success, "target_nodes": target_nodes, "current_nodes": target_nodes if success else 4}
+    return {
+        "success": success,
+        "target_nodes": target_nodes,
+        "cluster_metrics": cluster_metrics,
+        "repo_root": str(container.settings.repo_root),
+    }
 
 
 def create_multi_domain_training(
-    domains: list[str], config_path: str, start: bool, repo_root: str, artifacts_dir: str
-) -> dict[str, Any]:
-    """Create multi-domain training instance."""
-    from ai_factory.core.platform.container import build_platform_container
+    domains: list[str],
+    config_path: str,
+    start: bool,
+    repo_root: str | Path,
+    artifacts_dir: str | Path,
+):
+    """Create a real training instance annotated for multi-domain orchestration."""
+    container = _build_container(repo_root=repo_root, artifacts_dir=artifacts_dir)
+    resolved_config = Path(config_path)
+    if not resolved_config.is_absolute():
+        resolved_config = container.settings.repo_root / resolved_config
+    if not resolved_config.exists():
+        raise FileNotFoundError(f"Multi-domain config was not found: {resolved_config}")
 
-    build_platform_container(repo_root=Path(repo_root), artifacts_dir=Path(artifacts_dir))
-
-    # Create a mock manifest for now
-    manifest_dict = {
-        "id": f"multi_train_{int(__import__('time').time())}",
-        "type": "multi_train",
-        "status": "running" if start else "created",
-        "domains": domains,
-        "config_path": config_path,
-    }
-
-    # Convert to InstanceManifest-like object
-    from types import SimpleNamespace
-
-    manifest = SimpleNamespace(**manifest_dict)
-    return manifest.__dict__
+    return container.control_service.create_instance(
+        str(resolved_config),
+        start=start,
+        metadata_updates={
+            "domains": domains,
+            "multi_domain": True,
+            "requested_via": "platform.multi_train",
+        },
+    )

@@ -39,11 +39,14 @@ const INITIAL_STATE: LabMetadataState = {
   error: null,
 };
 
+const REFRESH_INTERVAL_MS = 15_000;
+
 export function useLabMetadata() {
   const [state, setState] = useState<LabMetadataState>(INITIAL_STATE);
 
   useEffect(() => {
     let active = true;
+
     async function load() {
       setState((current) => ({ ...current, loading: true, error: null }));
       try {
@@ -102,9 +105,22 @@ export function useLabMetadata() {
         }));
       }
     }
+
     void load();
+
+    const intervalId = window.setInterval(() => {
+      void load();
+    }, REFRESH_INTERVAL_MS);
+
+    const onFocus = () => {
+      void load();
+    };
+    window.addEventListener("focus", onFocus);
+
     return () => {
       active = false;
+      window.clearInterval(intervalId);
+      window.removeEventListener("focus", onFocus);
     };
   }, []);
 

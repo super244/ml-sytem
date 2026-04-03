@@ -1,9 +1,8 @@
 from __future__ import annotations
 
-import re
 import subprocess
 import sys
-from dataclasses import dataclass
+from importlib import import_module
 from pathlib import Path
 from typing import Any
 from urllib.parse import parse_qs, urlparse
@@ -11,33 +10,28 @@ from urllib.parse import parse_qs, urlparse
 import yaml
 
 from ai_factory.core.io import write_json
-from data.builders.corpus_builder import ProcessingConfig, build_corpus
+from ai_factory.core.workflows import (
+    WorkflowLayout,
+    slugify,
+)
+from ai_factory.core.workflows import (
+    build_workflow_layout as build_core_workflow_layout,
+)
+from ai_factory.core.workflows import (
+    parse_csv_values as parse_csv_values_core,
+)
+
+DEFAULT_BASE_MODEL = "Qwen/Qwen2.5-Math-1.5B-Instruct"
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
-DEFAULT_BASE_MODEL = "Qwen/Qwen2.5-Math-1.5B-Instruct"
 DEFAULT_CUSTOM_ROOT_CANDIDATES = (
     REPO_ROOT / "data" / "custom",
     REPO_ROOT / "datasets" / "custom",
 )
 
 
-@dataclass(frozen=True)
-class WorkflowLayout:
-    root: Path
-    datasets_dir: Path
-    configs_dir: Path
-    reports_dir: Path
-
-
-def slugify(value: str) -> str:
-    cleaned = re.sub(r"[^a-zA-Z0-9]+", "-", value).strip("-").lower()
-    return cleaned or "run"
-
-
 def parse_csv_values(value: str | None) -> list[str]:
-    if not value:
-        return []
-    return [item.strip() for item in value.split(",") if item.strip()]
+    return parse_csv_values_core(value)
 
 
 def resolve_custom_data_root(explicit_root: str | Path | None = None) -> Path:
@@ -117,13 +111,30 @@ def normalize_huggingface_dataset_reference(value: str) -> dict[str, str]:
 
 
 def build_workflow_layout(workflow_name: str, run_name: str) -> WorkflowLayout:
-    root = REPO_ROOT / "artifacts" / "workflows" / workflow_name / slugify(run_name)
-    datasets_dir = root / "datasets"
-    configs_dir = root / "configs"
-    reports_dir = root / "reports"
-    for path in (datasets_dir, configs_dir, reports_dir):
-        path.mkdir(parents=True, exist_ok=True)
-    return WorkflowLayout(root=root, datasets_dir=datasets_dir, configs_dir=configs_dir, reports_dir=reports_dir)
+    return build_core_workflow_layout(workflow_name, run_name, repo_root=REPO_ROOT)
+
+
+def _build_corpus_via_runtime_import(config_payload: dict[str, Any], config_path: Path) -> dict[str, Any]:
+    builder = import_module("data.builders.corpus_builder")
+    processing_config = builder.ProcessingConfig(**config_payload)
+    return builder.build_corpus(processing_config, config_path)
+
+
+def _build_corpus_via_subprocess(config_path: Path) -> dict[str, Any]:
+    completed = subprocess.run(
+        [sys.executable, "data/prepare_dataset.py", "--config", str(config_path)],
+        cwd=REPO_ROOT,
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+    payload = completed.stdout.strip()
+    if not payload:
+        raise RuntimeError("data/prepare_dataset.py did not return a result payload.")
+    result = yaml.safe_load(payload)
+    if not isinstance(result, dict):
+        raise RuntimeError("data/prepare_dataset.py returned an unexpected result payload.")
+    return result
 
 
 def build_source_specs(
@@ -206,7 +217,10 @@ def build_workflow_corpus(
         config_payload["system_prompt"] = system_prompt
     config_path = layout.configs_dir / "processing_config.yaml"
     config_path.write_text(yaml.safe_dump(config_payload, sort_keys=False))
-    result = build_corpus(ProcessingConfig(**config_payload), config_path)
+    if (REPO_ROOT / "data" / "prepare_dataset.py").exists():
+        result = _build_corpus_via_subprocess(config_path)
+    else:
+        result = _build_corpus_via_runtime_import(config_payload, config_path)
     write_json(layout.reports_dir / "dataset_sources.json", {"sources": source_specs, "result": result})
     return {
         "layout": layout,
