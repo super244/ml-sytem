@@ -40,6 +40,21 @@ The public registry currently tracks five calculus-oriented dataset families thr
 
 `data/prepare_dataset.py` accepts composable source specs in `data/configs/processing.yaml`. In addition to legacy local file paths and globs, sources can be declared as `local`, `huggingface`, `s3`, or `web`, and nested under `composite` groups with per-source `sample_ratio` and `version` metadata.
 
+## Cache Integration
+
+The `ai_factory/core/cache/` layer provides:
+- LRU eviction for bounded memory
+- Disk-backed persistence for large datasets
+- Automatic invalidation on source changes
+- Cross-process cache sharing via Redis
+
+## Security Considerations
+
+Sensitive data in datasets is handled by `ai_factory/core/security/`:
+- Credential redaction before training
+- Encrypted storage for PII-containing datasets
+- Access control via `ai_factory/core/security/config.py`
+
 ## Derived Packs
 
 The corpus builder emits these fixed pack ids:

@@ -2,6 +2,46 @@
 
 AI-Factory is organized as a shared-core platform rather than a loose stack of scripts. The same canonical schema, answer utilities, artifact layout, and metadata conventions are reused by data preparation, training, inference, evaluation, notebooks, and the frontend.
 
+## New Core Modules (v2)
+
+### `ai_factory/core/async_utils.py`
+Async utilities for managing concurrent operations, rate limiting, and backpressure handling.
+
+### `ai_factory/core/cache/`
+Memory-backed caching layer for frequent lookups (dataset records, model weights, tokenizer states).
+
+### `ai_factory/core/distributed/`
+Distributed compute primitives: worker registration, job dispatch, result aggregation across cluster nodes.
+
+### `ai_factory/core/security/`
+Security abstractions: credential rotation, encrypted artifact storage, access control lists.
+
+## Updated Modules
+
+### `ai_factory/core/orchestration/service.py`
+Enhanced orchestration service with:
+- Circuit breaker patterns for fault tolerance
+- Lease-based task ownership
+- Retry policies with exponential backoff
+- Task dependency resolution
+- Real-time heartbeat monitoring
+
+### `ai_factory/platform/monitoring/metrics.py`
+Improved metrics collection with:
+- System-level metrics (CPU, memory, disk, GPU)
+- Training job metrics (loss, accuracy, job counts)
+- Inference metrics (latency, throughput, success rate)
+- Historical queries via time-series database
+
+## Core vs. Subsystem Boundaries
+
+The `ai_factory.core` layer is strictly foundational:
+- No business logic
+- No imports from `data`, `training`, `evaluation`, `inference`, `agents` subsystems
+- All cross-subsystem communication flows through `FastAPI` or shared protocols
+
+This boundary is enforced by CI checks.
+
 ## Design Principles
 
 - Quality over scale: specialize a tractable model for calculus and olympiad reasoning rather than chasing generic coverage.

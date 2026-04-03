@@ -1,13 +1,17 @@
 """Alert management for AI-Factory monitoring."""
 
 import logging
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
 from ai_factory.core.schemas import Alert, MonitoringConfig
 
 logger = logging.getLogger(__name__)
+
+
+def _utc_now() -> datetime:
+    return datetime.now(timezone.utc)
 
 
 class AlertManager:
@@ -27,22 +31,22 @@ class AlertManager:
         if system_metrics.get("cpu_usage", 0) > self.config.thresholds.get("cpu_usage", 90):
             alerts.append(
                 Alert(
-                    id=f"cpu_high_{int(datetime.utcnow().timestamp())}",
+                    id=f"cpu_high_{int(_utc_now().timestamp())}",
                     severity="warning",
                     message=f"High CPU usage: {system_metrics.get('cpu_usage', 0):.1f}%",
                     source="system_monitor",
-                    timestamp=datetime.utcnow(),
+                    timestamp=_utc_now(),
                 )
             )
 
         if system_metrics.get("memory_usage", 0) > self.config.thresholds.get("memory_usage", 85):
             alerts.append(
                 Alert(
-                    id=f"memory_high_{int(datetime.utcnow().timestamp())}",
+                    id=f"memory_high_{int(_utc_now().timestamp())}",
                     severity="warning",
                     message=f"High memory usage: {system_metrics.get('memory_usage', 0):.1f}%",
                     source="system_monitor",
-                    timestamp=datetime.utcnow(),
+                    timestamp=_utc_now(),
                 )
             )
 
@@ -51,11 +55,11 @@ class AlertManager:
         if training_metrics.get("failed_jobs", 0) > 0:
             alerts.append(
                 Alert(
-                    id=f"training_failures_{int(datetime.utcnow().timestamp())}",
+                    id=f"training_failures_{int(_utc_now().timestamp())}",
                     severity="critical",
                     message=f"Training job failures: {training_metrics.get('failed_jobs', 0)}",
                     source="training_monitor",
-                    timestamp=datetime.utcnow(),
+                    timestamp=_utc_now(),
                 )
             )
 
@@ -73,7 +77,7 @@ class AlertManager:
 
     async def send_alert(self, alert: Alert) -> None:
         """Send alert notification through configured channels."""
-        logger.warning(f"ALERT: {alert.message}")
+        logger.warning("ALERT: %s", alert.message)
 
         # Send to configured channels
         for channel in self.config.alert_channels:
@@ -86,7 +90,7 @@ class AlertManager:
     async def _write_alert_to_file(self, alert: Alert) -> None:
         """Write alert to log file."""
         log_file = Path("alerts.log")
-        with open(log_file, "a") as f:
+        with log_file.open("a", encoding="utf-8") as f:
             f.write(f"{alert.timestamp.isoformat()} [{alert.severity}] {alert.message}\n")
 
     async def get_active_alerts(self) -> list[Alert]:

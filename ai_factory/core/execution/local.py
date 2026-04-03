@@ -32,7 +32,7 @@ class LocalExecutor(BaseExecutor):
             manifest_metadata=manifest.metadata,
             command=command,
         )
-        process = subprocess.Popen(
+        process = subprocess.Popen(  # nosec B603 - internal runner bootstrap with explicit argv
             [
                 sys.executable,
                 "-m",
@@ -84,7 +84,7 @@ def _run_payload(payload: RunnerPayload) -> int:
     attempt_id = (((manifest.execution or ExecutionHandle(backend="local")).metadata) or {}).get("attempt_id")
 
     try:
-        process = subprocess.Popen(
+        process = subprocess.Popen(  # nosec B603 - orchestrated command execution via validated payload argv
             payload.command.argv,
             cwd=payload.command.cwd,
             env={**os.environ, **payload.environment.env, **payload.command.env},

@@ -348,7 +348,7 @@ def _environment_from_args(args: argparse.Namespace) -> EnvironmentSpec | None:
     user = args.cloud_user or (_prompt("Cloud user") if interactive else None)
     key_path = args.cloud_key_path or (_prompt("SSH key path", "") if interactive else "")
     remote_repo_root = args.remote_repo_root or (
-        _prompt("Remote repo root", "/tmp/ai-factory") if interactive else None
+        _prompt("Remote repo root", "/home/ubuntu/ai-factory") if interactive else None
     )
     python_bin = args.python_bin or (_prompt("Remote python", "python3") if interactive else "python3")
     port_forwards = []
@@ -654,7 +654,7 @@ def parse_args() -> argparse.Namespace:
     titan_doc_parser.add_argument("--path", default="HARDWARE.md")
 
     serve_parser = subparsers.add_parser("serve", parents=[common_json])
-    serve_parser.add_argument("--host", default="0.0.0.0")
+    serve_parser.add_argument("--host", default="127.0.0.1")
     serve_parser.add_argument("--port", type=int, default=8000)
     serve_parser.add_argument("--reload", action="store_true", default=True)
 
@@ -722,7 +722,7 @@ def main() -> None:
         if args.reload:
             cmd.append("--reload")
         print(f"Starting AI-Factory API server on {args.host}:{args.port}")
-        subprocess.run(cmd)
+        subprocess.run(cmd)  # nosec B603 - controlled local dev command, shell=False argv execution
         return
 
     control = _build_control_service(args)

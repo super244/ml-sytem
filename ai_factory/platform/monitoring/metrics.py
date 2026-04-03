@@ -1,12 +1,16 @@
 """Metrics collection for AI-Factory monitoring."""
 
 import logging
-from datetime import datetime
+from datetime import datetime, timedelta, timezone
 from typing import Any
 
 from ai_factory.core.schemas import MetricPoint, MonitoringConfig
 
 logger = logging.getLogger(__name__)
+
+
+def _utc_now() -> datetime:
+    return datetime.now(timezone.utc)
 
 
 class MetricsCollector:
@@ -23,7 +27,7 @@ class MetricsCollector:
         inference_metrics = await self.get_inference_metrics()
 
         return {
-            "timestamp": datetime.utcnow().isoformat(),
+            "timestamp": _utc_now().isoformat(),
             "system": system_metrics,
             "training": training_metrics,
             "inference": inference_metrics,
@@ -88,7 +92,7 @@ class MetricsCollector:
                     labels={"instance_id": instance_id},
                 )
             )
-            current_time = current_time.replace(second=current_time.second + 60)
+            current_time = current_time + timedelta(minutes=1)
 
         return metrics
 
