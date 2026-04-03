@@ -34,22 +34,22 @@ jobs:
         run: |
           pip install ruff mypy bandit xenon types-PyYAML types-requests
 
-      - name: Ruff: Fast Formatting Check
+      - name: "Ruff: Fast Formatting Check"
         run: ruff format --check .
 
-      - name: Ruff: Strict Linting
+      - name: "Ruff: Strict Linting"
         run: ruff check . --output-format=github
 
-      - name: Mypy: Strict Type Registry Check
+      - name: "Mypy: Strict Type Registry Check"
         run: mypy . --no-incremental
 
-      - name: Bandit: Security Vulnerability Scan
-        run: bandit -r ai_factory/ data/ training/ evaluation/ inference/ -x tests/ -ll
+      - name: "Bandit: Security Vulnerability Scan"
+        run: bandit -r ai_factory/ data/ training/ evaluation/ inference/ scripts/ -x tests/ -ll
 
-      - name: Xenon: Code Complexity Audit
+      - name: "Xenon: Code Complexity Audit"
         run: |
           pip install xenon
-          xenon --max-absolute B --max-modules A --max-average A ai_factory/ data/ training/ evaluation/ inference/
+          xenon --max-absolute B --max-modules A --max-average A ai_factory/ data/ training/ evaluation/ inference/ scripts/
 
   # Stage 2: Core Engine (Rust)
   rust-verification:

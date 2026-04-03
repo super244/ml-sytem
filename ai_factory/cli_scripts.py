@@ -302,20 +302,25 @@ def cmd_doctor(args: argparse.Namespace) -> None:
     }
 
     if args.json:
-        from ai_factory.cli import _render_ready_summary
-        from inference.app.workspace import build_workspace_overview
+        try:
+            from inference.app.workspace import build_workspace_overview
+        except ImportError:
+            _emit_json({**payload, "workspace_overview_error": "inference package not available"})
+            return
 
         workspace_payload = build_workspace_overview(root)
-        if args.json:
-            _emit_json({**payload, **workspace_payload})
-        else:
-            _emit_json(payload)
+        _emit_json({**payload, **workspace_payload})
         return
 
     from ai_factory.cli import _print_section, _render_ready_summary
-    from inference.app.workspace import build_workspace_overview
-
-    workspace_payload = build_workspace_overview(root)
+    try:
+        from inference.app.workspace import build_workspace_overview
+    except ImportError:
+        from inference.app.workspace_minimal import get_instant_status
+        # Fallback: build minimal workspace payload
+        workspace_payload = {"readiness_checks": get_instant_status()["readiness_checks"]}
+    else:
+        workspace_payload = build_workspace_overview(root)
 
     if RICH_AVAILABLE:
         # First display the workspace readiness summary cleanly

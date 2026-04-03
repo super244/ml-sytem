@@ -19,7 +19,6 @@ from ai_factory.core.instances.models import (
 )
 from ai_factory.core.platform.container import build_platform_container
 from ai_factory.titan import detect_titan_status, write_hardware_markdown
-from inference.app.workspace import build_workspace_overview
 
 _STATUS_ICONS = {
     "running": "*",
@@ -675,6 +674,8 @@ def main() -> None:
         return
 
     if args.command in {"workspace", "ready"}:
+        from inference.app.workspace import build_workspace_overview
+
         root = Path(getattr(args, "root", None) or ".") if hasattr(args, "root") and args.root else None
         payload = build_workspace_overview(root)
         if args.json:
