@@ -151,3 +151,5 @@ The solve view mirrors the backend capabilities by surfacing model selection, pr
 4. The async control plane dispatches tasks, records attempts, heartbeats, retries, and structured events, and projects status back into instance manifests.
 5. Serve models through the inference API and frontend.
 6. Evaluate against benchmark packs, mine failures, and let the control plane recommend or queue the next step.
+
+For the concrete V1 route, degraded-mode, and artifact contract that the web and desktop shells consume, see [V1 Operational Contract](v1-operational-contract.md).

@@ -5,7 +5,7 @@ import hashlib
 import random
 import uuid
 from datetime import datetime, timedelta, timezone
-from typing import Any, cast
+from typing import Any, Literal, cast
 
 from ai_factory.core.instances.models import InstanceManifest
 from ai_factory.core.orchestration.agents import AgentRegistry
@@ -40,6 +40,9 @@ def _stable_hash(parts: list[str]) -> str:
     return hashlib.sha1(body.encode("utf-8")).hexdigest()[:12]
 
 
+EventLevel = Literal["debug", "info", "warning", "error"]
+
+
 class OrchestrationService:
     def __init__(self, control_plane: Any, settings: PlatformSettings) -> None:
         self.control_plane = control_plane
@@ -56,8 +59,8 @@ class OrchestrationService:
     def _attempt_id(self) -> str:
         return f"att-{uuid.uuid4().hex[:12]}"
 
-    def _agent_for_manifest(self, manifest: InstanceManifest) -> str:
-        mapping = {
+    def _agent_for_manifest(self, manifest: InstanceManifest) -> AgentType:
+        mapping: dict[str, AgentType] = {
             "prepare": "data_processing",
             "train": "training_orchestration",
             "finetune": "training_orchestration",
@@ -68,7 +71,7 @@ class OrchestrationService:
         }
         return mapping.get(manifest.type, "monitoring_telemetry")
 
-    def _resource_for_manifest(self, manifest: InstanceManifest) -> str:
+    def _resource_for_manifest(self, manifest: InstanceManifest) -> ResourceClass:
         if manifest.type in {"train", "finetune"}:
             return "gpu"
         if manifest.type in {"prepare", "report"}:
@@ -180,7 +183,7 @@ class OrchestrationService:
         self,
         *,
         run_id: str,
-        task_type: str,
+        task_type: TaskType,
         input_payload: dict[str, Any] | None = None,
         dependencies: list[str] | None = None,
         legacy_instance_id: str | None = None,
@@ -193,7 +196,7 @@ class OrchestrationService:
                 if task.input.idempotency_key == idempotency_key:
                     return task
         task_id = f"task-{uuid.uuid4().hex[:12]}"
-        status = "blocked" if dependencies else "ready"
+        status: Literal["blocked", "ready"] = "blocked" if dependencies else "ready"
         task = OrchestrationTask(
             id=task_id,
             run_id=run_id,
@@ -204,7 +207,7 @@ class OrchestrationService:
             resource_class=descriptor.capability().resource_classes[0],
             retry_policy=descriptor.retry_policy,
             input=TaskInputEnvelope(
-                task_type=cast(TaskType, task_type),
+                task_type=task_type,
                 legacy_instance_id=legacy_instance_id,
                 payload=input_payload or {},
                 idempotency_key=idempotency_key,
@@ -658,8 +661,8 @@ class OrchestrationService:
         event_type: str,
         message: str,
         payload: dict[str, Any] | None = None,
-        level: str = "info",
-        agent_type: str | None = None,
+        level: EventLevel = "info",
+        agent_type: AgentType | None = None,
     ) -> OrchestrationEvent:
         event = OrchestrationEvent(
             id=self._event_id(),

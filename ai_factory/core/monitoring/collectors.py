@@ -218,16 +218,18 @@ def _inference_metrics(snapshot: dict[str, Any]) -> tuple[dict[str, Any], list[M
         "INFERENCE_TELEMETRY_PATH"
     ) or "artifacts/inference/telemetry/requests.jsonl"
     rows = read_jsonl(telemetry_path)
-    latencies = [row.get("latency_s") for row in rows if isinstance(row.get("latency_s"), (int, float))]
-    prompt_tokens = [row.get("prompt_tokens") for row in rows if isinstance(row.get("prompt_tokens"), (int, float))]
-    completion_tokens = [
-        row.get("completion_tokens") for row in rows if isinstance(row.get("completion_tokens"), (int, float))
+    latencies: list[float] = [float(row["latency_s"]) for row in rows if isinstance(row.get("latency_s"), (int, float))]
+    prompt_tokens: list[float] = [
+        float(row["prompt_tokens"]) for row in rows if isinstance(row.get("prompt_tokens"), (int, float))
     ]
-    ttft_values = [row.get("ttft_s") for row in rows if isinstance(row.get("ttft_s"), (int, float))]
+    completion_tokens: list[float] = [
+        float(row["completion_tokens"]) for row in rows if isinstance(row.get("completion_tokens"), (int, float))
+    ]
+    ttft_values: list[float] = [float(row["ttft_s"]) for row in rows if isinstance(row.get("ttft_s"), (int, float))]
     cache_hits = sum(1 for row in rows if row.get("cache_hit"))
-    total_prompt_tokens = sum(t for t in prompt_tokens if t is not None)
-    total_completion_tokens = sum(t for t in completion_tokens if t is not None)
-    total_latency_s = sum(t for t in latencies if t is not None) if latencies else None
+    total_prompt_tokens = sum(prompt_tokens)
+    total_completion_tokens = sum(completion_tokens)
+    total_latency_s = sum(latencies) if latencies else None
     summary = {
         "requests": len(rows),
         "cache_hits": cache_hits,
@@ -248,12 +250,12 @@ def _inference_progress(snapshot: dict[str, Any]) -> ProgressSnapshot | None:
         "INFERENCE_TELEMETRY_PATH"
     ) or "artifacts/inference/telemetry/requests.jsonl"
     rows = read_jsonl(telemetry_path)
-    latencies = [row.get("latency_s") for row in rows if isinstance(row.get("latency_s"), (int, float))]
-    completion_tokens = [
-        row.get("completion_tokens") for row in rows if isinstance(row.get("completion_tokens"), (int, float))
+    latencies: list[float] = [float(row["latency_s"]) for row in rows if isinstance(row.get("latency_s"), (int, float))]
+    completion_tokens: list[float] = [
+        float(row["completion_tokens"]) for row in rows if isinstance(row.get("completion_tokens"), (int, float))
     ]
-    total_latency_s = sum(t for t in latencies if t is not None) if latencies else None
-    total_completion_tokens = sum(t for t in completion_tokens if t is not None)
+    total_latency_s = sum(latencies) if latencies else None
+    total_completion_tokens = sum(completion_tokens)
     summary = {
         "requests": len(rows),
         "cache_hits": sum(1 for row in rows if row.get("cache_hit")),

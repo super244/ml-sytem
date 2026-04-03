@@ -13,7 +13,16 @@ from ai_factory.core.control.models import (
     LiveInstanceSnapshot,
     ManagedInstanceDetail,
 )
-from ai_factory.core.instances.models import InstanceManifest, utc_now_iso
+from ai_factory.core.instances.models import (
+    DeploymentTarget,
+    EnvironmentSpec,
+    InstanceManifest,
+    InstanceStatus,
+    InstanceType,
+    LifecycleProfile,
+    UserLevel,
+    utc_now_iso,
+)
 from ai_factory.core.lineage.models import LineageRecord
 from ai_factory.core.plugins.base import PluginDescriptor
 
@@ -68,35 +77,121 @@ class FactoryControlService:
         """List lineage records."""
         return self.lineage_registry.list_lineage(limit=limit)
 
-    def create_instance(self, *args, **kwargs) -> InstanceManifest:
-        return self.manager.create_instance(*args, **kwargs)
+    def create_instance(
+        self,
+        config_path: str,
+        *,
+        start: bool = True,
+        environment_override: EnvironmentSpec | None = None,
+        parent_instance_id: str | None = None,
+        name_override: str | None = None,
+        user_level_override: UserLevel | None = None,
+        lifecycle_override: LifecycleProfile | None = None,
+        subsystem_updates: dict[str, Any] | None = None,
+        execution_updates: dict[str, Any] | None = None,
+        metadata_updates: dict[str, Any] | None = None,
+    ) -> InstanceManifest:
+        return self.manager.create_instance(
+            config_path,
+            start=start,
+            environment_override=environment_override,
+            parent_instance_id=parent_instance_id,
+            name_override=name_override,
+            user_level_override=user_level_override,
+            lifecycle_override=lifecycle_override,
+            subsystem_updates=subsystem_updates,
+            execution_updates=execution_updates,
+            metadata_updates=metadata_updates,
+        )
 
-    def create_evaluation_instance(self, *args, **kwargs) -> InstanceManifest:
-        return self.manager.create_evaluation_instance(*args, **kwargs)
+    def create_evaluation_instance(
+        self,
+        source_instance_id: str,
+        *,
+        config_path: str = "configs/eval.yaml",
+        start: bool = True,
+        metadata_updates: dict[str, Any] | None = None,
+    ) -> InstanceManifest:
+        return self.manager.create_evaluation_instance(
+            source_instance_id,
+            config_path=config_path,
+            start=start,
+            metadata_updates=metadata_updates,
+        )
 
-    def create_deployment_instance(self, *args, **kwargs) -> InstanceManifest:
-        return self.manager.create_deployment_instance(*args, **kwargs)
+    def create_deployment_instance(
+        self,
+        source_instance_id: str,
+        *,
+        target: DeploymentTarget,
+        config_path: str = "configs/deploy.yaml",
+        start: bool = True,
+        metadata_updates: dict[str, Any] | None = None,
+    ) -> InstanceManifest:
+        return self.manager.create_deployment_instance(
+            source_instance_id,
+            target=target,
+            config_path=config_path,
+            start=start,
+            metadata_updates=metadata_updates,
+        )
 
-    def create_inference_instance(self, *args, **kwargs) -> InstanceManifest:
-        return self.manager.create_inference_instance(*args, **kwargs)
+    def create_inference_instance(
+        self,
+        source_instance_id: str,
+        *,
+        config_path: str = "configs/inference.yaml",
+        start: bool = True,
+        metadata_updates: dict[str, Any] | None = None,
+    ) -> InstanceManifest:
+        return self.manager.create_inference_instance(
+            source_instance_id,
+            config_path=config_path,
+            start=start,
+            metadata_updates=metadata_updates,
+        )
 
-    def execute_action(self, *args, **kwargs) -> InstanceManifest:
-        return self.manager.execute_action(*args, **kwargs)
+    def execute_action(
+        self,
+        instance_id: str,
+        *,
+        action: str,
+        config_path: str | None = None,
+        deployment_target: DeploymentTarget | None = None,
+        start: bool = True,
+    ) -> InstanceManifest:
+        return self.manager.execute_action(
+            instance_id,
+            action=action,
+            config_path=config_path,
+            deployment_target=deployment_target,
+            start=start,
+        )
 
-    def retry_instance(self, *args, **kwargs) -> InstanceManifest:
-        return self.manager.retry_instance(*args, **kwargs)
+    def retry_instance(self, instance_id: str) -> InstanceManifest:
+        return self.manager.retry_instance(instance_id)
 
-    def cancel_instance(self, *args, **kwargs) -> InstanceManifest:
-        return self.manager.cancel_instance(*args, **kwargs)
+    def cancel_instance(self, instance_id: str) -> InstanceManifest:
+        return self.manager.cancel_instance(instance_id)
 
-    def watch_instance(self, *args, **kwargs) -> dict[str, Any]:
-        return self.manager.watch_instance(*args, **kwargs)
+    def watch_instance(self, instance_id: str, *, timeout_s: float = 30.0) -> dict[str, Any]:
+        return self.manager.watch_instance(instance_id, timeout_s=timeout_s)
 
     def get_instance(self, instance_id: str) -> InstanceManifest:
         return self.manager.get_instance(instance_id)
 
-    def list_instances(self, **filters) -> list[InstanceManifest]:
-        return self.manager.list_instances(**filters)
+    def list_instances(
+        self,
+        *,
+        instance_type: InstanceType | None = None,
+        status: InstanceStatus | None = None,
+        parent_instance_id: str | None = None,
+    ) -> list[InstanceManifest]:
+        return self.manager.list_instances(
+            instance_type=instance_type,
+            status=status,
+            parent_instance_id=parent_instance_id,
+        )
 
     def get_children(self, instance_id: str) -> list[InstanceManifest]:
         return self.manager.get_children(instance_id)
@@ -217,9 +312,9 @@ class FactoryControlService:
 
     def describe_foundation(self) -> FoundationOverview:
         return FoundationOverview(
-            repo_root=self.settings.repo_root,
-            artifacts_dir=self.settings.artifacts_dir,
-            control_db_path=self.settings.control_db_path,
+            repo_root=str(self.settings.repo_root),
+            artifacts_dir=str(self.settings.artifacts_dir),
+            control_db_path=str(self.settings.control_db_path),
             interfaces=[
                 FoundationInterface(
                     id="cli",

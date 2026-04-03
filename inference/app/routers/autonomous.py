@@ -9,10 +9,20 @@ from typing import Any
 from fastapi import APIRouter, BackgroundTasks, HTTPException, status
 from pydantic import BaseModel, Field
 
+from inference.app.config import get_settings
+
 router = APIRouter(prefix="/experiments/autonomous", tags=["autonomous"])
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
 EXPERIMENTS_FILE = REPO_ROOT / "data" / "autonomous" / "experiments.jsonl"
+
+
+def _ensure_demo_mode() -> None:
+    if not get_settings().demo_mode:
+        raise HTTPException(
+            status_code=503,
+            detail="Autonomous experiment simulation is disabled outside AI_FACTORY_DEMO_MODE=1.",
+        )
 
 
 def _load_experiments() -> dict[str, dict[str, Any]]:
@@ -72,6 +82,7 @@ async def run_autonomous_experiment(
     """
     Start a new autonomous AI-driven experiment.
     """
+    _ensure_demo_mode()
     experiment_id = f"exp_{uuid.uuid4().hex[:8]}"
 
     exp_data = {
@@ -90,6 +101,20 @@ async def run_autonomous_experiment(
         status="accepted",
         message=f"Autonomous experiment '{request.experiment_name}' started successfully.",
     )
+
+
+@router.get("")
+def list_experiments() -> dict[str, Any]:
+    experiments = sorted(
+        _load_experiments().values(),
+        key=lambda item: str(item.get("experiment_id", "")),
+        reverse=True,
+    )
+    return {
+        "status": "available",
+        "write_enabled": get_settings().demo_mode,
+        "experiments": experiments,
+    }
 
 
 @router.get("/{experiment_id}")

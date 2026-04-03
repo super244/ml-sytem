@@ -1,7 +1,7 @@
 import SwiftUI
 
 struct SettingsView: View {
-    @AppStorage("ai_factory_dashboard_url") private var dashboardURL = "http://127.0.0.1:3000/workspace"
+    @AppStorage("ai_factory_dashboard_url") private var dashboardURL = "http://127.0.0.1:3000/dashboard"
     @AppStorage("ai_factory_api_url") private var apiURL = "http://127.0.0.1:8000"
     @AppStorage("ai_factory_artifacts_dir") private var artifactsDir = ""
     @AppStorage("ai_factory_poll_interval") private var pollInterval = 8.0
@@ -56,7 +56,7 @@ struct SettingsView: View {
     private var endpointsSection: some View {
         settingsCard(title: "Endpoints", icon: "network") {
             VStack(alignment: .leading, spacing: 14) {
-                labeledField("Dashboard URL", placeholder: "http://127.0.0.1:3000/workspace", value: $dashboardURL)
+                labeledField("Dashboard URL", placeholder: "http://127.0.0.1:3000/dashboard", value: $dashboardURL)
                 labeledField("API URL", placeholder: "http://127.0.0.1:8000", value: $apiURL)
                 labeledField("Artifacts directory", placeholder: "~/ai-factory/artifacts", value: $artifactsDir)
                 HStack(spacing: 10) {
@@ -132,7 +132,7 @@ struct SettingsView: View {
         settingsCard(title: "Reset", icon: "exclamationmark.triangle") {
             HStack(spacing: 12) {
                 Button("Reset to defaults") {
-                    dashboardURL = "http://127.0.0.1:3000/workspace"
+                    dashboardURL = "http://127.0.0.1:3000/dashboard"
                     apiURL = "http://127.0.0.1:8000"
                     artifactsDir = ""
                     pollInterval = 8.0

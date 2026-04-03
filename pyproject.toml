@@ -40,46 +40,11 @@ dev = [
 ai-factory = "ai_factory.cli:main"
 
 [tool.setuptools]
-packages = [
-  "ai_factory",
-  "ai_factory.core",
-  "ai_factory.core.config",
-  "ai_factory.core.control",
-  "ai_factory.core.decisions",
-  "ai_factory.core.execution",
-  "ai_factory.core.instances",
-  "ai_factory.core.monitoring",
-  "ai_factory.core.orchestration",
-  "ai_factory.core.platform",
-  "ai_factory.core.plugins",
-  "ai_factory.domains",
-  "ai_factory.domains.code_generation",
-  "ai_factory.domains.mathematics",
-  "ai_factory.interfaces",
-  "ai_factory.interfaces.cli",
-  "ai_factory.interfaces.desktop",
-  "ai_factory.interfaces.tui",
-  "ai_factory.interfaces.web",
-  "ai_factory.orchestration",
-  "ai_factory.platform",
-  "ai_factory.platform.deployment",
-  "ai_factory.platform.monitoring",
-  "ai_factory.platform.scaling",
-  "training",
-  "training.src",
-  "inference",
-  "inference.app",
-  "inference.app.routers",
-  "inference.app.services",
-  "evaluation",
-  "data",
-  "data.adapters",
-  "data.builders",
-  "data.quality",
-  "data.reports",
-  "data.synthesis",
-  "data.synthesis.families",
-]
+include-package-data = true
+
+[tool.setuptools.packages.find]
+include = ["ai_factory*", "training*", "inference*", "evaluation*", "data*"]
+exclude = ["tests", "tests.*"]
 
 [build-system]
 requires = ["setuptools>=75.6.0", "wheel"]
@@ -99,6 +64,7 @@ ignore_missing_imports = true
 warn_return_any = false
 warn_no_return = false
 disallow_untyped_defs = true
+exclude = ["^tests/"]
 
 [[tool.mypy.overrides]]
 module = [

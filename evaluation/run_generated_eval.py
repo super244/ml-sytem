@@ -8,13 +8,15 @@ from pathlib import Path
 if __package__ in {None, ""}:
     sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
+from ai_factory.core.workflows import DEFAULT_BASE_MODEL, build_workflow_layout  # noqa: E402
 from evaluation.generated_benchmark import (  # noqa: E402
     create_temp_model_registry,
     evaluate_records,
     generate_benchmark_records,
     write_evaluation_bundle,
 )
-from training.src.workflows import DEFAULT_BASE_MODEL, build_workflow_layout  # noqa: E402
+
+REPO_ROOT = Path(__file__).resolve().parents[1]
 
 
 def parse_args() -> argparse.Namespace:
@@ -32,7 +34,7 @@ def parse_args() -> argparse.Namespace:
 
 def main() -> None:
     args = parse_args()
-    layout = build_workflow_layout("generated_eval", args.run_name)
+    layout = build_workflow_layout("generated_eval", args.run_name, repo_root=REPO_ROOT)
     questions = generate_benchmark_records(question_count=args.question_count, seed=args.seed)
     registry_path = create_temp_model_registry(
         layout.configs_dir / "generated_eval_registry.yaml",

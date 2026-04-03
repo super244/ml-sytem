@@ -53,6 +53,8 @@ struct NativeAction: Identifiable {
 }
 
 struct APIStatusResponse: Decodable {
+    let status: String?
+    let errors: [String]?
     let instance_count: Int?
     let running_count: Int?
     let version: String?
@@ -66,6 +68,7 @@ final class NativeWorkspaceStore: ObservableObject {
     @Published var shellSummary: String
 
     @Published var apiReachable: Bool = false
+    @Published var apiDegraded: Bool = false
     @Published var instanceCount: Int = 0
     @Published var runningCount: Int = 0
     @Published var apiVersion: String = "—"
@@ -81,7 +84,7 @@ final class NativeWorkspaceStore: ObservableObject {
         let storedAPI = UserDefaults.standard.string(forKey: "ai_factory_api_url")
         let storedArtifacts = UserDefaults.standard.string(forKey: "ai_factory_artifacts_dir")
 
-        self.dashboardURL = URL(string: storedDashboard ?? environment["AI_FACTORY_DESKTOP_URL"] ?? "http://127.0.0.1:3000/workspace")!
+        self.dashboardURL = URL(string: storedDashboard ?? environment["AI_FACTORY_DESKTOP_URL"] ?? "http://127.0.0.1:3000/dashboard")!
         self.apiURL = URL(string: storedAPI ?? environment["AI_FACTORY_API_URL"] ?? "http://127.0.0.1:8000")!
         let artifactsPath = storedArtifacts?.isEmpty == false
             ? storedArtifacts!
@@ -124,14 +127,16 @@ final class NativeWorkspaceStore: ObservableObject {
             }
             let status = try JSONDecoder().decode(APIStatusResponse.self, from: data)
             apiReachable = true
+            apiDegraded = status.status == "degraded"
             instanceCount = status.instance_count ?? 0
             runningCount = status.running_count ?? 0
             apiVersion = status.version ?? "—"
             uptimeSeconds = status.uptime_seconds ?? 0
-            statusError = nil
+            statusError = apiDegraded ? (status.errors?.joined(separator: " | ") ?? "Backend metadata is degraded.") : nil
             lastChecked = Date()
         } catch {
             apiReachable = false
+            apiDegraded = false
             statusError = error.localizedDescription
             lastChecked = Date()
         }
