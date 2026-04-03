@@ -44,12 +44,12 @@ jobs:
         run: mypy . --no-incremental
 
       - name: Bandit: Security Vulnerability Scan
-        run: bandit -r ai_factory/ -x tests/ -ll
+        run: bandit -r ai_factory/ data/ training/ evaluation/ inference/ -x tests/ -ll
 
       - name: Xenon: Code Complexity Audit
         run: |
           pip install xenon
-          xenon --max-absolute B --max-modules A --max-average A ai_factory/
+          xenon --max-absolute B --max-modules A --max-average A ai_factory/ data/ training/ evaluation/ inference/
 
   # Stage 2: Core Engine (Rust)
   rust-verification:
@@ -91,7 +91,7 @@ jobs:
 
       - name: Pytest: Logic & Model Validation
         run: |
-          pytest --cov=ai_factory --cov-report=xml --cov-report=term-missing --cov-fail-under=60
+          pytest --cov=ai_factory --cov=data --cov=training --cov=evaluation --cov=inference --cov-report=xml --cov-report=term-missing --cov-fail-under=60
 
       - name: Upload Logic Coverage Results
         uses: codecov/codecov-action@v4

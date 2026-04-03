@@ -6,6 +6,10 @@ from ai_factory.core.instances.models import InstanceManifest
 from ai_factory.core.plugins.registry import PluginRegistry, build_default_plugin_registry
 
 
+class UnsupportedInstanceTypeError(Exception):
+    pass
+
+
 def build_command(
     config: OrchestrationConfig, manifest: InstanceManifest, *, plugin_registry: PluginRegistry | None = None
 ) -> CommandSpec:

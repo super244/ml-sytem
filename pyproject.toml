@@ -107,7 +107,8 @@ module = [
     "training.*",
     "inference.*",
     "ai_factory.interfaces.*",
-    "ai_factory.cli"
+    "ai_factory.cli",
+    "tests.*"
 ]
 ignore_errors = true
 warn_unused_ignores = true
