@@ -921,14 +921,21 @@ def main() -> None:
         if args.platform_command == "status":
             from ai_factory.platform import get_platform_status
 
-            status = get_platform_status()
+            status = get_platform_status(
+                repo_root=args.repo_root,
+                artifacts_dir=args.artifacts_dir,
+            )
             _render_payload(status, as_json=args.json)
             return
 
         if args.platform_command == "scale":
             from ai_factory.platform import scale_platform
 
-            result = scale_platform(args.target_nodes)
+            result = scale_platform(
+                args.target_nodes,
+                repo_root=args.repo_root,
+                artifacts_dir=args.artifacts_dir,
+            )
             _render_payload(result, as_json=args.json)
             return
 

@@ -433,6 +433,8 @@ export type PromptExample = {
 };
 
 export type PromptLibrary = {
+  status?: "available" | "degraded";
+  errors?: string[];
   presets: PromptPreset[];
   examples: PromptExample[];
 };
@@ -473,6 +475,8 @@ export type RunInfo = {
 export type StatusInfo = {
   title: string;
   version: string;
+  status?: "available" | "degraded";
+  errors?: string[];
   models: ModelInfo[];
   cache: {
     enabled?: boolean;
@@ -561,6 +565,8 @@ export type WorkspaceExtensionPoint = {
 };
 
 export type WorkspaceOverview = {
+  status?: "available" | "degraded";
+  errors?: string[];
   repo_root: string;
   summary: {
     datasets: number;
@@ -1115,13 +1121,34 @@ export type AgentLogEvent = {
   level: string;
 };
 
+export type AgentSwarmSnapshot = {
+  status?: string;
+  write_enabled?: boolean;
+  deploy_enabled?: boolean;
+  swarm: AgentSwarmStatus[];
+};
+
+export type AgentLogsSnapshot = {
+  status?: string;
+  simulation_enabled?: boolean;
+  logs: AgentLogEvent[];
+};
+
+export async function getAgentSwarmSnapshot(): Promise<AgentSwarmSnapshot> {
+  return fetchJson<AgentSwarmSnapshot>("/v1/agents/swarm");
+}
+
 export async function getAgentSwarmStatus(): Promise<AgentSwarmStatus[]> {
-  const payload = await fetchJson<{ swarm: AgentSwarmStatus[] }>("/v1/agents/swarm");
+  const payload = await getAgentSwarmSnapshot();
   return payload.swarm;
 }
 
+export async function getAgentLogsSnapshot(limit: number = 20): Promise<AgentLogsSnapshot> {
+  return fetchJson<AgentLogsSnapshot>(`/v1/agents/logs?limit=${limit}`);
+}
+
 export async function getAgentLogs(limit: number = 20): Promise<AgentLogEvent[]> {
-  const payload = await fetchJson<{ logs: AgentLogEvent[] }>(`/v1/agents/logs?limit=${limit}`);
+  const payload = await getAgentLogsSnapshot(limit);
   return payload.logs;
 }
 
@@ -1195,6 +1222,12 @@ export type AutoMLSweep = {
   trials: AutoMLTrial[];
 };
 
+export type AutoMLSweepSnapshot = {
+  status?: string;
+  write_enabled?: boolean;
+  sweeps: AutoMLSweep[];
+};
+
 export type LaunchSweepRequest = {
   name: string;
   base_model: string;
@@ -1208,8 +1241,12 @@ export type LaunchSweepRequest = {
   };
 };
 
+export async function getSweepsSnapshot(): Promise<AutoMLSweepSnapshot> {
+  return fetchJson<AutoMLSweepSnapshot>("/v1/automl/sweeps");
+}
+
 export async function getSweeps(): Promise<AutoMLSweep[]> {
-  const payload = await fetchJson<{ sweeps: AutoMLSweep[] }>("/v1/automl/sweeps");
+  const payload = await getSweepsSnapshot();
   return payload.sweeps;
 }
 

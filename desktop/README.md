@@ -11,7 +11,7 @@ This folder contains the desktop surfaces for AI-Factory.
 
 ## Current behavior
 
-- `main.js` opens the workspace route from `AI_FACTORY_DESKTOP_URL` or `http://127.0.0.1:3000/workspace`.
+- `main.js` opens the dashboard route from `AI_FACTORY_DESKTOP_URL` or `http://127.0.0.1:3000/dashboard`.
 - `preload.js` exposes a minimal desktop capability object for future renderer-side feature checks.
 - No desktop-specific orchestration logic lives here. All lifecycle actions still flow through the shared backend.
 

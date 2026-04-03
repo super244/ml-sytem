@@ -15,6 +15,7 @@ import {
 import { FALLBACK_EXAMPLES, FALLBACK_MODELS, FALLBACK_PROMPTS, RESEARCH_RESOURCES } from "@/lib/demo-content";
 import { formatCount, formatLatency, formatPercent } from "@/lib/formatting";
 import { DIFFICULTY_OPTIONS, OUTPUT_FORMAT_OPTIONS, SAMPLE_OPTIONS, SOLVER_MODE_OPTIONS } from "@/lib/options";
+import { isDemoMode, pickPrimaryModel, pickPromptPreset, pickSecondaryModel } from "@/lib/runtime-mode";
 import { ROUTES } from "@/lib/routes";
 import { useLabMetadata } from "@/hooks/use-lab-metadata";
 
@@ -47,32 +48,53 @@ const INITIAL_MESSAGES: ChatMessage[] = [
 
 export function ChatShell() {
   const metadata = useLabMetadata();
+  const demoMode = isDemoMode();
   const promptLibrary = metadata.promptLibrary;
-  const availableModels = metadata.models.length ? metadata.models : FALLBACK_MODELS;
+  const availableModels = metadata.models.length ? metadata.models : demoMode ? FALLBACK_MODELS : [];
   const promptPresets =
-    promptLibrary && promptLibrary.presets.length > 0 ? promptLibrary.presets : FALLBACK_PROMPTS;
+    promptLibrary && promptLibrary.presets.length > 0
+      ? promptLibrary.presets
+      : demoMode
+        ? FALLBACK_PROMPTS
+        : [];
   const promptExamples =
     promptLibrary && promptLibrary.examples.length > 0
       ? promptLibrary.examples.slice(0, 6)
-      : FALLBACK_EXAMPLES;
+      : demoMode
+        ? FALLBACK_EXAMPLES
+        : [];
+  const metadataDegraded = !demoMode && (metadata.status?.status === "degraded" || Boolean(metadata.error));
 
   const [messages, setMessages] = useState<ChatMessage[]>(INITIAL_MESSAGES);
   const [question, setQuestion] = useState("");
-  const [modelVariant, setModelVariant] = useState<ModelVariant>("finetuned");
-  const [compareToModel, setCompareToModel] = useState<string>("base");
+  const [modelVariant, setModelVariant] = useState<ModelVariant>("");
+  const [compareToModel, setCompareToModel] = useState<string>("");
   const [showReasoning, setShowReasoning] = useState(true);
   const [difficultyTarget, setDifficultyTarget] = useState<Difficulty>("olympiad");
   const [useCalculator, setUseCalculator] = useState(true);
   const [solverMode, setSolverMode] = useState<SolverMode>("rigorous");
   const [temperature, setTemperature] = useState(0.2);
   const [numSamples, setNumSamples] = useState(3);
-  const [promptPreset, setPromptPreset] = useState("atlas_rigorous");
+  const [promptPreset, setPromptPreset] = useState("");
   const [outputFormat, setOutputFormat] = useState<OutputFormat>("text");
   const [selectedCandidateIndex, setSelectedCandidateIndex] = useState(0);
   const [workspaceMode, setWorkspaceMode] = useState<WorkspaceMode>("research");
   const [density, setDensity] = useState<WorkspaceDensity>("balanced");
   const [isPending, startTransition] = useTransition();
-  const canSubmit = question.trim().length > 0;
+  const canSubmit =
+    question.trim().length > 0 && Boolean(modelVariant) && Boolean(promptPreset) && !metadataDegraded;
+
+  useEffect(() => {
+    setModelVariant((current) => pickPrimaryModel(availableModels, current));
+  }, [availableModels]);
+
+  useEffect(() => {
+    setCompareToModel((current) => pickSecondaryModel(availableModels, modelVariant, current));
+  }, [availableModels, modelVariant]);
+
+  useEffect(() => {
+    setPromptPreset((current) => pickPromptPreset(promptPresets, ["atlas_rigorous"], current));
+  }, [promptPresets]);
 
   useEffect(() => {
     try {
@@ -111,7 +133,7 @@ export function ChatShell() {
   function applyWorkspacePreset(mode: WorkspaceMode) {
     setWorkspaceMode(mode);
     if (mode === "focus") {
-      setPromptPreset("atlas_exam");
+      setPromptPreset(pickPromptPreset(promptPresets, ["atlas_exam", "atlas_rigorous"]));
       setDifficultyTarget("medium");
       setSolverMode("exam");
       setShowReasoning(false);
@@ -122,7 +144,7 @@ export function ChatShell() {
       return;
     }
     if (mode === "verification") {
-      setPromptPreset("atlas_verifier");
+      setPromptPreset(pickPromptPreset(promptPresets, ["atlas_verifier", "atlas_rigorous"]));
       setDifficultyTarget("hard");
       setSolverMode("verification");
       setShowReasoning(true);
@@ -132,7 +154,7 @@ export function ChatShell() {
       setOutputFormat("json");
       return;
     }
-    setPromptPreset("atlas_rigorous");
+    setPromptPreset(pickPromptPreset(promptPresets, ["atlas_rigorous"]));
     setDifficultyTarget("olympiad");
     setSolverMode("rigorous");
     setShowReasoning(true);
@@ -144,7 +166,7 @@ export function ChatShell() {
 
   async function submitQuestion(submittedQuestion: string) {
     const trimmed = submittedQuestion.trim();
-    if (!trimmed) {
+    if (!trimmed || !modelVariant || !promptPreset || metadataDegraded) {
       return;
     }
     const userMessage: ChatMessage = {
@@ -278,8 +300,8 @@ export function ChatShell() {
 
         {metadata.error ? (
           <StatePanel
-            eyebrow="Metadata Fallback"
-            title="The workspace is running with fallback metadata."
+            eyebrow={demoMode ? "Demo Metadata" : "Metadata Degraded"}
+            title={demoMode ? "The workspace is running with demo metadata." : "The workspace cannot trust live metadata."}
             description={metadata.error}
             tone="error"
             action={
@@ -287,6 +309,15 @@ export function ChatShell() {
                 Start clean session
               </button>
             }
+          />
+        ) : null}
+
+        {!demoMode && !availableModels.length ? (
+          <StatePanel
+            eyebrow="Metadata Required"
+            title="No live model inventory is available."
+            description="Restore `/v1/status` and `/v1/models` metadata before sending prompts from the assistant workspace."
+            tone="error"
           />
         ) : null}
 

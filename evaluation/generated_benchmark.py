@@ -3,6 +3,7 @@ from __future__ import annotations
 import random
 import time
 from collections import Counter
+from importlib import import_module
 from pathlib import Path
 from typing import Any
 
@@ -10,22 +11,23 @@ import yaml
 from tqdm import tqdm
 
 from ai_factory.core.io import write_json, write_jsonl
-from data.synthesis import GENERATOR_MAP, DatasetSpec
-from data.synthesis.base import choose_weighted
 from evaluation.metrics import score_prediction
-from inference.app.generation import MathGenerator
-from inference.app.model_loader import MathModelRegistry, load_registry_from_yaml
-from inference.app.parameters import GenerationParameters
-from inference.app.prompts import load_prompt_presets
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_GENERATION_CONFIG = REPO_ROOT / "data" / "configs" / "generation.yaml"
 DEFAULT_PROMPT_LIBRARY = REPO_ROOT / "inference" / "configs" / "prompt_presets.yaml"
 
 
-def load_dataset_specs(config_path: str | Path = DEFAULT_GENERATION_CONFIG) -> list[DatasetSpec]:
+def _load_synthesis_runtime() -> tuple[type[Any], dict[str, Any], Any]:
+    synthesis = import_module("data.synthesis")
+    synthesis_base = import_module("data.synthesis.base")
+    return synthesis.DatasetSpec, synthesis.GENERATOR_MAP, synthesis_base.choose_weighted
+
+
+def load_dataset_specs(config_path: str | Path = DEFAULT_GENERATION_CONFIG) -> list[Any]:
+    dataset_spec_type, _, _ = _load_synthesis_runtime()
     payload = yaml.safe_load(Path(config_path).read_text()) or {}
-    return [DatasetSpec(**item) for item in payload.get("dataset_specs", [])]
+    return [dataset_spec_type(**item) for item in payload.get("dataset_specs", [])]
 
 
 def generate_benchmark_records(
@@ -37,6 +39,7 @@ def generate_benchmark_records(
     specs = load_dataset_specs(config_path)
     if not specs:
         raise ValueError(f"No dataset specs were found in {config_path}")
+    _, generator_map, choose_weighted = _load_synthesis_runtime()
     rng = random.Random(seed)
     records: list[dict[str, Any]] = []
     seen_questions: set[str] = set()
@@ -48,7 +51,7 @@ def generate_benchmark_records(
             raise RuntimeError(f"Could not generate {question_count} unique benchmark questions.")
         spec = specs[attempts % len(specs)]
         difficulty = choose_weighted(rng, spec.difficulty_mix)
-        generator = GENERATOR_MAP[spec.family]
+        generator = generator_map[spec.family]
         record = dict(generator(rng, spec, attempts, difficulty))
         attempts += 1
         if record["question"] in seen_questions:
@@ -93,12 +96,14 @@ def create_temp_model_registry(
     return path
 
 
-def build_generator(
-    registry_path: str | Path, *, prompt_library_path: str | Path = DEFAULT_PROMPT_LIBRARY
-) -> MathGenerator:
-    model_registry = MathModelRegistry(load_registry_from_yaml(registry_path))
-    prompt_presets = load_prompt_presets(prompt_library_path)
-    return MathGenerator(model_registry, prompt_presets=prompt_presets)
+def build_generator(registry_path: str | Path, *, prompt_library_path: str | Path = DEFAULT_PROMPT_LIBRARY) -> Any:
+    generation_module = import_module("inference.app.generation")
+    model_loader_module = import_module("inference.app.model_loader")
+    prompts_module = import_module("inference.app.prompts")
+
+    model_registry = model_loader_module.MathModelRegistry(model_loader_module.load_registry_from_yaml(registry_path))
+    prompt_presets = prompts_module.load_prompt_presets(prompt_library_path)
+    return generation_module.MathGenerator(model_registry, prompt_presets=prompt_presets)
 
 
 def evaluate_records(
@@ -115,6 +120,9 @@ def evaluate_records(
     use_calculator: bool = True,
     use_cache: bool = False,
 ) -> tuple[list[dict[str, Any]], dict[str, Any]]:
+    parameters_module = import_module("inference.app.parameters")
+    generation_parameters = parameters_module.GenerationParameters
+
     generator = build_generator(registry_path)
     results: list[dict[str, Any]] = []
     total_marks = 0
@@ -124,7 +132,7 @@ def evaluate_records(
     correct_by_difficulty: Counter[str] = Counter()
 
     for record in tqdm(records, desc="Evaluating generated benchmark"):
-        params = GenerationParameters(
+        params = generation_parameters(
             question=record["question"],
             model_variant=model_variant,
             prompt_preset=prompt_preset,

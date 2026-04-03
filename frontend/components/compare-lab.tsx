@@ -1,12 +1,13 @@
 "use client";
 
 import Link from "next/link";
-import { useState, useTransition } from "react";
+import { useEffect, useState, useTransition } from "react";
 
 import { compareModels, type CompareResponse, type Difficulty, type OutputFormat, type SolverMode } from "@/lib/api";
 import { FALLBACK_EXAMPLES, FALLBACK_MODELS, FALLBACK_PROMPTS } from "@/lib/demo-content";
 import { formatCount, formatLatency, formatPercent } from "@/lib/formatting";
 import { DIFFICULTY_OPTIONS, OUTPUT_FORMAT_OPTIONS, SOLVER_MODE_OPTIONS } from "@/lib/options";
+import { isDemoMode, pickPrimaryModel, pickPromptPreset, pickSecondaryModel } from "@/lib/runtime-mode";
 import { ROUTES } from "@/lib/routes";
 import { useLabMetadata } from "@/hooks/use-lab-metadata";
 
@@ -19,26 +20,49 @@ import { StatePanel } from "@/components/ui/state-panel";
 
 export function CompareLab() {
   const metadata = useLabMetadata();
+  const demoMode = isDemoMode();
   const promptLibrary = metadata.promptLibrary;
-  const models = metadata.models.length ? metadata.models : FALLBACK_MODELS;
+  const models = metadata.models.length ? metadata.models : demoMode ? FALLBACK_MODELS : [];
   const examples =
     promptLibrary && promptLibrary.examples.length > 0
       ? promptLibrary.examples.slice(0, 4)
-      : FALLBACK_EXAMPLES;
+      : demoMode
+        ? FALLBACK_EXAMPLES
+        : [];
   const promptPresets =
-    promptLibrary && promptLibrary.presets.length > 0 ? promptLibrary.presets : FALLBACK_PROMPTS;
+    promptLibrary && promptLibrary.presets.length > 0 ? promptLibrary.presets : demoMode ? FALLBACK_PROMPTS : [];
+  const metadataDegraded = !demoMode && (metadata.status?.status === "degraded" || Boolean(metadata.error));
 
   const [question, setQuestion] = useState("Evaluate \\int_0^1 x e^{x^2} dx.");
-  const [primaryModel, setPrimaryModel] = useState("finetuned");
-  const [secondaryModel, setSecondaryModel] = useState("base");
+  const [primaryModel, setPrimaryModel] = useState("");
+  const [secondaryModel, setSecondaryModel] = useState("");
   const [difficultyTarget, setDifficultyTarget] = useState<Difficulty>("hard");
   const [solverMode, setSolverMode] = useState<SolverMode>("rigorous");
   const [outputFormat, setOutputFormat] = useState<OutputFormat>("text");
-  const [promptPreset, setPromptPreset] = useState("atlas_rigorous");
+  const [promptPreset, setPromptPreset] = useState("");
   const [result, setResult] = useState<CompareResponse | null>(null);
   const [requestError, setRequestError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
-  const compareDisabled = isPending || !question.trim() || primaryModel === secondaryModel;
+  const compareDisabled =
+    isPending ||
+    !question.trim() ||
+    !primaryModel ||
+    !secondaryModel ||
+    !promptPreset ||
+    primaryModel === secondaryModel ||
+    metadataDegraded;
+
+  useEffect(() => {
+    setPrimaryModel((current) => pickPrimaryModel(models, current));
+  }, [models]);
+
+  useEffect(() => {
+    setSecondaryModel((current) => pickSecondaryModel(models, primaryModel, current));
+  }, [models, primaryModel]);
+
+  useEffect(() => {
+    setPromptPreset((current) => pickPromptPreset(promptPresets, ["atlas_rigorous"], current));
+  }, [promptPresets]);
 
   return (
     <AppShell>
@@ -66,8 +90,8 @@ export function CompareLab() {
 
         {metadata.error ? (
           <StatePanel
-            eyebrow="Metadata Fallback"
-            title="The compare lab is using fallback metadata."
+            eyebrow={demoMode ? "Demo Metadata" : "Metadata Degraded"}
+            title={demoMode ? "The compare lab is using demo metadata." : "The compare lab cannot trust live metadata."}
             description={metadata.error}
             tone="error"
           />

@@ -217,7 +217,7 @@ class TuiController:
             return
         instance = self.snapshot.instances[self.selected_index]
         try:
-            self.control.execute_action(instance.id, action_name)
+            self.control.execute_action(instance.id, action=action_name)
             self.last_action_msg = f"{action_name} triggered on {instance.name}"
         except Exception as exc:
             self.last_action_msg = f"Error: {exc}"

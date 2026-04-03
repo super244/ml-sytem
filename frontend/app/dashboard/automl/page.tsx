@@ -2,11 +2,15 @@
 
 import { useEffect, useState } from "react";
 import {
-  getSweeps,
+  getModels,
+  getSweepsSnapshot,
   launchSweep,
+  type AutoMLSweepSnapshot,
   type AutoMLSweep,
   type AutoMLTrial,
+  type ModelInfo,
 } from "@/lib/api";
+import { isDemoMode } from "@/lib/runtime-mode";
 
 const MODELS = ["qwen-2-7b", "llama-3-8b", "mistral-7b", "phi-3-mini"];
 const STRATEGIES = [
@@ -16,27 +20,83 @@ const STRATEGIES = [
 ];
 
 export default function AutoMLPage() {
+  const demoMode = isDemoMode();
   const [sweeps, setSweeps] = useState<AutoMLSweep[]>([]);
+  const [availableModels, setAvailableModels] = useState<ModelInfo[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [writeEnabled, setWriteEnabled] = useState(false);
   const [activeSweep, setActiveSweep] = useState<AutoMLSweep | null>(null);
 
   // Launch form state
   const [sweepName, setSweepName] = useState("");
-  const [baseModel, setBaseModel] = useState(MODELS[0]);
+  const [baseModel, setBaseModel] = useState("");
   const [strategy, setStrategy] = useState("bayesian");
   const [numTrials, setNumTrials] = useState(10);
   const [launching, setLaunching] = useState(false);
 
   useEffect(() => {
-    getSweeps()
-      .then(setSweeps)
-      .catch(() => null)
-      .finally(() => setLoading(false));
+    let cancelled = false;
+
+    async function refresh(initialLoad: boolean = false) {
+      if (initialLoad) {
+        setLoading(true);
+      }
+      try {
+        const [sweepsResponse, models] = await Promise.allSettled([getSweepsSnapshot(), getModels()]);
+        if (cancelled) {
+          return;
+        }
+
+        if (sweepsResponse.status === "fulfilled") {
+          const payload: AutoMLSweepSnapshot = sweepsResponse.value;
+          setSweeps(payload.sweeps);
+          setWriteEnabled(Boolean(payload.write_enabled));
+          setActiveSweep((current) => {
+            if (current) {
+              return payload.sweeps.find((sweep) => sweep.id === current.id) ?? current;
+            }
+            return payload.sweeps[0] ?? null;
+          });
+        } else {
+          setError(sweepsResponse.reason instanceof Error ? sweepsResponse.reason.message : "Failed to load sweeps.");
+        }
+
+        if (models.status === "fulfilled") {
+          setAvailableModels(models.value.filter((model) => model.available));
+        } else if (!demoMode) {
+          setError((current) => current ?? "Model inventory is unavailable.");
+        }
+      } finally {
+        if (!cancelled) {
+          setLoading(false);
+        }
+      }
+    }
+
+    void refresh(true);
+    const interval = setInterval(() => {
+      void refresh();
+    }, 5000);
+
+    return () => {
+      cancelled = true;
+      clearInterval(interval);
+    };
   }, []);
 
+  const modelOptions = availableModels.length > 0 ? availableModels.map((model) => model.name) : demoMode ? MODELS : [];
+
+  useEffect(() => {
+    if (!baseModel || !modelOptions.includes(baseModel)) {
+      setBaseModel(modelOptions[0] ?? "");
+    }
+  }, [baseModel, modelOptions]);
+
   async function handleLaunch() {
-    if (!sweepName.trim() || launching) return;
+    if (!sweepName.trim() || launching || !writeEnabled || !baseModel) return;
     setLaunching(true);
+    setError(null);
     try {
       const newSweep = await launchSweep({
         name: sweepName,
@@ -47,15 +107,15 @@ export default function AutoMLPage() {
       setSweeps((prev) => [newSweep, ...prev]);
       setActiveSweep(newSweep);
       setSweepName("");
-    } catch (e) {
-      console.error(e);
+    } catch (nextError) {
+      setError(nextError instanceof Error ? nextError.message : "Failed to launch sweep.");
     } finally {
       setLaunching(false);
     }
   }
 
-  function getBestTrial(sweep: AutoMLSweep): AutoMLTrial {
-    return sweep.best_trial ?? sweep.trials[0];
+  function getBestTrial(sweep: AutoMLSweep): AutoMLTrial | null {
+    return sweep.best_trial ?? sweep.trials[0] ?? null;
   }
 
   function statusColor(status: string) {
@@ -76,6 +136,18 @@ export default function AutoMLPage() {
           </p>
         </div>
       </div>
+
+      {error && <div className="dash-error-banner panel">⚠ {error}</div>}
+      {!writeEnabled && (
+        <div className="panel state-panel">
+          AutoML inventory is live in production, but launching simulated sweeps is disabled outside demo mode.
+        </div>
+      )}
+      {!demoMode && availableModels.length === 0 && (
+        <div className="panel state-panel">
+          No live model registry entries are available yet, so new sweep launch inputs stay disabled until inventory appears.
+        </div>
+      )}
 
       <div style={{ display: "grid", gridTemplateColumns: "360px 1fr", gap: "1.5rem", alignItems: "start" }}>
 
@@ -103,8 +175,9 @@ export default function AutoMLPage() {
                   id="base-model"
                   value={baseModel}
                   onChange={(e) => setBaseModel(e.target.value)}
+                  disabled={modelOptions.length === 0}
                 >
-                  {MODELS.map((m) => (
+                  {modelOptions.map((m) => (
                     <option key={m} value={m}>{m}</option>
                   ))}
                 </select>
@@ -138,11 +211,11 @@ export default function AutoMLPage() {
               <button
                 id="launch-sweep-btn"
                 className="primary-button"
-                disabled={launching || !sweepName.trim()}
+                disabled={launching || !sweepName.trim() || !writeEnabled || !baseModel}
                 onClick={() => void handleLaunch()}
                 style={{ justifyContent: "center", padding: "0.85rem" }}
               >
-                {launching ? "⟳ Launching..." : "▶ Launch Sweep"}
+                {launching ? "⟳ Launching..." : writeEnabled ? "▶ Launch Sweep" : "Read-Only Inventory"}
               </button>
             </div>
           </div>
@@ -196,7 +269,9 @@ export default function AutoMLPage() {
             <div className="resource-card" style={{ borderTop: "3px solid var(--accent)" }}>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "1rem" }}>
                 <div>
-                  <h2 style={{ margin: 0 }}>🏆 Best Trial: {getBestTrial(activeSweep).trial_id}</h2>
+                  <h2 style={{ margin: 0 }}>
+                    {getBestTrial(activeSweep) ? `🏆 Best Trial: ${getBestTrial(activeSweep)?.trial_id}` : "No completed trials yet"}
+                  </h2>
                   <span style={{ fontSize: "0.85rem", opacity: 0.7 }}>{activeSweep.name} · {activeSweep.strategy}</span>
                 </div>
                 <span style={{ fontSize: "0.8rem", color: statusColor(activeSweep.status), textTransform: "capitalize" }}>
@@ -204,23 +279,31 @@ export default function AutoMLPage() {
                 </span>
               </div>
 
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "1rem" }}>
-                {Object.entries(getBestTrial(activeSweep).metrics).map(([key, val]) => (
-                  <div key={key} style={{ background: "rgba(255,255,255,0.03)", border: "1px solid var(--line)", borderRadius: "6px", padding: "1rem", textAlign: "center" }}>
-                    <div style={{ fontSize: "1.5rem", fontWeight: 700, color: "var(--accent)" }}>{String(val)}</div>
-                    <div style={{ fontSize: "0.8rem", opacity: 0.7, textTransform: "capitalize", marginTop: "0.25rem" }}>{key.replace("_", " ")}</div>
-                  </div>
-                ))}
-              </div>
+              {getBestTrial(activeSweep) ? (
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "1rem" }}>
+                  {Object.entries(getBestTrial(activeSweep)?.metrics ?? {}).map(([key, val]) => (
+                    <div key={key} style={{ background: "rgba(255,255,255,0.03)", border: "1px solid var(--line)", borderRadius: "6px", padding: "1rem", textAlign: "center" }}>
+                      <div style={{ fontSize: "1.5rem", fontWeight: 700, color: "var(--accent)" }}>{String(val)}</div>
+                      <div style={{ fontSize: "0.8rem", opacity: 0.7, textTransform: "capitalize", marginTop: "0.25rem" }}>{key.replace("_", " ")}</div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="dash-empty" style={{ padding: "1.5rem 0" }}>
+                  This sweep has not produced any completed trials yet.
+                </div>
+              )}
 
-              <div style={{ marginTop: "1rem", display: "grid", gridTemplateColumns: "1fr 1fr 1fr 1fr", gap: "0.75rem" }}>
-                {Object.entries(getBestTrial(activeSweep).params).map(([key, val]) => (
-                  <div key={key} style={{ background: "rgba(255,255,255,0.02)", border: "1px solid var(--line)", borderRadius: "4px", padding: "0.6rem 0.75rem" }}>
-                    <div style={{ fontSize: "0.75rem", opacity: 0.6, marginBottom: "0.2rem" }}>{key.replace("_", " ")}</div>
-                    <div style={{ fontSize: "0.9rem", fontWeight: 600 }}>{String(val)}</div>
-                  </div>
-                ))}
-              </div>
+              {getBestTrial(activeSweep) ? (
+                <div style={{ marginTop: "1rem", display: "grid", gridTemplateColumns: "1fr 1fr 1fr 1fr", gap: "0.75rem" }}>
+                  {Object.entries(getBestTrial(activeSweep)?.params ?? {}).map(([key, val]) => (
+                    <div key={key} style={{ background: "rgba(255,255,255,0.02)", border: "1px solid var(--line)", borderRadius: "4px", padding: "0.6rem 0.75rem" }}>
+                      <div style={{ fontSize: "0.75rem", opacity: 0.6, marginBottom: "0.2rem" }}>{key.replace("_", " ")}</div>
+                      <div style={{ fontSize: "0.9rem", fontWeight: 600 }}>{String(val)}</div>
+                    </div>
+                  ))}
+                </div>
+              ) : null}
             </div>
 
             {/* Trial leaderboard */}

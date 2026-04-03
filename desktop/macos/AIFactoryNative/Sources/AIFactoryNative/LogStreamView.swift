@@ -1,5 +1,9 @@
 import SwiftUI
 
+private let desktopLogDemoModeEnabled =
+    ProcessInfo.processInfo.environment["AI_FACTORY_DESKTOP_DEMO_MODE"] == "1" ||
+    ProcessInfo.processInfo.environment["AI_FACTORY_DEMO_MODE"] == "1"
+
 struct LogEntry: Identifiable {
     let id = UUID()
     let timestamp: Date
@@ -20,6 +24,7 @@ final class LogStreamStore: ObservableObject {
     private var timer: Timer?
     private var cursor: String? = nil
     private let maxEntries = 500
+    private let demoMode = desktopLogDemoModeEnabled
 
     init(apiURL: URL) {
         self.apiURL = apiURL
@@ -49,9 +54,8 @@ final class LogStreamStore: ObservableObject {
     }
 
     func fetchLogs() async {
-        var components = URLComponents(url: apiURL.appendingPathComponent("v1/logs"), resolvingAgainstBaseURL: false)!
-        var queryItems: [URLQueryItem] = [URLQueryItem(name: "limit", value: "50")]
-        if let c = cursor { queryItems.append(URLQueryItem(name: "cursor", value: c)) }
+        var components = URLComponents(url: apiURL.appendingPathComponent("v1/agents/logs"), resolvingAgainstBaseURL: false)!
+        let queryItems: [URLQueryItem] = [URLQueryItem(name: "limit", value: "50")]
         components.queryItems = queryItems
 
         guard let url = components.url else { return }
@@ -62,13 +66,13 @@ final class LogStreamStore: ObservableObject {
             let (data, resp) = try await URLSession.shared.data(for: req)
             guard let http = resp as? HTTPURLResponse, http.statusCode == 200 else {
                 error = "HTTP \((resp as? HTTPURLResponse)?.statusCode ?? 0)"
-                seedSimulated()
+                if demoMode { seedSimulated() }
                 return
             }
             let decoded = try JSONDecoder().decode(APILogsResponse.self, from: data)
             let newEntries = decoded.entries.map { raw in
                 LogEntry(
-                    timestamp: ISO8601DateFormatter().date(from: raw.timestamp) ?? Date(),
+                    timestamp: raw.timestampAsDate,
                     level: raw.level,
                     message: raw.message,
                     source: raw.source
@@ -76,11 +80,11 @@ final class LogStreamStore: ObservableObject {
             }
             entries.append(contentsOf: newEntries)
             if entries.count > maxEntries { entries.removeFirst(entries.count - maxEntries) }
-            cursor = decoded.next_cursor
+            cursor = nil
             error = nil
         } catch {
             self.error = error.localizedDescription
-            seedSimulated()
+            if demoMode { seedSimulated() }
         }
     }
 
@@ -119,13 +123,22 @@ final class LogStreamStore: ObservableObject {
 
 struct APILogsResponse: Decodable {
     struct RawEntry: Decodable {
-        let timestamp: String
+        let timestamp: Double?
         let level: String
         let message: String
         let source: String?
+
+        var timestampAsDate: Date {
+            if let timestamp {
+                return Date(timeIntervalSince1970: timestamp)
+            }
+            return Date()
+        }
     }
-    let entries: [RawEntry]
-    let next_cursor: String?
+    let logs: [RawEntry]
+
+    var entries: [RawEntry] { logs }
+    let next_cursor: String? = nil
 }
 
 struct LogStreamView: View {

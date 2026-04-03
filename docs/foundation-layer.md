@@ -33,7 +33,7 @@ training/                          existing model training stack
 evaluation/                        existing benchmark + scoring stack
 inference/                         existing FastAPI inference stack
 frontend/                          existing monitoring/control dashboard surface
-desktop/                           Electron shell stub over the same backend contracts
+desktop/                           Electron + native shell over the same backend contracts
 artifacts/
 ├── control_plane/                 SQLite orchestration state
 └── instances/                     compatibility projection per managed instance
