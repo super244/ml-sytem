@@ -10,10 +10,16 @@ import {
   generateAnswer,
   getInstances,
   getModels,
+  getPromptLibrary,
+  getStatus,
   startManagedInference,
   type InstanceSummary,
   type ModelInfo,
+  type PromptPreset,
+  type StatusInfo,
 } from "@/lib/api";
+import { FALLBACK_MODELS, FALLBACK_PROMPTS } from "@/lib/demo-content";
+import { isDemoMode, pickPrimaryModel, pickPromptPreset, pickSecondaryModel } from "@/lib/runtime-mode";
 
 type AssistantVariant = {
   model: string;
@@ -73,10 +79,13 @@ export default function InferencePage() {
   const [instances, setInstances] = useState<InstanceSummary[]>([]);
   const [launchSources, setLaunchSources] = useState<InstanceSummary[]>([]);
   const [models, setModels] = useState<ModelInfo[]>([]);
+  const [promptPresets, setPromptPresets] = useState<PromptPreset[]>([]);
+  const [status, setStatus] = useState<StatusInfo | null>(null);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
-  const [selectedModel, setSelectedModel] = useState("finetuned");
-  const [secondaryModel, setSecondaryModel] = useState("base");
+  const [selectedModel, setSelectedModel] = useState("");
+  const [secondaryModel, setSecondaryModel] = useState("");
+  const [promptPreset, setPromptPreset] = useState("");
   const [compareMode, setCompareMode] = useState(false);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState("");
@@ -89,65 +98,86 @@ export default function InferencePage() {
   const [flagTarget, setFlagTarget] = useState<FlagTarget>(null);
   const [flagReason, setFlagReason] = useState("");
   const bottomRef = useRef<HTMLDivElement>(null);
+  const demoMode = isDemoMode();
+  const availableModels = models.length ? models : demoMode ? FALLBACK_MODELS : [];
+  const availablePromptPresets = promptPresets.length ? promptPresets : demoMode ? FALLBACK_PROMPTS : [];
+  const metadataDegraded = !demoMode && (status?.status === "degraded" || Boolean(loadError));
 
   useEffect(() => {
     let active = true;
     setLoadError(null);
-    Promise.allSettled([getInstances(), getModels()]).then(([instancesResult, modelsResult]) => {
-      if (!active) {
-        return;
-      }
+    Promise.allSettled([getInstances(), getModels(), getPromptLibrary(), getStatus()]).then(
+      ([instancesResult, modelsResult, promptResult, statusResult]) => {
+        if (!active) {
+          return;
+        }
 
-      const errors: string[] = [];
+        const errors: string[] = [];
 
-      if (instancesResult.status === "fulfilled") {
-        const list = instancesResult.value;
-        setInstances(
-          list.filter(
-            (instance) =>
-              (instance.type === "inference" && instance.status === "running") ||
-              (instance.type === "deploy" && instance.status === "completed"),
-          ),
-        );
-        setLaunchSources(
-          list.filter(
-            (instance) =>
-              instance.status === "completed" &&
-              (instance.type === "train" || instance.type === "finetune" || instance.type === "deploy"),
-          ),
-        );
-      } else {
-        errors.push(
-          instancesResult.reason instanceof Error
-            ? instancesResult.reason.message
-            : "Instances could not be loaded.",
-        );
-      }
+        if (instancesResult.status === "fulfilled") {
+          const list = instancesResult.value;
+          setInstances(
+            list.filter(
+              (instance) =>
+                (instance.type === "inference" && instance.status === "running") ||
+                (instance.type === "deploy" && instance.status === "completed"),
+            ),
+          );
+          setLaunchSources(
+            list.filter(
+              (instance) =>
+                instance.status === "completed" &&
+                (instance.type === "train" || instance.type === "finetune" || instance.type === "deploy"),
+            ),
+          );
+        } else {
+          errors.push(
+            instancesResult.reason instanceof Error
+              ? instancesResult.reason.message
+              : "Instances could not be loaded.",
+          );
+        }
 
-      if (modelsResult.status === "fulfilled") {
-        const nextModels = modelsResult.value;
-        setModels(nextModels);
-        const primary =
-          nextModels.find((model) => model.name === "finetuned")?.name ??
-          nextModels[0]?.name ??
-          "finetuned";
-        const secondary =
-          nextModels.find((model) => model.name !== primary)?.name ??
-          nextModels[0]?.name ??
-          "base";
-        setSelectedModel(primary);
-        setSecondaryModel(secondary);
-      } else {
-        errors.push(
-          modelsResult.reason instanceof Error
-            ? modelsResult.reason.message
-            : "Model registry could not be loaded.",
-        );
-      }
+        if (modelsResult.status === "fulfilled") {
+          setModels(modelsResult.value);
+        } else {
+          errors.push(
+            modelsResult.reason instanceof Error
+              ? modelsResult.reason.message
+              : "Model registry could not be loaded.",
+          );
+        }
 
-      setLoadError(errors.length ? errors.join(" | ") : null);
-      setLoading(false);
-    });
+        if (promptResult.status === "fulfilled") {
+          setPromptPresets(promptResult.value.presets);
+          if (promptResult.value.status === "degraded" && promptResult.value.errors?.length) {
+            errors.push(...promptResult.value.errors);
+          }
+        } else {
+          errors.push(
+            promptResult.reason instanceof Error
+              ? promptResult.reason.message
+              : "Prompt metadata could not be loaded.",
+          );
+        }
+
+        if (statusResult.status === "fulfilled") {
+          setStatus(statusResult.value);
+          if (statusResult.value.status === "degraded" && statusResult.value.errors?.length) {
+            errors.push(...statusResult.value.errors);
+          }
+        } else {
+          errors.push(
+            statusResult.reason instanceof Error
+              ? statusResult.reason.message
+              : "Status metadata could not be loaded.",
+          );
+        }
+
+        setLoadError(errors.length ? errors.join(" | ") : null);
+        setLoading(false);
+      },
+    );
 
     return () => {
       active = false;
@@ -155,21 +185,33 @@ export default function InferencePage() {
   }, []);
 
   useEffect(() => {
+    setSelectedModel((current) => pickPrimaryModel(availableModels, current));
+  }, [availableModels]);
+
+  useEffect(() => {
+    setSecondaryModel((current) => pickSecondaryModel(availableModels, selectedModel, current));
+  }, [availableModels, selectedModel]);
+
+  useEffect(() => {
+    setPromptPreset((current) => pickPromptPreset(availablePromptPresets, ["atlas_rigorous"], current));
+  }, [availablePromptPresets]);
+
+  useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages, generating]);
 
   useEffect(() => {
-    if (selectedModel === secondaryModel) {
-      const fallback = models.find((model) => model.name !== selectedModel)?.name;
+    if (selectedModel && selectedModel === secondaryModel) {
+      const fallback = availableModels.find((model) => model.name !== selectedModel)?.name;
       if (fallback) {
         setSecondaryModel(fallback);
       }
     }
-  }, [models, secondaryModel, selectedModel]);
+  }, [availableModels, secondaryModel, selectedModel]);
 
   const modelLabelLookup = useMemo(
-    () => new Map(models.map((model) => [model.name, model.label ?? model.name])),
-    [models],
+    () => new Map(availableModels.map((model) => [model.name, model.label ?? model.name])),
+    [availableModels],
   );
   const flaggedCount = useMemo(
     () =>
@@ -194,7 +236,7 @@ export default function InferencePage() {
   }
 
   async function send() {
-    if (!input.trim() || generating) {
+    if (!input.trim() || generating || metadataDegraded || !selectedModel || !promptPreset) {
       return;
     }
 
@@ -210,7 +252,7 @@ export default function InferencePage() {
           question,
           primary_model: selectedModel,
           secondary_model: secondaryModel,
-          prompt_preset: "atlas_rigorous",
+          prompt_preset: promptPreset,
           temperature,
           top_p: 0.95,
           max_new_tokens: maxTokens,
@@ -247,7 +289,7 @@ export default function InferencePage() {
           question,
           model_variant: selectedModel,
           compare_to_base: false,
-          prompt_preset: "atlas_rigorous",
+          prompt_preset: promptPreset,
           temperature,
           top_p: 0.95,
           max_new_tokens: maxTokens,
@@ -332,6 +374,9 @@ export default function InferencePage() {
   }
 
   async function launchInference(instanceId: string) {
+    if (metadataDegraded) {
+      return;
+    }
     setLaunching(true);
     setLaunchingId(instanceId);
     setLaunchNotice(null);
@@ -395,15 +440,16 @@ export default function InferencePage() {
                 id="primary-model"
                 value={selectedModel}
                 onChange={(event) => setSelectedModel(event.target.value)}
+                disabled={!availableModels.length || metadataDegraded}
               >
-                {models.length > 0 ? (
-                  models.map((model) => (
+                {availableModels.length > 0 ? (
+                  availableModels.map((model) => (
                     <option key={model.name} value={model.name}>
                       {model.label ?? model.name}
                     </option>
                   ))
                 ) : (
-                  <option value="finetuned">Finetuned</option>
+                  <option value="">No live models</option>
                 )}
               </select>
             </div>
@@ -416,8 +462,9 @@ export default function InferencePage() {
                   id="secondary-model"
                   value={secondaryModel}
                   onChange={(event) => setSecondaryModel(event.target.value)}
+                  disabled={!availableModels.length || metadataDegraded}
                 >
-                  {models
+                  {availableModels
                     .filter((model) => model.name !== selectedModel)
                     .map((model) => (
                       <option key={model.name} value={model.name}>
@@ -476,7 +523,7 @@ export default function InferencePage() {
                       key={source.id}
                       type="button"
                       className={`source-item ${launchingId === source.id ? "active" : ""}`}
-                      disabled={launching}
+                      disabled={launching || metadataDegraded}
                       onClick={() => setLaunchingId((current) => (current === source.id ? null : source.id))}
                     >
                       <span className="source-name">{source.name}</span>
@@ -489,7 +536,7 @@ export default function InferencePage() {
                 <button
                   type="button"
                   className="primary-button small"
-                  disabled={!launchingId || launching}
+                  disabled={!launchingId || launching || metadataDegraded}
                   onClick={() => {
                     if (launchingId) {
                       void launchInference(launchingId);
@@ -550,11 +597,12 @@ export default function InferencePage() {
           <div className="panel inference-settings-panel">
             <h2 className="section-title">Model Catalog</h2>
             <div className="model-catalog">
-              {models.slice(0, 6).map((model) => (
+              {availableModels.slice(0, 6).map((model) => (
                 <button
                   key={model.name}
                   type="button"
                   className={`model-catalog-item ${selectedModel === model.name ? "active" : ""}`}
+                  disabled={metadataDegraded}
                   onClick={() => setSelectedModel(model.name)}
                 >
                   <strong>{model.label ?? model.name}</strong>
@@ -562,7 +610,7 @@ export default function InferencePage() {
                 </button>
               ))}
             </div>
-            {!loading && models.length === 0 && (
+            {!loading && availableModels.length === 0 && (
               <Link href="/dashboard/deploy" className="secondary-button small">
                 ⬆ Deploy a model
               </Link>
@@ -714,7 +762,7 @@ export default function InferencePage() {
             <button
               type="button"
               className="primary-button inference-send-btn"
-              disabled={generating || !input.trim()}
+              disabled={generating || !input.trim() || metadataDegraded || !selectedModel || !promptPreset}
               onClick={() => void send()}
             >
               {generating ? "⟳" : compareMode ? "Compare →" : "Send →"}

@@ -6,7 +6,14 @@ import uuid
 from typing import Any
 
 from ai_factory.core.config.loader import load_orchestration_config
-from ai_factory.core.instances.models import InstanceManifest, utc_now_iso
+from ai_factory.core.instances.models import (
+    DeploymentTarget,
+    EnvironmentSpec,
+    InstanceManifest,
+    LifecycleProfile,
+    UserLevel,
+    utc_now_iso,
+)
 from ai_factory.core.instances.store import FileInstanceStore
 from ai_factory.core.io import write_json
 
@@ -14,7 +21,7 @@ from ai_factory.core.io import write_json
 class InstanceCreationService:
     """Service for creating new instances."""
 
-    def __init__(self, store: FileInstanceStore):
+    def __init__(self, store: FileInstanceStore) -> None:
         self.store = store
 
     def create_instance(
@@ -22,34 +29,33 @@ class InstanceCreationService:
         config_path: str,
         *,
         start: bool = True,
-        environment_override=None,
+        environment_override: EnvironmentSpec | None = None,
         name_override: str | None = None,
-        user_level_override=None,
-        lifecycle_override=None,
+        user_level_override: UserLevel | None = None,
+        lifecycle_override: LifecycleProfile | None = None,
         parent_instance_id: str | None = None,
         metadata_updates: dict[str, Any] | None = None,
     ) -> InstanceManifest:
         """Create a new instance - simplified version that delegates to store."""
-        # This is a simplified version - the actual creation logic should stay in the manager
-        # to avoid duplication and ensure consistency
+        del start
+        config = load_orchestration_config(config_path)
         instance_id = f"instance-{uuid.uuid4().hex[:12]}"
-
-        # Create a minimal manifest that will be properly populated by the manager
         manifest = InstanceManifest(
             id=instance_id,
-            type="unknown",  # Will be set by manager
+            type=config.instance.type,
             name=name_override or f"instance-{instance_id[:8]}",
             status="pending",
             created_at=utc_now_iso(),
             updated_at=utc_now_iso(),
             config_path=config_path,
+            environment=environment_override or config.instance.environment,
+            user_level=user_level_override or config.experience.level,
+            lifecycle=lifecycle_override or config.lifecycle,
+            parent_instance_id=parent_instance_id or config.instance.parent_instance_id,
             artifact_refs={},
             metadata=metadata_updates or {},
         )
-
-        # Save the basic manifest
         self.store.save(manifest)
-
         return manifest
 
     def create_evaluation_instance(
@@ -60,6 +66,7 @@ class InstanceCreationService:
         start: bool = True,
     ) -> InstanceManifest:
         """Create an evaluation instance from a parent."""
+        del start
         instance_id = f"evaluate-{uuid.uuid4().hex[:12]}"
 
         # Create a minimal manifest
@@ -87,12 +94,13 @@ class InstanceCreationService:
     def create_deployment_instance(
         self,
         parent_instance_id: str,
-        target: str,
+        target: DeploymentTarget,
         config_path: str,
         *,
         start: bool = True,
     ) -> InstanceManifest:
         """Create a deployment instance."""
+        del start
         instance_id = f"deploy-{uuid.uuid4().hex[:12]}"
 
         # Create a minimal manifest
@@ -126,6 +134,7 @@ class InstanceCreationService:
         start: bool = True,
     ) -> InstanceManifest:
         """Create an inference instance."""
+        del start
         instance_id = f"inference-{uuid.uuid4().hex[:12]}"
 
         # Create a minimal manifest

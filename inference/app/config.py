@@ -18,6 +18,7 @@ class AppSettings:
     telemetry_path: str
     cache_enabled: bool
     telemetry_enabled: bool
+    demo_mode: bool = False
     repo_root: str = field(default_factory=lambda: str(Path(__file__).resolve().parents[2]))
     openai_api_keys: list[str] = field(default_factory=list)
     openai_rate_limit_requests_per_minute: int = 0
@@ -72,6 +73,7 @@ def get_settings() -> AppSettings:
         telemetry_path=telemetry_path,
         cache_enabled=_env_flag("INFERENCE_CACHE_ENABLED", "1"),
         telemetry_enabled=_env_flag("INFERENCE_TELEMETRY_ENABLED", "1"),
+        demo_mode=_env_flag("AI_FACTORY_DEMO_MODE", "0"),
         openai_api_keys=[key.strip() for key in os.getenv("OPENAI_API_KEYS", "").split(",") if key.strip()],
         openai_rate_limit_requests_per_minute=int(os.getenv("OPENAI_RATE_LIMIT_REQUESTS_PER_MINUTE", "0")),
         openai_rate_limit_window_seconds=int(os.getenv("OPENAI_RATE_LIMIT_WINDOW_SECONDS", "60")),

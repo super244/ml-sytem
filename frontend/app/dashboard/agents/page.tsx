@@ -2,10 +2,12 @@
 
 import { useEffect, useState, useRef } from "react";
 import {
-  getAgentSwarmStatus,
-  getAgentLogs,
+  getAgentSwarmSnapshot,
+  getAgentLogsSnapshot,
   deployAgent,
   updateAgent,
+  type AgentLogsSnapshot,
+  type AgentSwarmSnapshot,
   type AgentSwarmStatus,
   type AgentLogEvent,
   type AgentDeployRequest,
@@ -18,6 +20,8 @@ export default function AgentsPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
+  const [deployEnabled, setDeployEnabled] = useState(false);
+  const [simulationEnabled, setSimulationEnabled] = useState(false);
   
   // Deploy Agent State
   const [showDeployModal, setShowDeployModal] = useState(false);
@@ -38,36 +42,50 @@ export default function AgentsPage() {
 
   const endOfTerminalRef = useRef<HTMLDivElement>(null);
 
-  // Initial load
   useEffect(() => {
-    Promise.all([getAgentSwarmStatus(), getAgentLogs(5)])
-      .then(([swarm, initialLogs]) => {
-        setAgents(swarm);
-        setLogs(initialLogs);
-      })
-      .catch((nextError) => {
-        setError(nextError instanceof Error ? nextError.message : "Failed to load swarm state.");
-      })
-      .finally(() => setLoading(false));
-  }, []);
+    let cancelled = false;
 
-  // Polling loop for thought stream
-  useEffect(() => {
-    if (loading) return;
-    const interval = setInterval(() => {
-      getAgentLogs(1).then((newLogs) => {
-        if (newLogs.length > 0) {
-          setLogs((prev) => {
-            const next = [...prev, ...newLogs];
-            // Deduplicate roughly and keep last 50
-            const unique = Array.from(new Map(next.map(item => [item.timestamp, item])).values());
-            return unique.slice(-50);
-          });
+    async function refresh(initialLoad: boolean = false) {
+      if (initialLoad) {
+        setLoading(true);
+      }
+
+      try {
+        const [swarmResponse, logsResponse] = await Promise.all([
+          getAgentSwarmSnapshot(),
+          getAgentLogsSnapshot(initialLoad ? 5 : 50),
+        ]);
+        if (cancelled) {
+          return;
         }
-      }).catch(() => null);
+        const swarmPayload: AgentSwarmSnapshot = swarmResponse;
+        const logsPayload: AgentLogsSnapshot = logsResponse;
+        setAgents(swarmPayload.swarm);
+        setDeployEnabled(Boolean(swarmPayload.deploy_enabled));
+        setSimulationEnabled(Boolean(logsPayload.simulation_enabled));
+        setLogs(logsPayload.logs);
+        setError(null);
+      } catch (nextError) {
+        if (!cancelled) {
+          setError(nextError instanceof Error ? nextError.message : "Failed to load swarm state.");
+        }
+      } finally {
+        if (!cancelled) {
+          setLoading(false);
+        }
+      }
+    }
+
+    void refresh(true);
+    const interval = setInterval(() => {
+      void refresh();
     }, 3000);
-    return () => clearInterval(interval);
-  }, [loading]);
+
+    return () => {
+      cancelled = true;
+      clearInterval(interval);
+    };
+  }, []);
 
   // Auto-scroll terminal
   useEffect(() => {
@@ -140,6 +158,11 @@ export default function AgentsPage() {
 
       {error && <div className="dash-error-banner panel">⚠ {error}</div>}
       {notice && <div className="panel state-panel">{notice}</div>}
+      {!deployEnabled && (
+        <div className="panel state-panel">
+          Agent registry and logs are live, but deploying simulated swarm agents is disabled outside demo mode.
+        </div>
+      )}
 
       <div className="workspace-section-grid">
         
@@ -150,14 +173,19 @@ export default function AgentsPage() {
             <button 
               className="primary-button small" 
               onClick={() => setShowDeployModal(true)}
+              disabled={!deployEnabled}
             >
-              + Add Agent
+              {deployEnabled ? "+ Add Agent" : "Demo Only"}
             </button>
           </div>
           
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(300px, 1fr))", gap: "1rem" }}>
             {loading ? (
               <div className="dash-loading"><span>⟳</span> Connecting to Swarm...</div>
+            ) : agents.length === 0 ? (
+              <div className="dash-empty" style={{ padding: "2rem 0" }}>
+                No persisted agents are registered yet.
+              </div>
             ) : agents.map((agent) => (
               <div key={agent.id} className="resource-card" style={{ borderTop: agent.status === "active" ? "3px solid var(--accent)" : "3px solid var(--line)" }}>
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "0.5rem" }}>
@@ -202,7 +230,7 @@ export default function AgentsPage() {
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
             <h2 className="section-title" style={{ margin: 0 }}>Live Thought Stream</h2>
             <div style={{ fontSize: "0.8rem", color: "var(--accent)", display: "flex", alignItems: "center", gap: "0.5rem" }}>
-              <span className="monitor-status-dot status-running" /> Network Connected
+              <span className="monitor-status-dot status-running" /> {simulationEnabled ? "Simulated stream" : "Persisted log stream"}
             </div>
           </div>
           
@@ -222,7 +250,11 @@ export default function AgentsPage() {
               gap: "0.5rem"
             }}
           >
-            {logs.map((log) => {
+            {logs.length === 0 ? (
+              <div style={{ color: "#8b949e" }}>
+                No agent log events have been recorded yet.
+              </div>
+            ) : logs.map((log) => {
               const timeStr = new Date(log.timestamp * 1000).toLocaleTimeString([], { hour12: false });
               const isAccent = log.message.includes("Optimization") || log.message.includes("Red-Team");
               return (
@@ -280,7 +312,7 @@ export default function AgentsPage() {
               <button 
                 className="primary-button" 
                 style={{ flex: 1, justifyContent: "center" }}
-                disabled={deploying || !newAgent.name || !newAgent.role}
+                disabled={deploying || !newAgent.name || !newAgent.role || !deployEnabled}
                 onClick={() => void handleDeploy()}
               >
                 {deploying ? "⟳ Deploying..." : "Deploy Agent"}

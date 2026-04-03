@@ -1,27 +1,31 @@
 from __future__ import annotations
 
-from collections.abc import Iterable
 from dataclasses import dataclass, field
-from typing import Any, cast
+from typing import Any
 
-from ai_factory.core.orchestration.models import AgentCapability, AgentType, RetryPolicy
+from ai_factory.core.orchestration.models import (
+    AgentCapability,
+    AgentType,
+    ResourceClass,
+    RetryPolicy,
+    TaskType,
+)
 
 
 @dataclass(frozen=True)
 class AgentDescriptor:
     agent_type: AgentType
     label: str
-    supported_task_types: tuple[str, ...]
+    supported_task_types: tuple[TaskType, ...]
     max_concurrency: int = 1
-    resource_classes: tuple[str, ...] = ("control",)
+    resource_classes: tuple[ResourceClass, ...] = ("control",)
     retry_policy: RetryPolicy = field(default_factory=RetryPolicy)
 
     def capability(self) -> AgentCapability:
-        from ai_factory.core.orchestration.models import ResourceClass, TaskType
         return AgentCapability(
             agent_type=self.agent_type,
-            task_types=cast(Iterable[TaskType], list(self.supported_task_types)),
-            resource_classes=cast(Iterable[ResourceClass], list(self.resource_classes)),
+            task_types=list(self.supported_task_types),
+            resource_classes=list(self.resource_classes),
             max_concurrency=self.max_concurrency,
             retry_policy=self.retry_policy,
         )
@@ -120,7 +124,7 @@ class AgentRegistry:
     def get(self, agent_type: AgentType) -> AgentDescriptor:
         return self._agents[agent_type]
 
-    def agent_for_task_type(self, task_type: str) -> AgentDescriptor:
+    def agent_for_task_type(self, task_type: TaskType) -> AgentDescriptor:
         for descriptor in self._agents.values():
             if task_type in descriptor.supported_task_types:
                 return descriptor

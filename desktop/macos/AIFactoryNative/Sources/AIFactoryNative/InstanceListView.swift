@@ -1,13 +1,21 @@
 import SwiftUI
 
+struct InstanceEnvironment: Decodable {
+    let kind: String
+}
+
+struct InstanceProgress: Decodable {
+    let stage: String
+}
+
 struct InstanceRecord: Identifiable, Decodable {
     let id: String
     let name: String
+    let type: String
     let status: String
-    let model: String?
-    let created_at: String?
-    let gpu: String?
-    let task_count: Int?
+    let environment: InstanceEnvironment
+    let progress: InstanceProgress?
+    let updated_at: String?
 }
 
 struct APIInstancesResponse: Decodable {
@@ -63,15 +71,39 @@ final class InstanceListStore: ObservableObject {
     func performAction(_ action: String, on instanceID: String) async {
         actionInFlight = instanceID
         defer { actionInFlight = nil }
-        let endpoint = apiURL.appendingPathComponent("v1/instances/\(instanceID)/\(action)")
+        let endpoint = apiURL.appendingPathComponent("v1/instances/\(instanceID)/actions")
         var req = URLRequest(url: endpoint)
         req.httpMethod = "POST"
+        req.setValue("application/json", forHTTPHeaderField: "Content-Type")
         req.timeoutInterval = 10
         do {
-            let (_, _) = try await URLSession.shared.data(for: req)
+            let payload = try JSONSerialization.data(withJSONObject: [
+                "action": action,
+                "start": true,
+            ])
+            req.httpBody = payload
+            let (_, response) = try await URLSession.shared.data(for: req)
+            guard let http = response as? HTTPURLResponse, http.statusCode == 200 else {
+                error = "HTTP \((response as? HTTPURLResponse)?.statusCode ?? 0)"
+                return
+            }
             await fetchInstances()
         } catch {
             self.error = error.localizedDescription
+        }
+    }
+
+    func availableActions(for record: InstanceRecord) -> [(label: String, action: String)] {
+        guard record.status == "completed" else { return [] }
+        switch record.type {
+        case "train", "finetune":
+            return [("Evaluate", "evaluate"), ("Infer", "open_inference")]
+        case "evaluate":
+            return [("Infer", "open_inference"), ("Deploy", "deploy")]
+        case "deploy":
+            return [("Infer", "open_inference")]
+        default:
+            return []
         }
     }
 }
@@ -89,8 +121,9 @@ struct InstanceListView: View {
         guard !searchText.isEmpty else { return store.instances }
         return store.instances.filter {
             $0.name.localizedCaseInsensitiveContains(searchText) ||
+            $0.type.localizedCaseInsensitiveContains(searchText) ||
             $0.status.localizedCaseInsensitiveContains(searchText) ||
-            ($0.model ?? "").localizedCaseInsensitiveContains(searchText)
+            $0.environment.kind.localizedCaseInsensitiveContains(searchText)
         }
     }
 
@@ -152,38 +185,35 @@ struct InstanceListView: View {
             }
             .width(90)
 
-            TableColumn("Model") { rec in
-                Text(rec.model ?? "—")
-                    .font(.system(size: 12, design: .monospaced))
-                    .foregroundStyle(.secondary)
-            }
-            .width(min: 100, ideal: 160)
-
-            TableColumn("GPU") { rec in
-                Text(rec.gpu ?? "—")
+            TableColumn("Type") { rec in
+                Text(rec.type)
                     .font(.system(size: 12, design: .rounded))
                     .foregroundStyle(.secondary)
             }
-            .width(80)
+            .width(100)
 
-            TableColumn("Tasks") { rec in
-                Text("\(rec.task_count ?? 0)")
+            TableColumn("Environment") { rec in
+                Text(rec.environment.kind)
                     .font(.system(size: 12, design: .rounded))
                     .foregroundStyle(.secondary)
             }
-            .width(50)
+            .width(100)
+
+            TableColumn("Stage") { rec in
+                Text(rec.progress?.stage ?? "—")
+                    .font(.system(size: 12, design: .rounded))
+                    .foregroundStyle(.secondary)
+            }
+            .width(120)
 
             TableColumn("Actions") { rec in
                 HStack(spacing: 6) {
-                    if rec.status == "running" {
-                        actionButton("Stop", color: .red, instanceID: rec.id, action: "stop")
-                    } else {
-                        actionButton("Start", color: .green, instanceID: rec.id, action: "start")
+                    ForEach(store.availableActions(for: rec), id: \.action) { entry in
+                        actionButton(entry.label, color: .blue, instanceID: rec.id, action: entry.action)
                     }
-                    actionButton("Delete", color: .secondary, instanceID: rec.id, action: "delete")
                 }
             }
-            .width(130)
+            .width(180)
         }
     }
 
@@ -200,8 +230,8 @@ struct InstanceListView: View {
     private func statusBadge(_ status: String) -> some View {
         let color: Color = switch status {
         case "running": .green
-        case "stopped": .secondary
-        case "error": .red
+        case "completed": .secondary
+        case "failed": .red
         case "pending": .orange
         default: .secondary
         }

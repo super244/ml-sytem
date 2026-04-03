@@ -18,7 +18,7 @@ class InterfaceSurface(BaseModel):
     entrypoint: str
     backend_contract: str
     description: str
-    status: Literal["ready", "stub", "planned"] = "ready"
+    status: Literal["ready", "beta", "planned"] = "ready"
 
 
 class ExperienceTier(BaseModel):
@@ -37,7 +37,7 @@ class ExtensionPoint(BaseModel):
     description: str
     supported_instance_types: list[str] = Field(default_factory=list)
     source: Literal["built_in", "benchmark_registry"] = "built_in"
-    maturity: Literal["ready", "beta", "placeholder"] = "ready"
+    maturity: Literal["ready", "beta", "planned"] = "ready"
     config_hint: str | None = None
     future_ready: bool = False
 
@@ -79,8 +79,8 @@ def _interfaces() -> list[InterfaceSurface]:
             label="Desktop App",
             entrypoint="desktop/main.js",
             backend_contract="Desktop shell -> FastAPI/CLI backend contracts",
-            description="Electron shell that wraps the same web/API control center for macOS-oriented local operation.",
-            status="stub",
+            description="Electron and native macOS shells that wrap the same web/API control center for local operation.",
+            status="beta",
         ),
     ]
 
@@ -166,10 +166,10 @@ def _training_extensions() -> list[ExtensionPoint]:
         ExtensionPoint(
             id="rlhf",
             kind="training_method",
-            label="RLHF Placeholder",
-            description="Reserved extension point for future preference and reinforcement learning workflows.",
+            label="RLHF (Planned)",
+            description="Planned extension point for future preference and reinforcement learning workflows.",
             supported_instance_types=["finetune"],
-            maturity="placeholder",
+            maturity="planned",
             future_ready=True,
         ),
     ]

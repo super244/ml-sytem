@@ -12,6 +12,8 @@ from typing import Any
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 
+from inference.app.config import get_settings
+
 router = APIRouter(prefix="/agents", tags=["agents"])
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
@@ -66,13 +68,27 @@ _DEFAULT_AGENTS: list[dict[str, Any]] = [
 _log_generator_task: asyncio.Task[None] | None = None
 
 
+def _demo_mode_enabled() -> bool:
+    return get_settings().demo_mode
+
+
+def _ensure_demo_mode() -> None:
+    if not _demo_mode_enabled():
+        raise HTTPException(
+            status_code=503,
+            detail="Agent swarm simulation is disabled outside AI_FACTORY_DEMO_MODE=1.",
+        )
+
+
 def _load_agents() -> list[dict[str, Any]]:
     if not AGENTS_FILE.exists():
-        AGENTS_FILE.parent.mkdir(parents=True, exist_ok=True)
-        with open(AGENTS_FILE, "w") as f:
-            for a in _DEFAULT_AGENTS:
-                f.write(json.dumps(a) + "\n")
-        return list(_DEFAULT_AGENTS)
+        if _demo_mode_enabled():
+            AGENTS_FILE.parent.mkdir(parents=True, exist_ok=True)
+            with open(AGENTS_FILE, "w") as f:
+                for a in _DEFAULT_AGENTS:
+                    f.write(json.dumps(a) + "\n")
+            return list(_DEFAULT_AGENTS)
+        return []
     agents = []
     with open(AGENTS_FILE) as f:
         for line in f:
@@ -129,16 +145,27 @@ def _ensure_log_worker() -> None:
 
 @router.get("/swarm")
 def get_swarm_status() -> dict[str, Any]:
-    _ensure_log_worker()
+    if _demo_mode_enabled():
+        _ensure_log_worker()
     agents = _load_agents()
-    return {"swarm": [_enrich_agent(a) for a in agents]}
+    return {
+        "status": "available",
+        "write_enabled": True,
+        "deploy_enabled": _demo_mode_enabled(),
+        "swarm": [_enrich_agent(a) for a in agents],
+    }
 
 
 @router.get("/logs")
 def get_swarm_logs(limit: int = 10) -> dict[str, Any]:
-    _ensure_log_worker()
+    if _demo_mode_enabled():
+        _ensure_log_worker()
     if not LOGS_FILE.exists():
-        return {"logs": []}
+        return {
+            "status": "available",
+            "simulation_enabled": _demo_mode_enabled(),
+            "logs": [],
+        }
 
     logs = []
     with open(LOGS_FILE) as f:
@@ -151,7 +178,11 @@ def get_swarm_logs(limit: int = 10) -> dict[str, Any]:
                     pass
 
     logs = logs[-limit:]
-    return {"logs": logs}
+    return {
+        "status": "available",
+        "simulation_enabled": _demo_mode_enabled(),
+        "logs": logs,
+    }
 
 
 class AgentDeploy(BaseModel):
@@ -169,6 +200,7 @@ class AgentUpdate(BaseModel):
 
 @router.post("/deploy")
 def deploy_agent(agent: AgentDeploy) -> dict[str, Any]:
+    _ensure_demo_mode()
     _ensure_log_worker()
     new_agent: dict[str, Any] = {
         "id": f"agent-custom-{uuid.uuid4().hex[:6]}",

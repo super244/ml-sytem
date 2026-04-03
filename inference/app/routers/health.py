@@ -46,7 +46,8 @@ def detailed_health() -> dict[str, Any]:
         workspace_status = build_workspace_overview_fast()
 
         return {
-            "status": "healthy",
+            "status": "healthy" if workspace_status.get("status") == "available" else "degraded",
+            "errors": workspace_status.get("errors", []),
             "workspace": workspace_status["summary"],
             "checks": workspace_status["readiness_checks"],
         }

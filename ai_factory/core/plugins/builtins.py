@@ -2,11 +2,11 @@ from __future__ import annotations
 
 import json
 import sys
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, cast
 
 from ai_factory.core.execution.base import CommandSpec
 from ai_factory.core.instances.models import InstanceManifest
-from ai_factory.core.plugins.base import PluginDescriptor
+from ai_factory.core.plugins.base import DeploymentProviderPlugin, InstanceHandlerPlugin, PluginDescriptor
 
 if TYPE_CHECKING:
     from ai_factory.core.config.schema import OrchestrationConfig
@@ -378,18 +378,24 @@ class LmStudioDeploymentProvider:
         raise ValueError("lmstudio deploys require subsystem.provider_options.command for V1")
 
 
-BUILTIN_INSTANCE_HANDLERS = (
-    PrepareInstanceHandler(),
-    TrainingInstanceHandler(),
-    EvaluationInstanceHandler(),
-    InferenceInstanceHandler(),
-    ReportInstanceHandler(),
-    DeploymentInstanceHandler(),
+BUILTIN_INSTANCE_HANDLERS = cast(
+    tuple[InstanceHandlerPlugin, ...],
+    (
+        PrepareInstanceHandler(),
+        TrainingInstanceHandler(),
+        EvaluationInstanceHandler(),
+        InferenceInstanceHandler(),
+        ReportInstanceHandler(),
+        DeploymentInstanceHandler(),
+    ),
 )
 
-BUILTIN_DEPLOYMENT_PROVIDERS = (
-    ApiCompatibleDeploymentProvider(),
-    HuggingFaceDeploymentProvider(),
-    OllamaDeploymentProvider(),
-    LmStudioDeploymentProvider(),
+BUILTIN_DEPLOYMENT_PROVIDERS = cast(
+    tuple[DeploymentProviderPlugin, ...],
+    (
+        ApiCompatibleDeploymentProvider(),
+        HuggingFaceDeploymentProvider(),
+        OllamaDeploymentProvider(),
+        LmStudioDeploymentProvider(),
+    ),
 )

@@ -2,13 +2,17 @@
 
 import asyncio
 from collections import Counter
+from collections.abc import Coroutine
 from pathlib import Path
-from typing import Any
+from typing import Any, TypeVar
 
+from ai_factory.core.instances.models import InstanceManifest
 from ai_factory.core.platform.container import PlatformContainer, build_platform_container
 from ai_factory.core.schemas import ScalingConfig
 
 from .scaling.manager import ScalingManager
+
+T = TypeVar("T")
 
 
 def _build_container(
@@ -21,7 +25,7 @@ def _build_container(
     )
 
 
-def _run_async(coro: Any) -> Any:
+def _run_async(coro: Coroutine[Any, Any, T]) -> T:
     return asyncio.run(coro)
 
 
@@ -81,7 +85,7 @@ def create_multi_domain_training(
     start: bool,
     repo_root: str | Path,
     artifacts_dir: str | Path,
-):
+) -> InstanceManifest:
     """Create a real training instance annotated for multi-domain orchestration."""
     container = _build_container(repo_root=repo_root, artifacts_dir=artifacts_dir)
     resolved_config = Path(config_path)
