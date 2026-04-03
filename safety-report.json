@@ -1,0 +1,3617 @@
+
+
++===========================================================================================================================================================================================+
+
+
+DEPRECATED: this command (`check`) has been DEPRECATED, and will be unsupported beyond 01 June 2024.
+
+
+We highly encourage switching to the new `scan` command which is easier to use, more powerful, and can be set up to mimic the deprecated command if required.
+
+
++===========================================================================================================================================================================================+
+
+
+{
+    "report_meta": {
+        "scan_target": "environment",
+        "scanned": [
+            "/opt/homebrew/Caskroom/miniconda/base/lib/python3.13/site-packages"
+        ],
+        "scanned_full_path": [
+            "/opt/homebrew/Caskroom/miniconda/base/lib/python3.13/site-packages"
+        ],
+        "target_languages": [
+            "python"
+        ],
+        "policy_file": null,
+        "policy_file_source": "local",
+        "audit_and_monitor": false,
+        "api_key": false,
+        "account": "",
+        "local_database_path": null,
+        "safety_version": "3.7.0",
+        "timestamp": "2026-04-03 13:09:14",
+        "packages_found": 235,
+        "vulnerabilities_found": 0,
+        "vulnerabilities_ignored": 0,
+        "remediations_recommended": 0,
+        "telemetry": {
+            "safety_options": {
+                "json": {
+                    "--json": 1
+                }
+            },
+            "safety_version": "3.7.0",
+            "safety_source": "cli",
+            "os_type": "Darwin",
+            "os_release": "25.3.0",
+            "os_description": "macOS-26.3.1-arm64-arm-64bit-Mach-O",
+            "python_version": "3.13.12",
+            "safety_command": "check"
+        },
+        "git": {
+            "branch": "feature/lovable-frontend",
+            "tag": "",
+            "commit": "ec4b092044538cf6c78d609cfc482124386defea",
+            "dirty": "True",
+            "origin": "https://github.com/super244/ml-sytem.git"
+        },
+        "project": null,
+        "json_version": "1.1",
+        "remediations_attempted": 0,
+        "remediations_completed": 0,
+        "remediation_mode": "NON_INTERACTIVE"
+    },
+    "scanned_packages": {
+        "truststore": {
+            "name": "truststore",
+            "version": "0.10.1",
+            "requirements": [
+                {
+                    "raw": "truststore==0.10.1",
+                    "extras": [],
+                    "marker": null,
+                    "name": "truststore",
+                    "specifier": "==0.10.1",
+                    "url": null,
+                    "found": "/opt/homebrew/Caskroom/miniconda/base/lib/python3.13/site-packages/truststore-0.10.1.dist-info"
+                }
+            ]
+        },
+        "tomli": {
+            "name": "tomli",
+            "version": "2.4.0",
+            "requirements": [
+                {
+                    "raw": "tomli==2.4.0",
+                    "extras": [],
+                    "marker": null,
+                    "name": "tomli",
+                    "specifier": "==2.4.0",
+                    "url": null,
+                    "found": "/opt/homebrew/Caskroom/miniconda/base/lib/python3.13/site-packages/tomli-2.4.0.dist-info"
+                }
+            ]
+        },
+        "shellingham": {
+            "name": "shellingham",
+            "version": "1.5.4",
+            "requirements": [
+                {
+                    "raw": "shellingham==1.5.4",
+                    "extras": [],
+                    "marker": null,
+                    "name": "shellingham",
+                    "specifier": "==1.5.4",
+                    "url": null,
+                    "found": "/opt/homebrew/Caskroom/miniconda/base/lib/python3.13/site-packages/shellingham-1.5.4.dist-info"
+                }
+            ]
+        },
+        "pkce": {
+            "name": "pkce",
+            "version": "1.0.3",
+            "requirements": [
+                {
+                    "raw": "pkce==1.0.3",
+                    "extras": [],
+                    "marker": null,
+                    "name": "pkce",
+                    "specifier": "==1.0.3",
+                    "url": null,
+                    "found": "/opt/homebrew/Caskroom/miniconda/base/lib/python3.13/site-packages/pkce-1.0.3.dist-info"
+                }
+            ]
+        },
+        "readchar": {
+            "name": "readchar",
+            "version": "4.2.1",
+            "requirements": [
+                {
+                    "raw": "readchar==4.2.1",
+                    "extras": [],
+                    "marker": null,
+                    "name": "readchar",
+                    "specifier": "==4.2.1",
+                    "url": null,
+                    "found": "/opt/homebrew/Caskroom/miniconda/base/lib/python3.13/site-packages/readchar-4.2.1.dist-info"
+                }
+            ]
+        },
+        "datasets": {
+            "name": "datasets",
+            "version": "4.8.4",
+            "requirements": [
+                {
+                    "raw": "datasets==4.8.4",
+                    "extras": [],
+                    "marker": null,
+                    "name": "datasets",
+                    "specifier": "==4.8.4",
+                    "url": null,
+                    "found": "/opt/homebrew/Caskroom/miniconda/base/lib/python3.13/site-packages/datasets-4.8.4.dist-info"
+                }
+            ]
+        },
+        "threadpoolctl": {
+            "name": "threadpoolctl",
+            "version": "3.6.0",
+            "requirements": [
+                {
+                    "raw": "threadpoolctl==3.6.0",
+                    "extras": [],
+                    "marker": null,
+                    "name": "threadpoolctl",
+                    "specifier": "==3.6.0",
+                    "url": null,
+                    "found": "/opt/homebrew/Caskroom/miniconda/base/lib/python3.13/site-packages/threadpoolctl-3.6.0.dist-info"
+                }
+            ]
+        },
+        "uri-template": {
+            "name": "uri-template",
+            "version": "1.3.0",
+            "requirements": [
+                {
+                    "raw": "uri-template==1.3.0",
+                    "extras": [],
+                    "marker": null,
+                    "name": "uri-template",
+                    "specifier": "==1.3.0",
+                    "url": null,
+                    "found": "/opt/homebrew/Caskroom/miniconda/base/lib/python3.13/site-packages/uri_template-1.3.0.dist-info"
+                }
+            ]
+        },
+        "conda_package_streaming": {
+            "name": "conda_package_streaming",
+            "version": "0.12.0",
+            "requirements": [
+                {
+                    "raw": "conda_package_streaming==0.12.0",
+                    "extras": [],
+                    "marker": null,
+                    "name": "conda_package_streaming",
+                    "specifier": "==0.12.0",
+                    "url": null,
+                    "found": "/opt/homebrew/Caskroom/miniconda/base/lib/python3.13/site-packages/conda_package_streaming-0.12.0.dist-info"
+                }
+            ]
+        },
+        "rfc3339-validator": {
+            "name": "rfc3339-validator",
+            "version": "0.1.4",
+            "requirements": [
+                {
+                    "raw": "rfc3339-validator==0.1.4",
+                    "extras": [],
+                    "marker": null,
+                    "name": "rfc3339-validator",
+                    "specifier": "==0.1.4",
+                    "url": null,
+                    "found": "/opt/homebrew/Caskroom/miniconda/base/lib/python3.13/site-packages/rfc3339_validator-0.1.4.dist-info"
+                }
+            ]
+        },
+        "more-itertools": {
+            "name": "more-itertools",
+            "version": "10.8.0",
+            "requirements": [
+                {
+                    "raw": "more-itertools==10.8.0",
+                    "extras": [],
+                    "marker": null,
+                    "name": "more-itertools",
+                    "specifier": "==10.8.0",
+                    "url": null,
+                    "found": "/opt/homebrew/Caskroom/miniconda/base/lib/python3.13/site-packages/more_itertools-10.8.0.dist-info"
+                }
+            ]
+        },
+        "pexpect": {
+            "name": "pexpect",
+            "version": "4.9.0",
+            "requirements": [
+                {
+                    "raw": "pexpect==4.9.0",
+                    "extras": [],
+                    "marker": null,
+                    "name": "pexpect",
+                    "specifier": "==4.9.0",
+                    "url": null,
+                    "found": "/opt/homebrew/Caskroom/miniconda/base/lib/python3.13/site-packages/pexpect-4.9.0.dist-info"
+                }
+            ]
+        },
+        "fqdn": {
+            "name": "fqdn",
+            "version": "1.5.1",
+            "requirements": [
+                {
+                    "raw": "fqdn==1.5.1",
+                    "extras": [],
+                    "marker": null,
+                    "name": "fqdn",
+                    "specifier": "==1.5.1",
+                    "url": null,
+                    "found": "/opt/homebrew/Caskroom/miniconda/base/lib/python3.13/site-packages/fqdn-1.5.1.dist-info"
+                }
+            ]
+        },
+        "requests": {
+            "name": "requests",
+            "version": "2.32.5",
+            "requirements": [
+                {
+                    "raw": "requests==2.32.5",
+                    "extras": [],
+                    "marker": null,
+                    "name": "requests",
+                    "specifier": "==2.32.5",
+                    "url": null,
+                    "found": "/opt/homebrew/Caskroom/miniconda/base/lib/python3.13/site-packages/requests-2.32.5.dist-info"
+                }
+            ]
+        },
+        "setuptools": {
+            "name": "setuptools",
+            "version": "80.10.2",
+            "requirements": [
+                {
+                    "raw": "setuptools==80.10.2",
+                    "extras": [],
+                    "marker": null,
+                    "name": "setuptools",
+                    "specifier": "==80.10.2",
+                    "url": null,
+                    "found": "/opt/homebrew/Caskroom/miniconda/base/lib/python3.13/site-packages/setuptools-80.10.2-py3.13.egg-info"
+                }
+            ]
+        },
+        "semver": {
+            "name": "semver",
+            "version": "3.0.4",
+            "requirements": [
+                {
+                    "raw": "semver==3.0.4",
+                    "extras": [],
+                    "marker": null,
+                    "name": "semver",
+                    "specifier": "==3.0.4",
+                    "url": null,
+                    "found": "/opt/homebrew/Caskroom/miniconda/base/lib/python3.13/site-packages/semver-3.0.4.dist-info"
+                }
+            ]
+        },
+        "rich": {
+            "name": "rich",
+            "version": "14.2.0",
+            "requirements": [
+                {
+                    "raw": "rich==14.2.0",
+                    "extras": [],
+                    "marker": null,
+                    "name": "rich",
+                    "specifier": "==14.2.0",
+                    "url": null,
+                    "found": "/opt/homebrew/Caskroom/miniconda/base/lib/python3.13/site-packages/rich-14.2.0.dist-info"
+                }
+            ]
+        },
+        "aiohttp": {
+            "name": "aiohttp",
+            "version": "3.13.3",
+            "requirements": [
+                {
+                    "raw": "aiohttp==3.13.3",
+                    "extras": [],
+                    "marker": null,
+                    "name": "aiohttp",
+                    "specifier": "==3.13.3",
+                    "url": null,
+                    "found": "/opt/homebrew/Caskroom/miniconda/base/lib/python3.13/site-packages/aiohttp-3.13.3.dist-info"
+                }
+            ]
+        },
+        "traitlets": {
+            "name": "traitlets",
+            "version": "5.14.3",
+            "requirements": [
+                {
+                    "raw": "traitlets==5.14.3",
+                    "extras": [],
+                    "marker": null,
+                    "name": "traitlets",
+                    "specifier": "==5.14.3",
+                    "url": null,
+                    "found": "/opt/homebrew/Caskroom/miniconda/base/lib/python3.13/site-packages/traitlets-5.14.3.dist-info"
+                }
+            ]
+        },
+        "tornado": {
+            "name": "tornado",
+            "version": "6.5.5",
+            "requirements": [
+                {
+                    "raw": "tornado==6.5.5",
+                    "extras": [],
+                    "marker": null,
+                    "name": "tornado",
+                    "specifier": "==6.5.5",
+                    "url": null,
+                    "found": "/opt/homebrew/Caskroom/miniconda/base/lib/python3.13/site-packages/tornado-6.5.5.dist-info"
+                }
+            ]
+        },
+        "multidict": {
+            "name": "multidict",
+            "version": "6.7.1",
+            "requirements": [
+                {
+                    "raw": "multidict==6.7.1",
+                    "extras": [],
+                    "marker": null,
+                    "name": "multidict",
+                    "specifier": "==6.7.1",
+                    "url": null,
+                    "found": "/opt/homebrew/Caskroom/miniconda/base/lib/python3.13/site-packages/multidict-6.7.1.dist-info"
+                }
+            ]
+        },
+        "nest-asyncio": {
+            "name": "nest-asyncio",
+            "version": "1.6.0",
+            "requirements": [
+                {
+                    "raw": "nest-asyncio==1.6.0",
+                    "extras": [],
+                    "marker": null,
+                    "name": "nest-asyncio",
+                    "specifier": "==1.6.0",
+                    "url": null,
+                    "found": "/opt/homebrew/Caskroom/miniconda/base/lib/python3.13/site-packages/nest_asyncio-1.6.0.dist-info"
+                }
+            ]
+        },
+        "nbconvert": {
+            "name": "nbconvert",
+            "version": "7.17.0",
+            "requirements": [
+                {
+                    "raw": "nbconvert==7.17.0",
+                    "extras": [],
+                    "marker": null,
+                    "name": "nbconvert",
+                    "specifier": "==7.17.0",
+                    "url": null,
+                    "found": "/opt/homebrew/Caskroom/miniconda/base/lib/python3.13/site-packages/nbconvert-7.17.0.dist-info"
+                }
+            ]
+        },
+        "asttokens": {
+            "name": "asttokens",
+            "version": "3.0.1",
+            "requirements": [
+                {
+                    "raw": "asttokens==3.0.1",
+                    "extras": [],
+                    "marker": null,
+                    "name": "asttokens",
+                    "specifier": "==3.0.1",
+                    "url": null,
+                    "found": "/opt/homebrew/Caskroom/miniconda/base/lib/python3.13/site-packages/asttokens-3.0.1.dist-info"
+                }
+            ]
+        },
+        "dparse": {
+            "name": "dparse",
+            "version": "0.6.4",
+            "requirements": [
+                {
+                    "raw": "dparse==0.6.4",
+                    "extras": [],
+                    "marker": null,
+                    "name": "dparse",
+                    "specifier": "==0.6.4",
+                    "url": null,
+                    "found": "/opt/homebrew/Caskroom/miniconda/base/lib/python3.13/site-packages/dparse-0.6.4.dist-info"
+                }
+            ]
+        },
+        "ptyprocess": {
+            "name": "ptyprocess",
+            "version": "0.7.0",
+            "requirements": [
+                {
+                    "raw": "ptyprocess==0.7.0",
+                    "extras": [],
+                    "marker": null,
+                    "name": "ptyprocess",
+                    "specifier": "==0.7.0",
+                    "url": null,
+                    "found": "/opt/homebrew/Caskroom/miniconda/base/lib/python3.13/site-packages/ptyprocess-0.7.0.dist-info"
+                }
+            ]
+        },
+        "bitsandbytes": {
+            "name": "bitsandbytes",
+            "version": "0.49.2",
+            "requirements": [
+                {
+                    "raw": "bitsandbytes==0.49.2",
+                    "extras": [],
+                    "marker": null,
+                    "name": "bitsandbytes",
+                    "specifier": "==0.49.2",
+                    "url": null,
+                    "found": "/opt/homebrew/Caskroom/miniconda/base/lib/python3.13/site-packages/bitsandbytes-0.49.2.dist-info"
+                }
+            ]
+        },
+        "conda": {
+            "name": "conda",
+            "version": "26.1.1",
+            "requirements": [
+                {
+                    "raw": "conda==26.1.1",
+                    "extras": [],
+                    "marker": null,
+                    "name": "conda",
+                    "specifier": "==26.1.1",
+                    "url": null,
+                    "found": "/opt/homebrew/Caskroom/miniconda/base/lib/python3.13/site-packages/conda-26.1.1.dist-info"
+                }
+            ]
+        },
+        "jaraco.classes": {
+            "name": "jaraco.classes",
+            "version": "3.4.0",
+            "requirements": [
+                {
+                    "raw": "jaraco.classes==3.4.0",
+                    "extras": [],
+                    "marker": null,
+                    "name": "jaraco.classes",
+                    "specifier": "==3.4.0",
+                    "url": null,
+                    "found": "/opt/homebrew/Caskroom/miniconda/base/lib/python3.13/site-packages/jaraco_classes-3.4.0.dist-info"
+                }
+            ]
+        },
+        "lark": {
+            "name": "lark",
+            "version": "1.3.1",
+            "requirements": [
+                {
+                    "raw": "lark==1.3.1",
+                    "extras": [],
+                    "marker": null,
+                    "name": "lark",
+                    "specifier": "==1.3.1",
+                    "url": null,
+                    "found": "/opt/homebrew/Caskroom/miniconda/base/lib/python3.13/site-packages/lark-1.3.1.dist-info"
+                }
+            ]
+        },
+        "isoduration": {
+            "name": "isoduration",
+            "version": "20.11.0",
+            "requirements": [
+                {
+                    "raw": "isoduration==20.11.0",
+                    "extras": [],
+                    "marker": null,
+                    "name": "isoduration",
+                    "specifier": "==20.11.0",
+                    "url": null,
+                    "found": "/opt/homebrew/Caskroom/miniconda/base/lib/python3.13/site-packages/isoduration-20.11.0.dist-info"
+                }
+            ]
+        },
+        "jupyterlab": {
+            "name": "jupyterlab",
+            "version": "4.5.6",
+            "requirements": [
+                {
+                    "raw": "jupyterlab==4.5.6",
+                    "extras": [],
+                    "marker": null,
+                    "name": "jupyterlab",
+                    "specifier": "==4.5.6",
+                    "url": null,
+                    "found": "/opt/homebrew/Caskroom/miniconda/base/lib/python3.13/site-packages/jupyterlab-4.5.6.dist-info"
+                }
+            ]
+        },
+        "tzdata": {
+            "name": "tzdata",
+            "version": "2025.3",
+            "requirements": [
+                {
+                    "raw": "tzdata==2025.3",
+                    "extras": [],
+                    "marker": null,
+                    "name": "tzdata",
+                    "specifier": "==2025.3",
+                    "url": null,
+                    "found": "/opt/homebrew/Caskroom/miniconda/base/lib/python3.13/site-packages/tzdata-2025.3.dist-info"
+                }
+            ]
+        },
+        "iniconfig": {
+            "name": "iniconfig",
+            "version": "2.3.0",
+            "requirements": [
+                {
+                    "raw": "iniconfig==2.3.0",
+                    "extras": [],
+                    "marker": null,
+                    "name": "iniconfig",
+                    "specifier": "==2.3.0",
+                    "url": null,
+                    "found": "/opt/homebrew/Caskroom/miniconda/base/lib/python3.13/site-packages/iniconfig-2.3.0.dist-info"
+                }
+            ]
+        },
+        "boltons": {
+            "name": "boltons",
+            "version": "25.0.0",
+            "requirements": [
+                {
+                    "raw": "boltons==25.0.0",
+                    "extras": [],
+                    "marker": null,
+                    "name": "boltons",
+                    "specifier": "==25.0.0",
+                    "url": null,
+                    "found": "/opt/homebrew/Caskroom/miniconda/base/lib/python3.13/site-packages/boltons-25.0.0.dist-info"
+                }
+            ]
+        },
+        "ruff": {
+            "name": "ruff",
+            "version": "0.15.7",
+            "requirements": [
+                {
+                    "raw": "ruff==0.15.7",
+                    "extras": [],
+                    "marker": null,
+                    "name": "ruff",
+                    "specifier": "==0.15.7",
+                    "url": null,
+                    "found": "/opt/homebrew/Caskroom/miniconda/base/lib/python3.13/site-packages/ruff-0.15.7.dist-info"
+                }
+            ]
+        },
+        "nodeenv": {
+            "name": "nodeenv",
+            "version": "1.10.0",
+            "requirements": [
+                {
+                    "raw": "nodeenv==1.10.0",
+                    "extras": [],
+                    "marker": null,
+                    "name": "nodeenv",
+                    "specifier": "==1.10.0",
+                    "url": null,
+                    "found": "/opt/homebrew/Caskroom/miniconda/base/lib/python3.13/site-packages/nodeenv-1.10.0.dist-info"
+                }
+            ]
+        },
+        "plotly": {
+            "name": "plotly",
+            "version": "6.6.0",
+            "requirements": [
+                {
+                    "raw": "plotly==6.6.0",
+                    "extras": [],
+                    "marker": null,
+                    "name": "plotly",
+                    "specifier": "==6.6.0",
+                    "url": null,
+                    "found": "/opt/homebrew/Caskroom/miniconda/base/lib/python3.13/site-packages/plotly-6.6.0.dist-info"
+                }
+            ]
+        },
+        "certifi": {
+            "name": "certifi",
+            "version": "2026.1.4",
+            "requirements": [
+                {
+                    "raw": "certifi==2026.1.4",
+                    "extras": [],
+                    "marker": null,
+                    "name": "certifi",
+                    "specifier": "==2026.1.4",
+                    "url": null,
+                    "found": "/opt/homebrew/Caskroom/miniconda/base/lib/python3.13/site-packages/certifi-2026.1.4.dist-info"
+                }
+            ]
+        },
+        "virtualenv": {
+            "name": "virtualenv",
+            "version": "21.2.0",
+            "requirements": [
+                {
+                    "raw": "virtualenv==21.2.0",
+                    "extras": [],
+                    "marker": null,
+                    "name": "virtualenv",
+                    "specifier": "==21.2.0",
+                    "url": null,
+                    "found": "/opt/homebrew/Caskroom/miniconda/base/lib/python3.13/site-packages/virtualenv-21.2.0.dist-info"
+                }
+            ]
+        },
+        "mistune": {
+            "name": "mistune",
+            "version": "3.2.0",
+            "requirements": [
+                {
+                    "raw": "mistune==3.2.0",
+                    "extras": [],
+                    "marker": null,
+                    "name": "mistune",
+                    "specifier": "==3.2.0",
+                    "url": null,
+                    "found": "/opt/homebrew/Caskroom/miniconda/base/lib/python3.13/site-packages/mistune-3.2.0.dist-info"
+                }
+            ]
+        },
+        "webencodings": {
+            "name": "webencodings",
+            "version": "0.5.1",
+            "requirements": [
+                {
+                    "raw": "webencodings==0.5.1",
+                    "extras": [],
+                    "marker": null,
+                    "name": "webencodings",
+                    "specifier": "==0.5.1",
+                    "url": null,
+                    "found": "/opt/homebrew/Caskroom/miniconda/base/lib/python3.13/site-packages/webencodings-0.5.1.dist-info"
+                }
+            ]
+        },
+        "colorama": {
+            "name": "colorama",
+            "version": "0.4.6",
+            "requirements": [
+                {
+                    "raw": "colorama==0.4.6",
+                    "extras": [],
+                    "marker": null,
+                    "name": "colorama",
+                    "specifier": "==0.4.6",
+                    "url": null,
+                    "found": "/opt/homebrew/Caskroom/miniconda/base/lib/python3.13/site-packages/colorama-0.4.6.dist-info"
+                }
+            ]
+        },
+        "safety": {
+            "name": "safety",
+            "version": "3.7.0",
+            "requirements": [
+                {
+                    "raw": "safety==3.7.0",
+                    "extras": [],
+                    "marker": null,
+                    "name": "safety",
+                    "specifier": "==3.7.0",
+                    "url": null,
+                    "found": "/opt/homebrew/Caskroom/miniconda/base/lib/python3.13/site-packages/safety-3.7.0.dist-info"
+                }
+            ]
+        },
+        "prometheus_client": {
+            "name": "prometheus_client",
+            "version": "0.24.1",
+            "requirements": [
+                {
+                    "raw": "prometheus_client==0.24.1",
+                    "extras": [],
+                    "marker": null,
+                    "name": "prometheus_client",
+                    "specifier": "==0.24.1",
+                    "url": null,
+                    "found": "/opt/homebrew/Caskroom/miniconda/base/lib/python3.13/site-packages/prometheus_client-0.24.1.dist-info"
+                }
+            ]
+        },
+        "tinycss2": {
+            "name": "tinycss2",
+            "version": "1.4.0",
+            "requirements": [
+                {
+                    "raw": "tinycss2==1.4.0",
+                    "extras": [],
+                    "marker": null,
+                    "name": "tinycss2",
+                    "specifier": "==1.4.0",
+                    "url": null,
+                    "found": "/opt/homebrew/Caskroom/miniconda/base/lib/python3.13/site-packages/tinycss2-1.4.0.dist-info"
+                }
+            ]
+        },
+        "cfgv": {
+            "name": "cfgv",
+            "version": "3.5.0",
+            "requirements": [
+                {
+                    "raw": "cfgv==3.5.0",
+                    "extras": [],
+                    "marker": null,
+                    "name": "cfgv",
+                    "specifier": "==3.5.0",
+                    "url": null,
+                    "found": "/opt/homebrew/Caskroom/miniconda/base/lib/python3.13/site-packages/cfgv-3.5.0.dist-info"
+                }
+            ]
+        },
+        "jsonschema-specifications": {
+            "name": "jsonschema-specifications",
+            "version": "2025.9.1",
+            "requirements": [
+                {
+                    "raw": "jsonschema-specifications==2025.9.1",
+                    "extras": [],
+                    "marker": null,
+                    "name": "jsonschema-specifications",
+                    "specifier": "==2025.9.1",
+                    "url": null,
+                    "found": "/opt/homebrew/Caskroom/miniconda/base/lib/python3.13/site-packages/jsonschema_specifications-2025.9.1.dist-info"
+                }
+            ]
+        },
+        "huggingface_hub": {
+            "name": "huggingface_hub",
+            "version": "1.7.2",
+            "requirements": [
+                {
+                    "raw": "huggingface_hub==1.7.2",
+                    "extras": [],
+                    "marker": null,
+                    "name": "huggingface_hub",
+                    "specifier": "==1.7.2",
+                    "url": null,
+                    "found": "/opt/homebrew/Caskroom/miniconda/base/lib/python3.13/site-packages/huggingface_hub-1.7.2.dist-info"
+                }
+            ]
+        },
+        "starlette": {
+            "name": "starlette",
+            "version": "1.0.0",
+            "requirements": [
+                {
+                    "raw": "starlette==1.0.0",
+                    "extras": [],
+                    "marker": null,
+                    "name": "starlette",
+                    "specifier": "==1.0.0",
+                    "url": null,
+                    "found": "/opt/homebrew/Caskroom/miniconda/base/lib/python3.13/site-packages/starlette-1.0.0.dist-info"
+                }
+            ]
+        },
+        "executing": {
+            "name": "executing",
+            "version": "2.2.1",
+            "requirements": [
+                {
+                    "raw": "executing==2.2.1",
+                    "extras": [],
+                    "marker": null,
+                    "name": "executing",
+                    "specifier": "==2.2.1",
+                    "url": null,
+                    "found": "/opt/homebrew/Caskroom/miniconda/base/lib/python3.13/site-packages/executing-2.2.1.dist-info"
+                }
+            ]
+        },
+        "python-multipart": {
+            "name": "python-multipart",
+            "version": "0.0.22",
+            "requirements": [
+                {
+                    "raw": "python-multipart==0.0.22",
+                    "extras": [],
+                    "marker": null,
+                    "name": "python-multipart",
+                    "specifier": "==0.0.22",
+                    "url": null,
+                    "found": "/opt/homebrew/Caskroom/miniconda/base/lib/python3.13/site-packages/python_multipart-0.0.22.dist-info"
+                }
+            ]
+        },
+        "websockets": {
+            "name": "websockets",
+            "version": "16.0",
+            "requirements": [
+                {
+                    "raw": "websockets==16.0",
+                    "extras": [],
+                    "marker": null,
+                    "name": "websockets",
+                    "specifier": "==16.0",
+                    "url": null,
+                    "found": "/opt/homebrew/Caskroom/miniconda/base/lib/python3.13/site-packages/websockets-16.0.dist-info"
+                }
+            ]
+        },
+        "defusedxml": {
+            "name": "defusedxml",
+            "version": "0.7.1",
+            "requirements": [
+                {
+                    "raw": "defusedxml==0.7.1",
+                    "extras": [],
+                    "marker": null,
+                    "name": "defusedxml",
+                    "specifier": "==0.7.1",
+                    "url": null,
+                    "found": "/opt/homebrew/Caskroom/miniconda/base/lib/python3.13/site-packages/defusedxml-0.7.1.dist-info"
+                }
+            ]
+        },
+        "jupyterlab_server": {
+            "name": "jupyterlab_server",
+            "version": "2.28.0",
+            "requirements": [
+                {
+                    "raw": "jupyterlab_server==2.28.0",
+                    "extras": [],
+                    "marker": null,
+                    "name": "jupyterlab_server",
+                    "specifier": "==2.28.0",
+                    "url": null,
+                    "found": "/opt/homebrew/Caskroom/miniconda/base/lib/python3.13/site-packages/jupyterlab_server-2.28.0.dist-info"
+                }
+            ]
+        },
+        "anaconda-cli-base": {
+            "name": "anaconda-cli-base",
+            "version": "0.8.1",
+            "requirements": [
+                {
+                    "raw": "anaconda-cli-base==0.8.1",
+                    "extras": [],
+                    "marker": null,
+                    "name": "anaconda-cli-base",
+                    "specifier": "==0.8.1",
+                    "url": null,
+                    "found": "/opt/homebrew/Caskroom/miniconda/base/lib/python3.13/site-packages/anaconda_cli_base-0.8.1.dist-info"
+                }
+            ]
+        },
+        "anaconda-auth": {
+            "name": "anaconda-auth",
+            "version": "0.13.0",
+            "requirements": [
+                {
+                    "raw": "anaconda-auth==0.13.0",
+                    "extras": [],
+                    "marker": null,
+                    "name": "anaconda-auth",
+                    "specifier": "==0.13.0",
+                    "url": null,
+                    "found": "/opt/homebrew/Caskroom/miniconda/base/lib/python3.13/site-packages/anaconda_auth-0.13.0.dist-info"
+                }
+            ]
+        },
+        "propcache": {
+            "name": "propcache",
+            "version": "0.4.1",
+            "requirements": [
+                {
+                    "raw": "propcache==0.4.1",
+                    "extras": [],
+                    "marker": null,
+                    "name": "propcache",
+                    "specifier": "==0.4.1",
+                    "url": null,
+                    "found": "/opt/homebrew/Caskroom/miniconda/base/lib/python3.13/site-packages/propcache-0.4.1.dist-info"
+                }
+            ]
+        },
+        "networkx": {
+            "name": "networkx",
+            "version": "3.6.1",
+            "requirements": [
+                {
+                    "raw": "networkx==3.6.1",
+                    "extras": [],
+                    "marker": null,
+                    "name": "networkx",
+                    "specifier": "==3.6.1",
+                    "url": null,
+                    "found": "/opt/homebrew/Caskroom/miniconda/base/lib/python3.13/site-packages/networkx-3.6.1.dist-info"
+                }
+            ]
+        },
+        "wheel": {
+            "name": "wheel",
+            "version": "0.46.3",
+            "requirements": [
+                {
+                    "raw": "wheel==0.46.3",
+                    "extras": [],
+                    "marker": null,
+                    "name": "wheel",
+                    "specifier": "==0.46.3",
+                    "url": null,
+                    "found": "/opt/homebrew/Caskroom/miniconda/base/lib/python3.13/site-packages/wheel-0.46.3.dist-info"
+                }
+            ]
+        },
+        "pytest-cov": {
+            "name": "pytest-cov",
+            "version": "7.1.0",
+            "requirements": [
+                {
+                    "raw": "pytest-cov==7.1.0",
+                    "extras": [],
+                    "marker": null,
+                    "name": "pytest-cov",
+                    "specifier": "==7.1.0",
+                    "url": null,
+                    "found": "/opt/homebrew/Caskroom/miniconda/base/lib/python3.13/site-packages/pytest_cov-7.1.0.dist-info"
+                }
+            ]
+        },
+        "python-dotenv": {
+            "name": "python-dotenv",
+            "version": "1.2.1",
+            "requirements": [
+                {
+                    "raw": "python-dotenv==1.2.1",
+                    "extras": [],
+                    "marker": null,
+                    "name": "python-dotenv",
+                    "specifier": "==1.2.1",
+                    "url": null,
+                    "found": "/opt/homebrew/Caskroom/miniconda/base/lib/python3.13/site-packages/python_dotenv-1.2.1.dist-info"
+                }
+            ]
+        },
+        "websocket-client": {
+            "name": "websocket-client",
+            "version": "1.9.0",
+            "requirements": [
+                {
+                    "raw": "websocket-client==1.9.0",
+                    "extras": [],
+                    "marker": null,
+                    "name": "websocket-client",
+                    "specifier": "==1.9.0",
+                    "url": null,
+                    "found": "/opt/homebrew/Caskroom/miniconda/base/lib/python3.13/site-packages/websocket_client-1.9.0.dist-info"
+                }
+            ]
+        },
+        "libmambapy": {
+            "name": "libmambapy",
+            "version": "2.3.2",
+            "requirements": [
+                {
+                    "raw": "libmambapy==2.3.2",
+                    "extras": [],
+                    "marker": null,
+                    "name": "libmambapy",
+                    "specifier": "==2.3.2",
+                    "url": null,
+                    "found": "/opt/homebrew/Caskroom/miniconda/base/lib/python3.13/site-packages/libmambapy-2.3.2.dist-info"
+                }
+            ]
+        },
+        "jsonschema": {
+            "name": "jsonschema",
+            "version": "4.26.0",
+            "requirements": [
+                {
+                    "raw": "jsonschema==4.26.0",
+                    "extras": [],
+                    "marker": null,
+                    "name": "jsonschema",
+                    "specifier": "==4.26.0",
+                    "url": null,
+                    "found": "/opt/homebrew/Caskroom/miniconda/base/lib/python3.13/site-packages/jsonschema-4.26.0.dist-info"
+                }
+            ]
+        },
+        "contourpy": {
+            "name": "contourpy",
+            "version": "1.3.3",
+            "requirements": [
+                {
+                    "raw": "contourpy==1.3.3",
+                    "extras": [],
+                    "marker": null,
+                    "name": "contourpy",
+                    "specifier": "==1.3.3",
+                    "url": null,
+                    "found": "/opt/homebrew/Caskroom/miniconda/base/lib/python3.13/site-packages/contourpy-1.3.3.dist-info"
+                }
+            ]
+        },
+        "babel": {
+            "name": "babel",
+            "version": "2.18.0",
+            "requirements": [
+                {
+                    "raw": "babel==2.18.0",
+                    "extras": [],
+                    "marker": null,
+                    "name": "babel",
+                    "specifier": "==2.18.0",
+                    "url": null,
+                    "found": "/opt/homebrew/Caskroom/miniconda/base/lib/python3.13/site-packages/babel-2.18.0.dist-info"
+                }
+            ]
+        },
+        "seaborn": {
+            "name": "seaborn",
+            "version": "0.13.2",
+            "requirements": [
+                {
+                    "raw": "seaborn==0.13.2",
+                    "extras": [],
+                    "marker": null,
+                    "name": "seaborn",
+                    "specifier": "==0.13.2",
+                    "url": null,
+                    "found": "/opt/homebrew/Caskroom/miniconda/base/lib/python3.13/site-packages/seaborn-0.13.2.dist-info"
+                }
+            ]
+        },
+        "safety-schemas": {
+            "name": "safety-schemas",
+            "version": "0.0.16",
+            "requirements": [
+                {
+                    "raw": "safety-schemas==0.0.16",
+                    "extras": [],
+                    "marker": null,
+                    "name": "safety-schemas",
+                    "specifier": "==0.0.16",
+                    "url": null,
+                    "found": "/opt/homebrew/Caskroom/miniconda/base/lib/python3.13/site-packages/safety_schemas-0.0.16.dist-info"
+                }
+            ]
+        },
+        "fsspec": {
+            "name": "fsspec",
+            "version": "2026.2.0",
+            "requirements": [
+                {
+                    "raw": "fsspec==2026.2.0",
+                    "extras": [],
+                    "marker": null,
+                    "name": "fsspec",
+                    "specifier": "==2026.2.0",
+                    "url": null,
+                    "found": "/opt/homebrew/Caskroom/miniconda/base/lib/python3.13/site-packages/fsspec-2026.2.0.dist-info"
+                }
+            ]
+        },
+        "jedi": {
+            "name": "jedi",
+            "version": "0.19.2",
+            "requirements": [
+                {
+                    "raw": "jedi==0.19.2",
+                    "extras": [],
+                    "marker": null,
+                    "name": "jedi",
+                    "specifier": "==0.19.2",
+                    "url": null,
+                    "found": "/opt/homebrew/Caskroom/miniconda/base/lib/python3.13/site-packages/jedi-0.19.2.dist-info"
+                }
+            ]
+        },
+        "yarl": {
+            "name": "yarl",
+            "version": "1.23.0",
+            "requirements": [
+                {
+                    "raw": "yarl==1.23.0",
+                    "extras": [],
+                    "marker": null,
+                    "name": "yarl",
+                    "specifier": "==1.23.0",
+                    "url": null,
+                    "found": "/opt/homebrew/Caskroom/miniconda/base/lib/python3.13/site-packages/yarl-1.23.0.dist-info"
+                }
+            ]
+        },
+        "transformers": {
+            "name": "transformers",
+            "version": "5.3.0",
+            "requirements": [
+                {
+                    "raw": "transformers==5.3.0",
+                    "extras": [],
+                    "marker": null,
+                    "name": "transformers",
+                    "specifier": "==5.3.0",
+                    "url": null,
+                    "found": "/opt/homebrew/Caskroom/miniconda/base/lib/python3.13/site-packages/transformers-5.3.0.dist-info"
+                }
+            ]
+        },
+        "kiwisolver": {
+            "name": "kiwisolver",
+            "version": "1.5.0",
+            "requirements": [
+                {
+                    "raw": "kiwisolver==1.5.0",
+                    "extras": [],
+                    "marker": null,
+                    "name": "kiwisolver",
+                    "specifier": "==1.5.0",
+                    "url": null,
+                    "found": "/opt/homebrew/Caskroom/miniconda/base/lib/python3.13/site-packages/kiwisolver-1.5.0.dist-info"
+                }
+            ]
+        },
+        "idna": {
+            "name": "idna",
+            "version": "3.11",
+            "requirements": [
+                {
+                    "raw": "idna==3.11",
+                    "extras": [],
+                    "marker": null,
+                    "name": "idna",
+                    "specifier": "==3.11",
+                    "url": null,
+                    "found": "/opt/homebrew/Caskroom/miniconda/base/lib/python3.13/site-packages/idna-3.11.dist-info"
+                }
+            ]
+        },
+        "accelerate": {
+            "name": "accelerate",
+            "version": "1.13.0",
+            "requirements": [
+                {
+                    "raw": "accelerate==1.13.0",
+                    "extras": [],
+                    "marker": null,
+                    "name": "accelerate",
+                    "specifier": "==1.13.0",
+                    "url": null,
+                    "found": "/opt/homebrew/Caskroom/miniconda/base/lib/python3.13/site-packages/accelerate-1.13.0.dist-info"
+                }
+            ]
+        },
+        "annotated-types": {
+            "name": "annotated-types",
+            "version": "0.6.0",
+            "requirements": [
+                {
+                    "raw": "annotated-types==0.6.0",
+                    "extras": [],
+                    "marker": null,
+                    "name": "annotated-types",
+                    "specifier": "==0.6.0",
+                    "url": null,
+                    "found": "/opt/homebrew/Caskroom/miniconda/base/lib/python3.13/site-packages/annotated_types-0.6.0.dist-info"
+                }
+            ]
+        },
+        "PySocks": {
+            "name": "PySocks",
+            "version": "1.7.1",
+            "requirements": [
+                {
+                    "raw": "PySocks==1.7.1",
+                    "extras": [],
+                    "marker": null,
+                    "name": "PySocks",
+                    "specifier": "==1.7.1",
+                    "url": null,
+                    "found": "/opt/homebrew/Caskroom/miniconda/base/lib/python3.13/site-packages/pysocks-1.7.1.dist-info"
+                }
+            ]
+        },
+        "bleach": {
+            "name": "bleach",
+            "version": "6.3.0",
+            "requirements": [
+                {
+                    "raw": "bleach==6.3.0",
+                    "extras": [],
+                    "marker": null,
+                    "name": "bleach",
+                    "specifier": "==6.3.0",
+                    "url": null,
+                    "found": "/opt/homebrew/Caskroom/miniconda/base/lib/python3.13/site-packages/bleach-6.3.0.dist-info"
+                }
+            ]
+        },
+        "debugpy": {
+            "name": "debugpy",
+            "version": "1.8.20",
+            "requirements": [
+                {
+                    "raw": "debugpy==1.8.20",
+                    "extras": [],
+                    "marker": null,
+                    "name": "debugpy",
+                    "specifier": "==1.8.20",
+                    "url": null,
+                    "found": "/opt/homebrew/Caskroom/miniconda/base/lib/python3.13/site-packages/debugpy-1.8.20.dist-info"
+                }
+            ]
+        },
+        "conda-anaconda-telemetry": {
+            "name": "conda-anaconda-telemetry",
+            "version": "0.3.0",
+            "requirements": [
+                {
+                    "raw": "conda-anaconda-telemetry==0.3.0",
+                    "extras": [],
+                    "marker": null,
+                    "name": "conda-anaconda-telemetry",
+                    "specifier": "==0.3.0",
+                    "url": null,
+                    "found": "/opt/homebrew/Caskroom/miniconda/base/lib/python3.13/site-packages/conda_anaconda_telemetry-0.3.0.dist-info"
+                }
+            ]
+        },
+        "fastapi": {
+            "name": "fastapi",
+            "version": "0.135.2",
+            "requirements": [
+                {
+                    "raw": "fastapi==0.135.2",
+                    "extras": [],
+                    "marker": null,
+                    "name": "fastapi",
+                    "specifier": "==0.135.2",
+                    "url": null,
+                    "found": "/opt/homebrew/Caskroom/miniconda/base/lib/python3.13/site-packages/fastapi-0.135.2.dist-info"
+                }
+            ]
+        },
+        "cffi": {
+            "name": "cffi",
+            "version": "2.0.0",
+            "requirements": [
+                {
+                    "raw": "cffi==2.0.0",
+                    "extras": [],
+                    "marker": null,
+                    "name": "cffi",
+                    "specifier": "==2.0.0",
+                    "url": null,
+                    "found": "/opt/homebrew/Caskroom/miniconda/base/lib/python3.13/site-packages/cffi-2.0.0.dist-info"
+                }
+            ]
+        },
+        "distlib": {
+            "name": "distlib",
+            "version": "0.4.0",
+            "requirements": [
+                {
+                    "raw": "distlib==0.4.0",
+                    "extras": [],
+                    "marker": null,
+                    "name": "distlib",
+                    "specifier": "==0.4.0",
+                    "url": null,
+                    "found": "/opt/homebrew/Caskroom/miniconda/base/lib/python3.13/site-packages/distlib-0.4.0.dist-info"
+                }
+            ]
+        },
+        "anaconda-anon-usage": {
+            "name": "anaconda-anon-usage",
+            "version": "0.7.5",
+            "requirements": [
+                {
+                    "raw": "anaconda-anon-usage==0.7.5",
+                    "extras": [],
+                    "marker": null,
+                    "name": "anaconda-anon-usage",
+                    "specifier": "==0.7.5",
+                    "url": null,
+                    "found": "/opt/homebrew/Caskroom/miniconda/base/lib/python3.13/site-packages/anaconda_anon_usage-0.7.5.dist-info"
+                }
+            ]
+        },
+        "pandocfilters": {
+            "name": "pandocfilters",
+            "version": "1.5.1",
+            "requirements": [
+                {
+                    "raw": "pandocfilters==1.5.1",
+                    "extras": [],
+                    "marker": null,
+                    "name": "pandocfilters",
+                    "specifier": "==1.5.1",
+                    "url": null,
+                    "found": "/opt/homebrew/Caskroom/miniconda/base/lib/python3.13/site-packages/pandocfilters-1.5.1.dist-info"
+                }
+            ]
+        },
+        "mypy": {
+            "name": "mypy",
+            "version": "1.19.1",
+            "requirements": [
+                {
+                    "raw": "mypy==1.19.1",
+                    "extras": [],
+                    "marker": null,
+                    "name": "mypy",
+                    "specifier": "==1.19.1",
+                    "url": null,
+                    "found": "/opt/homebrew/Caskroom/miniconda/base/lib/python3.13/site-packages/mypy-1.19.1.dist-info"
+                }
+            ]
+        },
+        "uvicorn": {
+            "name": "uvicorn",
+            "version": "0.42.0",
+            "requirements": [
+                {
+                    "raw": "uvicorn==0.42.0",
+                    "extras": [],
+                    "marker": null,
+                    "name": "uvicorn",
+                    "specifier": "==0.42.0",
+                    "url": null,
+                    "found": "/opt/homebrew/Caskroom/miniconda/base/lib/python3.13/site-packages/uvicorn-0.42.0.dist-info"
+                }
+            ]
+        },
+        "jsonpatch": {
+            "name": "jsonpatch",
+            "version": "1.33",
+            "requirements": [
+                {
+                    "raw": "jsonpatch==1.33",
+                    "extras": [],
+                    "marker": null,
+                    "name": "jsonpatch",
+                    "specifier": "==1.33",
+                    "url": null,
+                    "found": "/opt/homebrew/Caskroom/miniconda/base/lib/python3.13/site-packages/jsonpatch-1.33.dist-info"
+                }
+            ]
+        },
+        "jsonpointer": {
+            "name": "jsonpointer",
+            "version": "3.0.0",
+            "requirements": [
+                {
+                    "raw": "jsonpointer==3.0.0",
+                    "extras": [],
+                    "marker": null,
+                    "name": "jsonpointer",
+                    "specifier": "==3.0.0",
+                    "url": null,
+                    "found": "/opt/homebrew/Caskroom/miniconda/base/lib/python3.13/site-packages/jsonpointer-3.0.0.dist-info"
+                }
+            ]
+        },
+        "ipython_pygments_lexers": {
+            "name": "ipython_pygments_lexers",
+            "version": "1.1.1",
+            "requirements": [
+                {
+                    "raw": "ipython_pygments_lexers==1.1.1",
+                    "extras": [],
+                    "marker": null,
+                    "name": "ipython_pygments_lexers",
+                    "specifier": "==1.1.1",
+                    "url": null,
+                    "found": "/opt/homebrew/Caskroom/miniconda/base/lib/python3.13/site-packages/ipython_pygments_lexers-1.1.1.dist-info"
+                }
+            ]
+        },
+        "appnope": {
+            "name": "appnope",
+            "version": "0.1.4",
+            "requirements": [
+                {
+                    "raw": "appnope==0.1.4",
+                    "extras": [],
+                    "marker": null,
+                    "name": "appnope",
+                    "specifier": "==0.1.4",
+                    "url": null,
+                    "found": "/opt/homebrew/Caskroom/miniconda/base/lib/python3.13/site-packages/appnope-0.1.4.dist-info"
+                }
+            ]
+        },
+        "matplotlib": {
+            "name": "matplotlib",
+            "version": "3.10.8",
+            "requirements": [
+                {
+                    "raw": "matplotlib==3.10.8",
+                    "extras": [],
+                    "marker": null,
+                    "name": "matplotlib",
+                    "specifier": "==3.10.8",
+                    "url": null,
+                    "found": "/opt/homebrew/Caskroom/miniconda/base/lib/python3.13/site-packages/matplotlib-3.10.8.dist-info"
+                }
+            ]
+        },
+        "Send2Trash": {
+            "name": "Send2Trash",
+            "version": "2.1.0",
+            "requirements": [
+                {
+                    "raw": "Send2Trash==2.1.0",
+                    "extras": [],
+                    "marker": null,
+                    "name": "Send2Trash",
+                    "specifier": "==2.1.0",
+                    "url": null,
+                    "found": "/opt/homebrew/Caskroom/miniconda/base/lib/python3.13/site-packages/send2trash-2.1.0.dist-info"
+                }
+            ]
+        },
+        "marshmallow": {
+            "name": "marshmallow",
+            "version": "4.2.4",
+            "requirements": [
+                {
+                    "raw": "marshmallow==4.2.4",
+                    "extras": [],
+                    "marker": null,
+                    "name": "marshmallow",
+                    "specifier": "==4.2.4",
+                    "url": null,
+                    "found": "/opt/homebrew/Caskroom/miniconda/base/lib/python3.13/site-packages/marshmallow-4.2.4.dist-info"
+                }
+            ]
+        },
+        "librt": {
+            "name": "librt",
+            "version": "0.8.1",
+            "requirements": [
+                {
+                    "raw": "librt==0.8.1",
+                    "extras": [],
+                    "marker": null,
+                    "name": "librt",
+                    "specifier": "==0.8.1",
+                    "url": null,
+                    "found": "/opt/homebrew/Caskroom/miniconda/base/lib/python3.13/site-packages/librt-0.8.1.dist-info"
+                }
+            ]
+        },
+        "torch": {
+            "name": "torch",
+            "version": "2.11.0",
+            "requirements": [
+                {
+                    "raw": "torch==2.11.0",
+                    "extras": [],
+                    "marker": null,
+                    "name": "torch",
+                    "specifier": "==2.11.0",
+                    "url": null,
+                    "found": "/opt/homebrew/Caskroom/miniconda/base/lib/python3.13/site-packages/torch-2.11.0.dist-info"
+                }
+            ]
+        },
+        "tenacity": {
+            "name": "tenacity",
+            "version": "9.1.4",
+            "requirements": [
+                {
+                    "raw": "tenacity==9.1.4",
+                    "extras": [],
+                    "marker": null,
+                    "name": "tenacity",
+                    "specifier": "==9.1.4",
+                    "url": null,
+                    "found": "/opt/homebrew/Caskroom/miniconda/base/lib/python3.13/site-packages/tenacity-9.1.4.dist-info"
+                }
+            ]
+        },
+        "pillow": {
+            "name": "pillow",
+            "version": "12.1.1",
+            "requirements": [
+                {
+                    "raw": "pillow==12.1.1",
+                    "extras": [],
+                    "marker": null,
+                    "name": "pillow",
+                    "specifier": "==12.1.1",
+                    "url": null,
+                    "found": "/opt/homebrew/Caskroom/miniconda/base/lib/python3.13/site-packages/pillow-12.1.1.dist-info"
+                }
+            ]
+        },
+        "prompt_toolkit": {
+            "name": "prompt_toolkit",
+            "version": "3.0.52",
+            "requirements": [
+                {
+                    "raw": "prompt_toolkit==3.0.52",
+                    "extras": [],
+                    "marker": null,
+                    "name": "prompt_toolkit",
+                    "specifier": "==3.0.52",
+                    "url": null,
+                    "found": "/opt/homebrew/Caskroom/miniconda/base/lib/python3.13/site-packages/prompt_toolkit-3.0.52.dist-info"
+                }
+            ]
+        },
+        "httpcore": {
+            "name": "httpcore",
+            "version": "1.0.9",
+            "requirements": [
+                {
+                    "raw": "httpcore==1.0.9",
+                    "extras": [],
+                    "marker": null,
+                    "name": "httpcore",
+                    "specifier": "==1.0.9",
+                    "url": null,
+                    "found": "/opt/homebrew/Caskroom/miniconda/base/lib/python3.13/site-packages/httpcore-1.0.9.dist-info"
+                }
+            ]
+        },
+        "filelock": {
+            "name": "filelock",
+            "version": "3.25.2",
+            "requirements": [
+                {
+                    "raw": "filelock==3.25.2",
+                    "extras": [],
+                    "marker": null,
+                    "name": "filelock",
+                    "specifier": "==3.25.2",
+                    "url": null,
+                    "found": "/opt/homebrew/Caskroom/miniconda/base/lib/python3.13/site-packages/filelock-3.25.2.dist-info"
+                }
+            ]
+        },
+        "decorator": {
+            "name": "decorator",
+            "version": "5.2.1",
+            "requirements": [
+                {
+                    "raw": "decorator==5.2.1",
+                    "extras": [],
+                    "marker": null,
+                    "name": "decorator",
+                    "specifier": "==5.2.1",
+                    "url": null,
+                    "found": "/opt/homebrew/Caskroom/miniconda/base/lib/python3.13/site-packages/decorator-5.2.1.dist-info"
+                }
+            ]
+        },
+        "pydantic": {
+            "name": "pydantic",
+            "version": "2.12.4",
+            "requirements": [
+                {
+                    "raw": "pydantic==2.12.4",
+                    "extras": [],
+                    "marker": null,
+                    "name": "pydantic",
+                    "specifier": "==2.12.4",
+                    "url": null,
+                    "found": "/opt/homebrew/Caskroom/miniconda/base/lib/python3.13/site-packages/pydantic-2.12.4.dist-info"
+                }
+            ]
+        },
+        "msgpack": {
+            "name": "msgpack",
+            "version": "1.1.1",
+            "requirements": [
+                {
+                    "raw": "msgpack==1.1.1",
+                    "extras": [],
+                    "marker": null,
+                    "name": "msgpack",
+                    "specifier": "==1.1.1",
+                    "url": null,
+                    "found": "/opt/homebrew/Caskroom/miniconda/base/lib/python3.13/site-packages/msgpack-1.1.1.dist-info"
+                }
+            ]
+        },
+        "jupyter_client": {
+            "name": "jupyter_client",
+            "version": "8.8.0",
+            "requirements": [
+                {
+                    "raw": "jupyter_client==8.8.0",
+                    "extras": [],
+                    "marker": null,
+                    "name": "jupyter_client",
+                    "specifier": "==8.8.0",
+                    "url": null,
+                    "found": "/opt/homebrew/Caskroom/miniconda/base/lib/python3.13/site-packages/jupyter_client-8.8.0.dist-info"
+                }
+            ]
+        },
+        "soupsieve": {
+            "name": "soupsieve",
+            "version": "2.8.3",
+            "requirements": [
+                {
+                    "raw": "soupsieve==2.8.3",
+                    "extras": [],
+                    "marker": null,
+                    "name": "soupsieve",
+                    "specifier": "==2.8.3",
+                    "url": null,
+                    "found": "/opt/homebrew/Caskroom/miniconda/base/lib/python3.13/site-packages/soupsieve-2.8.3.dist-info"
+                }
+            ]
+        },
+        "webcolors": {
+            "name": "webcolors",
+            "version": "25.10.0",
+            "requirements": [
+                {
+                    "raw": "webcolors==25.10.0",
+                    "extras": [],
+                    "marker": null,
+                    "name": "webcolors",
+                    "specifier": "==25.10.0",
+                    "url": null,
+                    "found": "/opt/homebrew/Caskroom/miniconda/base/lib/python3.13/site-packages/webcolors-25.10.0.dist-info"
+                }
+            ]
+        },
+        "nbformat": {
+            "name": "nbformat",
+            "version": "5.10.4",
+            "requirements": [
+                {
+                    "raw": "nbformat==5.10.4",
+                    "extras": [],
+                    "marker": null,
+                    "name": "nbformat",
+                    "specifier": "==5.10.4",
+                    "url": null,
+                    "found": "/opt/homebrew/Caskroom/miniconda/base/lib/python3.13/site-packages/nbformat-5.10.4.dist-info"
+                }
+            ]
+        },
+        "mando": {
+            "name": "mando",
+            "version": "0.7.1",
+            "requirements": [
+                {
+                    "raw": "mando==0.7.1",
+                    "extras": [],
+                    "marker": null,
+                    "name": "mando",
+                    "specifier": "==0.7.1",
+                    "url": null,
+                    "found": "/opt/homebrew/Caskroom/miniconda/base/lib/python3.13/site-packages/mando-0.7.1.dist-info"
+                }
+            ]
+        },
+        "hf-xet": {
+            "name": "hf-xet",
+            "version": "1.4.2",
+            "requirements": [
+                {
+                    "raw": "hf-xet==1.4.2",
+                    "extras": [],
+                    "marker": null,
+                    "name": "hf-xet",
+                    "specifier": "==1.4.2",
+                    "url": null,
+                    "found": "/opt/homebrew/Caskroom/miniconda/base/lib/python3.13/site-packages/hf_xet-1.4.2.dist-info"
+                }
+            ]
+        },
+        "stack-data": {
+            "name": "stack-data",
+            "version": "0.6.3",
+            "requirements": [
+                {
+                    "raw": "stack-data==0.6.3",
+                    "extras": [],
+                    "marker": null,
+                    "name": "stack-data",
+                    "specifier": "==0.6.3",
+                    "url": null,
+                    "found": "/opt/homebrew/Caskroom/miniconda/base/lib/python3.13/site-packages/stack_data-0.6.3.dist-info"
+                }
+            ]
+        },
+        "ai-factory": {
+            "name": "ai-factory",
+            "version": "0.2.0",
+            "requirements": [
+                {
+                    "raw": "ai-factory==0.2.0",
+                    "extras": [],
+                    "marker": null,
+                    "name": "ai-factory",
+                    "specifier": "==0.2.0",
+                    "url": null,
+                    "found": "/opt/homebrew/Caskroom/miniconda/base/lib/python3.13/site-packages/ai_factory-0.2.0.dist-info"
+                }
+            ]
+        },
+        "tomlkit": {
+            "name": "tomlkit",
+            "version": "0.13.3",
+            "requirements": [
+                {
+                    "raw": "tomlkit==0.13.3",
+                    "extras": [],
+                    "marker": null,
+                    "name": "tomlkit",
+                    "specifier": "==0.13.3",
+                    "url": null,
+                    "found": "/opt/homebrew/Caskroom/miniconda/base/lib/python3.13/site-packages/tomlkit-0.13.3.dist-info"
+                }
+            ]
+        },
+        "charset-normalizer": {
+            "name": "charset-normalizer",
+            "version": "3.4.4",
+            "requirements": [
+                {
+                    "raw": "charset-normalizer==3.4.4",
+                    "extras": [],
+                    "marker": null,
+                    "name": "charset-normalizer",
+                    "specifier": "==3.4.4",
+                    "url": null,
+                    "found": "/opt/homebrew/Caskroom/miniconda/base/lib/python3.13/site-packages/charset_normalizer-3.4.4.dist-info"
+                }
+            ]
+        },
+        "sympy": {
+            "name": "sympy",
+            "version": "1.14.0",
+            "requirements": [
+                {
+                    "raw": "sympy==1.14.0",
+                    "extras": [],
+                    "marker": null,
+                    "name": "sympy",
+                    "specifier": "==1.14.0",
+                    "url": null,
+                    "found": "/opt/homebrew/Caskroom/miniconda/base/lib/python3.13/site-packages/sympy-1.14.0.dist-info"
+                }
+            ]
+        },
+        "PyJWT": {
+            "name": "PyJWT",
+            "version": "2.10.1",
+            "requirements": [
+                {
+                    "raw": "PyJWT==2.10.1",
+                    "extras": [],
+                    "marker": null,
+                    "name": "PyJWT",
+                    "specifier": "==2.10.1",
+                    "url": null,
+                    "found": "/opt/homebrew/Caskroom/miniconda/base/lib/python3.13/site-packages/pyjwt-2.10.1.dist-info"
+                }
+            ]
+        },
+        "pydantic-settings": {
+            "name": "pydantic-settings",
+            "version": "2.12.0",
+            "requirements": [
+                {
+                    "raw": "pydantic-settings==2.12.0",
+                    "extras": [],
+                    "marker": null,
+                    "name": "pydantic-settings",
+                    "specifier": "==2.12.0",
+                    "url": null,
+                    "found": "/opt/homebrew/Caskroom/miniconda/base/lib/python3.13/site-packages/pydantic_settings-2.12.0.dist-info"
+                }
+            ]
+        },
+        "markdown-it-py": {
+            "name": "markdown-it-py",
+            "version": "4.0.0",
+            "requirements": [
+                {
+                    "raw": "markdown-it-py==4.0.0",
+                    "extras": [],
+                    "marker": null,
+                    "name": "markdown-it-py",
+                    "specifier": "==4.0.0",
+                    "url": null,
+                    "found": "/opt/homebrew/Caskroom/miniconda/base/lib/python3.13/site-packages/markdown_it_py-4.0.0.dist-info"
+                }
+            ]
+        },
+        "ipykernel": {
+            "name": "ipykernel",
+            "version": "7.2.0",
+            "requirements": [
+                {
+                    "raw": "ipykernel==7.2.0",
+                    "extras": [],
+                    "marker": null,
+                    "name": "ipykernel",
+                    "specifier": "==7.2.0",
+                    "url": null,
+                    "found": "/opt/homebrew/Caskroom/miniconda/base/lib/python3.13/site-packages/ipykernel-7.2.0.dist-info"
+                }
+            ]
+        },
+        "anyio": {
+            "name": "anyio",
+            "version": "4.10.0",
+            "requirements": [
+                {
+                    "raw": "anyio==4.10.0",
+                    "extras": [],
+                    "marker": null,
+                    "name": "anyio",
+                    "specifier": "==4.10.0",
+                    "url": null,
+                    "found": "/opt/homebrew/Caskroom/miniconda/base/lib/python3.13/site-packages/anyio-4.10.0.dist-info"
+                }
+            ]
+        },
+        "matplotlib-inline": {
+            "name": "matplotlib-inline",
+            "version": "0.2.1",
+            "requirements": [
+                {
+                    "raw": "matplotlib-inline==0.2.1",
+                    "extras": [],
+                    "marker": null,
+                    "name": "matplotlib-inline",
+                    "specifier": "==0.2.1",
+                    "url": null,
+                    "found": "/opt/homebrew/Caskroom/miniconda/base/lib/python3.13/site-packages/matplotlib_inline-0.2.1.dist-info"
+                }
+            ]
+        },
+        "conda-content-trust": {
+            "name": "conda-content-trust",
+            "version": "0.2.0",
+            "requirements": [
+                {
+                    "raw": "conda-content-trust==0.2.0",
+                    "extras": [],
+                    "marker": null,
+                    "name": "conda-content-trust",
+                    "specifier": "==0.2.0",
+                    "url": null,
+                    "found": "/opt/homebrew/Caskroom/miniconda/base/lib/python3.13/site-packages/conda_content_trust-0.2.0.dist-info"
+                }
+            ]
+        },
+        "identify": {
+            "name": "identify",
+            "version": "2.6.18",
+            "requirements": [
+                {
+                    "raw": "identify==2.6.18",
+                    "extras": [],
+                    "marker": null,
+                    "name": "identify",
+                    "specifier": "==2.6.18",
+                    "url": null,
+                    "found": "/opt/homebrew/Caskroom/miniconda/base/lib/python3.13/site-packages/identify-2.6.18.dist-info"
+                }
+            ]
+        },
+        "platformdirs": {
+            "name": "platformdirs",
+            "version": "4.5.0",
+            "requirements": [
+                {
+                    "raw": "platformdirs==4.5.0",
+                    "extras": [],
+                    "marker": null,
+                    "name": "platformdirs",
+                    "specifier": "==4.5.0",
+                    "url": null,
+                    "found": "/opt/homebrew/Caskroom/miniconda/base/lib/python3.13/site-packages/platformdirs-4.5.0.dist-info"
+                }
+            ]
+        },
+        "watchfiles": {
+            "name": "watchfiles",
+            "version": "1.1.1",
+            "requirements": [
+                {
+                    "raw": "watchfiles==1.1.1",
+                    "extras": [],
+                    "marker": null,
+                    "name": "watchfiles",
+                    "specifier": "==1.1.1",
+                    "url": null,
+                    "found": "/opt/homebrew/Caskroom/miniconda/base/lib/python3.13/site-packages/watchfiles-1.1.1.dist-info"
+                }
+            ]
+        },
+        "python-discovery": {
+            "name": "python-discovery",
+            "version": "1.2.0",
+            "requirements": [
+                {
+                    "raw": "python-discovery==1.2.0",
+                    "extras": [],
+                    "marker": null,
+                    "name": "python-discovery",
+                    "specifier": "==1.2.0",
+                    "url": null,
+                    "found": "/opt/homebrew/Caskroom/miniconda/base/lib/python3.13/site-packages/python_discovery-1.2.0.dist-info"
+                }
+            ]
+        },
+        "python-json-logger": {
+            "name": "python-json-logger",
+            "version": "4.0.0",
+            "requirements": [
+                {
+                    "raw": "python-json-logger==4.0.0",
+                    "extras": [],
+                    "marker": null,
+                    "name": "python-json-logger",
+                    "specifier": "==4.0.0",
+                    "url": null,
+                    "found": "/opt/homebrew/Caskroom/miniconda/base/lib/python3.13/site-packages/python_json_logger-4.0.0.dist-info"
+                }
+            ]
+        },
+        "pyarrow": {
+            "name": "pyarrow",
+            "version": "23.0.1",
+            "requirements": [
+                {
+                    "raw": "pyarrow==23.0.1",
+                    "extras": [],
+                    "marker": null,
+                    "name": "pyarrow",
+                    "specifier": "==23.0.1",
+                    "url": null,
+                    "found": "/opt/homebrew/Caskroom/miniconda/base/lib/python3.13/site-packages/pyarrow-23.0.1.dist-info"
+                }
+            ]
+        },
+        "h11": {
+            "name": "h11",
+            "version": "0.16.0",
+            "requirements": [
+                {
+                    "raw": "h11==0.16.0",
+                    "extras": [],
+                    "marker": null,
+                    "name": "h11",
+                    "specifier": "==0.16.0",
+                    "url": null,
+                    "found": "/opt/homebrew/Caskroom/miniconda/base/lib/python3.13/site-packages/h11-0.16.0.dist-info"
+                }
+            ]
+        },
+        "jupyter_server_terminals": {
+            "name": "jupyter_server_terminals",
+            "version": "0.5.4",
+            "requirements": [
+                {
+                    "raw": "jupyter_server_terminals==0.5.4",
+                    "extras": [],
+                    "marker": null,
+                    "name": "jupyter_server_terminals",
+                    "specifier": "==0.5.4",
+                    "url": null,
+                    "found": "/opt/homebrew/Caskroom/miniconda/base/lib/python3.13/site-packages/jupyter_server_terminals-0.5.4.dist-info"
+                }
+            ]
+        },
+        "coverage": {
+            "name": "coverage",
+            "version": "7.13.5",
+            "requirements": [
+                {
+                    "raw": "coverage==7.13.5",
+                    "extras": [],
+                    "marker": null,
+                    "name": "coverage",
+                    "specifier": "==7.13.5",
+                    "url": null,
+                    "found": "/opt/homebrew/Caskroom/miniconda/base/lib/python3.13/site-packages/coverage-7.13.5.dist-info"
+                }
+            ]
+        },
+        "sniffio": {
+            "name": "sniffio",
+            "version": "1.3.1",
+            "requirements": [
+                {
+                    "raw": "sniffio==1.3.1",
+                    "extras": [],
+                    "marker": null,
+                    "name": "sniffio",
+                    "specifier": "==1.3.1",
+                    "url": null,
+                    "found": "/opt/homebrew/Caskroom/miniconda/base/lib/python3.13/site-packages/sniffio-1.3.1.dist-info"
+                }
+            ]
+        },
+        "fonttools": {
+            "name": "fonttools",
+            "version": "4.62.1",
+            "requirements": [
+                {
+                    "raw": "fonttools==4.62.1",
+                    "extras": [],
+                    "marker": null,
+                    "name": "fonttools",
+                    "specifier": "==4.62.1",
+                    "url": null,
+                    "found": "/opt/homebrew/Caskroom/miniconda/base/lib/python3.13/site-packages/fonttools-4.62.1.dist-info"
+                }
+            ]
+        },
+        "httptools": {
+            "name": "httptools",
+            "version": "0.7.1",
+            "requirements": [
+                {
+                    "raw": "httptools==0.7.1",
+                    "extras": [],
+                    "marker": null,
+                    "name": "httptools",
+                    "specifier": "==0.7.1",
+                    "url": null,
+                    "found": "/opt/homebrew/Caskroom/miniconda/base/lib/python3.13/site-packages/httptools-0.7.1.dist-info"
+                }
+            ]
+        },
+        "typer": {
+            "name": "typer",
+            "version": "0.20.0",
+            "requirements": [
+                {
+                    "raw": "typer==0.20.0",
+                    "extras": [],
+                    "marker": null,
+                    "name": "typer",
+                    "specifier": "==0.20.0",
+                    "url": null,
+                    "found": "/opt/homebrew/Caskroom/miniconda/base/lib/python3.13/site-packages/typer-0.20.0.dist-info"
+                }
+            ]
+        },
+        "mdurl": {
+            "name": "mdurl",
+            "version": "0.1.2",
+            "requirements": [
+                {
+                    "raw": "mdurl==0.1.2",
+                    "extras": [],
+                    "marker": null,
+                    "name": "mdurl",
+                    "specifier": "==0.1.2",
+                    "url": null,
+                    "found": "/opt/homebrew/Caskroom/miniconda/base/lib/python3.13/site-packages/mdurl-0.1.2.dist-info"
+                }
+            ]
+        },
+        "pathspec": {
+            "name": "pathspec",
+            "version": "1.0.4",
+            "requirements": [
+                {
+                    "raw": "pathspec==1.0.4",
+                    "extras": [],
+                    "marker": null,
+                    "name": "pathspec",
+                    "specifier": "==1.0.4",
+                    "url": null,
+                    "found": "/opt/homebrew/Caskroom/miniconda/base/lib/python3.13/site-packages/pathspec-1.0.4.dist-info"
+                }
+            ]
+        },
+        "python-dateutil": {
+            "name": "python-dateutil",
+            "version": "2.9.0.post0",
+            "requirements": [
+                {
+                    "raw": "python-dateutil==2.9.0.post0",
+                    "extras": [],
+                    "marker": null,
+                    "name": "python-dateutil",
+                    "specifier": "==2.9.0.post0",
+                    "url": null,
+                    "found": "/opt/homebrew/Caskroom/miniconda/base/lib/python3.13/site-packages/python_dateutil-2.9.0.post0.dist-info"
+                }
+            ]
+        },
+        "menuinst": {
+            "name": "menuinst",
+            "version": "2.4.2",
+            "requirements": [
+                {
+                    "raw": "menuinst==2.4.2",
+                    "extras": [],
+                    "marker": null,
+                    "name": "menuinst",
+                    "specifier": "==2.4.2",
+                    "url": null,
+                    "found": "/opt/homebrew/Caskroom/miniconda/base/lib/python3.13/site-packages/menuinst-2.4.2.dist-info"
+                }
+            ]
+        },
+        "mpmath": {
+            "name": "mpmath",
+            "version": "1.3.0",
+            "requirements": [
+                {
+                    "raw": "mpmath==1.3.0",
+                    "extras": [],
+                    "marker": null,
+                    "name": "mpmath",
+                    "specifier": "==1.3.0",
+                    "url": null,
+                    "found": "/opt/homebrew/Caskroom/miniconda/base/lib/python3.13/site-packages/mpmath-1.3.0.dist-info"
+                }
+            ]
+        },
+        "jupyterlab_pygments": {
+            "name": "jupyterlab_pygments",
+            "version": "0.3.0",
+            "requirements": [
+                {
+                    "raw": "jupyterlab_pygments==0.3.0",
+                    "extras": [],
+                    "marker": null,
+                    "name": "jupyterlab_pygments",
+                    "specifier": "==0.3.0",
+                    "url": null,
+                    "found": "/opt/homebrew/Caskroom/miniconda/base/lib/python3.13/site-packages/jupyterlab_pygments-0.3.0.dist-info"
+                }
+            ]
+        },
+        "PyYAML": {
+            "name": "PyYAML",
+            "version": "6.0.3",
+            "requirements": [
+                {
+                    "raw": "PyYAML==6.0.3",
+                    "extras": [],
+                    "marker": null,
+                    "name": "PyYAML",
+                    "specifier": "==6.0.3",
+                    "url": null,
+                    "found": "/opt/homebrew/Caskroom/miniconda/base/lib/python3.13/site-packages/pyyaml-6.0.3.dist-info"
+                }
+            ]
+        },
+        "pytest-asyncio": {
+            "name": "pytest-asyncio",
+            "version": "1.3.0",
+            "requirements": [
+                {
+                    "raw": "pytest-asyncio==1.3.0",
+                    "extras": [],
+                    "marker": null,
+                    "name": "pytest-asyncio",
+                    "specifier": "==1.3.0",
+                    "url": null,
+                    "found": "/opt/homebrew/Caskroom/miniconda/base/lib/python3.13/site-packages/pytest_asyncio-1.3.0.dist-info"
+                }
+            ]
+        },
+        "conda-anaconda-tos": {
+            "name": "conda-anaconda-tos",
+            "version": "0.2.2",
+            "requirements": [
+                {
+                    "raw": "conda-anaconda-tos==0.2.2",
+                    "extras": [],
+                    "marker": null,
+                    "name": "conda-anaconda-tos",
+                    "specifier": "==0.2.2",
+                    "url": null,
+                    "found": "/opt/homebrew/Caskroom/miniconda/base/lib/python3.13/site-packages/conda_anaconda_tos-0.2.2.dist-info"
+                }
+            ]
+        },
+        "ruamel.yaml": {
+            "name": "ruamel.yaml",
+            "version": "0.18.16",
+            "requirements": [
+                {
+                    "raw": "ruamel.yaml==0.18.16",
+                    "extras": [],
+                    "marker": null,
+                    "name": "ruamel.yaml",
+                    "specifier": "==0.18.16",
+                    "url": null,
+                    "found": "/opt/homebrew/Caskroom/miniconda/base/lib/python3.13/site-packages/ruamel_yaml-0.18.16.dist-info"
+                }
+            ]
+        },
+        "rfc3987-syntax": {
+            "name": "rfc3987-syntax",
+            "version": "1.1.0",
+            "requirements": [
+                {
+                    "raw": "rfc3987-syntax==1.1.0",
+                    "extras": [],
+                    "marker": null,
+                    "name": "rfc3987-syntax",
+                    "specifier": "==1.1.0",
+                    "url": null,
+                    "found": "/opt/homebrew/Caskroom/miniconda/base/lib/python3.13/site-packages/rfc3987_syntax-1.1.0.dist-info"
+                }
+            ]
+        },
+        "bandit": {
+            "name": "bandit",
+            "version": "1.9.4",
+            "requirements": [
+                {
+                    "raw": "bandit==1.9.4",
+                    "extras": [],
+                    "marker": null,
+                    "name": "bandit",
+                    "specifier": "==1.9.4",
+                    "url": null,
+                    "found": "/opt/homebrew/Caskroom/miniconda/base/lib/python3.13/site-packages/bandit-1.9.4.dist-info"
+                }
+            ]
+        },
+        "parso": {
+            "name": "parso",
+            "version": "0.8.6",
+            "requirements": [
+                {
+                    "raw": "parso==0.8.6",
+                    "extras": [],
+                    "marker": null,
+                    "name": "parso",
+                    "specifier": "==0.8.6",
+                    "url": null,
+                    "found": "/opt/homebrew/Caskroom/miniconda/base/lib/python3.13/site-packages/parso-0.8.6.dist-info"
+                }
+            ]
+        },
+        "pydantic_core": {
+            "name": "pydantic_core",
+            "version": "2.41.5",
+            "requirements": [
+                {
+                    "raw": "pydantic_core==2.41.5",
+                    "extras": [],
+                    "marker": null,
+                    "name": "pydantic_core",
+                    "specifier": "==2.41.5",
+                    "url": null,
+                    "found": "/opt/homebrew/Caskroom/miniconda/base/lib/python3.13/site-packages/pydantic_core-2.41.5.dist-info"
+                }
+            ]
+        },
+        "regex": {
+            "name": "regex",
+            "version": "2026.2.28",
+            "requirements": [
+                {
+                    "raw": "regex==2026.2.28",
+                    "extras": [],
+                    "marker": null,
+                    "name": "regex",
+                    "specifier": "==2026.2.28",
+                    "url": null,
+                    "found": "/opt/homebrew/Caskroom/miniconda/base/lib/python3.13/site-packages/regex-2026.2.28.dist-info"
+                }
+            ]
+        },
+        "urllib3": {
+            "name": "urllib3",
+            "version": "2.6.3",
+            "requirements": [
+                {
+                    "raw": "urllib3==2.6.3",
+                    "extras": [],
+                    "marker": null,
+                    "name": "urllib3",
+                    "specifier": "==2.6.3",
+                    "url": null,
+                    "found": "/opt/homebrew/Caskroom/miniconda/base/lib/python3.13/site-packages/urllib3-2.6.3.dist-info"
+                }
+            ]
+        },
+        "jupyter-events": {
+            "name": "jupyter-events",
+            "version": "0.12.0",
+            "requirements": [
+                {
+                    "raw": "jupyter-events==0.12.0",
+                    "extras": [],
+                    "marker": null,
+                    "name": "jupyter-events",
+                    "specifier": "==0.12.0",
+                    "url": null,
+                    "found": "/opt/homebrew/Caskroom/miniconda/base/lib/python3.13/site-packages/jupyter_events-0.12.0.dist-info"
+                }
+            ]
+        },
+        "frozenlist": {
+            "name": "frozenlist",
+            "version": "1.8.0",
+            "requirements": [
+                {
+                    "raw": "frozenlist==1.8.0",
+                    "extras": [],
+                    "marker": null,
+                    "name": "frozenlist",
+                    "specifier": "==1.8.0",
+                    "url": null,
+                    "found": "/opt/homebrew/Caskroom/miniconda/base/lib/python3.13/site-packages/frozenlist-1.8.0.dist-info"
+                }
+            ]
+        },
+        "nbclient": {
+            "name": "nbclient",
+            "version": "0.10.4",
+            "requirements": [
+                {
+                    "raw": "nbclient==0.10.4",
+                    "extras": [],
+                    "marker": null,
+                    "name": "nbclient",
+                    "specifier": "==0.10.4",
+                    "url": null,
+                    "found": "/opt/homebrew/Caskroom/miniconda/base/lib/python3.13/site-packages/nbclient-0.10.4.dist-info"
+                }
+            ]
+        },
+        "wcwidth": {
+            "name": "wcwidth",
+            "version": "0.6.0",
+            "requirements": [
+                {
+                    "raw": "wcwidth==0.6.0",
+                    "extras": [],
+                    "marker": null,
+                    "name": "wcwidth",
+                    "specifier": "==0.6.0",
+                    "url": null,
+                    "found": "/opt/homebrew/Caskroom/miniconda/base/lib/python3.13/site-packages/wcwidth-0.6.0.dist-info"
+                }
+            ]
+        },
+        "typing_extensions": {
+            "name": "typing_extensions",
+            "version": "4.15.0",
+            "requirements": [
+                {
+                    "raw": "typing_extensions==4.15.0",
+                    "extras": [],
+                    "marker": null,
+                    "name": "typing_extensions",
+                    "specifier": "==4.15.0",
+                    "url": null,
+                    "found": "/opt/homebrew/Caskroom/miniconda/base/lib/python3.13/site-packages/typing_extensions-4.15.0.dist-info"
+                }
+            ]
+        },
+        "aiosignal": {
+            "name": "aiosignal",
+            "version": "1.4.0",
+            "requirements": [
+                {
+                    "raw": "aiosignal==1.4.0",
+                    "extras": [],
+                    "marker": null,
+                    "name": "aiosignal",
+                    "specifier": "==1.4.0",
+                    "url": null,
+                    "found": "/opt/homebrew/Caskroom/miniconda/base/lib/python3.13/site-packages/aiosignal-1.4.0.dist-info"
+                }
+            ]
+        },
+        "jaraco.functools": {
+            "name": "jaraco.functools",
+            "version": "4.4.0",
+            "requirements": [
+                {
+                    "raw": "jaraco.functools==4.4.0",
+                    "extras": [],
+                    "marker": null,
+                    "name": "jaraco.functools",
+                    "specifier": "==4.4.0",
+                    "url": null,
+                    "found": "/opt/homebrew/Caskroom/miniconda/base/lib/python3.13/site-packages/jaraco_functools-4.4.0.dist-info"
+                }
+            ]
+        },
+        "jaraco.context": {
+            "name": "jaraco.context",
+            "version": "6.1.0",
+            "requirements": [
+                {
+                    "raw": "jaraco.context==6.1.0",
+                    "extras": [],
+                    "marker": null,
+                    "name": "jaraco.context",
+                    "specifier": "==6.1.0",
+                    "url": null,
+                    "found": "/opt/homebrew/Caskroom/miniconda/base/lib/python3.13/site-packages/jaraco_context-6.1.0.dist-info"
+                }
+            ]
+        },
+        "pycosat": {
+            "name": "pycosat",
+            "version": "0.6.6",
+            "requirements": [
+                {
+                    "raw": "pycosat==0.6.6",
+                    "extras": [],
+                    "marker": null,
+                    "name": "pycosat",
+                    "specifier": "==0.6.6",
+                    "url": null,
+                    "found": "/opt/homebrew/Caskroom/miniconda/base/lib/python3.13/site-packages/pycosat-0.6.6.dist-info"
+                }
+            ]
+        },
+        "jupyter_core": {
+            "name": "jupyter_core",
+            "version": "5.9.1",
+            "requirements": [
+                {
+                    "raw": "jupyter_core==5.9.1",
+                    "extras": [],
+                    "marker": null,
+                    "name": "jupyter_core",
+                    "specifier": "==5.9.1",
+                    "url": null,
+                    "found": "/opt/homebrew/Caskroom/miniconda/base/lib/python3.13/site-packages/jupyter_core-5.9.1.dist-info"
+                }
+            ]
+        },
+        "fastjsonschema": {
+            "name": "fastjsonschema",
+            "version": "2.21.2",
+            "requirements": [
+                {
+                    "raw": "fastjsonschema==2.21.2",
+                    "extras": [],
+                    "marker": null,
+                    "name": "fastjsonschema",
+                    "specifier": "==2.21.2",
+                    "url": null,
+                    "found": "/opt/homebrew/Caskroom/miniconda/base/lib/python3.13/site-packages/fastjsonschema-2.21.2.dist-info"
+                }
+            ]
+        },
+        "click": {
+            "name": "click",
+            "version": "8.2.1",
+            "requirements": [
+                {
+                    "raw": "click==8.2.1",
+                    "extras": [],
+                    "marker": null,
+                    "name": "click",
+                    "specifier": "==8.2.1",
+                    "url": null,
+                    "found": "/opt/homebrew/Caskroom/miniconda/base/lib/python3.13/site-packages/click-8.2.1.dist-info"
+                }
+            ]
+        },
+        "beautifulsoup4": {
+            "name": "beautifulsoup4",
+            "version": "4.14.3",
+            "requirements": [
+                {
+                    "raw": "beautifulsoup4==4.14.3",
+                    "extras": [],
+                    "marker": null,
+                    "name": "beautifulsoup4",
+                    "specifier": "==4.14.3",
+                    "url": null,
+                    "found": "/opt/homebrew/Caskroom/miniconda/base/lib/python3.13/site-packages/beautifulsoup4-4.14.3.dist-info"
+                }
+            ]
+        },
+        "pandas": {
+            "name": "pandas",
+            "version": "3.0.1",
+            "requirements": [
+                {
+                    "raw": "pandas==3.0.1",
+                    "extras": [],
+                    "marker": null,
+                    "name": "pandas",
+                    "specifier": "==3.0.1",
+                    "url": null,
+                    "found": "/opt/homebrew/Caskroom/miniconda/base/lib/python3.13/site-packages/pandas-3.0.1.dist-info"
+                }
+            ]
+        },
+        "packaging": {
+            "name": "packaging",
+            "version": "25.0",
+            "requirements": [
+                {
+                    "raw": "packaging==25.0",
+                    "extras": [],
+                    "marker": null,
+                    "name": "packaging",
+                    "specifier": "==25.0",
+                    "url": null,
+                    "found": "/opt/homebrew/Caskroom/miniconda/base/lib/python3.13/site-packages/packaging-25.0.dist-info"
+                }
+            ]
+        },
+        "argon2-cffi": {
+            "name": "argon2-cffi",
+            "version": "25.1.0",
+            "requirements": [
+                {
+                    "raw": "argon2-cffi==25.1.0",
+                    "extras": [],
+                    "marker": null,
+                    "name": "argon2-cffi",
+                    "specifier": "==25.1.0",
+                    "url": null,
+                    "found": "/opt/homebrew/Caskroom/miniconda/base/lib/python3.13/site-packages/argon2_cffi-25.1.0.dist-info"
+                }
+            ]
+        },
+        "jupyter_server": {
+            "name": "jupyter_server",
+            "version": "2.17.0",
+            "requirements": [
+                {
+                    "raw": "jupyter_server==2.17.0",
+                    "extras": [],
+                    "marker": null,
+                    "name": "jupyter_server",
+                    "specifier": "==2.17.0",
+                    "url": null,
+                    "found": "/opt/homebrew/Caskroom/miniconda/base/lib/python3.13/site-packages/jupyter_server-2.17.0.dist-info"
+                }
+            ]
+        },
+        "scipy": {
+            "name": "scipy",
+            "version": "1.17.1",
+            "requirements": [
+                {
+                    "raw": "scipy==1.17.1",
+                    "extras": [],
+                    "marker": null,
+                    "name": "scipy",
+                    "specifier": "==1.17.1",
+                    "url": null,
+                    "found": "/opt/homebrew/Caskroom/miniconda/base/lib/python3.13/site-packages/scipy-1.17.1.dist-info"
+                }
+            ]
+        },
+        "joblib": {
+            "name": "joblib",
+            "version": "1.5.3",
+            "requirements": [
+                {
+                    "raw": "joblib==1.5.3",
+                    "extras": [],
+                    "marker": null,
+                    "name": "joblib",
+                    "specifier": "==1.5.3",
+                    "url": null,
+                    "found": "/opt/homebrew/Caskroom/miniconda/base/lib/python3.13/site-packages/joblib-1.5.3.dist-info"
+                }
+            ]
+        },
+        "cycler": {
+            "name": "cycler",
+            "version": "0.12.1",
+            "requirements": [
+                {
+                    "raw": "cycler==0.12.1",
+                    "extras": [],
+                    "marker": null,
+                    "name": "cycler",
+                    "specifier": "==0.12.1",
+                    "url": null,
+                    "found": "/opt/homebrew/Caskroom/miniconda/base/lib/python3.13/site-packages/cycler-0.12.1.dist-info"
+                }
+            ]
+        },
+        "Jinja2": {
+            "name": "Jinja2",
+            "version": "3.1.6",
+            "requirements": [
+                {
+                    "raw": "Jinja2==3.1.6",
+                    "extras": [],
+                    "marker": null,
+                    "name": "Jinja2",
+                    "specifier": "==3.1.6",
+                    "url": null,
+                    "found": "/opt/homebrew/Caskroom/miniconda/base/lib/python3.13/site-packages/jinja2-3.1.6.dist-info"
+                }
+            ]
+        },
+        "referencing": {
+            "name": "referencing",
+            "version": "0.37.0",
+            "requirements": [
+                {
+                    "raw": "referencing==0.37.0",
+                    "extras": [],
+                    "marker": null,
+                    "name": "referencing",
+                    "specifier": "==0.37.0",
+                    "url": null,
+                    "found": "/opt/homebrew/Caskroom/miniconda/base/lib/python3.13/site-packages/referencing-0.37.0.dist-info"
+                }
+            ]
+        },
+        "pyparsing": {
+            "name": "pyparsing",
+            "version": "3.3.2",
+            "requirements": [
+                {
+                    "raw": "pyparsing==3.3.2",
+                    "extras": [],
+                    "marker": null,
+                    "name": "pyparsing",
+                    "specifier": "==3.3.2",
+                    "url": null,
+                    "found": "/opt/homebrew/Caskroom/miniconda/base/lib/python3.13/site-packages/pyparsing-3.3.2.dist-info"
+                }
+            ]
+        },
+        "pluggy": {
+            "name": "pluggy",
+            "version": "1.5.0",
+            "requirements": [
+                {
+                    "raw": "pluggy==1.5.0",
+                    "extras": [],
+                    "marker": null,
+                    "name": "pluggy",
+                    "specifier": "==1.5.0",
+                    "url": null,
+                    "found": "/opt/homebrew/Caskroom/miniconda/base/lib/python3.13/site-packages/pluggy-1.5.0.dist-info"
+                }
+            ]
+        },
+        "numpy": {
+            "name": "numpy",
+            "version": "2.4.3",
+            "requirements": [
+                {
+                    "raw": "numpy==2.4.3",
+                    "extras": [],
+                    "marker": null,
+                    "name": "numpy",
+                    "specifier": "==2.4.3",
+                    "url": null,
+                    "found": "/opt/homebrew/Caskroom/miniconda/base/lib/python3.13/site-packages/numpy-2.4.3.dist-info"
+                }
+            ]
+        },
+        "argon2-cffi-bindings": {
+            "name": "argon2-cffi-bindings",
+            "version": "25.1.0",
+            "requirements": [
+                {
+                    "raw": "argon2-cffi-bindings==25.1.0",
+                    "extras": [],
+                    "marker": null,
+                    "name": "argon2-cffi-bindings",
+                    "specifier": "==25.1.0",
+                    "url": null,
+                    "found": "/opt/homebrew/Caskroom/miniconda/base/lib/python3.13/site-packages/argon2_cffi_bindings-25.1.0.dist-info"
+                }
+            ]
+        },
+        "MarkupSafe": {
+            "name": "MarkupSafe",
+            "version": "3.0.3",
+            "requirements": [
+                {
+                    "raw": "MarkupSafe==3.0.3",
+                    "extras": [],
+                    "marker": null,
+                    "name": "MarkupSafe",
+                    "specifier": "==3.0.3",
+                    "url": null,
+                    "found": "/opt/homebrew/Caskroom/miniconda/base/lib/python3.13/site-packages/markupsafe-3.0.3.dist-info"
+                }
+            ]
+        },
+        "pip": {
+            "name": "pip",
+            "version": "26.0.1",
+            "requirements": [
+                {
+                    "raw": "pip==26.0.1",
+                    "extras": [],
+                    "marker": null,
+                    "name": "pip",
+                    "specifier": "==26.0.1",
+                    "url": null,
+                    "found": "/opt/homebrew/Caskroom/miniconda/base/lib/python3.13/site-packages/pip-26.0.1.dist-info"
+                }
+            ]
+        },
+        "pygame": {
+            "name": "pygame",
+            "version": "2.6.1",
+            "requirements": [
+                {
+                    "raw": "pygame==2.6.1",
+                    "extras": [],
+                    "marker": null,
+                    "name": "pygame",
+                    "specifier": "==2.6.1",
+                    "url": null,
+                    "found": "/opt/homebrew/Caskroom/miniconda/base/lib/python3.13/site-packages/pygame-2.6.1.dist-info"
+                }
+            ]
+        },
+        "atlas-math-lab": {
+            "name": "atlas-math-lab",
+            "version": "0.2.0",
+            "requirements": [
+                {
+                    "raw": "atlas-math-lab==0.2.0",
+                    "extras": [],
+                    "marker": null,
+                    "name": "atlas-math-lab",
+                    "specifier": "==0.2.0",
+                    "url": null,
+                    "found": "/opt/homebrew/Caskroom/miniconda/base/lib/python3.13/site-packages/atlas_math_lab-0.2.0.dist-info"
+                }
+            ]
+        },
+        "peft": {
+            "name": "peft",
+            "version": "0.18.1",
+            "requirements": [
+                {
+                    "raw": "peft==0.18.1",
+                    "extras": [],
+                    "marker": null,
+                    "name": "peft",
+                    "specifier": "==0.18.1",
+                    "url": null,
+                    "found": "/opt/homebrew/Caskroom/miniconda/base/lib/python3.13/site-packages/peft-0.18.1.dist-info"
+                }
+            ]
+        },
+        "pure_eval": {
+            "name": "pure_eval",
+            "version": "0.2.3",
+            "requirements": [
+                {
+                    "raw": "pure_eval==0.2.3",
+                    "extras": [],
+                    "marker": null,
+                    "name": "pure_eval",
+                    "specifier": "==0.2.3",
+                    "url": null,
+                    "found": "/opt/homebrew/Caskroom/miniconda/base/lib/python3.13/site-packages/pure_eval-0.2.3.dist-info"
+                }
+            ]
+        },
+        "distro": {
+            "name": "distro",
+            "version": "1.9.0",
+            "requirements": [
+                {
+                    "raw": "distro==1.9.0",
+                    "extras": [],
+                    "marker": null,
+                    "name": "distro",
+                    "specifier": "==1.9.0",
+                    "url": null,
+                    "found": "/opt/homebrew/Caskroom/miniconda/base/lib/python3.13/site-packages/distro-1.9.0.dist-info"
+                }
+            ]
+        },
+        "stevedore": {
+            "name": "stevedore",
+            "version": "5.7.0",
+            "requirements": [
+                {
+                    "raw": "stevedore==5.7.0",
+                    "extras": [],
+                    "marker": null,
+                    "name": "stevedore",
+                    "specifier": "==5.7.0",
+                    "url": null,
+                    "found": "/opt/homebrew/Caskroom/miniconda/base/lib/python3.13/site-packages/stevedore-5.7.0.dist-info"
+                }
+            ]
+        },
+        "Pygments": {
+            "name": "Pygments",
+            "version": "2.19.2",
+            "requirements": [
+                {
+                    "raw": "Pygments==2.19.2",
+                    "extras": [],
+                    "marker": null,
+                    "name": "Pygments",
+                    "specifier": "==2.19.2",
+                    "url": null,
+                    "found": "/opt/homebrew/Caskroom/miniconda/base/lib/python3.13/site-packages/pygments-2.19.2.dist-info"
+                }
+            ]
+        },
+        "rfc3986-validator": {
+            "name": "rfc3986-validator",
+            "version": "0.1.1",
+            "requirements": [
+                {
+                    "raw": "rfc3986-validator==0.1.1",
+                    "extras": [],
+                    "marker": null,
+                    "name": "rfc3986-validator",
+                    "specifier": "==0.1.1",
+                    "url": null,
+                    "found": "/opt/homebrew/Caskroom/miniconda/base/lib/python3.13/site-packages/rfc3986_validator-0.1.1.dist-info"
+                }
+            ]
+        },
+        "attrs": {
+            "name": "attrs",
+            "version": "26.1.0",
+            "requirements": [
+                {
+                    "raw": "attrs==26.1.0",
+                    "extras": [],
+                    "marker": null,
+                    "name": "attrs",
+                    "specifier": "==26.1.0",
+                    "url": null,
+                    "found": "/opt/homebrew/Caskroom/miniconda/base/lib/python3.13/site-packages/attrs-26.1.0.dist-info"
+                }
+            ]
+        },
+        "aiohappyeyeballs": {
+            "name": "aiohappyeyeballs",
+            "version": "2.6.1",
+            "requirements": [
+                {
+                    "raw": "aiohappyeyeballs==2.6.1",
+                    "extras": [],
+                    "marker": null,
+                    "name": "aiohappyeyeballs",
+                    "specifier": "==2.6.1",
+                    "url": null,
+                    "found": "/opt/homebrew/Caskroom/miniconda/base/lib/python3.13/site-packages/aiohappyeyeballs-2.6.1.dist-info"
+                }
+            ]
+        },
+        "terminado": {
+            "name": "terminado",
+            "version": "0.18.1",
+            "requirements": [
+                {
+                    "raw": "terminado==0.18.1",
+                    "extras": [],
+                    "marker": null,
+                    "name": "terminado",
+                    "specifier": "==0.18.1",
+                    "url": null,
+                    "found": "/opt/homebrew/Caskroom/miniconda/base/lib/python3.13/site-packages/terminado-0.18.1.dist-info"
+                }
+            ]
+        },
+        "pre_commit": {
+            "name": "pre_commit",
+            "version": "4.5.1",
+            "requirements": [
+                {
+                    "raw": "pre_commit==4.5.1",
+                    "extras": [],
+                    "marker": null,
+                    "name": "pre_commit",
+                    "specifier": "==4.5.1",
+                    "url": null,
+                    "found": "/opt/homebrew/Caskroom/miniconda/base/lib/python3.13/site-packages/pre_commit-4.5.1.dist-info"
+                }
+            ]
+        },
+        "Authlib": {
+            "name": "Authlib",
+            "version": "1.6.9",
+            "requirements": [
+                {
+                    "raw": "Authlib==1.6.9",
+                    "extras": [],
+                    "marker": null,
+                    "name": "Authlib",
+                    "specifier": "==1.6.9",
+                    "url": null,
+                    "found": "/opt/homebrew/Caskroom/miniconda/base/lib/python3.13/site-packages/authlib-1.6.9.dist-info"
+                }
+            ]
+        },
+        "jupyter-lsp": {
+            "name": "jupyter-lsp",
+            "version": "2.3.0",
+            "requirements": [
+                {
+                    "raw": "jupyter-lsp==2.3.0",
+                    "extras": [],
+                    "marker": null,
+                    "name": "jupyter-lsp",
+                    "specifier": "==2.3.0",
+                    "url": null,
+                    "found": "/opt/homebrew/Caskroom/miniconda/base/lib/python3.13/site-packages/jupyter_lsp-2.3.0.dist-info"
+                }
+            ]
+        },
+        "narwhals": {
+            "name": "narwhals",
+            "version": "2.18.0",
+            "requirements": [
+                {
+                    "raw": "narwhals==2.18.0",
+                    "extras": [],
+                    "marker": null,
+                    "name": "narwhals",
+                    "specifier": "==2.18.0",
+                    "url": null,
+                    "found": "/opt/homebrew/Caskroom/miniconda/base/lib/python3.13/site-packages/narwhals-2.18.0.dist-info"
+                }
+            ]
+        },
+        "httpx": {
+            "name": "httpx",
+            "version": "0.28.1",
+            "requirements": [
+                {
+                    "raw": "httpx==0.28.1",
+                    "extras": [],
+                    "marker": null,
+                    "name": "httpx",
+                    "specifier": "==0.28.1",
+                    "url": null,
+                    "found": "/opt/homebrew/Caskroom/miniconda/base/lib/python3.13/site-packages/httpx-0.28.1.dist-info"
+                }
+            ]
+        },
+        "tqdm": {
+            "name": "tqdm",
+            "version": "4.67.3",
+            "requirements": [
+                {
+                    "raw": "tqdm==4.67.3",
+                    "extras": [],
+                    "marker": null,
+                    "name": "tqdm",
+                    "specifier": "==4.67.3",
+                    "url": null,
+                    "found": "/opt/homebrew/Caskroom/miniconda/base/lib/python3.13/site-packages/tqdm-4.67.3.dist-info"
+                }
+            ]
+        },
+        "brotlicffi": {
+            "name": "brotlicffi",
+            "version": "1.2.0.0",
+            "requirements": [
+                {
+                    "raw": "brotlicffi==1.2.0.0",
+                    "extras": [],
+                    "marker": null,
+                    "name": "brotlicffi",
+                    "specifier": "==1.2.0.0",
+                    "url": null,
+                    "found": "/opt/homebrew/Caskroom/miniconda/base/lib/python3.13/site-packages/brotlicffi-1.2.0.0.dist-info"
+                }
+            ]
+        },
+        "radon": {
+            "name": "radon",
+            "version": "6.0.1",
+            "requirements": [
+                {
+                    "raw": "radon==6.0.1",
+                    "extras": [],
+                    "marker": null,
+                    "name": "radon",
+                    "specifier": "==6.0.1",
+                    "url": null,
+                    "found": "/opt/homebrew/Caskroom/miniconda/base/lib/python3.13/site-packages/radon-6.0.1.dist-info"
+                }
+            ]
+        },
+        "async-lru": {
+            "name": "async-lru",
+            "version": "2.3.0",
+            "requirements": [
+                {
+                    "raw": "async-lru==2.3.0",
+                    "extras": [],
+                    "marker": null,
+                    "name": "async-lru",
+                    "specifier": "==2.3.0",
+                    "url": null,
+                    "found": "/opt/homebrew/Caskroom/miniconda/base/lib/python3.13/site-packages/async_lru-2.3.0.dist-info"
+                }
+            ]
+        },
+        "json5": {
+            "name": "json5",
+            "version": "0.13.0",
+            "requirements": [
+                {
+                    "raw": "json5==0.13.0",
+                    "extras": [],
+                    "marker": null,
+                    "name": "json5",
+                    "specifier": "==0.13.0",
+                    "url": null,
+                    "found": "/opt/homebrew/Caskroom/miniconda/base/lib/python3.13/site-packages/json5-0.13.0.dist-info"
+                }
+            ]
+        },
+        "safetensors": {
+            "name": "safetensors",
+            "version": "0.7.0",
+            "requirements": [
+                {
+                    "raw": "safetensors==0.7.0",
+                    "extras": [],
+                    "marker": null,
+                    "name": "safetensors",
+                    "specifier": "==0.7.0",
+                    "url": null,
+                    "found": "/opt/homebrew/Caskroom/miniconda/base/lib/python3.13/site-packages/safetensors-0.7.0.dist-info"
+                }
+            ]
+        },
+        "tokenizers": {
+            "name": "tokenizers",
+            "version": "0.22.2",
+            "requirements": [
+                {
+                    "raw": "tokenizers==0.22.2",
+                    "extras": [],
+                    "marker": null,
+                    "name": "tokenizers",
+                    "specifier": "==0.22.2",
+                    "url": null,
+                    "found": "/opt/homebrew/Caskroom/miniconda/base/lib/python3.13/site-packages/tokenizers-0.22.2.dist-info"
+                }
+            ]
+        },
+        "uvloop": {
+            "name": "uvloop",
+            "version": "0.22.1",
+            "requirements": [
+                {
+                    "raw": "uvloop==0.22.1",
+                    "extras": [],
+                    "marker": null,
+                    "name": "uvloop",
+                    "specifier": "==0.22.1",
+                    "url": null,
+                    "found": "/opt/homebrew/Caskroom/miniconda/base/lib/python3.13/site-packages/uvloop-0.22.1.dist-info"
+                }
+            ]
+        },
+        "psutil": {
+            "name": "psutil",
+            "version": "7.2.2",
+            "requirements": [
+                {
+                    "raw": "psutil==7.2.2",
+                    "extras": [],
+                    "marker": null,
+                    "name": "psutil",
+                    "specifier": "==7.2.2",
+                    "url": null,
+                    "found": "/opt/homebrew/Caskroom/miniconda/base/lib/python3.13/site-packages/psutil-7.2.2.dist-info"
+                }
+            ]
+        },
+        "conda-package-handling": {
+            "name": "conda-package-handling",
+            "version": "2.4.0",
+            "requirements": [
+                {
+                    "raw": "conda-package-handling==2.4.0",
+                    "extras": [],
+                    "marker": null,
+                    "name": "conda-package-handling",
+                    "specifier": "==2.4.0",
+                    "url": null,
+                    "found": "/opt/homebrew/Caskroom/miniconda/base/lib/python3.13/site-packages/conda_package_handling-2.4.0.dist-info"
+                }
+            ]
+        },
+        "orjson": {
+            "name": "orjson",
+            "version": "3.11.7",
+            "requirements": [
+                {
+                    "raw": "orjson==3.11.7",
+                    "extras": [],
+                    "marker": null,
+                    "name": "orjson",
+                    "specifier": "==3.11.7",
+                    "url": null,
+                    "found": "/opt/homebrew/Caskroom/miniconda/base/lib/python3.13/site-packages/orjson-3.11.7.dist-info"
+                }
+            ]
+        },
+        "typer-slim": {
+            "name": "typer-slim",
+            "version": "0.20.0",
+            "requirements": [
+                {
+                    "raw": "typer-slim==0.20.0",
+                    "extras": [],
+                    "marker": null,
+                    "name": "typer-slim",
+                    "specifier": "==0.20.0",
+                    "url": null,
+                    "found": "/opt/homebrew/Caskroom/miniconda/base/lib/python3.13/site-packages/typer_slim-0.20.0.dist-info"
+                }
+            ]
+        },
+        "zstandard": {
+            "name": "zstandard",
+            "version": "0.24.0",
+            "requirements": [
+                {
+                    "raw": "zstandard==0.24.0",
+                    "extras": [],
+                    "marker": null,
+                    "name": "zstandard",
+                    "specifier": "==0.24.0",
+                    "url": null,
+                    "found": "/opt/homebrew/Caskroom/miniconda/base/lib/python3.13/site-packages/zstandard-0.24.0.dist-info"
+                }
+            ]
+        },
+        "multiprocess": {
+            "name": "multiprocess",
+            "version": "0.70.19",
+            "requirements": [
+                {
+                    "raw": "multiprocess==0.70.19",
+                    "extras": [],
+                    "marker": null,
+                    "name": "multiprocess",
+                    "specifier": "==0.70.19",
+                    "url": null,
+                    "found": "/opt/homebrew/Caskroom/miniconda/base/lib/python3.13/site-packages/multiprocess-0.70.19.dist-info"
+                }
+            ]
+        },
+        "types-PyYAML": {
+            "name": "types-PyYAML",
+            "version": "6.0.12.20250915",
+            "requirements": [
+                {
+                    "raw": "types-PyYAML==6.0.12.20250915",
+                    "extras": [],
+                    "marker": null,
+                    "name": "types-PyYAML",
+                    "specifier": "==6.0.12.20250915",
+                    "url": null,
+                    "found": "/opt/homebrew/Caskroom/miniconda/base/lib/python3.13/site-packages/types_pyyaml-6.0.12.20250915.dist-info"
+                }
+            ]
+        },
+        "archspec": {
+            "name": "archspec",
+            "version": "0.2.5",
+            "requirements": [
+                {
+                    "raw": "archspec==0.2.5",
+                    "extras": [],
+                    "marker": null,
+                    "name": "archspec",
+                    "specifier": "==0.2.5",
+                    "url": null,
+                    "found": "/opt/homebrew/Caskroom/miniconda/base/lib/python3.13/site-packages/archspec-0.2.5.dist-info"
+                }
+            ]
+        },
+        "typing-inspection": {
+            "name": "typing-inspection",
+            "version": "0.4.2",
+            "requirements": [
+                {
+                    "raw": "typing-inspection==0.4.2",
+                    "extras": [],
+                    "marker": null,
+                    "name": "typing-inspection",
+                    "specifier": "==0.4.2",
+                    "url": null,
+                    "found": "/opt/homebrew/Caskroom/miniconda/base/lib/python3.13/site-packages/typing_inspection-0.4.2.dist-info"
+                }
+            ]
+        },
+        "xenon": {
+            "name": "xenon",
+            "version": "0.9.3",
+            "requirements": [
+                {
+                    "raw": "xenon==0.9.3",
+                    "extras": [],
+                    "marker": null,
+                    "name": "xenon",
+                    "specifier": "==0.9.3",
+                    "url": null,
+                    "found": "/opt/homebrew/Caskroom/miniconda/base/lib/python3.13/site-packages/xenon-0.9.3.dist-info"
+                }
+            ]
+        },
+        "frozendict": {
+            "name": "frozendict",
+            "version": "2.4.6",
+            "requirements": [
+                {
+                    "raw": "frozendict==2.4.6",
+                    "extras": [],
+                    "marker": null,
+                    "name": "frozendict",
+                    "specifier": "==2.4.6",
+                    "url": null,
+                    "found": "/opt/homebrew/Caskroom/miniconda/base/lib/python3.13/site-packages/frozendict-2.4.6.dist-info"
+                }
+            ]
+        },
+        "types-requests": {
+            "name": "types-requests",
+            "version": "2.33.0.20260327",
+            "requirements": [
+                {
+                    "raw": "types-requests==2.33.0.20260327",
+                    "extras": [],
+                    "marker": null,
+                    "name": "types-requests",
+                    "specifier": "==2.33.0.20260327",
+                    "url": null,
+                    "found": "/opt/homebrew/Caskroom/miniconda/base/lib/python3.13/site-packages/types_requests-2.33.0.20260327.dist-info"
+                }
+            ]
+        },
+        "ruamel.yaml.clib": {
+            "name": "ruamel.yaml.clib",
+            "version": "0.2.14",
+            "requirements": [
+                {
+                    "raw": "ruamel.yaml.clib==0.2.14",
+                    "extras": [],
+                    "marker": null,
+                    "name": "ruamel.yaml.clib",
+                    "specifier": "==0.2.14",
+                    "url": null,
+                    "found": "/opt/homebrew/Caskroom/miniconda/base/lib/python3.13/site-packages/ruamel_yaml_clib-0.2.14.dist-info"
+                }
+            ]
+        },
+        "keyring": {
+            "name": "keyring",
+            "version": "25.7.0",
+            "requirements": [
+                {
+                    "raw": "keyring==25.7.0",
+                    "extras": [],
+                    "marker": null,
+                    "name": "keyring",
+                    "specifier": "==25.7.0",
+                    "url": null,
+                    "found": "/opt/homebrew/Caskroom/miniconda/base/lib/python3.13/site-packages/keyring-25.7.0.dist-info"
+                }
+            ]
+        },
+        "cryptography": {
+            "name": "cryptography",
+            "version": "46.0.5",
+            "requirements": [
+                {
+                    "raw": "cryptography==46.0.5",
+                    "extras": [],
+                    "marker": null,
+                    "name": "cryptography",
+                    "specifier": "==46.0.5",
+                    "url": null,
+                    "found": "/opt/homebrew/Caskroom/miniconda/base/lib/python3.13/site-packages/cryptography-46.0.5.dist-info"
+                }
+            ]
+        },
+        "ipython": {
+            "name": "ipython",
+            "version": "9.11.0",
+            "requirements": [
+                {
+                    "raw": "ipython==9.11.0",
+                    "extras": [],
+                    "marker": null,
+                    "name": "ipython",
+                    "specifier": "==9.11.0",
+                    "url": null,
+                    "found": "/opt/homebrew/Caskroom/miniconda/base/lib/python3.13/site-packages/ipython-9.11.0.dist-info"
+                }
+            ]
+        },
+        "arrow": {
+            "name": "arrow",
+            "version": "1.4.0",
+            "requirements": [
+                {
+                    "raw": "arrow==1.4.0",
+                    "extras": [],
+                    "marker": null,
+                    "name": "arrow",
+                    "specifier": "==1.4.0",
+                    "url": null,
+                    "found": "/opt/homebrew/Caskroom/miniconda/base/lib/python3.13/site-packages/arrow-1.4.0.dist-info"
+                }
+            ]
+        },
+        "mypy_extensions": {
+            "name": "mypy_extensions",
+            "version": "1.1.0",
+            "requirements": [
+                {
+                    "raw": "mypy_extensions==1.1.0",
+                    "extras": [],
+                    "marker": null,
+                    "name": "mypy_extensions",
+                    "specifier": "==1.1.0",
+                    "url": null,
+                    "found": "/opt/homebrew/Caskroom/miniconda/base/lib/python3.13/site-packages/mypy_extensions-1.1.0.dist-info"
+                }
+            ]
+        },
+        "rpds-py": {
+            "name": "rpds-py",
+            "version": "0.30.0",
+            "requirements": [
+                {
+                    "raw": "rpds-py==0.30.0",
+                    "extras": [],
+                    "marker": null,
+                    "name": "rpds-py",
+                    "specifier": "==0.30.0",
+                    "url": null,
+                    "found": "/opt/homebrew/Caskroom/miniconda/base/lib/python3.13/site-packages/rpds_py-0.30.0.dist-info"
+                }
+            ]
+        },
+        "six": {
+            "name": "six",
+            "version": "1.17.0",
+            "requirements": [
+                {
+                    "raw": "six==1.17.0",
+                    "extras": [],
+                    "marker": null,
+                    "name": "six",
+                    "specifier": "==1.17.0",
+                    "url": null,
+                    "found": "/opt/homebrew/Caskroom/miniconda/base/lib/python3.13/site-packages/six-1.17.0.dist-info"
+                }
+            ]
+        },
+        "pycparser": {
+            "name": "pycparser",
+            "version": "2.23",
+            "requirements": [
+                {
+                    "raw": "pycparser==2.23",
+                    "extras": [],
+                    "marker": null,
+                    "name": "pycparser",
+                    "specifier": "==2.23",
+                    "url": null,
+                    "found": "/opt/homebrew/Caskroom/miniconda/base/lib/python3.13/site-packages/pycparser-2.23.dist-info"
+                }
+            ]
+        },
+        "pyzmq": {
+            "name": "pyzmq",
+            "version": "27.1.0",
+            "requirements": [
+                {
+                    "raw": "pyzmq==27.1.0",
+                    "extras": [],
+                    "marker": null,
+                    "name": "pyzmq",
+                    "specifier": "==27.1.0",
+                    "url": null,
+                    "found": "/opt/homebrew/Caskroom/miniconda/base/lib/python3.13/site-packages/pyzmq-27.1.0.dist-info"
+                }
+            ]
+        },
+        "conda-libmamba-solver": {
+            "name": "conda-libmamba-solver",
+            "version": "25.11.0",
+            "requirements": [
+                {
+                    "raw": "conda-libmamba-solver==25.11.0",
+                    "extras": [],
+                    "marker": null,
+                    "name": "conda-libmamba-solver",
+                    "specifier": "==25.11.0",
+                    "url": null,
+                    "found": "/opt/homebrew/Caskroom/miniconda/base/lib/python3.13/site-packages/conda_libmamba_solver-25.11.0.dist-info"
+                }
+            ]
+        },
+        "scikit-learn": {
+            "name": "scikit-learn",
+            "version": "1.8.0",
+            "requirements": [
+                {
+                    "raw": "scikit-learn==1.8.0",
+                    "extras": [],
+                    "marker": null,
+                    "name": "scikit-learn",
+                    "specifier": "==1.8.0",
+                    "url": null,
+                    "found": "/opt/homebrew/Caskroom/miniconda/base/lib/python3.13/site-packages/scikit_learn-1.8.0.dist-info"
+                }
+            ]
+        },
+        "nltk": {
+            "name": "nltk",
+            "version": "3.9.4",
+            "requirements": [
+                {
+                    "raw": "nltk==3.9.4",
+                    "extras": [],
+                    "marker": null,
+                    "name": "nltk",
+                    "specifier": "==3.9.4",
+                    "url": null,
+                    "found": "/opt/homebrew/Caskroom/miniconda/base/lib/python3.13/site-packages/nltk-3.9.4.dist-info"
+                }
+            ]
+        },
+        "xxhash": {
+            "name": "xxhash",
+            "version": "3.6.0",
+            "requirements": [
+                {
+                    "raw": "xxhash==3.6.0",
+                    "extras": [],
+                    "marker": null,
+                    "name": "xxhash",
+                    "specifier": "==3.6.0",
+                    "url": null,
+                    "found": "/opt/homebrew/Caskroom/miniconda/base/lib/python3.13/site-packages/xxhash-3.6.0.dist-info"
+                }
+            ]
+        },
+        "dill": {
+            "name": "dill",
+            "version": "0.4.1",
+            "requirements": [
+                {
+                    "raw": "dill==0.4.1",
+                    "extras": [],
+                    "marker": null,
+                    "name": "dill",
+                    "specifier": "==0.4.1",
+                    "url": null,
+                    "found": "/opt/homebrew/Caskroom/miniconda/base/lib/python3.13/site-packages/dill-0.4.1.dist-info"
+                }
+            ]
+        },
+        "notebook_shim": {
+            "name": "notebook_shim",
+            "version": "0.2.4",
+            "requirements": [
+                {
+                    "raw": "notebook_shim==0.2.4",
+                    "extras": [],
+                    "marker": null,
+                    "name": "notebook_shim",
+                    "specifier": "==0.2.4",
+                    "url": null,
+                    "found": "/opt/homebrew/Caskroom/miniconda/base/lib/python3.13/site-packages/notebook_shim-0.2.4.dist-info"
+                }
+            ]
+        },
+        "annotated-doc": {
+            "name": "annotated-doc",
+            "version": "0.0.4",
+            "requirements": [
+                {
+                    "raw": "annotated-doc==0.0.4",
+                    "extras": [],
+                    "marker": null,
+                    "name": "annotated-doc",
+                    "specifier": "==0.0.4",
+                    "url": null,
+                    "found": "/opt/homebrew/Caskroom/miniconda/base/lib/python3.13/site-packages/annotated_doc-0.0.4.dist-info"
+                }
+            ]
+        },
+        "pytest": {
+            "name": "pytest",
+            "version": "9.0.2",
+            "requirements": [
+                {
+                    "raw": "pytest==9.0.2",
+                    "extras": [],
+                    "marker": null,
+                    "name": "pytest",
+                    "specifier": "==9.0.2",
+                    "url": null,
+                    "found": "/opt/homebrew/Caskroom/miniconda/base/lib/python3.13/site-packages/pytest-9.0.2.dist-info"
+                }
+            ]
+        },
+        "comm": {
+            "name": "comm",
+            "version": "0.2.3",
+            "requirements": [
+                {
+                    "raw": "comm==0.2.3",
+                    "extras": [],
+                    "marker": null,
+                    "name": "comm",
+                    "specifier": "==0.2.3",
+                    "url": null,
+                    "found": "/opt/homebrew/Caskroom/miniconda/base/lib/python3.13/site-packages/comm-0.2.3.dist-info"
+                }
+            ]
+        }
+    },
+    "affected_packages": {},
+    "announcements": [],
+    "vulnerabilities": [],
+    "ignored_vulnerabilities": [],
+    "remediations": {},
+    "remediations_results": {
+        "vulnerabilities_fixed": [],
+        "remediations_applied": {},
+        "remediations_skipped": {}
+    }
+}
+
+
++===========================================================================================================================================================================================+
+
+
+DEPRECATED: this command (`check`) has been DEPRECATED, and will be unsupported beyond 01 June 2024.
+
+
+We highly encourage switching to the new `scan` command which is easier to use, more powerful, and can be set up to mimic the deprecated command if required.
+
+
++===========================================================================================================================================================================================+
+
+
