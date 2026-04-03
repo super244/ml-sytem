@@ -101,10 +101,14 @@ jobs:
 
       - name: Rust checks
         run: |
-          cd ai_factory_titan || exit 0
-          cargo check || true
-          cargo clippy || true
-          cargo fmt --check || true
+          if [ -f ai_factory_titan/Cargo.toml ]; then
+            cd ai_factory_titan
+            cargo check || true
+            cargo clippy || true
+            cargo fmt --check || true
+          else
+            echo "No Rust/Titan components found"
+          fi
 
   # Frontend Checks
   frontend-checks:
