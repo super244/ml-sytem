@@ -15,7 +15,6 @@ from ai_factory.core.instances.models import (
     utc_now_iso,
 )
 from ai_factory.core.instances.store import FileInstanceStore
-from ai_factory.core.io import write_json
 
 
 class InstanceCreationService:
@@ -55,7 +54,7 @@ class InstanceCreationService:
             artifact_refs={},
             metadata=metadata_updates or {},
         )
-        self.store.save(manifest)
+        self.store.create(manifest, config.model_dump(mode="json"))
         return manifest
 
     def create_evaluation_instance(
@@ -82,12 +81,8 @@ class InstanceCreationService:
             artifact_refs={},
         )
 
-        # Save the manifest
-        self.store.save(manifest)
-
-        # Save config snapshot
         config = load_orchestration_config(config_path)
-        write_json(self.store.config_snapshot_path(instance_id), config.model_dump(mode="json"))
+        self.store.create(manifest, config.model_dump(mode="json"))
 
         return manifest
 
@@ -116,13 +111,9 @@ class InstanceCreationService:
             artifact_refs={},
         )
 
-        # Save the manifest
-        self.store.save(manifest)
-
-        # Save config snapshot
         config = load_orchestration_config(config_path)
         config.subsystem.provider = target
-        write_json(self.store.config_snapshot_path(instance_id), config.model_dump(mode="json"))
+        self.store.create(manifest, config.model_dump(mode="json"))
 
         return manifest
 
@@ -150,11 +141,7 @@ class InstanceCreationService:
             artifact_refs={},
         )
 
-        # Save the manifest
-        self.store.save(manifest)
-
-        # Save config snapshot
         config = load_orchestration_config(config_path)
-        write_json(self.store.config_snapshot_path(instance_id), config.model_dump(mode="json"))
+        self.store.create(manifest, config.model_dump(mode="json"))
 
         return manifest

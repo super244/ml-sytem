@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import hashlib
-import random
+import secrets
 import uuid
 from datetime import datetime, timedelta, timezone
 from typing import Any, Literal, cast
@@ -37,7 +37,7 @@ def _iso_plus(seconds: float) -> str:
 
 def _stable_hash(parts: list[str]) -> str:
     body = "|".join(parts)
-    return hashlib.sha1(body.encode("utf-8")).hexdigest()[:12]
+    return hashlib.sha256(body.encode("utf-8")).hexdigest()[:12]
 
 
 EventLevel = Literal["debug", "info", "warning", "error"]
@@ -95,6 +95,86 @@ class OrchestrationService:
             base_delay_s=base_delay_s,
             max_delay_s=max_delay_s,
         )
+
+    def _workload_to_task_type(self, workload: str) -> TaskType | None:
+        mapping: dict[str, TaskType] = {
+            "preprocess": "prepare",
+            "metrics": "monitor",
+            "evaluation": "evaluate",
+            "finetune": "finetune",
+            "publish": "deploy",
+        }
+        return mapping.get(workload)
+
+    def _seed_sub_agent_tasks(
+        self,
+        run: OrchestrationRun,
+        primary_task: OrchestrationTask,
+        manifest: InstanceManifest,
+        snapshot: dict[str, Any],
+    ) -> None:
+        raw_sub_agents = snapshot.get("sub_agents") or {}
+        if not raw_sub_agents.get("enabled"):
+            return
+
+        workloads = list(raw_sub_agents.get("workloads") or [])
+        if not workloads:
+            return
+
+        max_parallelism = max(int(raw_sub_agents.get("max_parallelism") or 1), 1)
+        created_by_workload: dict[str, OrchestrationTask] = {}
+
+        for index, workload in enumerate(workloads):
+            task_type = self._workload_to_task_type(str(workload))
+            if task_type is None:
+                continue
+            if task_type == cast(TaskType, manifest.type):
+                # Avoid spawning duplicate sub-agents for the exact primary task type.
+                continue
+
+            dependencies: list[str] = [primary_task.id]
+            if task_type == "prepare":
+                dependencies = []
+            elif task_type == "deploy" and "evaluation" in created_by_workload:
+                dependencies = [created_by_workload["evaluation"].id]
+
+            created_task = self.create_task(
+                run_id=run.id,
+                task_type=task_type,
+                dependencies=dependencies,
+                idempotency_key=f"{run.id}:sub-agent:{workload}",
+                input_payload={
+                    "source_instance_id": manifest.id,
+                    "workload": workload,
+                    "parent_task_id": primary_task.id,
+                    "config_path": manifest.config_path,
+                },
+                metadata={
+                    "spawned_by": "sub_agents",
+                    "workload": workload,
+                    "parallelism_cap": max_parallelism,
+                    "sub_agent_slot": (index % max_parallelism) + 1,
+                },
+            )
+            created_by_workload[str(workload)] = created_task
+
+        preprocess_task = created_by_workload.get("preprocess")
+        if preprocess_task is not None:
+            self.control_plane.create_dependency(
+                TaskDependency(task_id=primary_task.id, depends_on_task_id=preprocess_task.id)
+            )
+            primary_task.status = "blocked"
+            primary_task.updated_at = utc_now_iso()
+            self.control_plane.upsert_task(primary_task)
+            self.append_event(
+                run.id,
+                primary_task.id,
+                None,
+                event_type="task.blocked",
+                message="Primary task is waiting for preprocess sub-agent completion.",
+                agent_type=primary_task.agent_type,
+                payload={"depends_on": preprocess_task.id},
+            )
 
     def ensure_run_for_instance(
         self,
@@ -177,6 +257,7 @@ class OrchestrationService:
                     message="Attached run to parent orchestration lineage.",
                     payload={"parent_run_id": parent_run.id},
                 )
+        self._seed_sub_agent_tasks(run, task, manifest, snapshot)
         return run, task
 
     def create_task(
@@ -510,7 +591,10 @@ class OrchestrationService:
     def compute_retry_delay(self, policy: RetryPolicy, current_attempt: int) -> int:
         raw = policy.base_delay_s * (policy.multiplier ** max(current_attempt - 1, 0))
         bounded = min(int(raw), policy.max_delay_s)
-        jitter = random.uniform(0, policy.jitter_s) if policy.jitter_s > 0 else 0.0
+        jitter = 0.0
+        if policy.jitter_s > 0:
+            jitter_ms = max(int(policy.jitter_s * 1000), 0)
+            jitter = (secrets.randbelow(jitter_ms + 1) / 1000.0) if jitter_ms > 0 else 0.0
         return max(int(round(bounded + jitter)), 0)
 
     def record_agent_failure(self, agent_type: AgentType, message: str) -> CircuitState:

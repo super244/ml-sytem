@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+import logging
 import os
+import shutil
 import subprocess
 from dataclasses import dataclass
 from datetime import datetime, timezone
@@ -9,6 +11,8 @@ from typing import Any
 
 from ai_factory.core.hashing import sha256_file, sha256_text
 from ai_factory.core.io import load_json, read_jsonl, write_json, write_jsonl, write_markdown
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass(frozen=True)
@@ -30,14 +34,17 @@ class ArtifactLayout:
 
 
 def current_git_sha(repo_root: Path) -> str | None:
+    git_bin = shutil.which("git")
+    if git_bin is None:
+        return None
     try:
-        result = subprocess.run(
-            ["git", "-C", str(repo_root), "rev-parse", "HEAD"],
+        result = subprocess.run(  # nosec B603 - fixed trusted git command, shell=False
+            [git_bin, "-C", str(repo_root), "rev-parse", "HEAD"],
             check=True,
             capture_output=True,
             text=True,
         )
-    except Exception:
+    except (OSError, subprocess.SubprocessError):
         return None
     return result.stdout.strip() or None
 
@@ -86,8 +93,8 @@ def ensure_latest_pointer(
         if symlink_path.is_symlink() or symlink_path.exists():
             symlink_path.unlink()
         symlink_path.symlink_to(Path(target_dir).resolve())
-    except Exception:
-        pass
+    except OSError as exc:
+        logger.debug("unable to update latest symlink at %s: %s", symlink_path, exc)
 
 
 __all__ = [

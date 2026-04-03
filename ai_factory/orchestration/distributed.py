@@ -74,7 +74,7 @@ class DistributedTrainingOrchestrator:
             logger.debug(f"Distributed config: {self.config}")
 
         try:
-            result = subprocess.run(
+            result = subprocess.run(  # nosec B603
                 cmd,
                 env=env,
                 check=check,

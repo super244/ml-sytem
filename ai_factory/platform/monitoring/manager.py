@@ -3,7 +3,7 @@
 import asyncio
 import logging
 from collections.abc import AsyncIterator
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
@@ -13,6 +13,10 @@ from .alerts import AlertManager
 from .metrics import MetricsCollector
 
 logger = logging.getLogger(__name__)
+
+
+def _utc_now() -> datetime:
+    return datetime.now(timezone.utc)
 
 
 class MonitoringManager:
@@ -79,7 +83,7 @@ class MonitoringManager:
         """Stream real-time metrics."""
         while self._running:
             metrics = await self.get_realtime_metrics(instance_id)
-            yield {"timestamp": datetime.utcnow().isoformat(), "metrics": metrics}
+            yield {"timestamp": _utc_now().isoformat(), "metrics": metrics}
             await asyncio.sleep(1)  # 1-second updates
 
     async def get_system_health(self) -> dict[str, Any]:

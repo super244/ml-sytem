@@ -96,3 +96,43 @@ def test_control_plane_dependency_resolution_and_circuit_breaking(tmp_path: Path
     circuit = manager.orchestration.record_agent_failure("deployment", "fail-3")
     assert circuit.status == "open"
     assert manager.orchestration.is_circuit_open("deployment") is True
+
+
+def test_control_plane_seeds_sub_agent_workloads_with_dependencies(tmp_path: Path) -> None:
+    store = FileInstanceStore(tmp_path)
+    manager = InstanceManager(store)
+    manifest = InstanceManifest(
+        id="train-001",
+        type="train",
+        name="train",
+        environment=EnvironmentSpec(kind="local"),
+    )
+    snapshot = {
+        "instance": {"type": "train"},
+        "subsystem": {"config_ref": "training/configs/profiles/baseline_qlora.yaml"},
+        "sub_agents": {
+            "enabled": True,
+            "max_parallelism": 2,
+            "workloads": ["preprocess", "evaluation", "metrics", "publish"],
+        },
+    }
+    store.create(manifest, snapshot)
+    run, primary = manager.orchestration.ensure_run_for_instance(manifest, snapshot)
+
+    tasks = manager.orchestration.list_tasks(run.id)
+    task_types = {task.task_type for task in tasks}
+    assert {"train", "prepare", "evaluate", "monitor", "deploy"} <= task_types
+
+    dependencies_by_task = {task.id: manager.orchestration.control_plane.list_dependencies(task.id) for task in tasks}
+    preprocess_task = next(task for task in tasks if task.task_type == "prepare")
+    evaluate_task = next(task for task in tasks if task.task_type == "evaluate")
+    deploy_task = next(task for task in tasks if task.task_type == "deploy")
+
+    primary_dependencies = {dep.depends_on_task_id for dep in dependencies_by_task[primary.id]}
+    assert preprocess_task.id in primary_dependencies
+
+    evaluate_dependencies = {dep.depends_on_task_id for dep in dependencies_by_task[evaluate_task.id]}
+    assert primary.id in evaluate_dependencies
+
+    deploy_dependencies = {dep.depends_on_task_id for dep in dependencies_by_task[deploy_task.id]}
+    assert evaluate_task.id in deploy_dependencies
