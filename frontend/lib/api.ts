@@ -694,6 +694,8 @@ export type MissionControlSnapshot = {
   repo_root: string;
   workspace: WorkspaceOverview;
   orchestration: OrchestrationSummary;
+  autonomous?: AutonomousCampaignSnapshot;
+  autonomy: AutonomyOverview;
   titan: TitanStatus;
   criticality: {
     level: "critical" | "warning" | "opportunity" | "info";
@@ -730,6 +732,16 @@ export type MissionControlSnapshot = {
   cluster: {
     nodes: ClusterNodeHardware[];
     status_counts: Record<string, number>;
+    placements?: Array<Record<string, unknown>>;
+    pressure?: Record<string, unknown>;
+  };
+  lineage?: {
+    records?: number;
+    roots?: number;
+    covered_instances?: number;
+    gap_count?: number;
+    gaps?: Array<Record<string, unknown>>;
+    latest?: Array<Record<string, unknown>>;
   };
   telemetry: {
     flagged: {
@@ -752,6 +764,10 @@ export type MissionControlSnapshot = {
     running_instances: number;
     failed_instances: number;
     orchestration_runs: number;
+    autonomous_campaigns?: number;
+    ready_autonomous_actions?: number;
+    lineage_records?: number;
+    lineage_gaps?: number;
     agents: number;
     automl_sweeps: number;
     cluster_nodes: number;
@@ -765,8 +781,15 @@ export type MissionControlSnapshot = {
     datasets: number;
     training_profiles: number;
     open_circuits: number;
+    autonomous_actions?: number;
+    autonomous_executable_actions?: number;
+    autonomous_ready?: boolean;
+    autonomous_blockers: number;
     titan_backend?: string;
     titan_mode?: string;
+    autonomy_status?: AutonomyOverview["status"];
+    autonomy_mode?: AutonomyOverview["mode"];
+    stalled_runs?: number;
   };
 };
 
@@ -780,6 +803,215 @@ export type MissionControlRecommendation = {
   metric_label?: string | null;
   metric_value?: string | null;
   command?: string | null;
+};
+
+export type AutonomyStageSnapshot = {
+  id: string;
+  title: string;
+  status: "blocked" | "active" | "attention" | "ready" | "idle";
+  headline: string;
+  detail: string;
+  href: string;
+  metric_label?: string | null;
+  metric_value?: string | null;
+  counts: Record<string, number>;
+};
+
+export type AutonomyAgentCoverage = {
+  agent_type: string;
+  label: string;
+  status: "blocked" | "active" | "attention" | "ready" | "idle";
+  queued_tasks: number;
+  running_tasks: number;
+  active_swarm_agents: number;
+  open_circuit: boolean;
+  resource_classes: string[];
+  recommended_action: string;
+};
+
+export type AutonomyLineageAlert = {
+  id: string;
+  severity: "critical" | "warning" | "opportunity" | "info";
+  title: string;
+  detail: string;
+  href: string;
+  instance_id?: string | null;
+};
+
+export type AutonomyNextAction = {
+  id: string;
+  title: string;
+  detail: string;
+  href: string;
+  category: "stabilize" | "dispatch" | "optimize" | "lineage";
+  blocking: boolean;
+  command?: string | null;
+};
+
+export type AutonomyCapacitySnapshot = {
+  status: "blocked" | "active" | "ready" | "idle";
+  idle_nodes: number;
+  busy_nodes: number;
+  offline_nodes: number;
+  active_gpu_tasks: number;
+  active_cpu_tasks: number;
+  schedulable_trials: number;
+  suggested_parallelism: number;
+  bottleneck: string;
+  execution_modes: Record<string, number>;
+};
+
+export type AutonomyOverview = {
+  status: "blocked" | "degraded" | "active" | "ready" | "idle";
+  mode: "manual" | "assisted" | "autonomous";
+  summary: string;
+  open_circuits: number;
+  telemetry_backlog: number;
+  active_runs: number;
+  running_sweeps: number;
+  stalled_runs: number;
+  stages: AutonomyStageSnapshot[];
+  agent_coverage: AutonomyAgentCoverage[];
+  capacity: AutonomyCapacitySnapshot;
+  lineage_alerts: AutonomyLineageAlert[];
+  next_actions: AutonomyNextAction[];
+};
+
+export type AutonomousLoopAction = {
+  id: string;
+  kind: "launch_training" | "run_action" | "advisory";
+  title: string;
+  detail: string;
+  priority: number;
+  executable: boolean;
+  status: "planned" | "executed" | "blocked" | "failed" | "skipped";
+  source_instance_id?: string | null;
+  source_instance_name?: string | null;
+  action?: string | null;
+  config_path?: string | null;
+  deployment_target?: string | null;
+  surface: string;
+  href: string;
+  command?: string | null;
+  created_instance_id?: string | null;
+  error?: string | null;
+  metadata: Record<string, unknown>;
+};
+
+export type AutonomousLoopRun = {
+  id: string;
+  created_at: string;
+  status: "planned" | "executed" | "partial" | "blocked" | "failed";
+  dry_run: boolean;
+  start_instances: boolean;
+  blockers: string[];
+  summary: Record<string, unknown>;
+  actions: AutonomousLoopAction[];
+};
+
+export type AutonomousLoopSnapshot = {
+  generated_at: string;
+  ready: boolean;
+  blockers: string[];
+  summary: {
+    workspace_ready: boolean;
+    ready_checks: number;
+    total_checks: number;
+    instances: number;
+    completed_instances: number;
+    running_instances: number;
+    failed_instances: number;
+    completed_evaluations: number;
+    completed_training_branches: number;
+    telemetry_backlog: number;
+    idle_nodes: number;
+    open_circuits: number;
+    total_actions: number;
+    executable_actions: number;
+    advisory_actions: number;
+    [key: string]: unknown;
+  };
+  actions: AutonomousLoopAction[];
+  recent_loops: AutonomousLoopRun[];
+  latest_loop: AutonomousLoopRun | null;
+};
+
+export type AutonomousCampaignAction = {
+  id: string;
+  kind: "prepare" | "train" | "finetune" | "evaluate" | "inference" | "deploy" | "lineage";
+  title: string;
+  detail: string;
+  status: "planned" | "started" | "blocked" | "completed" | "failed" | "skipped";
+  config_path?: string | null;
+  source_instance_id?: string | null;
+  instance_id?: string | null;
+  depends_on: string[];
+  metadata: Record<string, unknown>;
+};
+
+export type AutonomousCampaign = {
+  campaign_id: string;
+  experiment_name: string;
+  goal: string;
+  status: "planned" | "running" | "completed" | "degraded";
+  created_at: string;
+  updated_at: string;
+  parameters: Record<string, unknown>;
+  plan: AutonomousCampaignAction[];
+  execution: Array<Record<string, unknown>>;
+  summary: Record<string, unknown>;
+};
+
+export type AutonomousCampaignSnapshot = {
+  status: "available";
+  write_enabled: boolean;
+  path: string;
+  count: number;
+  status_counts: Record<string, number>;
+  active_campaigns: number;
+  campaigns: AutonomousCampaign[];
+  ready_actions: AutonomousCampaignAction[];
+  actions: AutonomousLoopAction[];
+  loop_health: Record<string, unknown>;
+  lineage: {
+    records: number;
+    roots: number;
+    covered_instances: number;
+    gap_count: number;
+    gaps: Array<Record<string, unknown>>;
+    latest: Array<Record<string, unknown>>;
+  };
+  cluster: {
+    nodes: ClusterNodeHardware[];
+    idle_nodes: number;
+    placements: Array<Record<string, unknown>>;
+    pressure: Record<string, unknown>;
+  };
+  summary: {
+    total_actions: number;
+    executable_actions: number;
+    advisory_actions: number;
+    telemetry_backlog: number;
+    idle_nodes: number;
+    [key: string]: unknown;
+  };
+  ready: boolean;
+  blockers: string[];
+};
+
+export type CreateAutonomousCampaignRequest = {
+  experiment_name: string;
+  goal: string;
+  parameters?: Record<string, string | number | boolean>;
+  auto_start?: boolean;
+  max_actions?: number;
+};
+
+export type AutonomousCampaignResponse = {
+  experiment_id: string;
+  status: string;
+  message: string;
+  campaign: AutonomousCampaign;
 };
 
 export type CreateManagedInstanceRequest = {
@@ -992,6 +1224,56 @@ export async function getOrchestrationSummary(): Promise<OrchestrationSummary> {
 
 export async function getMissionControl(): Promise<MissionControlSnapshot> {
   return fetchJson<MissionControlSnapshot>("/v1/lab/mission-control");
+}
+
+export async function getAutonomousSnapshot(): Promise<AutonomousLoopSnapshot> {
+  return fetchJson<AutonomousLoopSnapshot>("/v1/experiments/autonomous");
+}
+
+export async function getAutonomousOverview(): Promise<AutonomyOverview> {
+  return fetchJson<AutonomyOverview>("/v1/experiments/autonomous/overview");
+}
+
+export async function getAutonomousCampaigns(): Promise<AutonomousCampaignSnapshot> {
+  return fetchJson<AutonomousCampaignSnapshot>("/v1/experiments/autonomous/campaigns");
+}
+
+export async function runAutonomousCampaign(
+  payload: CreateAutonomousCampaignRequest,
+): Promise<AutonomousCampaignResponse> {
+  return fetchJson<AutonomousCampaignResponse>("/v1/experiments/autonomous/campaigns/run", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+}
+
+export async function getAutonomousCampaign(experimentId: string): Promise<AutonomousCampaignResponse> {
+  return fetchJson<AutonomousCampaignResponse>(`/v1/experiments/autonomous/campaigns/${experimentId}`);
+}
+
+export async function planAutonomousLoop(payload?: { max_actions?: number }): Promise<AutonomousLoopRun> {
+  return fetchJson<AutonomousLoopRun>("/v1/experiments/autonomous/plan", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(payload ?? {}),
+  });
+}
+
+export async function executeAutonomousLoop(payload?: {
+  max_actions?: number;
+  dry_run?: boolean;
+  start_instances?: boolean;
+}): Promise<AutonomousLoopRun> {
+  return fetchJson<AutonomousLoopRun>("/v1/experiments/autonomous/run", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(payload ?? {}),
+  });
 }
 
 export async function getTitanStatus(): Promise<TitanStatus> {

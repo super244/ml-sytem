@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 
 import { getMissionControl, type MissionControlSnapshot } from "@/lib/api";
+import { AutonomyLoopPanel } from "@/components/autonomy-loop-panel";
 import { formatCount } from "@/lib/formatting";
 import { ROUTES } from "@/lib/routes";
 
@@ -130,6 +131,38 @@ export default function ClusterPage() {
           </div>
         ))}
       </div>
+
+      {mission?.autonomy ? (
+        <AutonomyLoopPanel
+          autonomy={mission.autonomy}
+          title="Dispatch Posture"
+          description="Cluster state is evaluated against queue demand, sweep pressure, and orchestration health."
+          maxStages={2}
+          maxActions={2}
+          compact
+        />
+      ) : null}
+
+      {mission?.autonomy ? (
+        <section className="panel aside-section" style={{ marginTop: "1.5rem" }}>
+          <div className="model-chip-header">
+            <div>
+              <h2 className="section-title">Capacity Envelope</h2>
+              <p className="control-label">
+                Resource classes and execution modes are derived from live orchestration tasks and active runs.
+              </p>
+            </div>
+            <span className="status-pill">{mission.autonomy.capacity.bottleneck}</span>
+          </div>
+          <div className="badge-row" style={{ marginTop: "0.75rem" }}>
+            <span className="status-pill">gpu tasks {mission.autonomy.capacity.active_gpu_tasks}</span>
+            <span className="status-pill">cpu tasks {mission.autonomy.capacity.active_cpu_tasks}</span>
+            <span className="status-pill">local {mission.autonomy.capacity.execution_modes.local ?? 0}</span>
+            <span className="status-pill">cloud {mission.autonomy.capacity.execution_modes.cloud ?? 0}</span>
+            <span className="status-pill">parallelism {mission.autonomy.capacity.suggested_parallelism}</span>
+          </div>
+        </section>
+      ) : null}
 
       <div className="workspace-section-grid">
         <section className="panel aside-section">

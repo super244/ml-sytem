@@ -6,12 +6,15 @@ import { useEffect, useMemo, useState, useTransition } from "react";
 
 import {
   createManagedInstance,
+  executeAutonomousLoop,
   getMissionControl,
+  planAutonomousLoop,
   runManagedInstanceAction,
   type FeedbackRecommendation,
   type InstanceSummary,
   type MissionControlSnapshot,
 } from "@/lib/api";
+import { AutonomyLoopPanel } from "@/components/autonomy-loop-panel";
 import { formatCount } from "@/lib/formatting";
 import { performanceMonitor } from "@/lib/performance";
 import { ROUTES } from "@/lib/routes";
@@ -58,6 +61,19 @@ function latestLifecycleSource(instances: InstanceSummary[]): InstanceSummary | 
     )
     .sort((left, right) => String(right.updated_at).localeCompare(String(left.updated_at)));
   return completed[0] ?? null;
+}
+
+function autonomousTone(status: string): string {
+  if (status === "running" || status === "ready") {
+    return "var(--accent)";
+  }
+  if (status === "completed") {
+    return "#6b8";
+  }
+  if (status === "attention") {
+    return "#d9a441";
+  }
+  return "var(--danger)";
 }
 
 export default function Dashboard() {
@@ -112,6 +128,8 @@ export default function Dashboard() {
   const mission = state.mission;
   const instances = mission?.control_plane.instances ?? [];
   const runningInstances = mission?.watchlist.running_instances ?? [];
+  const autonomous = mission?.autonomous;
+  const autonomy = mission?.autonomy;
   const latestSource = useMemo(() => latestLifecycleSource(instances), [instances]);
 
   async function launchTrainingBranch(): Promise<void> {
@@ -220,6 +238,43 @@ export default function Dashboard() {
     }
   }
 
+  async function previewAutonomousPlan(): Promise<void> {
+    setBusyAction("autonomous:plan");
+    setNotice(null);
+    try {
+      const run = await planAutonomousLoop({ max_actions: 6 });
+      setNotice(
+        `Autonomous plan ${run.id} captured ${run.actions.length} action${run.actions.length === 1 ? "" : "s"}.`,
+      );
+      const refreshed = await getMissionControl();
+      setState({ mission: refreshed, loading: false, error: null });
+    } catch (error) {
+      setNotice(error instanceof Error ? error.message : "Autonomous planning failed.");
+    } finally {
+      setBusyAction(null);
+    }
+  }
+
+  async function queueAutonomousActions(): Promise<void> {
+    setBusyAction("autonomous:execute");
+    setNotice(null);
+    try {
+      const run = await executeAutonomousLoop({ max_actions: 2, dry_run: false, start_instances: false });
+      const queued = Number(run.summary.created_instances ?? 0);
+      setNotice(
+        queued > 0
+          ? `Autonomous loop queued ${queued} managed instance${queued === 1 ? "" : "s"}.`
+          : `Autonomous loop ${run.status}.`,
+      );
+      const refreshed = await getMissionControl();
+      setState({ mission: refreshed, loading: false, error: null });
+    } catch (error) {
+      setNotice(error instanceof Error ? error.message : "Autonomous execution failed.");
+    } finally {
+      setBusyAction(null);
+    }
+  }
+
   if (state.loading && !mission) {
     return (
       <div className="dashboard-content">
@@ -274,12 +329,21 @@ export default function Dashboard() {
       {state.error ? <div className="dash-error-banner panel">⚠ {state.error}</div> : null}
       {notice ? <div className="dash-note-banner panel">◎ {notice}</div> : null}
 
+      {autonomy ? (
+        <AutonomyLoopPanel
+          autonomy={autonomy}
+          title="Autonomous Loop"
+          description="Shared loop state spanning datasets, training, evaluation, deployment, agents, and cluster capacity."
+        />
+      ) : null}
+
       <div className="workspace-summary-grid">
         {[
           { label: "Ready Checks", value: `${mission.summary.ready_checks}/${mission.summary.total_checks}` },
           { label: "Managed Instances", value: formatCount(mission.summary.instances) },
           { label: "Running", value: formatCount(mission.summary.running_instances) },
           { label: "AutoML Sweeps", value: formatCount(mission.summary.running_sweeps) },
+          { label: "Loop Blockers", value: formatCount(mission.summary.autonomous_blockers) },
           { label: "Telemetry Backlog", value: formatCount(mission.summary.telemetry_backlog) },
           { label: "Titan Mode", value: mission.titan.mode },
         ].map((item) => (
@@ -436,6 +500,82 @@ export default function Dashboard() {
           </div>
         </section>
       </div>
+
+      {autonomous ? (
+        <section className="panel aside-section">
+          <div className="model-chip-header">
+            <div>
+              <h2 className="section-title">Loop Planner</h2>
+              <p className="control-label">
+                Planner-backed execution queue for the next lifecycle moves. This complements the richer autonomy state above.
+              </p>
+            </div>
+            <span className="status-pill">{autonomous.ready ? "ready" : autonomous.blockers.length ? "blocked" : "standby"}</span>
+          </div>
+
+          <div className="badge-row">
+            <span className="status-pill">{autonomous.summary.executable_actions} executable actions</span>
+            <span className="status-pill">{autonomous.summary.advisory_actions} advisories</span>
+            <span className="status-pill">{autonomous.summary.telemetry_backlog} flagged prompts</span>
+            <span className="status-pill">{autonomous.summary.idle_nodes} idle nodes</span>
+          </div>
+
+          {autonomous.blockers.length > 0 ? (
+            <div className="dash-error-banner panel" style={{ marginTop: "1rem" }}>
+              ⚠ {autonomous.blockers[0]}
+            </div>
+          ) : null}
+
+          <div className="workspace-actions" style={{ marginTop: "1rem" }}>
+            <button
+              type="button"
+              className="primary-button small"
+              disabled={busyAction === "autonomous:execute"}
+              onClick={() => void queueAutonomousActions()}
+            >
+              {busyAction === "autonomous:execute" ? "Queuing..." : "Queue Next Actions"}
+            </button>
+            <button
+              type="button"
+              className="secondary-button small"
+              disabled={busyAction === "autonomous:plan"}
+              onClick={() => void previewAutonomousPlan()}
+            >
+              {busyAction === "autonomous:plan" ? "Planning..." : "Capture Plan"}
+            </button>
+          </div>
+
+          {autonomous.actions.length > 0 ? (
+            <div style={{ marginTop: "1rem" }}>
+              <h3 className="section-title" style={{ marginBottom: "0.75rem" }}>Next Actions</h3>
+              <div className="resource-list">
+                {autonomous.actions.map((action) => (
+                  <article key={action.id} className="resource-card">
+                    <div className="model-chip-header">
+                      <strong>{action.title}</strong>
+                      <span>p{action.priority}</span>
+                    </div>
+                    <p>{action.detail}</p>
+                    <div className="badge-row">
+                      <span className="status-pill" style={{ color: autonomousTone(action.executable ? "ready" : "attention") }}>
+                        {action.executable ? "executable" : "advisory"}
+                      </span>
+                      {action.source_instance_name ? (
+                        <span className="status-pill">{action.source_instance_name}</span>
+                      ) : null}
+                    </div>
+                    <div className="workspace-actions">
+                      <a href={action.href} className="secondary-button small">
+                        Open surface
+                      </a>
+                    </div>
+                  </article>
+                ))}
+              </div>
+            </div>
+          ) : null}
+        </section>
+      ) : null}
 
       <div className="workspace-section-grid">
         <section className="panel aside-section">
