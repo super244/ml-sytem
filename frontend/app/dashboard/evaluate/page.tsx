@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 
 import {
@@ -19,11 +20,14 @@ function formatMetric(val: unknown): string {
 }
 
 export default function EvaluatePage() {
+  const router = useRouter();
   const [instances, setInstances] = useState<InstanceSummary[]>([]);
   const [loading, setLoading] = useState(true);
   const [selected, setSelected] = useState<string | null>(null);
   const [compareId, setCompareId] = useState<string | null>(null);
   const [launching, setLaunching] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     getInstances()
@@ -40,8 +44,14 @@ export default function EvaluatePage() {
 
   async function launchEval(instanceId: string) {
     setLaunching(instanceId);
+    setError(null);
+    setNotice(null);
     try {
-      await evaluateManagedInstance(instanceId, { start: true });
+      const detail = await evaluateManagedInstance(instanceId, { start: true });
+      setNotice(`Evaluation ${detail.name} launched.`);
+      router.push(`/runs/${detail.id}`);
+    } catch (launchError) {
+      setError(launchError instanceof Error ? launchError.message : "Evaluation launch failed.");
     } finally {
       setLaunching(null);
     }
@@ -74,6 +84,9 @@ export default function EvaluatePage() {
           </p>
         </div>
       </div>
+
+      {notice ? <div className="dash-note-banner panel">◎ {notice}</div> : null}
+      {error ? <div className="dash-error-banner panel">⚠ {error}</div> : null}
 
       <div className="eval-grid">
         {/* Launch Evaluation */}

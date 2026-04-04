@@ -7,23 +7,17 @@ import { useEffect, useMemo, useState, useTransition } from "react";
 import {
   createManagedInstance,
   executeAutonomousLoop,
-  getMissionControl,
   planAutonomousLoop,
   runManagedInstanceAction,
   type FeedbackRecommendation,
   type InstanceSummary,
-  type MissionControlSnapshot,
 } from "@/lib/api";
 import { AutonomyLoopPanel } from "@/components/autonomy-loop-panel";
 import { formatCount } from "@/lib/formatting";
 import { performanceMonitor } from "@/lib/performance";
 import { ROUTES } from "@/lib/routes";
-
-type DashboardState = {
-  mission: MissionControlSnapshot | null;
-  loading: boolean;
-  error: string | null;
-};
+import type { TitanStatus } from "@/lib/titan-schema";
+import { useMissionControl } from "@/hooks/use-mission-control";
 
 const DEFAULT_SOURCE_MODEL = "Qwen/Qwen2.5-Math-1.5B-Instruct";
 
@@ -79,53 +73,14 @@ function autonomousTone(status: string): string {
 export default function Dashboard() {
   const router = useRouter();
   const [isNavigating, startTransition] = useTransition();
-  const [state, setState] = useState<DashboardState>({
-    mission: null,
-    loading: true,
-    error: null,
-  });
+  const { mission, loading, error, refresh, replaceMission } = useMissionControl(7_500);
   const [busyAction, setBusyAction] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
-
-  useEffect(() => {
-    let active = true;
-
-    async function loadMission() {
-      try {
-        const mission = await getMissionControl();
-        if (!active) {
-          return;
-        }
-        setState({
-          mission,
-          loading: false,
-          error: null,
-        });
-      } catch (error) {
-        if (!active) {
-          return;
-        }
-        setState({
-          mission: null,
-          loading: false,
-          error: error instanceof Error ? error.message : "Mission control is unavailable.",
-        });
-      }
-    }
-
-    void loadMission();
-    const interval = setInterval(() => void loadMission(), 7_500);
-    return () => {
-      active = false;
-      clearInterval(interval);
-    };
-  }, []);
 
   useEffect(() => {
     performanceMonitor.start();
   }, []);
 
-  const mission = state.mission;
   const instances = mission?.control_plane.instances ?? [];
   const runningInstances = mission?.watchlist.running_instances ?? [];
   const autonomous = mission?.autonomous;
@@ -246,8 +201,10 @@ export default function Dashboard() {
       setNotice(
         `Autonomous plan ${run.id} captured ${run.actions.length} action${run.actions.length === 1 ? "" : "s"}.`,
       );
-      const refreshed = await getMissionControl();
-      setState({ mission: refreshed, loading: false, error: null });
+      const refreshed = await refresh();
+      if (refreshed) {
+        replaceMission(refreshed);
+      }
     } catch (error) {
       setNotice(error instanceof Error ? error.message : "Autonomous planning failed.");
     } finally {
@@ -266,8 +223,10 @@ export default function Dashboard() {
           ? `Autonomous loop queued ${queued} managed instance${queued === 1 ? "" : "s"}.`
           : `Autonomous loop ${run.status}.`,
       );
-      const refreshed = await getMissionControl();
-      setState({ mission: refreshed, loading: false, error: null });
+      const refreshed = await refresh();
+      if (refreshed) {
+        replaceMission(refreshed);
+      }
     } catch (error) {
       setNotice(error instanceof Error ? error.message : "Autonomous execution failed.");
     } finally {
@@ -275,7 +234,7 @@ export default function Dashboard() {
     }
   }
 
-  if (state.loading && !mission) {
+  if (loading && !mission) {
     return (
       <div className="dashboard-content">
         <div className="dash-loading panel">
@@ -286,12 +245,12 @@ export default function Dashboard() {
     );
   }
 
-  if (state.error && !mission) {
+  if (error && !mission) {
     return (
       <div className="dashboard-content">
         <div className="dash-error-banner panel">
           <span>⚠</span>
-          <span>{state.error}</span>
+          <span>{error}</span>
         </div>
       </div>
     );
@@ -301,6 +260,7 @@ export default function Dashboard() {
     return null;
   }
 
+  const titan = mission.titan as TitanStatus;
   const latestRecommendationSource = runningInstances[0] ?? latestSource;
 
   return (
@@ -326,7 +286,7 @@ export default function Dashboard() {
         </div>
       </div>
 
-      {state.error ? <div className="dash-error-banner panel">⚠ {state.error}</div> : null}
+      {error ? <div className="dash-error-banner panel">⚠ {error}</div> : null}
       {notice ? <div className="dash-note-banner panel">◎ {notice}</div> : null}
 
       {autonomy ? (
@@ -364,16 +324,14 @@ export default function Dashboard() {
                 orchestration layer used by the CLI and TUI.
               </p>
             </div>
-            <span className="status-pill">
-              {mission.titan.backend} · {mission.titan.remote_execution ? "cloud-aware" : "local-first"}
-            </span>
+            <span className="status-pill">{titan.backend} · {titan.remote_execution ? "cloud-aware" : "local-first"}</span>
           </div>
 
           <div className="resource-list">
             <article className="resource-card">
               <div className="model-chip-header">
                 <strong>Start training</strong>
-                <span>{mission.titan.mode}</span>
+                <span>{titan.mode}</span>
               </div>
               <p>Launch `configs/train.yaml` with a managed QLoRA-first training branch.</p>
               <div className="workspace-actions">
@@ -485,19 +443,31 @@ export default function Dashboard() {
             <span className="status-pill">{mission.titan.preferred_training_backend}</span>
           </div>
           <div className="badge-row">
-            <span className="status-pill">{mission.titan.silicon}</span>
-            <span className="status-pill">{mission.titan.bandwidth_gbps ?? "n/a"} GB/s</span>
+            <span className="status-pill">{titan.silicon}</span>
+            <span className="status-pill">{titan.bandwidth_gbps ?? "n/a"} GB/s</span>
+            <span className="status-pill">{titan.runtime.selected ?? titan.engine.runtime_mode ?? "python"}</span>
+            <span className="status-pill">{titan.engine.cache_strategy}</span>
             <span className="status-pill">
-              {mission.titan.supports_cuda
-                ? mission.titan.cuda_compute_capability ?? "cuda-ready"
+              {titan.supports_cuda
+                ? titan.cuda_compute_capability ?? "cuda-ready"
                 : "metal-first"}
             </span>
             <span className="status-pill">
-              {mission.titan.remote_execution
-                ? mission.titan.cloud_provider ?? "remote-execution"
+              {titan.remote_execution
+                ? titan.cloud_provider ?? "remote-execution"
                 : "on-device"}
             </span>
+            {titan.runtime.gguf_support ? (
+              <span className="status-pill">gguf-ready</span>
+            ) : null}
+            {titan.engine.acceleration.cpp_kernels ? (
+              <span className="status-pill">cpp-kernels</span>
+            ) : null}
           </div>
+          <p className="control-label" style={{ marginTop: "0.85rem" }}>
+            {titan.engine.decode_model} · cache {titan.engine.cache_strategy} · sampler{" "}
+            {(titan.runtime.sampler_stack ?? titan.engine.sampler_stack).join(" / ")}
+          </p>
         </section>
       </div>
 
@@ -565,9 +535,9 @@ export default function Dashboard() {
                       ) : null}
                     </div>
                     <div className="workspace-actions">
-                      <a href={action.href} className="secondary-button small">
+                      <Link href={action.href as any} className="secondary-button small">
                         Open surface
-                      </a>
+                      </Link>
                     </div>
                   </article>
                 ))}
@@ -729,9 +699,9 @@ export default function Dashboard() {
                 <span className="status-pill">{recommendation.surface}</span>
               </div>
               <div className="workspace-actions">
-                <a href={recommendation.href} className="secondary-button small">
+                <Link href={recommendation.href as any} className="secondary-button small">
                   Open surface
-                </a>
+                </Link>
               </div>
             </article>
           ))}

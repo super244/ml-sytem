@@ -1,18 +1,12 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
 
-import { getMissionControl, type MissionControlSnapshot } from "@/lib/api";
 import { AutonomyLoopPanel } from "@/components/autonomy-loop-panel";
 import { formatCount } from "@/lib/formatting";
+import { useMissionControl } from "@/hooks/use-mission-control";
 import { ROUTES } from "@/lib/routes";
-
-type ClusterState = {
-  mission: MissionControlSnapshot | null;
-  loading: boolean;
-  error: string | null;
-};
+import type { TitanStatus } from "@/lib/titan-schema";
 
 function nodeTone(status: string) {
   if (status === "online") {
@@ -25,48 +19,8 @@ function nodeTone(status: string) {
 }
 
 export default function ClusterPage() {
-  const [state, setState] = useState<ClusterState>({
-    mission: null,
-    loading: true,
-    error: null,
-  });
-
-  useEffect(() => {
-    let active = true;
-
-    async function load() {
-      try {
-        const mission = await getMissionControl();
-        if (!active) {
-          return;
-        }
-        setState({
-          mission,
-          loading: false,
-          error: null,
-        });
-      } catch (error) {
-        if (!active) {
-          return;
-        }
-        setState({
-          mission: null,
-          loading: false,
-          error: error instanceof Error ? error.message : "Cluster state could not be loaded.",
-        });
-      }
-    }
-
-    void load();
-    const interval = setInterval(() => void load(), 10_000);
-    return () => {
-      active = false;
-      clearInterval(interval);
-    };
-  }, []);
-
-  const mission = state.mission;
-  const titan = mission?.titan;
+  const { mission, loading, error, refresh } = useMissionControl(10_000);
+  const titan = mission?.titan as TitanStatus | undefined;
   const nodes = mission?.watchlist.cluster_nodes ?? [];
   const runningInstances = mission?.watchlist.running_instances ?? [];
 
@@ -92,7 +46,7 @@ export default function ClusterPage() {
         </div>
       </div>
 
-      {state.error ? <div className="dash-error-banner panel">⚠ {state.error}</div> : null}
+      {error ? <div className="dash-error-banner panel">⚠ {error}</div> : null}
 
       {titan ? (
         <section className="panel aside-section" style={{ marginBottom: "1.5rem" }}>
@@ -110,9 +64,17 @@ export default function ClusterPage() {
           <div className="badge-row" style={{ marginTop: "0.75rem" }}>
             <span className="status-pill">{titan.backend}</span>
             <span className="status-pill">{titan.scheduler.runtime}</span>
+            <span className="status-pill">{titan.runtime.selected ?? titan.engine.runtime_mode ?? "python"}</span>
+            <span className="status-pill">{titan.engine.cache_strategy}</span>
             <span className="status-pill">{titan.quantization.formats.join(" / ")}</span>
             <span className="status-pill">{titan.telemetry.bridge}</span>
+            {titan.runtime.gguf_support ? <span className="status-pill">gguf-ready</span> : null}
+            {titan.engine.acceleration.cpp_kernels ? <span className="status-pill">cpp-kernels</span> : null}
           </div>
+          <p className="control-label" style={{ marginTop: "0.75rem" }}>
+            {titan.engine.decode_model} · queue depth {titan.engine.scheduler_queue_depth} · sampler{" "}
+            {(titan.runtime.sampler_stack ?? titan.engine.sampler_stack).join(" / ")}
+          </p>
         </section>
       ) : null}
 
@@ -173,7 +135,13 @@ export default function ClusterPage() {
             </p>
           </div>
 
-          {state.loading && !nodes.length ? (
+          <div className="workspace-actions" style={{ marginTop: "0.75rem" }}>
+            <button type="button" className="secondary-button small" onClick={() => void refresh()}>
+              Refresh cluster
+            </button>
+          </div>
+
+          {loading && !nodes.length ? (
             <div className="dash-loading"><span>⟳</span> Loading cluster nodes…</div>
           ) : nodes.length === 0 ? (
             <div className="dash-empty" style={{ padding: "2rem 1rem" }}>
