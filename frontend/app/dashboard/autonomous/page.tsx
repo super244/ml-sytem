@@ -1,19 +1,12 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 
 import {
-  getMissionControl,
   runAutonomousCampaign,
   type AutonomousCampaign,
-  type MissionControlSnapshot,
 } from "@/lib/api";
-
-type AutonomousState = {
-  mission: MissionControlSnapshot | null;
-  loading: boolean;
-  error: string | null;
-};
+import { useMissionControl } from "@/hooks/use-mission-control";
 
 function tone(status: string): string {
   if (["running", "active", "ready"].includes(status)) {
@@ -37,45 +30,11 @@ function formatStamp(value?: string | null): string {
 }
 
 export default function AutonomousPage() {
-  const [state, setState] = useState<AutonomousState>({
-    mission: null,
-    loading: true,
-    error: null,
-  });
+  const { mission, loading, error, refresh, replaceMission } = useMissionControl(8_000);
   const [experimentName, setExperimentName] = useState("Expo autonomy wave");
   const [goal, setGoal] = useState("Convert telemetry into the next finetune branch and reconcile lineage.");
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
-
-  useEffect(() => {
-    let active = true;
-
-    async function load() {
-      try {
-        const mission = await getMissionControl();
-        if (!active) {
-          return;
-        }
-        setState({ mission, loading: false, error: null });
-      } catch (error) {
-        if (!active) {
-          return;
-        }
-        setState({
-          mission: null,
-          loading: false,
-          error: error instanceof Error ? error.message : "Autonomous mission control is unavailable.",
-        });
-      }
-    }
-
-    void load();
-    const interval = setInterval(() => void load(), 8000);
-    return () => {
-      active = false;
-      clearInterval(interval);
-    };
-  }, []);
 
   async function launchCampaign(autoStart: boolean) {
     if (!experimentName.trim() || !goal.trim() || busy) {
@@ -91,8 +50,10 @@ export default function AutonomousPage() {
         max_actions: 3,
       });
       setNotice(`${response.campaign.experiment_name} created with status ${response.campaign.status}.`);
-      const mission = await getMissionControl();
-      setState({ mission, loading: false, error: null });
+      const nextMission = await refresh();
+      if (nextMission) {
+        replaceMission(nextMission);
+      }
     } catch (error) {
       setNotice(error instanceof Error ? error.message : "Autonomous campaign launch failed.");
     } finally {
@@ -100,7 +61,6 @@ export default function AutonomousPage() {
     }
   }
 
-  const mission = state.mission;
   const autonomy = mission?.autonomy;
   const campaigns = mission?.autonomous?.campaigns ?? [];
   const readyActions = mission?.autonomous?.ready_actions ?? [];
@@ -119,7 +79,7 @@ export default function AutonomousPage() {
         </div>
       </div>
 
-      {state.error ? <div className="dash-error-banner panel">⚠ {state.error}</div> : null}
+      {error ? <div className="dash-error-banner panel">⚠ {error}</div> : null}
       {notice ? <div className="panel state-panel">{notice}</div> : null}
 
       <div className="workspace-summary-grid">
@@ -179,7 +139,12 @@ export default function AutonomousPage() {
             <h2 className="section-title">Ready Actions</h2>
             <p className="control-label">The next highest-leverage actions inferred from telemetry, lineage, orchestration, and cluster state.</p>
           </div>
-          {state.loading && !readyActions.length ? (
+          <div style={{ display: "flex", gap: "0.75rem", flexWrap: "wrap", marginTop: "0.75rem" }}>
+            <button type="button" className="secondary-button small" onClick={() => void refresh()}>
+              Refresh actions
+            </button>
+          </div>
+          {loading && !readyActions.length ? (
             <div className="dash-loading"><span>⟳</span> Loading action queue…</div>
           ) : readyActions.length === 0 ? (
             <div className="dash-empty" style={{ padding: "2rem 1rem" }}>

@@ -17,6 +17,7 @@ default = []
 metal = ["dep:metal", "dep:objc"]
 cuda = ["dep:cudarc", "cudarc/cuda-12080"]
 python = ["dep:pyo3"]
+cpp = []
 
 [dependencies]
 anyhow = "1"
@@ -44,3 +45,6 @@ optional = true
 version = "0.23"
 features = ["extension-module"]
 optional = true
+
+[build-dependencies]
+cc = "1"

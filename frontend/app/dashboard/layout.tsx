@@ -70,16 +70,16 @@ export default function DashboardLayout({ children }: SidebarLayoutProps) {
             {LAB_NAV.map((item) => {
               const isActive = pathname.startsWith(item.href);
               return (
-                <a
+                <Link
                   key={item.href}
-                  href={item.href}
+                  href={item.href as any}
                   className={`sidebar-nav-item ${isActive ? "active" : ""}`}
                   title={!sidebarOpen ? item.label : undefined}
                 >
                   <span className="sidebar-nav-icon">{item.icon}</span>
                   {sidebarOpen && <span className="sidebar-nav-label">{item.label}</span>}
                   {isActive && sidebarOpen && <span className="sidebar-nav-indicator" />}
-                </a>
+                </Link>
               );
             })}
           </div>

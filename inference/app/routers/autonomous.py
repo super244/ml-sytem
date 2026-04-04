@@ -9,9 +9,15 @@ from inference.app.services.autonomous_lab import (
     AutonomousExperimentRequest,
     AutonomousExperimentResponse,
     AutonomousLabService,
+)
+from inference.app.services.autonomous_lab import (
     AutonomousLoopSnapshot as AutonomousCampaignSnapshot,
 )
-from inference.app.services.autonomous_loop_service import AutonomousLoopRun, AutonomousLoopSnapshot, AutonomousLoopService
+from inference.app.services.autonomous_loop_service import (
+    AutonomousLoopRun,
+    AutonomousLoopService,
+    AutonomousLoopSnapshot,
+)
 from inference.app.services.mission_control_service import AutonomyOverview, MissionControlService
 
 router = APIRouter(prefix="/experiments/autonomous", tags=["autonomous"])
@@ -37,6 +43,7 @@ def _lab_service() -> AutonomousLabService:
 
 def _mission_control_service() -> MissionControlService:
     return MissionControlService(get_settings(), instance_service=get_instance_service())
+
 
 @router.get("", response_model=AutonomousLoopSnapshot)
 def autonomous_snapshot() -> AutonomousLoopSnapshot:

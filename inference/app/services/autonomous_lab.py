@@ -5,7 +5,7 @@ import json
 import time
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, Literal, TYPE_CHECKING
+from typing import TYPE_CHECKING, Any, Literal
 
 from pydantic import BaseModel, Field
 
@@ -85,7 +85,7 @@ class AutonomousExperimentResponse(BaseModel):
 
 
 class AutonomousLabService:
-    def __init__(self, settings: AppSettings, *, instance_service: "InstanceService") -> None:
+    def __init__(self, settings: AppSettings, *, instance_service: InstanceService) -> None:
         self.settings = settings
         self.instance_service = instance_service
         self.repo_root = Path(settings.repo_root).resolve()

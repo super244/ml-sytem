@@ -70,6 +70,7 @@ export default function DeployPage() {
   const [configPath, setConfigPath] = useState("configs/deploy.yaml");
   const [launching, setLaunching] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
   const [deployed, setDeployed] = useState<InstanceSummary[]>([]);
 
   useEffect(() => {
@@ -93,8 +94,10 @@ export default function DeployPage() {
     if (!selectedId) return;
     setLaunching(true);
     setError(null);
+    setNotice(null);
     try {
       const instance = await deployManagedInstance(selectedId, { target, config_path: configPath, start: true });
+      setNotice(`Deployment ${instance.name} launched for ${target}.`);
       router.push(`/runs/${instance.id}`);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Deploy failed");
@@ -120,6 +123,10 @@ export default function DeployPage() {
 
       {error && (
         <div className="dash-error-banner panel">⚠ {error}</div>
+      )}
+
+      {notice && (
+        <div className="dash-note-banner panel">◎ {notice}</div>
       )}
 
       <div className="deploy-grid">
