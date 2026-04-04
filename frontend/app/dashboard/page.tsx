@@ -85,7 +85,7 @@ export default function Dashboard() {
     performanceMonitor.start();
   }, []);
 
-  const instances = mission?.control_plane.instances ?? [];
+  const instances = useMemo(() => mission?.control_plane.instances ?? [], [mission?.control_plane.instances]);
   const runningInstances = mission?.watchlist.running_instances ?? [];
   const autonomous = mission?.autonomous;
   const autonomy = mission?.autonomy;

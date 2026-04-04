@@ -104,12 +104,12 @@ export default function InferencePage() {
   const [flagReason, setFlagReason] = useState('');
   const bottomRef = useRef<HTMLDivElement>(null);
   const demoMode = isDemoMode();
-  const availableModels = models.length ? models : demoMode ? FALLBACK_MODELS : [];
-  const availablePromptPresets = promptPresets.length
+  const availableModels = useMemo(() => models.length ? models : demoMode ? FALLBACK_MODELS : [], [models, demoMode]);
+  const availablePromptPresets = useMemo(() => promptPresets.length
     ? promptPresets
     : demoMode
       ? FALLBACK_PROMPTS
-      : [];
+      : [], [promptPresets, demoMode]);
   const metadataDegraded = !demoMode && (status?.status === 'degraded' || Boolean(loadError));
 
   useEffect(() => {

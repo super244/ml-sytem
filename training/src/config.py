@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import os
 import sys
-from dataclasses import asdict, dataclass, field
+from pydantic import BaseModel, ConfigDict, Field
 from pathlib import Path
 from typing import Any
 
@@ -13,8 +13,8 @@ class ConfigValidationError(ValueError):
     pass
 
 
-@dataclass
-class ModelConfig:
+class ModelConfig(BaseModel):
+    model_config = ConfigDict(strict=True)
     name: str = "qwen25_math_1p5b"
     base_model_name: str = "Qwen/Qwen2.5-Math-1.5B-Instruct"
     tokenizer_name: str | None = None
@@ -32,8 +32,8 @@ class ModelConfig:
     output_cost_per_million: float | None = None
 
 
-@dataclass
-class DataConfig:
+class DataConfig(BaseModel):
+    model_config = ConfigDict(strict=True)
     train_file: str = "data/processed/train.jsonl"
     eval_file: str | None = "data/processed/eval.jsonl"
     test_file: str | None = "data/processed/test.jsonl"
@@ -41,7 +41,7 @@ class DataConfig:
     max_length: int = 2048
     curriculum_learning: bool = False
     sequential_curriculum: bool = False
-    curriculum_phases: list[str] = field(default_factory=lambda: ["easy", "medium", "hard", "olympiad"])
+    curriculum_phases: list[str] = Field(default_factory=lambda: ["easy", "medium", "hard", "olympiad"])
     oversample_hard_examples: bool = False
     hard_weight: float = 2.0
     include_failure_tag: bool = True
@@ -51,14 +51,14 @@ class DataConfig:
     max_train_samples: int | None = None
     max_eval_samples: int | None = None
     system_prompt: str = "You are an elite competition mathematician. Solve carefully and end with Final Answer: ..."
-    source_weights: dict[str, float] = field(default_factory=dict)
-    difficulty_weights: dict[str, float] = field(default_factory=dict)
+    source_weights: dict[str, float] = Field(default_factory=dict)
+    difficulty_weights: dict[str, float] = Field(default_factory=dict)
     failure_replay_boost: float = 1.35
     verification_boost: float = 1.15
 
 
-@dataclass
-class TrainingConfig:
+class TrainingConfig(BaseModel):
+    model_config = ConfigDict(strict=True)
     artifacts_dir: str = "artifacts"
     num_train_epochs: float = 2.0
     max_steps: int = -1
@@ -86,15 +86,15 @@ class TrainingConfig:
     max_validation_eval_rows: int = 16
 
 
-@dataclass
-class AdapterConfig:
+class AdapterConfig(BaseModel):
+    model_config = ConfigDict(strict=True)
     method: str = "qlora"
     r: int = 32
     alpha: int = 64
     dropout: float = 0.05
     bias: str = "none"
     task_type: str = "CAUSAL_LM"
-    target_modules: list[str] = field(
+    target_modules: list[str] = Field(
         default_factory=lambda: [
             "q_proj",
             "k_proj",
@@ -107,8 +107,8 @@ class AdapterConfig:
     )
 
 
-@dataclass
-class RuntimeConfig:
+class RuntimeConfig(BaseModel):
+    model_config = ConfigDict(strict=True)
     profile_name: str = "hybrid_local"
     accelerate_config: str | None = None
     deepspeed_config: str | None = None
@@ -118,23 +118,23 @@ class RuntimeConfig:
     low_cpu_mem_usage: bool = True
 
 
-@dataclass
-class LoggingConfig:
-    report_to: list[str] = field(default_factory=lambda: ["none"])
+class LoggingConfig(BaseModel):
+    model_config = ConfigDict(strict=True)
+    report_to: list[str] = Field(default_factory=lambda: ["none"])
     logging_first_step: bool = True
     jsonl_metrics_filename: str = "training_metrics.jsonl"
     summary_markdown_filename: str = "run_summary.md"
     manifest_filename: str = "run_manifest.json"
 
 
-@dataclass
-class TrackingConfig:
+class TrackingConfig(BaseModel):
+    model_config = ConfigDict(strict=True)
     provider: str = "none"
     project: str = "ai-factory"
     experiment_name: str = "default"
     run_name: str | None = None
-    tags: list[str] = field(default_factory=list)
-    metadata: dict[str, Any] = field(default_factory=dict)
+    tags: list[str] = Field(default_factory=list)
+    metadata: dict[str, Any] = Field(default_factory=dict)
     mlflow_tracking_uri: str | None = None
     wandb_entity: str | None = None
     wandb_mode: str = "offline"
@@ -146,8 +146,8 @@ class TrackingConfig:
     log_summary_artifact: bool = True
 
 
-@dataclass
-class PackagingConfig:
+class PackagingConfig(BaseModel):
+    model_config = ConfigDict(strict=True)
     publish_model_name: str = "atlas-math-failure-aware"
     export_merged_model: bool = False
     publish_latest: bool = True
@@ -156,8 +156,8 @@ class PackagingConfig:
     merged_model_subdir: str = "published/merged_model"
 
 
-@dataclass
-class PreferenceConfig:
+class PreferenceConfig(BaseModel):
+    model_config = ConfigDict(strict=True)
     enabled: bool = False
     beta: float = 0.1
     loss_type: str = "sigmoid"
@@ -168,8 +168,8 @@ class PreferenceConfig:
     orpo_alpha: float = 0.1
 
 
-@dataclass
-class ExperimentConfig:
+class ExperimentConfig(BaseModel):
+    model_config = ConfigDict(strict=True)
     run_name: str
     seed: int
     profile_name: str
@@ -177,11 +177,11 @@ class ExperimentConfig:
     data: DataConfig
     training: TrainingConfig
     adapter: AdapterConfig
-    preference: PreferenceConfig = field(default_factory=PreferenceConfig)
-    runtime: RuntimeConfig = field(default_factory=RuntimeConfig)
-    logging: LoggingConfig = field(default_factory=LoggingConfig)
-    tracking: TrackingConfig = field(default_factory=TrackingConfig)
-    packaging: PackagingConfig = field(default_factory=PackagingConfig)
+    preference: PreferenceConfig = Field(default_factory=PreferenceConfig)
+    runtime: RuntimeConfig = Field(default_factory=RuntimeConfig)
+    logging: LoggingConfig = Field(default_factory=LoggingConfig)
+    tracking: TrackingConfig = Field(default_factory=TrackingConfig)
+    packaging: PackagingConfig = Field(default_factory=PackagingConfig)
     config_path: str | None = None
 
     @property
@@ -189,7 +189,7 @@ class ExperimentConfig:
         return self.adapter
 
     def to_dict(self) -> dict[str, Any]:
-        return asdict(self)
+        return self.model_dump()
 
 
 SUPPORTED_ADAPTER_METHODS = {"qlora", "lora", "full", "sft"}
@@ -209,7 +209,7 @@ def _deep_merge(left: dict[str, Any], right: dict[str, Any]) -> dict[str, Any]:
 
 
 def _construct(dataclass_type: type[Any], payload: dict[str, Any] | None) -> Any:
-    return dataclass_type(**(payload or {}))
+    return dataclass_type.model_validate(payload or {})
 
 
 def _load_yaml(path: Path) -> dict[str, Any]:

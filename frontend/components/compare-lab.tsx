@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { useEffect, useState, useTransition } from 'react';
+import { useState, useTransition } from 'react';
 
 import {
   compareModels,
@@ -68,17 +68,25 @@ export function CompareLab() {
     primaryModel === secondaryModel ||
     metadataDegraded;
 
-  useEffect(() => {
-    setPrimaryModel((current) => pickPrimaryModel(models, current));
-  }, [models]);
+  const modelsStr = JSON.stringify(models);
+  const [prevModelsStr, setPrevModelsStr] = useState(modelsStr);
+  if (modelsStr !== prevModelsStr) {
+    setPrevModelsStr(modelsStr);
+    setPrimaryModel(pickPrimaryModel(models, primaryModel));
+  }
 
-  useEffect(() => {
-    setSecondaryModel((current) => pickSecondaryModel(models, primaryModel, current));
-  }, [models, primaryModel]);
+  const [prevCompareVariant, setPrevCompareVariant] = useState(primaryModel);
+  if (modelsStr !== prevModelsStr || primaryModel !== prevCompareVariant) {
+    setPrevCompareVariant(primaryModel);
+    setSecondaryModel(pickSecondaryModel(models, primaryModel, secondaryModel));
+  }
 
-  useEffect(() => {
-    setPromptPreset((current) => pickPromptPreset(promptPresets, ['atlas_rigorous'], current));
-  }, [promptPresets]);
+  const promptPresetsStr = JSON.stringify(promptPresets);
+  const [prevPresetsStr, setPrevPresetsStr] = useState(promptPresetsStr);
+  if (promptPresetsStr !== prevPresetsStr) {
+    setPrevPresetsStr(promptPresetsStr);
+    setPromptPreset(pickPromptPreset(promptPresets, ['atlas_rigorous'], promptPreset));
+  }
 
   return (
     <AppShell>
