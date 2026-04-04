@@ -5,7 +5,7 @@ from __future__ import annotations
 
 import json
 import subprocess
-from datetime import UTC, datetime
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
@@ -38,7 +38,7 @@ def get_security_issue_count() -> int | None:
 
 def main() -> None:
     metrics: dict[str, Any] = {
-        "timestamp": datetime.now(UTC).isoformat(),
+        "timestamp": datetime.now(timezone.utc).isoformat(),
         "test_coverage_percent": get_test_coverage(),
         "security_issues": get_security_issue_count(),
     }

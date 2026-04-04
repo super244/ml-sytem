@@ -35,7 +35,8 @@ class DistributedTrainingOrchestrator:
         env["MASTER_PORT"] = str(self.config.master_port)
         env["WORLD_SIZE"] = str(self.world_size)
         env["NODE_RANK"] = str(self.config.node_rank)
-        env["NCCL_DEBUG"] = "WARN"  # Reduce verbosity in production
+        # Reduce verbosity in production, but allow override
+        env.setdefault("NCCL_DEBUG", "WARN")
         return env
 
     def get_torchrun_cmd(self, training_script: str, training_args: list[str]) -> list[str]:
