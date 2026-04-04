@@ -22,6 +22,8 @@ app.add_middleware(
 
 def _register_v1_routers(application: FastAPI) -> None:
     from inference.app.routers.agents import router as agents_router
+    from inference.app.routers.autonomous import router as autonomous_router
+    from inference.app.routers.autonomous import router as autonomous_router
     from inference.app.routers.automl import router as automl_router
     from inference.app.routers.cluster import router as cluster_router
     from inference.app.routers.datasets import router as datasets_router
@@ -45,6 +47,8 @@ def _register_v1_routers(application: FastAPI) -> None:
         orchestration_router,
         datasets_router,
         agents_router,
+        autonomous_router,
+        autonomous_router,
         automl_router,
         cluster_router,
         telemetry_router,

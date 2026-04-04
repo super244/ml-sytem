@@ -51,7 +51,7 @@ export default function DashboardLayout({ children }: SidebarLayoutProps) {
               return (
                 <Link
                   key={item.href}
-                  href={item.href}
+                  href={item.href as any}
                   className={`sidebar-nav-item ${isActive ? "active" : ""}`}
                   title={!sidebarOpen ? item.label : undefined}
                 >
@@ -70,7 +70,7 @@ export default function DashboardLayout({ children }: SidebarLayoutProps) {
             {LAB_NAV.map((item) => {
               const isActive = pathname.startsWith(item.href);
               return (
-                <Link
+                <a
                   key={item.href}
                   href={item.href}
                   className={`sidebar-nav-item ${isActive ? "active" : ""}`}
@@ -79,7 +79,7 @@ export default function DashboardLayout({ children }: SidebarLayoutProps) {
                   <span className="sidebar-nav-icon">{item.icon}</span>
                   {sidebarOpen && <span className="sidebar-nav-label">{item.label}</span>}
                   {isActive && sidebarOpen && <span className="sidebar-nav-indicator" />}
-                </Link>
+                </a>
               );
             })}
           </div>

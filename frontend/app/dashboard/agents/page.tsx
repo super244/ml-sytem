@@ -4,6 +4,7 @@ import { useEffect, useState, useRef } from "react";
 import {
   getAgentSwarmSnapshot,
   getAgentLogsSnapshot,
+  getMissionControl,
   deployAgent,
   updateAgent,
   type AgentLogsSnapshot,
@@ -12,11 +13,14 @@ import {
   type AgentLogEvent,
   type AgentDeployRequest,
   type AgentUpdateRequest,
+  type MissionControlSnapshot,
 } from "@/lib/api";
+import { AutonomyLoopPanel } from "@/components/autonomy-loop-panel";
 
 export default function AgentsPage() {
   const [agents, setAgents] = useState<AgentSwarmStatus[]>([]);
   const [logs, setLogs] = useState<AgentLogEvent[]>([]);
+  const [mission, setMission] = useState<MissionControlSnapshot | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
@@ -51,9 +55,10 @@ export default function AgentsPage() {
       }
 
       try {
-        const [swarmResponse, logsResponse] = await Promise.all([
+        const [swarmResponse, logsResponse, missionResponse] = await Promise.all([
           getAgentSwarmSnapshot(),
           getAgentLogsSnapshot(initialLoad ? 5 : 50),
+          getMissionControl(),
         ]);
         if (cancelled) {
           return;
@@ -64,6 +69,7 @@ export default function AgentsPage() {
         setDeployEnabled(Boolean(swarmPayload.deploy_enabled));
         setSimulationEnabled(Boolean(logsPayload.simulation_enabled));
         setLogs(logsPayload.logs);
+        setMission(missionResponse);
         setError(null);
       } catch (nextError) {
         if (!cancelled) {
@@ -163,6 +169,56 @@ export default function AgentsPage() {
           Agent registry and logs are live, but deploying simulated swarm agents is disabled outside demo mode.
         </div>
       )}
+
+      {mission?.autonomy ? (
+        <AutonomyLoopPanel
+          autonomy={mission.autonomy}
+          title="Swarm Coverage"
+          description="Agent coverage is measured against the shared orchestration queue, not just the persisted registry."
+          maxStages={2}
+          maxActions={2}
+          compact
+        />
+      ) : null}
+
+      {mission?.autonomy ? (
+        <section className="panel aside-section">
+          <div className="model-chip-header">
+            <div>
+              <h2 className="section-title">Agent Coverage Matrix</h2>
+              <p className="control-label">
+                Queue pressure, running tasks, and swarm coverage are synchronized against the same autonomy snapshot.
+              </p>
+            </div>
+            <span className="status-pill">{mission.autonomy.mode}</span>
+          </div>
+          <div className="resource-list" style={{ marginTop: "1rem" }}>
+            {mission.autonomy.agent_coverage.map((coverage) => (
+              <article
+                key={coverage.agent_type}
+                className="resource-card"
+                style={{
+                  borderTop: `3px solid ${
+                    coverage.open_circuit ? "var(--danger)" : coverage.status === "attention" ? "#d9a441" : coverage.status === "active" ? "var(--accent)" : "var(--line)"
+                  }`,
+                }}
+              >
+                <div className="model-chip-header">
+                  <strong>{coverage.label}</strong>
+                  <span style={{ textTransform: "capitalize" }}>{coverage.status}</span>
+                </div>
+                <p>{coverage.recommended_action}</p>
+                <div className="badge-row">
+                  <span className="status-pill">queued {coverage.queued_tasks}</span>
+                  <span className="status-pill">running {coverage.running_tasks}</span>
+                  <span className="status-pill">swarm {coverage.active_swarm_agents}</span>
+                  <span className="status-pill">{coverage.resource_classes.join(" / ") || "control"}</span>
+                </div>
+              </article>
+            ))}
+          </div>
+        </section>
+      ) : null}
 
       <div className="workspace-section-grid">
         
