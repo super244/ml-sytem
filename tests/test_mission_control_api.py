@@ -63,6 +63,7 @@ async def test_mission_control_endpoint_aggregates_lab_surfaces(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     from ai_factory.platform.monitoring import hardware
+    from inference.app.routers import autonomous as autonomous_router
     from inference.app.routers import lab as lab_router
     from inference.app.services import mission_control_service
 
@@ -161,6 +162,8 @@ async def test_mission_control_endpoint_aggregates_lab_surfaces(
 
     monkeypatch.setattr(lab_router, "get_settings", lambda: settings)
     monkeypatch.setattr(lab_router, "get_instance_service", lambda: instance_service)
+    monkeypatch.setattr(autonomous_router, "get_settings", lambda: settings)
+    monkeypatch.setattr(autonomous_router, "get_instance_service", lambda: instance_service)
     monkeypatch.setattr(
         mission_control_service,
         "detect_titan_status",
@@ -190,22 +193,36 @@ async def test_mission_control_endpoint_aggregates_lab_surfaces(
     transport = httpx.ASGITransport(app=app)
     async with httpx.AsyncClient(transport=transport, base_url="http://testserver") as client:
         response = await client.get("/v1/lab/mission-control")
+        autonomy_response = await client.get("/v1/experiments/autonomous/overview")
 
     assert response.status_code == 200
+    assert autonomy_response.status_code == 200
     payload = response.json()
+    autonomy = autonomy_response.json()
     assert payload["repo_root"] == str(tmp_path)
     assert payload["workspace"]["summary"]["datasets"] == 3
     assert payload["control_plane"]["orchestration_summary"]["runs"] >= 1
     assert payload["agents"]["count"] == 1
     assert payload["automl"]["count"] == 1
+    assert payload["autonomous"]["summary"]["total_actions"] >= 1
+    assert payload["autonomous"]["summary"]["executable_actions"] >= 0
     assert payload["cluster"]["nodes"][0]["id"] == "gpu-1"
     assert payload["telemetry"]["flagged"]["count"] == 1
     assert payload["titan"]["backend"] == "metal"
     assert payload["summary"]["titan_mode"] == "Metal-Direct"
     assert payload["telemetry"]["requests"]["by_model"]["finetuned"] == 1
+    assert payload["summary"]["autonomous_actions"] >= 1
+    assert payload["summary"]["autonomous_executable_actions"] >= 0
     assert payload["criticality"]["counts"]["warning"] >= 1
+    assert payload["autonomy"]["mode"] == "assisted"
+    assert payload["autonomy"]["status"] in {"blocked", "active", "ready", "degraded"}
+    assert payload["autonomy"]["capacity"]["idle_nodes"] == 1
+    assert any(stage["id"] == "datasets" and stage["counts"]["flagged"] == 1 for stage in payload["autonomy"]["stages"])
+    assert any(coverage["agent_type"] == "data_processing" for coverage in payload["autonomy"]["agent_coverage"])
     assert any(
         item["id"] == "telemetry-backlog" and item["surface"] == "datasets" and item["metric_value"] == "1"
         for item in payload["recommendations"]
     )
     assert payload["summary"]["telemetry_requests"] == 2
+    assert autonomy["telemetry_backlog"] == 1
+    assert autonomy["capacity"]["idle_nodes"] == 1

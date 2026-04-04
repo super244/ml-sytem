@@ -190,6 +190,56 @@ async def test_automl_routes_expose_persisted_sweeps_without_demo_mode(
 
 
 @pytest.mark.anyio
+async def test_autonomous_routes_plan_and_persist_campaigns(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+):
+    from inference.app.routers import autonomous as autonomous_router
+    from inference.app.services.instance_service import InstanceService
+
+    settings = AppSettings(
+        title="test",
+        version="0.0.0",
+        repo_root=str(tmp_path),
+        cors_origins=["*"],
+        model_registry_path=str(tmp_path / "inference" / "configs" / "model_registry.yaml"),
+        prompt_library_path=str(tmp_path / "inference" / "configs" / "prompt_presets.yaml"),
+        benchmark_registry_path=str(tmp_path / "evaluation" / "benchmarks" / "registry.yaml"),
+        artifacts_dir=str(tmp_path / "artifacts"),
+        cache_dir=str(tmp_path / "artifacts" / "cache"),
+        telemetry_path=str(tmp_path / "artifacts" / "inference" / "telemetry" / "requests.jsonl"),
+        cache_enabled=False,
+        telemetry_enabled=False,
+    )
+    service = InstanceService(settings)
+    monkeypatch.setattr(autonomous_router, "get_settings", lambda: settings)
+    monkeypatch.setattr(autonomous_router, "get_instance_service", lambda: service)
+
+    transport = httpx.ASGITransport(app=app)
+    async with httpx.AsyncClient(transport=transport, base_url="http://testserver") as client:
+        create_response = await client.post(
+            "/v1/experiments/autonomous/campaigns/run",
+            json={
+                "experiment_name": "Expo Autonomy",
+                "goal": "Keep the loop moving",
+                "auto_start": False,
+            },
+        )
+        list_response = await client.get("/v1/experiments/autonomous/campaigns")
+
+    assert create_response.status_code == 202
+    created = create_response.json()
+    assert created["campaign"]["plan"][0]["kind"] == "train"
+    assert created["campaign"]["status"] == "planned"
+
+    assert list_response.status_code == 200
+    payload = list_response.json()
+    assert payload["count"] == 1
+    assert payload["ready_actions"][0]["kind"] == "train"
+    assert payload["campaigns"][0]["campaign_id"] == created["experiment_id"]
+
+
+@pytest.mark.anyio
 async def test_dataset_dashboard_exposes_processed_and_pack_provenance(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,

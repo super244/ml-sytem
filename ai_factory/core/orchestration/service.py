@@ -675,11 +675,17 @@ class OrchestrationService:
         run_status_counts: dict[str, int] = {}
         status_counts: dict[str, int] = {}
         task_type_counts: dict[str, int] = {}
+        resource_class_counts: dict[str, int] = {}
         for task in tasks:
             status_counts[task.status] = status_counts.get(task.status, 0) + 1
             task_type_counts[task.task_type] = task_type_counts.get(task.task_type, 0) + 1
+            resource_class_counts[task.resource_class] = resource_class_counts.get(task.resource_class, 0) + 1
         for run in runs:
             run_status_counts[run.status] = run_status_counts.get(run.status, 0) + 1
+        ready_tasks = self.ready_tasks()
+        ready_by_resource: dict[str, int] = {}
+        for task in ready_tasks:
+            ready_by_resource[task.resource_class] = ready_by_resource.get(task.resource_class, 0) + 1
         return {
             "runs": len(runs),
             "tasks": len(tasks),
@@ -687,6 +693,9 @@ class OrchestrationService:
             "run_status_counts": run_status_counts,
             "task_status_counts": status_counts,
             "task_type_counts": task_type_counts,
+            "resource_class_counts": resource_class_counts,
+            "ready_tasks": len(ready_tasks),
+            "ready_by_resource": ready_by_resource,
             "open_circuits": [
                 circuit.agent_type
                 for circuit in (

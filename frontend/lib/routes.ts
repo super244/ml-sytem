@@ -18,6 +18,7 @@ export const ROUTES = {
   benchmarks: "/benchmarks",
   runs: "/runs",
   dashboard_datasets: "/dashboard/datasets",
+  dashboard_autonomous: "/dashboard/autonomous",
   dashboard_agents: "/dashboard/agents",
   dashboard_automl: "/dashboard/automl",
   dashboard_cluster: "/dashboard/cluster",
@@ -45,6 +46,7 @@ export const LIFECYCLE_NAV = [
 
 export const LAB_NAV = [
   { href: ROUTES.dashboard_datasets, label: "Datasets", icon: "▤", stage: "datasets" },
+  { href: ROUTES.dashboard_autonomous, label: "Autonomy", icon: "⟡", stage: "autonomous" },
   { href: ROUTES.dashboard_agents, label: "Agents", icon: "⍾", stage: "agents" },
   { href: ROUTES.dashboard_automl, label: "AutoML", icon: "⎈", stage: "automl" },
   { href: ROUTES.dashboard_cluster, label: "Cluster", icon: "▦", stage: "cluster" },

@@ -3,13 +3,16 @@
 import { useEffect, useState } from "react";
 import {
   getModels,
+  getMissionControl,
   getSweepsSnapshot,
   launchSweep,
   type AutoMLSweepSnapshot,
   type AutoMLSweep,
   type AutoMLTrial,
   type ModelInfo,
+  type MissionControlSnapshot,
 } from "@/lib/api";
+import { AutonomyLoopPanel } from "@/components/autonomy-loop-panel";
 import { isDemoMode } from "@/lib/runtime-mode";
 
 const MODELS = ["qwen-2-7b", "llama-3-8b", "mistral-7b", "phi-3-mini"];
@@ -23,6 +26,7 @@ export default function AutoMLPage() {
   const demoMode = isDemoMode();
   const [sweeps, setSweeps] = useState<AutoMLSweep[]>([]);
   const [availableModels, setAvailableModels] = useState<ModelInfo[]>([]);
+  const [mission, setMission] = useState<MissionControlSnapshot | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [writeEnabled, setWriteEnabled] = useState(false);
@@ -43,7 +47,11 @@ export default function AutoMLPage() {
         setLoading(true);
       }
       try {
-        const [sweepsResponse, models] = await Promise.allSettled([getSweepsSnapshot(), getModels()]);
+        const [sweepsResponse, models, missionResponse] = await Promise.allSettled([
+          getSweepsSnapshot(),
+          getModels(),
+          getMissionControl(),
+        ]);
         if (cancelled) {
           return;
         }
@@ -66,6 +74,10 @@ export default function AutoMLPage() {
           setAvailableModels(models.value.filter((model) => model.available));
         } else if (!demoMode) {
           setError((current) => current ?? "Model inventory is unavailable.");
+        }
+
+        if (missionResponse.status === "fulfilled") {
+          setMission(missionResponse.value);
         }
       } finally {
         if (!cancelled) {
@@ -148,6 +160,37 @@ export default function AutoMLPage() {
           No live model registry entries are available yet, so new sweep launch inputs stay disabled until inventory appears.
         </div>
       )}
+
+      {mission?.autonomy ? (
+        <AutonomyLoopPanel
+          autonomy={mission.autonomy}
+          title="Search Readiness"
+          description="AutoML now reads the same cluster, agent, and lineage posture as the rest of the lab."
+          maxStages={2}
+          maxActions={2}
+          compact
+        />
+      ) : null}
+
+      {mission?.autonomy ? (
+        <section className="panel aside-section">
+          <div className="model-chip-header">
+            <div>
+              <h2 className="section-title">Dispatch Envelope</h2>
+              <p className="control-label">
+                Sweep fan-out is constrained by current cluster capacity, queue pressure, and lineage backlog.
+              </p>
+            </div>
+            <span className="status-pill">{mission.autonomy.capacity.status}</span>
+          </div>
+          <div className="badge-row" style={{ marginTop: "0.75rem" }}>
+            <span className="status-pill">idle nodes {mission.autonomy.capacity.idle_nodes}</span>
+            <span className="status-pill">schedulable trials {mission.autonomy.capacity.schedulable_trials}</span>
+            <span className="status-pill">suggested parallelism {mission.autonomy.capacity.suggested_parallelism}</span>
+            <span className="status-pill">bottleneck {mission.autonomy.capacity.bottleneck}</span>
+          </div>
+        </section>
+      ) : null}
 
       <div style={{ display: "grid", gridTemplateColumns: "360px 1fr", gap: "1.5rem", alignItems: "start" }}>
 
