@@ -1,4 +1,4 @@
-/** @type {import('next').NextConfig} */
+
 const nextConfig = {
   poweredByHeader: false,
   compress: true,
@@ -6,17 +6,17 @@ const nextConfig = {
   webpack: (config, { isServer }) => {
     if (!isServer) {
       config.optimization.splitChunks = {
-        chunks: "all",
+        chunks: 'all',
         cacheGroups: {
           vendor: {
             test: /[\\/]node_modules[\\/]/,
-            name: "vendors",
-            chunks: "all",
+            name: 'vendors',
+            chunks: 'all',
           },
           common: {
-            name: "common",
+            name: 'common',
             minChunks: 2,
-            chunks: "all",
+            chunks: 'all',
             enforce: true,
           },
         },
@@ -26,4 +26,4 @@ const nextConfig = {
   },
 };
 
-module.exports = nextConfig;
+export default nextConfig;

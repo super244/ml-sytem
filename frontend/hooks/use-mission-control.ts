@@ -1,8 +1,8 @@
-"use client";
+'use client';
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from 'react';
 
-import { getMissionControl, type MissionControlSnapshot } from "@/lib/api";
+import { getMissionControl, type MissionControlSnapshot } from '@/lib/api';
 
 type MissionControlState = {
   mission: MissionControlSnapshot | null;
@@ -38,7 +38,7 @@ export function useMissionControl(intervalMs: number) {
         setState({
           mission: null,
           loading: false,
-          error: error instanceof Error ? error.message : "Mission control is unavailable.",
+          error: error instanceof Error ? error.message : 'Mission control is unavailable.',
         });
       }
       return null;
@@ -51,7 +51,7 @@ export function useMissionControl(intervalMs: number) {
     mountedRef.current = true;
 
     function pollIfVisible() {
-      if (typeof document !== "undefined" && document.visibilityState === "hidden") {
+      if (typeof document !== 'undefined' && document.visibilityState === 'hidden') {
         return;
       }
       void refresh();
@@ -60,12 +60,12 @@ export function useMissionControl(intervalMs: number) {
     pollIfVisible();
     const intervalId = window.setInterval(pollIfVisible, intervalMs);
     const onVisibility = () => pollIfVisible();
-    document.addEventListener("visibilitychange", onVisibility);
+    document.addEventListener('visibilitychange', onVisibility);
 
     return () => {
       mountedRef.current = false;
       window.clearInterval(intervalId);
-      document.removeEventListener("visibilitychange", onVisibility);
+      document.removeEventListener('visibilitychange', onVisibility);
     };
   }, [intervalMs, refresh]);
 

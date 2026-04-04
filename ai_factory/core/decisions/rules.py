@@ -1,12 +1,12 @@
 from __future__ import annotations
 
-from typing import cast
+from typing import cast, Any
 
 from ai_factory.core.config.schema import DecisionPolicy
 from ai_factory.core.instances.models import DecisionResult, FeedbackRecommendation
 
 
-def decide_next_step(summary: dict, policy: DecisionPolicy) -> DecisionResult:
+def decide_next_step(summary: dict[str, Any], policy: DecisionPolicy) -> DecisionResult:
     accuracy = float(summary.get("accuracy") or 0.0)
     parse_rate = float(summary.get("parse_rate") or 0.0)
     verifier = float(summary.get("verifier_agreement_rate") or 0.0)
@@ -82,7 +82,7 @@ def decide_next_step(summary: dict, policy: DecisionPolicy) -> DecisionResult:
 
 
 def build_feedback_recommendations(
-    summary: dict,
+    summary: dict[str, Any],
     policy: DecisionPolicy,
     *,
     default_prepare_config: str,

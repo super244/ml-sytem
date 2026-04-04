@@ -85,3 +85,25 @@ try:
         )
 except ImportError:
     pass
+
+from fastapi import HTTPException, Request
+
+@app.exception_handler(HTTPException)
+async def custom_http_exception_handler(request: Request, exc: HTTPException) -> JSONResponse:
+    if exc.status_code == 503:
+        return JSONResponse(
+            status_code=503,
+            content={
+                "type": "about:blank",
+                "title": "Service Unavailable",
+                "status": 503,
+                "detail": exc.detail,
+                "instance": str(request.url),
+            },
+            headers={"Content-Type": "application/problem+json"}
+        )
+    return JSONResponse(
+        status_code=exc.status_code,
+        content={"detail": exc.detail},
+        headers=exc.headers
+    )

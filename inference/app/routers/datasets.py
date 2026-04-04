@@ -7,7 +7,7 @@ import uuid
 from pathlib import Path
 from typing import Any
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 
 from ai_factory.core.orchestration.sqlite import SqliteControlPlane
@@ -40,17 +40,17 @@ def _telemetry_record_id(record: dict[str, Any]) -> str:
 
 
 @router.get("")
-def list_datasets() -> dict[str, Any]:
+def list_datasets(service: Any = Depends(get_metadata_service)) -> dict[str, Any]:
     try:
-        return get_metadata_service().dataset_dashboard()
+        return service.dataset_dashboard()
     except Exception as exc:
         raise HTTPException(status_code=503, detail=f"Datasets service unavailable: {str(exc)}") from exc
 
 
 @router.get("/telemetry")
-def get_telemetry_backlog() -> dict[str, Any]:
+def get_telemetry_backlog(db: SqliteControlPlane = Depends(_get_db)) -> dict[str, Any]:
     try:
-        db = _get_db()
+        
         records = db.list_telemetry(status="flagged")
         return {"telemetry": records}
     except Exception as exc:
@@ -58,9 +58,9 @@ def get_telemetry_backlog() -> dict[str, Any]:
 
 
 @router.post("/telemetry/{record_id}/promote")
-def promote_telemetry_record(record_id: str) -> dict[str, Any]:
+def promote_telemetry_record(record_id: str, db: SqliteControlPlane = Depends(_get_db)) -> dict[str, Any]:
     try:
-        db = _get_db()
+        
         updated = db.update_telemetry_status(record_id, status="promoted", actioned_at=time.time())
         if not updated:
             raise HTTPException(status_code=404, detail=f"Telemetry record '{record_id}' not found")
@@ -77,9 +77,9 @@ def promote_telemetry_record(record_id: str) -> dict[str, Any]:
 
 
 @router.post("/telemetry/{record_id}/discard")
-def discard_telemetry_record(record_id: str) -> dict[str, Any]:
+def discard_telemetry_record(record_id: str, db: SqliteControlPlane = Depends(_get_db)) -> dict[str, Any]:
     try:
-        db = _get_db()
+        
         updated = db.update_telemetry_status(record_id, status="discarded", actioned_at=time.time())
         if not updated:
             raise HTTPException(status_code=404, detail=f"Telemetry record '{record_id}' not found")
@@ -96,9 +96,9 @@ def discard_telemetry_record(record_id: str) -> dict[str, Any]:
 
 
 @router.post("/synthesize")
-def synthesize_dataset(req: SynthesizeRequest) -> dict[str, Any]:
+def synthesize_dataset(req: SynthesizeRequest, db: SqliteControlPlane = Depends(_get_db)) -> dict[str, Any]:
     try:
-        db = _get_db()
+        
         job_id = f"synth-{uuid.uuid4().hex[:8]}"
         estimated_time = req.num_variants * 1.5
         settings = get_settings()
@@ -126,9 +126,9 @@ def synthesize_dataset(req: SynthesizeRequest) -> dict[str, Any]:
 
 
 @router.get("/synthesize/{job_id}")
-def get_synthesis_job(job_id: str) -> dict[str, Any]:
+def get_synthesis_job(job_id: str, db: SqliteControlPlane = Depends(_get_db)) -> dict[str, Any]:
     try:
-        db = _get_db()
+        
         job = db.get_synth_job(job_id)
         if not job:
             raise HTTPException(status_code=404, detail=f"Job '{job_id}' not found")

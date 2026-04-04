@@ -1,8 +1,8 @@
-"use client";
+'use client';
 
-import clsx from "clsx";
-import Link from "next/link";
-import { useEffect, useState } from "react";
+import clsx from 'clsx';
+import Link from 'next/link';
+import { useEffect, useState } from 'react';
 
 import {
   type WorkspaceExtensionPoint,
@@ -16,14 +16,14 @@ import {
   type WorkspaceOverview,
   type WorkspaceRecipe,
   type WorkspaceTrainingProfile,
-} from "@/lib/api";
-import { formatCount } from "@/lib/formatting";
-import { ROUTES } from "@/lib/routes";
+} from '@/lib/api';
+import { formatCount } from '@/lib/formatting';
+import { ROUTES } from '@/lib/routes';
 
-import { AppShell } from "@/components/layout/app-shell";
-import { MetricBadge } from "@/components/panels/metric-badge";
-import { PageHeader } from "@/components/ui/page-header";
-import { StatePanel } from "@/components/ui/state-panel";
+import { AppShell } from '@/components/layout/app-shell';
+import { MetricBadge } from '@/components/panels/metric-badge';
+import { PageHeader } from '@/components/ui/page-header';
+import { StatePanel } from '@/components/ui/state-panel';
 
 type CopyMap = Record<string, boolean>;
 
@@ -44,8 +44,12 @@ function CommandBlock({
       <pre className="workspace-command">
         <code>{command}</code>
       </pre>
-      <button className="secondary-button small" type="button" onClick={() => onCopy(command, command)}>
-        {copied ? "Copied" : `Copy ${label.toLowerCase()}`}
+      <button
+        className="secondary-button small"
+        type="button"
+        onClick={() => onCopy(command, command)}
+      >
+        {copied ? 'Copied' : `Copy ${label.toLowerCase()}`}
       </button>
     </div>
   );
@@ -53,16 +57,18 @@ function CommandBlock({
 
 function ReadinessCard({ check }: { check: WorkspaceCheck }) {
   return (
-    <article className={clsx("workspace-card", "workspace-check", { ok: check.ok, bad: !check.ok })}>
+    <article
+      className={clsx('workspace-card', 'workspace-check', { ok: check.ok, bad: !check.ok })}
+    >
       <div className="workspace-check-header">
-        <span className={clsx("workspace-dot", { ok: check.ok, bad: !check.ok })} />
+        <span className={clsx('workspace-dot', { ok: check.ok, bad: !check.ok })} />
         <strong>{check.label}</strong>
       </div>
       <p className="hero-copy">{check.detail}</p>
       <MetricBadge
         label="State"
-        value={check.ok ? "ready" : "needs setup"}
-        tone={check.ok ? "accent" : "secondary"}
+        value={check.ok ? 'ready' : 'needs setup'}
+        tone={check.ok ? 'accent' : 'secondary'}
       />
     </article>
   );
@@ -90,7 +96,9 @@ export function WorkspaceView() {
         if (!active) {
           return;
         }
-        setLoadError(nextError instanceof Error ? nextError.message : "Failed to load the command center.");
+        setLoadError(
+          nextError instanceof Error ? nextError.message : 'Failed to load the command center.',
+        );
       } finally {
         if (active) {
           setLoading(false);
@@ -112,7 +120,7 @@ export function WorkspaceView() {
         setCopied((current) => ({ ...current, [key]: false }));
       }, 1600);
     } catch {
-      setNotice("Clipboard access failed. You can still copy the commands manually.");
+      setNotice('Clipboard access failed. You can still copy the commands manually.');
     }
   }
 
@@ -136,26 +144,26 @@ export function WorkspaceView() {
           description="Inspect local readiness, discover training and evaluation entry points, and copy the exact commands for setup, serving, dry-runs, and benchmark loops."
           metrics={[
             {
-              label: "Ready checks",
-              value: summary ? `${summary.ready_checks}/${summary.total_checks}` : "n/a",
+              label: 'Ready checks',
+              value: summary ? `${summary.ready_checks}/${summary.total_checks}` : 'n/a',
             },
             {
-              label: "Profiles",
+              label: 'Profiles',
               value: formatCount(summary?.training_profiles),
-              tone: "secondary",
+              tone: 'secondary',
             },
             {
-              label: "Eval configs",
+              label: 'Eval configs',
               value: formatCount(summary?.evaluation_configs),
-              tone: "accent",
+              tone: 'accent',
             },
             {
-              label: "Control templates",
+              label: 'Control templates',
               value: formatCount(summary?.orchestration_templates),
-              tone: "secondary",
+              tone: 'secondary',
             },
             {
-              label: "Runs",
+              label: 'Runs',
               value: formatCount(summary?.runs),
             },
           ]}
@@ -209,8 +217,16 @@ export function WorkspaceView() {
                   </div>
                   <div className="badge-row">
                     <MetricBadge label="Datasets" value={formatCount(summary?.datasets)} />
-                    <MetricBadge label="Packs" value={formatCount(summary?.packs)} tone="secondary" />
-                    <MetricBadge label="Benchmarks" value={formatCount(summary?.benchmarks)} tone="accent" />
+                    <MetricBadge
+                      label="Packs"
+                      value={formatCount(summary?.packs)}
+                      tone="secondary"
+                    />
+                    <MetricBadge
+                      label="Benchmarks"
+                      value={formatCount(summary?.benchmarks)}
+                      tone="accent"
+                    />
                   </div>
                 </div>
                 <div className="workspace-card-grid compact">
@@ -232,7 +248,9 @@ export function WorkspaceView() {
                     <article key={recipe.id} className="workspace-card">
                       <div className="message-meta">
                         <span>{recipe.category}</span>
-                        <span className="status-pill">{copied[recipe.id] ? "Copied" : "Ready"}</span>
+                        <span className="status-pill">
+                          {copied[recipe.id] ? 'Copied' : 'Ready'}
+                        </span>
                       </div>
                       <h2>{recipe.title}</h2>
                       <p className="hero-copy">{recipe.description}</p>
@@ -245,7 +263,7 @@ export function WorkspaceView() {
                           type="button"
                           onClick={() => copyCommand(recipe.id, recipe.command)}
                         >
-                          {copied[recipe.id] ? "Copied" : "Copy command"}
+                          {copied[recipe.id] ? 'Copied' : 'Copy command'}
                         </button>
                       </div>
                     </article>
@@ -299,8 +317,8 @@ export function WorkspaceView() {
                       <p className="hero-copy">{tier.description}</p>
                       <div className="preview-block subtle">
                         <strong>Visible controls</strong>
-                        <p>{tier.visible_controls.join(" • ")}</p>
-                        <p>Modes: {tier.recommended_modes.join(" • ")}</p>
+                        <p>{tier.visible_controls.join(' • ')}</p>
+                        <p>Modes: {tier.recommended_modes.join(' • ')}</p>
                       </div>
                     </article>
                   ))}
@@ -348,7 +366,7 @@ export function WorkspaceView() {
                       <p className="hero-copy">{extension.description}</p>
                       <div className="preview-block subtle">
                         <strong>Instance types</strong>
-                        <p>{extension.supported_instance_types.join(" • ")}</p>
+                        <p>{extension.supported_instance_types.join(' • ')}</p>
                         {extension.config_hint ? <p>Hint: {extension.config_hint}</p> : null}
                       </div>
                     </article>
@@ -375,7 +393,11 @@ export function WorkspaceView() {
                       <h2>{template.title}</h2>
                       <div className="badge-row">
                         <MetricBadge label="User level" value={template.user_level} />
-                        <MetricBadge label="Mode" value={template.orchestration_mode} tone="secondary" />
+                        <MetricBadge
+                          label="Mode"
+                          value={template.orchestration_mode}
+                          tone="secondary"
+                        />
                       </div>
                       <CommandBlock
                         label="Create instance"

@@ -5,7 +5,7 @@ import shutil
 import subprocess
 import time
 from pathlib import Path
-from typing import Any, cast
+from typing import Any, cast, cast
 
 from ai_factory.core.discovery import latest_training_run, list_training_runs
 from ai_factory.core.instances.models import InstanceManifest, MetricPoint, ProgressSnapshot
@@ -427,7 +427,7 @@ def _titan_snapshot() -> dict[str, Any] | None:
         if result.returncode == 0:
             import json
 
-            payload = json.loads(result.stdout)
+            payload = cast(dict[str, Any], json.loads(result.stdout))
             _gpu_cache = (now, payload)
             return payload
     except (OSError, subprocess.SubprocessError, ValueError) as exc:

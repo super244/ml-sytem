@@ -1,47 +1,53 @@
-"use client";
+'use client';
 
-import Link from "next/link";
-import { useEffect, useState } from "react";
 
-import { createManagedInstance, getInstances, type InstanceSummary } from "@/lib/api";
-import { useRouter } from "next/navigation";
+import { useEffect, useState } from 'react';
 
-type FinetuneMode = "qlora" | "lora" | "full_finetune";
+import { createManagedInstance, getInstances, type InstanceSummary } from '@/lib/api';
+import { useRouter } from 'next/navigation';
 
-const FINETUNE_MODES: { id: FinetuneMode; label: string; desc: string; vram: string; speed: string }[] = [
+type FinetuneMode = 'qlora' | 'lora' | 'full_finetune';
+
+const FINETUNE_MODES: {
+  id: FinetuneMode;
+  label: string;
+  desc: string;
+  vram: string;
+  speed: string;
+}[] = [
   {
-    id: "qlora",
-    label: "QLoRA",
-    desc: "Quantized 4-bit adaptation. Best for limited VRAM. Memory-efficient and fast.",
-    vram: "6–16 GB",
-    speed: "Fast",
+    id: 'qlora',
+    label: 'QLoRA',
+    desc: 'Quantized 4-bit adaptation. Best for limited VRAM. Memory-efficient and fast.',
+    vram: '6–16 GB',
+    speed: 'Fast',
   },
   {
-    id: "lora",
-    label: "LoRA",
-    desc: "Low-rank adaptation. Trains a fraction of parameters. Great balance of speed and quality.",
-    vram: "16–40 GB",
-    speed: "Moderate",
+    id: 'lora',
+    label: 'LoRA',
+    desc: 'Low-rank adaptation. Trains a fraction of parameters. Great balance of speed and quality.',
+    vram: '16–40 GB',
+    speed: 'Moderate',
   },
   {
-    id: "full_finetune",
-    label: "Full Finetune",
-    desc: "All parameters updated. Maximum flexibility and quality, requires the most resources.",
-    vram: "40–80+ GB",
-    speed: "Slow",
+    id: 'full_finetune',
+    label: 'Full Finetune',
+    desc: 'All parameters updated. Maximum flexibility and quality, requires the most resources.',
+    vram: '40–80+ GB',
+    speed: 'Slow',
   },
 ];
 
 export default function FinetunePage() {
   const router = useRouter();
   const [sources, setSources] = useState<InstanceSummary[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [selectedSource, setSelectedSource] = useState<string | null>(null);
-  const [mode, setMode] = useState<FinetuneMode>("qlora");
-  const [sourceModel, setSourceModel] = useState("");
-  const [configPath, setConfigPath] = useState("configs/finetune.yaml");
-  const [instanceName, setInstanceName] = useState("");
+  const [mode, setMode] = useState<FinetuneMode>('qlora');
+  const [sourceModel, setSourceModel] = useState('');
+  const [configPath, setConfigPath] = useState('configs/finetune.yaml');
+  const [instanceName, setInstanceName] = useState('');
   const [iterations, setIterations] = useState(1);
   const [launching, setLaunching] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -52,20 +58,20 @@ export default function FinetunePage() {
       .then((list) => {
         const completed = list.filter(
           (i) =>
-            i.status === "completed" &&
-            (i.type === "train" || i.type === "evaluate" || i.type === "finetune"),
+            i.status === 'completed' &&
+            (i.type === 'train' || i.type === 'evaluate' || i.type === 'finetune'),
         );
         setSources(completed);
         if (completed.length > 0) {
           setSelectedSource(completed[0].id);
-          setSourceModel(completed[0].lifecycle?.source_model ?? "");
+          setSourceModel(completed[0].lifecycle?.source_model ?? '');
         }
       })
       .catch((nextError) =>
         setLoadError(
           nextError instanceof Error
             ? nextError.message
-            : "Completed instances could not be loaded.",
+            : 'Completed instances could not be loaded.',
         ),
       )
       .finally(() => setLoading(false));
@@ -78,10 +84,10 @@ export default function FinetunePage() {
       const instance = await createManagedInstance({
         config_path: configPath,
         start: true,
-        user_level: "hobbyist",
+        user_level: 'hobbyist',
         parent_instance_id: selectedSource ?? undefined,
         lifecycle: {
-          origin: "existing_model",
+          origin: 'existing_model',
           learning_mode: mode,
           source_model: sourceModel || undefined,
         },
@@ -89,7 +95,7 @@ export default function FinetunePage() {
       });
       router.push(`/runs/${instance.id}`);
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Launch failed");
+      setError(e instanceof Error ? e.message : 'Launch failed');
     } finally {
       setLaunching(false);
     }
@@ -102,8 +108,8 @@ export default function FinetunePage() {
           <span className="eyebrow">Lifecycle → Finetune</span>
           <h1 className="dash-page-title">Finetuning</h1>
           <p className="dash-page-desc">
-            Refine an existing model with LoRA, QLoRA, or full finetuning.
-            Supports multiple iterations and version tracking.
+            Refine an existing model with LoRA, QLoRA, or full finetuning. Supports multiple
+            iterations and version tracking.
           </p>
         </div>
       </div>
@@ -129,7 +135,7 @@ export default function FinetunePage() {
               <button
                 key={m.id}
                 type="button"
-                className={`finetune-mode-card ${mode === m.id ? "active" : ""}`}
+                className={`finetune-mode-card ${mode === m.id ? 'active' : ''}`}
                 onClick={() => setMode(m.id)}
               >
                 <div className="finetune-mode-header">
@@ -157,10 +163,10 @@ export default function FinetunePage() {
                   <button
                     key={inst.id}
                     type="button"
-                    className={`source-item ${selectedSource === inst.id ? "active" : ""}`}
+                    className={`source-item ${selectedSource === inst.id ? 'active' : ''}`}
                     onClick={() => {
                       setSelectedSource(inst.id);
-                      setSourceModel(inst.lifecycle?.source_model ?? "");
+                      setSourceModel(inst.lifecycle?.source_model ?? '');
                     }}
                   >
                     <span className="source-name">{inst.name}</span>
@@ -190,7 +196,9 @@ export default function FinetunePage() {
           <h2 className="section-title">Configuration</h2>
           <div className="control-row">
             <div className="input-group">
-              <label className="control-label" htmlFor="ft-config">Config path</label>
+              <label className="control-label" htmlFor="ft-config">
+                Config path
+              </label>
               <input
                 id="ft-config"
                 type="text"
@@ -199,7 +207,9 @@ export default function FinetunePage() {
               />
             </div>
             <div className="input-group">
-              <label className="control-label" htmlFor="ft-name">Instance name (optional)</label>
+              <label className="control-label" htmlFor="ft-name">
+                Instance name (optional)
+              </label>
               <input
                 id="ft-name"
                 type="text"
@@ -229,17 +239,20 @@ export default function FinetunePage() {
           <h2 className="launch-title">Launch Finetuning</h2>
           <div className="launch-summary">
             <div className="launch-summary-row">
-              <span>Method</span><strong>{mode}</strong>
+              <span>Method</span>
+              <strong>{mode}</strong>
             </div>
             <div className="launch-summary-row">
               <span>Source</span>
-              <strong>{sourceModel || selectedSource || "not set"}</strong>
+              <strong>{sourceModel || selectedSource || 'not set'}</strong>
             </div>
             <div className="launch-summary-row">
-              <span>Config</span><strong>{configPath}</strong>
+              <span>Config</span>
+              <strong>{configPath}</strong>
             </div>
             <div className="launch-summary-row">
-              <span>Iterations</span><strong>{iterations}</strong>
+              <span>Iterations</span>
+              <strong>{iterations}</strong>
             </div>
           </div>
           <button
@@ -248,10 +261,10 @@ export default function FinetunePage() {
             disabled={launching || (!sourceModel && !selectedSource)}
             onClick={() => void launchFinetune()}
           >
-            {launching ? "⟳ Launching…" : "⟳ Launch Finetuning"}
+            {launching ? '⟳ Launching…' : '⟳ Launch Finetuning'}
           </button>
           {!sourceModel && !selectedSource && (
-            <p className="launch-hint" style={{ color: "var(--danger)" }}>
+            <p className="launch-hint" style={{ color: 'var(--danger)' }}>
               Select a source model or completed instance to continue.
             </p>
           )}

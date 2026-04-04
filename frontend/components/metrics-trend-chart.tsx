@@ -1,4 +1,4 @@
-import { type MetricPoint } from "@/lib/api";
+import { type MetricPoint } from '@/lib/api';
 
 type MetricSeries = {
   name: string;
@@ -6,19 +6,19 @@ type MetricSeries = {
 };
 
 const PREFERRED_SERIES = [
-  "loss",
-  "train_loss",
-  "eval_loss",
-  "accuracy",
-  "parse_rate",
-  "verifier_agreement_rate",
-  "avg_latency_s",
+  'loss',
+  'train_loss',
+  'eval_loss',
+  'accuracy',
+  'parse_rate',
+  'verifier_agreement_rate',
+  'avg_latency_s',
 ];
 
 function toSeries(points: MetricPoint[]): MetricSeries[] {
   const grouped = new Map<string, number[]>();
   for (const point of points) {
-    if (typeof point.value !== "number" || !Number.isFinite(point.value)) {
+    if (typeof point.value !== 'number' || !Number.isFinite(point.value)) {
       continue;
     }
     const bucket = grouped.get(point.name) ?? [];
@@ -49,7 +49,7 @@ function formatValue(value: number): string {
 
 function buildPolyline(values: number[]): string {
   if (values.length < 2) {
-    return "";
+    return '';
   }
   const max = Math.max(...values);
   const min = Math.min(...values);
@@ -60,7 +60,7 @@ function buildPolyline(values: number[]): string {
       const y = 100 - ((value - min) / range) * 100;
       return `${x},${y}`;
     })
-    .join(" ");
+    .join(' ');
 }
 
 export function MetricsTrendChart({ points }: { points: MetricPoint[] }) {
@@ -69,7 +69,10 @@ export function MetricsTrendChart({ points }: { points: MetricPoint[] }) {
     return (
       <div className="metrics-empty-state">
         <strong>No numeric metric stream yet.</strong>
-        <p>The control center will render learning curves as soon as the instance writes metric points.</p>
+        <p>
+          The control center will render learning curves as soon as the instance writes metric
+          points.
+        </p>
       </div>
     );
   }

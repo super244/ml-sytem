@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 
 from inference.app.dependencies import get_metadata_service
 
@@ -23,9 +23,9 @@ def _openai_model_record(model: dict[str, Any]) -> dict[str, Any]:
 
 
 @router.get("/models")
-def list_models() -> dict:
+def list_models(service: Any = Depends(get_metadata_service)) -> dict:
     try:
-        models = get_metadata_service().models()
+        models = service.models()
         return {
             "object": "list",
             "data": [_openai_model_record(model) for model in models],
@@ -36,9 +36,9 @@ def list_models() -> dict:
 
 
 @router.get("/models/{model_id}")
-def get_model(model_id: str) -> dict:
+def get_model(model_id: str, service: Any = Depends(get_metadata_service)) -> dict:
     try:
-        models = get_metadata_service().models()
+        models = service.models()
     except Exception as exc:
         raise HTTPException(status_code=503, detail=f"Metadata service unavailable: {str(exc)}") from exc
         
@@ -49,9 +49,9 @@ def get_model(model_id: str) -> dict:
 
 
 @router.get("/prompts")
-def list_prompts(limit: int = 12) -> dict:
+def list_prompts(limit: int = 12, service: Any = Depends(get_metadata_service)) -> dict:
     try:
-        return get_metadata_service().prompt_library(limit=limit)
+        return service.prompt_library(limit=limit)
     except Exception as exc:
         raise HTTPException(status_code=503, detail=f"Prompt library unavailable: {str(exc)}") from exc
 

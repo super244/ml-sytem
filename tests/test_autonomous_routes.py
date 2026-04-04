@@ -105,8 +105,8 @@ async def test_autonomous_overview_exposes_real_loop_actions(
     instance_service = InstanceService(settings)
 
     monkeypatch.setattr(workspace_module, "_has_package", lambda _name: True)
-    monkeypatch.setattr(autonomous_router, "get_settings", lambda: settings)
-    monkeypatch.setattr(autonomous_router, "get_instance_service", lambda: instance_service)
+    app.dependency_overrides[autonomous_router.get_settings] = lambda: settings
+    app.dependency_overrides[autonomous_router.get_instance_service] = lambda: instance_service
     monkeypatch.setattr(hardware, "get_cluster_nodes", lambda: [{"id": "gpu-1", "status": "idle"}])
 
     transport = httpx.ASGITransport(app=app)
@@ -137,8 +137,8 @@ async def test_autonomous_execute_queues_managed_instances_without_starting_them
     instance_service = InstanceService(settings)
 
     monkeypatch.setattr(workspace_module, "_has_package", lambda _name: True)
-    monkeypatch.setattr(autonomous_router, "get_settings", lambda: settings)
-    monkeypatch.setattr(autonomous_router, "get_instance_service", lambda: instance_service)
+    app.dependency_overrides[autonomous_router.get_settings] = lambda: settings
+    app.dependency_overrides[autonomous_router.get_instance_service] = lambda: instance_service
     monkeypatch.setattr(hardware, "get_cluster_nodes", lambda: [{"id": "gpu-1", "status": "idle"}])
 
     transport = httpx.ASGITransport(app=app)

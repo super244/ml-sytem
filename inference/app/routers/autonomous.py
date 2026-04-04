@@ -1,6 +1,7 @@
 from __future__ import annotations
+from typing import Any
 
-from fastapi import APIRouter, status
+from fastapi import APIRouter, Depends, status
 from pydantic import BaseModel, Field
 
 from inference.app.config import get_settings
@@ -33,36 +34,36 @@ class AutonomousLoopPlanRequest(BaseModel):
     max_actions: int = Field(default=6, ge=1, le=25)
 
 
-def _loop_service() -> AutonomousLoopService:
-    return AutonomousLoopService(get_settings(), instance_service=get_instance_service())
+def _loop_service(settings: Any = Depends(get_settings), instance_service: Any = Depends(get_instance_service)) -> AutonomousLoopService:
+    return AutonomousLoopService(settings, instance_service=instance_service)
 
 
-def _lab_service() -> AutonomousLabService:
-    return AutonomousLabService(get_settings(), instance_service=get_instance_service())
+def _lab_service(settings: Any = Depends(get_settings), instance_service: Any = Depends(get_instance_service)) -> AutonomousLabService:
+    return AutonomousLabService(settings, instance_service=instance_service)
 
 
-def _mission_control_service() -> MissionControlService:
-    return MissionControlService(get_settings(), instance_service=get_instance_service())
+def _mission_control_service(settings: Any = Depends(get_settings), instance_service: Any = Depends(get_instance_service)) -> MissionControlService:
+    return MissionControlService(settings, instance_service=instance_service)
 
 
 @router.get("", response_model=AutonomousLoopSnapshot)
-def autonomous_snapshot() -> AutonomousLoopSnapshot:
-    return _loop_service().snapshot()
+def autonomous_snapshot(service: AutonomousLoopService = Depends(_loop_service)) -> AutonomousLoopSnapshot:
+    return service.snapshot()
 
 
 @router.get("/overview", response_model=AutonomyOverview)
-def autonomous_overview() -> AutonomyOverview:
-    return _mission_control_service().autonomy_overview()
+def autonomous_overview(service: MissionControlService = Depends(_mission_control_service)) -> AutonomyOverview:
+    return service.autonomy_overview()
 
 
 @router.post("/plan", response_model=AutonomousLoopRun)
-def plan_autonomous_loop(request: AutonomousLoopPlanRequest) -> AutonomousLoopRun:
-    return _loop_service().plan(max_actions=request.max_actions)
+def plan_autonomous_loop(request: AutonomousLoopPlanRequest, service: AutonomousLoopService = Depends(_loop_service)) -> AutonomousLoopRun:
+    return service.plan(max_actions=request.max_actions)
 
 
 @router.post("/run", response_model=AutonomousLoopRun)
-def run_autonomous_loop(request: AutonomousLoopRunRequest) -> AutonomousLoopRun:
-    return _loop_service().execute(
+def run_autonomous_loop(request: AutonomousLoopRunRequest, service: AutonomousLoopService = Depends(_loop_service)) -> AutonomousLoopRun:
+    return service.execute(
         max_actions=request.max_actions,
         dry_run=request.dry_run,
         start_instances=request.start_instances,
@@ -70,18 +71,22 @@ def run_autonomous_loop(request: AutonomousLoopRunRequest) -> AutonomousLoopRun:
 
 
 @router.post("/execute", response_model=AutonomousLoopRun)
-def execute_autonomous_loop(request: AutonomousLoopRunRequest) -> AutonomousLoopRun:
-    return run_autonomous_loop(request)
+def execute_autonomous_loop(request: AutonomousLoopRunRequest, service: AutonomousLoopService = Depends(_loop_service)) -> AutonomousLoopRun:
+    return service.execute(
+        max_actions=request.max_actions,
+        dry_run=request.dry_run,
+        start_instances=request.start_instances,
+    )
 
 
 @router.get("/campaigns", response_model=AutonomousCampaignSnapshot)
-def autonomous_campaigns() -> AutonomousCampaignSnapshot:
-    return _lab_service().snapshot()
+def autonomous_campaigns(service: AutonomousLabService = Depends(_lab_service)) -> AutonomousCampaignSnapshot:
+    return service.snapshot()
 
 
 @router.post("/campaigns/run", response_model=AutonomousExperimentResponse, status_code=status.HTTP_202_ACCEPTED)
-def run_autonomous_campaign(request: AutonomousExperimentRequest) -> AutonomousExperimentResponse:
-    campaign = _lab_service().create_campaign(request)
+def run_autonomous_campaign(request: AutonomousExperimentRequest, service: AutonomousLabService = Depends(_lab_service)) -> AutonomousExperimentResponse:
+    campaign = service.create_campaign(request)
     return AutonomousExperimentResponse(
         experiment_id=campaign.campaign_id,
         status=campaign.status,
@@ -91,8 +96,8 @@ def run_autonomous_campaign(request: AutonomousExperimentRequest) -> AutonomousE
 
 
 @router.get("/campaigns/{experiment_id}", response_model=AutonomousExperimentResponse)
-def autonomous_campaign_detail(experiment_id: str) -> AutonomousExperimentResponse:
-    campaign = _lab_service().get_campaign(experiment_id)
+def autonomous_campaign_detail(experiment_id: str, service: AutonomousLabService = Depends(_lab_service)) -> AutonomousExperimentResponse:
+    campaign = service.get_campaign(experiment_id)
     return AutonomousExperimentResponse(
         experiment_id=campaign.campaign_id,
         status=campaign.status,

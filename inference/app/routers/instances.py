@@ -1,6 +1,7 @@
 from __future__ import annotations
 
-from fastapi import APIRouter, BackgroundTasks, Query
+from typing import Any
+from fastapi import APIRouter, BackgroundTasks, Query, Depends
 from fastapi.responses import StreamingResponse
 
 from inference.app.dependencies import get_instance_service
@@ -26,8 +27,8 @@ def list_instances(
     instance_type: str | None = Query(default=None),
     status: str | None = Query(default=None),
     parent_instance_id: str | None = Query(default=None),
-) -> InstanceListResponse:
-    service = get_instance_service()
+    service: Any = Depends(get_instance_service)) -> InstanceListResponse:
+
     return InstanceListResponse(
         instances=service.list_instances(
             instance_type=instance_type,
@@ -38,8 +39,8 @@ def list_instances(
 
 
 @router.post("/instances", response_model=InstanceDetail)
-def create_instance(request: InstanceCreateRequest, background_tasks: BackgroundTasks) -> InstanceDetail:
-    service = get_instance_service()
+def create_instance(request: InstanceCreateRequest, background_tasks: BackgroundTasks, service: Any = Depends(get_instance_service)) -> InstanceDetail:
+
     should_start = request.start
     request.start = False
     instance = service.create_instance(request)
@@ -49,23 +50,23 @@ def create_instance(request: InstanceCreateRequest, background_tasks: Background
 
 
 @router.get("/instances/{instance_id}", response_model=InstanceDetail)
-def get_instance(instance_id: str) -> InstanceDetail:
-    return get_instance_service().get_instance(instance_id)
+def get_instance(instance_id: str, service: Any = Depends(get_instance_service)) -> InstanceDetail:
+    return service.get_instance(instance_id)
 
 
 @router.get("/instances/{instance_id}/logs", response_model=InstanceLogsResponse)
-def get_instance_logs(instance_id: str) -> InstanceLogsResponse:
-    return get_instance_service().get_logs(instance_id)
+def get_instance_logs(instance_id: str, service: Any = Depends(get_instance_service)) -> InstanceLogsResponse:
+    return service.get_logs(instance_id)
 
 
 @router.get("/instances/{instance_id}/metrics", response_model=InstanceMetricsResponse)
-def get_instance_metrics(instance_id: str) -> InstanceMetricsResponse:
-    return get_instance_service().get_metrics(instance_id)
+def get_instance_metrics(instance_id: str, service: Any = Depends(get_instance_service)) -> InstanceMetricsResponse:
+    return service.get_metrics(instance_id)
 
 
 @router.get("/instances/{instance_id}/live", response_model=InstanceStreamResponse)
-def get_instance_live(instance_id: str) -> InstanceStreamResponse:
-    return get_instance_service().get_live_snapshot(instance_id)
+def get_instance_live(instance_id: str, service: Any = Depends(get_instance_service)) -> InstanceStreamResponse:
+    return service.get_live_snapshot(instance_id)
 
 
 @router.get("/instances/{instance_id}/stream")
@@ -76,8 +77,8 @@ async def stream_instance(
     metric_tail_points: int = Query(default=200, ge=10, le=2000),
     event_limit: int = Query(default=50, ge=1, le=500),
     task_limit: int = Query(default=20, ge=1, le=200),
-) -> StreamingResponse:
-    service = get_instance_service()
+    service: Any = Depends(get_instance_service)) -> StreamingResponse:
+
     service.get_live_snapshot(instance_id)
 
     async def event_stream():
@@ -99,8 +100,8 @@ def evaluate_instance(
     instance_id: str,
     background_tasks: BackgroundTasks,
     request: InstanceEvaluateRequest | None = None,
-) -> InstanceDetail:
-    service = get_instance_service()
+    service: Any = Depends(get_instance_service)) -> InstanceDetail:
+
     request = request or InstanceEvaluateRequest()
     should_start = request.start
     request.start = False
@@ -115,8 +116,8 @@ def start_inference_instance(
     instance_id: str,
     background_tasks: BackgroundTasks,
     request: InstanceInferenceRequest | None = None,
-) -> InstanceDetail:
-    service = get_instance_service()
+    service: Any = Depends(get_instance_service)) -> InstanceDetail:
+
     request = request or InstanceInferenceRequest()
     should_start = request.start
     request.start = False
@@ -128,9 +129,9 @@ def start_inference_instance(
 
 @router.post("/instances/{instance_id}/deploy", response_model=InstanceDetail)
 def deploy_instance(
-    instance_id: str, request: InstanceDeployRequest, background_tasks: BackgroundTasks
-) -> InstanceDetail:
-    service = get_instance_service()
+    instance_id: str, request: InstanceDeployRequest, background_tasks: BackgroundTasks,
+    service: Any = Depends(get_instance_service)) -> InstanceDetail:
+
     should_start = request.start
     request.start = False
     instance = service.deploy_instance(instance_id, request)
@@ -141,9 +142,9 @@ def deploy_instance(
 
 @router.post("/instances/{instance_id}/actions", response_model=InstanceDetail)
 def run_instance_action(
-    instance_id: str, request: InstanceActionRequest, background_tasks: BackgroundTasks
-) -> InstanceDetail:
-    service = get_instance_service()
+    instance_id: str, request: InstanceActionRequest, background_tasks: BackgroundTasks,
+    service: Any = Depends(get_instance_service)) -> InstanceDetail:
+
     should_start = request.start
     request.start = False
     instance = service.run_instance_action(instance_id, request)
@@ -153,5 +154,5 @@ def run_instance_action(
 
 
 @router.get("/foundation", response_model=FoundationOverviewResponse)
-def get_foundation() -> FoundationOverviewResponse:
-    return get_instance_service().get_foundation_overview()
+def get_foundation(service: Any = Depends(get_instance_service)) -> FoundationOverviewResponse:
+    return service.get_foundation_overview()

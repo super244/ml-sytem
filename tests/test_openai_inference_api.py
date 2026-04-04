@@ -121,7 +121,7 @@ def anyio_backend():
 async def test_openai_chat_completions_streams_sse(monkeypatch) -> None:
     from inference.app.routers import openai as openai_router
 
-    monkeypatch.setattr(openai_router, "get_openai_service", lambda: DummyOpenAIService())
+    app.dependency_overrides[openai_router.get_openai_service] = lambda: DummyOpenAIService()
     transport = httpx.ASGITransport(app=app)
     async with httpx.AsyncClient(transport=transport, base_url="http://testserver") as client:
         async with client.stream(
@@ -146,7 +146,7 @@ async def test_openai_chat_completions_streams_sse(monkeypatch) -> None:
 async def test_openai_chat_completions_returns_usage(monkeypatch) -> None:
     from inference.app.routers import openai as openai_router
 
-    monkeypatch.setattr(openai_router, "get_openai_service", lambda: DummyOpenAIService())
+    app.dependency_overrides[openai_router.get_openai_service] = lambda: DummyOpenAIService()
     transport = httpx.ASGITransport(app=app)
     async with httpx.AsyncClient(transport=transport, base_url="http://testserver") as client:
         response = await client.post(
