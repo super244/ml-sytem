@@ -191,7 +191,9 @@ class CacheManager:
         return stats
 
 
-def cached(category: str = "default", ttl: int | None = None) -> Callable[[Callable[P, Awaitable[T]]], Callable[P, Awaitable[T]]]:
+def cached(
+    category: str = "default", ttl: int | None = None
+) -> Callable[[Callable[P, Awaitable[T]]], Callable[P, Awaitable[T]]]:
     """
     Decorator for caching async function results.
 
