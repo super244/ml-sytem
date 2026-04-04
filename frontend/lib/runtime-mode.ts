@@ -1,16 +1,16 @@
-"use client";
+'use client';
 
-import type { ModelInfo, PromptPreset } from "@/lib/api";
+import type { ModelInfo, PromptPreset } from '@/lib/api';
 
 export function isDemoMode(): boolean {
-  return process.env.NEXT_PUBLIC_AI_FACTORY_DEMO_MODE === "1";
+  return process.env.NEXT_PUBLIC_AI_FACTORY_DEMO_MODE === '1';
 }
 
 export function pickPrimaryModel(models: ModelInfo[], current?: string | null): string {
   if (current && models.some((model) => model.name === current)) {
     return current;
   }
-  return models[0]?.name ?? "";
+  return models[0]?.name ?? '';
 }
 
 export function pickSecondaryModel(
@@ -21,7 +21,7 @@ export function pickSecondaryModel(
   if (current && current !== primaryModel && models.some((model) => model.name === current)) {
     return current;
   }
-  return models.find((model) => model.name !== primaryModel)?.name ?? "";
+  return models.find((model) => model.name !== primaryModel)?.name ?? '';
 }
 
 export function pickPromptPreset(
@@ -38,5 +38,5 @@ export function pickPromptPreset(
       return match.id;
     }
   }
-  return presets[0]?.id ?? "";
+  return presets[0]?.id ?? '';
 }

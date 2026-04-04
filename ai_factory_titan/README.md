@@ -1,30 +1,47 @@
 # AI-Factory Titan Engine
 
-Titan is the high-performance Rust core of AI-Factory, providing specialized computational kernels and low-level resource management for large-scale AI operations.
+Titan is the systems-facing Rust core for AI-Factory. It now exposes hardware/runtime introspection, scheduler primitives, quantization metadata, a minimal GGUF/KV/sampler runtime surface, and optional C++ CPU kernel acceleration.
 
-## Overview
+## Current Focus
 
-The Titan engine handles:
-- **High-throughput I/O**: Fast dataset loading and processing via optimized Rust buffers.
-- **Titan-K (Kernel Library)**: Hand-optimized SIMD kernels for common tensor operations used in training and inference.
-- **Resource Orchestration**: Low-level GPU memory management and node-level scaling orchestration.
+Titan is moving toward a `llama.cpp`-style local runtime in stages:
 
-## Architecture
+- hardware detection and backend selection
+- scheduler/runtime metadata for local execution
+- quantization-aware tensor layout contracts
+- GGUF header probing, paged KV cache primitives, and sampler scaffolding
+- pure-Rust CPU kernels with optional C++ acceleration
+- Python bridge hooks for future runtime integration
 
-Titan is structured as a standalone Rust crate that is integrated into the primary AI-Factory Python platform via FFI and shared buffers.
+## Module Map
 
-### Core Modules
-- `src/core/`: Foundation logic for memory management.
-- `src/kernels/`: Optimized computational kernels.
-- `src/io/`: Asynchronous data loading and serialization.
+- `src/backend.rs`: backend identity and runtime mode metadata
+- `src/detect.rs`: local hardware probing for Metal, CUDA, and CPU fallback
+- `src/engine.rs`: Titan engine descriptor and acceleration capability map
+- `src/runtime.rs`: runtime selection and env-driven runtime descriptor
+- `src/tensor.rs`: tensor-shape and quantized-layout contracts
+- `src/quantization.rs`: Arrow schema and quantization layout helpers
+- `src/gguf.rs`: minimal GGUF header parsing
+- `src/kv_cache.rs`: paged KV cache primitives
+- `src/sampler.rs`: deterministic sampler stack primitives
+- `src/cpu_kernels.rs`: CPU fallback math kernels
+- `src/cpp.rs`: optional bridge to C++ kernels behind the `cpp` feature
+- `src/scheduler.rs`: bounded Tokio scheduler primitive
+- `src/telemetry.rs`: telemetry frame contract
+- `src/python.rs`: PyO3 bridge stub for Python integration
 
 ## Building
-
-To build Titan in release mode:
 
 ```bash
 cd ai_factory_titan
 cargo build --release
+```
+
+To include the optional C++ kernel path:
+
+```bash
+cd ai_factory_titan
+cargo build --release --features cpp
 ```
 
 ## Testing
@@ -32,7 +49,9 @@ cargo build --release
 ```bash
 cd ai_factory_titan
 cargo test
+cargo test --features cpp
 ```
 
-## Performance Note
-Titan is designed for maximum efficiency. When running on supported hardware, it utilizes specialized instruction sets (AVX-512, NEON) to accelerate computation.
+## Near-Term Direction
+
+Titan still does not replace the Python Transformers inference stack. The current MVP is enough to report richer runtime metadata through Python/API/frontend and to start growing a real local engine around GGUF ingestion, KV-cache management, decode loops, and backend-specific kernels.

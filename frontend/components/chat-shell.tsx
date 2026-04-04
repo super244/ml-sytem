@@ -1,8 +1,8 @@
-"use client";
+'use client';
 
-import clsx from "clsx";
-import Link from "next/link";
-import { useEffect, useState, useTransition } from "react";
+import clsx from 'clsx';
+import Link from 'next/link';
+import { useEffect, useState, useTransition } from 'react';
 
 import {
   generateAnswer,
@@ -11,38 +11,53 @@ import {
   type ModelVariant,
   type OutputFormat,
   type SolverMode,
-} from "@/lib/api";
-import { FALLBACK_EXAMPLES, FALLBACK_MODELS, FALLBACK_PROMPTS, RESEARCH_RESOURCES } from "@/lib/demo-content";
-import { formatCount, formatLatency, formatPercent } from "@/lib/formatting";
-import { DIFFICULTY_OPTIONS, OUTPUT_FORMAT_OPTIONS, SAMPLE_OPTIONS, SOLVER_MODE_OPTIONS } from "@/lib/options";
-import { isDemoMode, pickPrimaryModel, pickPromptPreset, pickSecondaryModel } from "@/lib/runtime-mode";
-import { ROUTES } from "@/lib/routes";
-import { useLabMetadata } from "@/hooks/use-lab-metadata";
+} from '@/lib/api';
+import {
+  FALLBACK_EXAMPLES,
+  FALLBACK_MODELS,
+  FALLBACK_PROMPTS,
+  RESEARCH_RESOURCES,
+} from '@/lib/demo-content';
+import { formatCount, formatLatency, formatPercent } from '@/lib/formatting';
+import {
+  DIFFICULTY_OPTIONS,
+  OUTPUT_FORMAT_OPTIONS,
+  SAMPLE_OPTIONS,
+  SOLVER_MODE_OPTIONS,
+} from '@/lib/options';
+import {
+  isDemoMode,
+  pickPrimaryModel,
+  pickPromptPreset,
+  pickSecondaryModel,
+} from '@/lib/runtime-mode';
+import { ROUTES } from '@/lib/routes';
+import { useLabMetadata } from '@/hooks/use-lab-metadata';
 
-import { MathBlock } from "@/components/math-block";
-import { AppShell } from "@/components/layout/app-shell";
-import { CandidateInspector } from "@/components/panels/candidate-inspector";
-import { MetricBadge } from "@/components/panels/metric-badge";
-import { ModelChip } from "@/components/panels/model-chip";
-import { PageHeader } from "@/components/ui/page-header";
-import { StatePanel } from "@/components/ui/state-panel";
+import { MathBlock } from '@/components/math-block';
+import { AppShell } from '@/components/layout/app-shell';
+import { CandidateInspector } from '@/components/panels/candidate-inspector';
+import { MetricBadge } from '@/components/panels/metric-badge';
+import { ModelChip } from '@/components/panels/model-chip';
+import { PageHeader } from '@/components/ui/page-header';
+import { StatePanel } from '@/components/ui/state-panel';
 
 type ChatMessage = {
   id: string;
-  role: "user" | "assistant" | "system";
+  role: 'user' | 'assistant' | 'system';
   content: string;
   result?: GenerateResponse;
 };
 
-type WorkspaceMode = "focus" | "research" | "verification";
-type WorkspaceDensity = "compact" | "balanced" | "expanded";
+type WorkspaceMode = 'focus' | 'research' | 'verification';
+type WorkspaceDensity = 'compact' | 'balanced' | 'expanded';
 
 const INITIAL_MESSAGES: ChatMessage[] = [
   {
-    id: "intro",
-    role: "system",
+    id: 'intro',
+    role: 'system',
     content:
-      "AI-Factory specializes in verifier-aware reasoning, controlled sampling, and model comparison. Use the control rail to switch presets, compare models, and inspect reranked candidates.",
+      'AI-Factory specializes in verifier-aware reasoning, controlled sampling, and model comparison. Use the control rail to switch presets, compare models, and inspect reranked candidates.',
   },
 ];
 
@@ -50,7 +65,11 @@ export function ChatShell() {
   const metadata = useLabMetadata();
   const demoMode = isDemoMode();
   const promptLibrary = metadata.promptLibrary;
-  const availableModels = metadata.models.length ? metadata.models : demoMode ? FALLBACK_MODELS : [];
+  const availableModels = metadata.models.length
+    ? metadata.models
+    : demoMode
+      ? FALLBACK_MODELS
+      : [];
   const promptPresets =
     promptLibrary && promptLibrary.presets.length > 0
       ? promptLibrary.presets
@@ -63,26 +82,30 @@ export function ChatShell() {
       : demoMode
         ? FALLBACK_EXAMPLES
         : [];
-  const metadataDegraded = !demoMode && (metadata.status?.status === "degraded" || Boolean(metadata.error));
+  const metadataDegraded =
+    !demoMode && (metadata.status?.status === 'degraded' || Boolean(metadata.error));
 
   const [messages, setMessages] = useState<ChatMessage[]>(INITIAL_MESSAGES);
-  const [question, setQuestion] = useState("");
-  const [modelVariant, setModelVariant] = useState<ModelVariant>("");
-  const [compareToModel, setCompareToModel] = useState<string>("");
+  const [question, setQuestion] = useState('');
+  const [modelVariant, setModelVariant] = useState<ModelVariant>('');
+  const [compareToModel, setCompareToModel] = useState<string>('');
   const [showReasoning, setShowReasoning] = useState(true);
-  const [difficultyTarget, setDifficultyTarget] = useState<Difficulty>("olympiad");
+  const [difficultyTarget, setDifficultyTarget] = useState<Difficulty>('olympiad');
   const [useCalculator, setUseCalculator] = useState(true);
-  const [solverMode, setSolverMode] = useState<SolverMode>("rigorous");
+  const [solverMode, setSolverMode] = useState<SolverMode>('rigorous');
   const [temperature, setTemperature] = useState(0.2);
   const [numSamples, setNumSamples] = useState(3);
-  const [promptPreset, setPromptPreset] = useState("");
-  const [outputFormat, setOutputFormat] = useState<OutputFormat>("text");
+  const [promptPreset, setPromptPreset] = useState('');
+  const [outputFormat, setOutputFormat] = useState<OutputFormat>('text');
   const [selectedCandidateIndex, setSelectedCandidateIndex] = useState(0);
-  const [workspaceMode, setWorkspaceMode] = useState<WorkspaceMode>("research");
-  const [density, setDensity] = useState<WorkspaceDensity>("balanced");
+  const [workspaceMode, setWorkspaceMode] = useState<WorkspaceMode>('research');
+  const [density, setDensity] = useState<WorkspaceDensity>('balanced');
   const [isPending, startTransition] = useTransition();
   const canSubmit =
-    question.trim().length > 0 && Boolean(modelVariant) && Boolean(promptPreset) && !metadataDegraded;
+    question.trim().length > 0 &&
+    Boolean(modelVariant) &&
+    Boolean(promptPreset) &&
+    !metadataDegraded;
 
   useEffect(() => {
     setModelVariant((current) => pickPrimaryModel(availableModels, current));
@@ -93,17 +116,21 @@ export function ChatShell() {
   }, [availableModels, modelVariant]);
 
   useEffect(() => {
-    setPromptPreset((current) => pickPromptPreset(promptPresets, ["atlas_rigorous"], current));
+    setPromptPreset((current) => pickPromptPreset(promptPresets, ['atlas_rigorous'], current));
   }, [promptPresets]);
 
   useEffect(() => {
     try {
-      const storedMode = window.localStorage.getItem("ai-factory-workspace-mode");
-      const storedDensity = window.localStorage.getItem("ai-factory-workspace-density");
-      if (storedMode === "focus" || storedMode === "research" || storedMode === "verification") {
+      const storedMode = window.localStorage.getItem('ai-factory-workspace-mode');
+      const storedDensity = window.localStorage.getItem('ai-factory-workspace-density');
+      if (storedMode === 'focus' || storedMode === 'research' || storedMode === 'verification') {
         setWorkspaceMode(storedMode);
       }
-      if (storedDensity === "compact" || storedDensity === "balanced" || storedDensity === "expanded") {
+      if (
+        storedDensity === 'compact' ||
+        storedDensity === 'balanced' ||
+        storedDensity === 'expanded'
+      ) {
         setDensity(storedDensity);
       }
     } catch {
@@ -113,8 +140,8 @@ export function ChatShell() {
 
   useEffect(() => {
     try {
-      window.localStorage.setItem("ai-factory-workspace-mode", workspaceMode);
-      window.localStorage.setItem("ai-factory-workspace-density", density);
+      window.localStorage.setItem('ai-factory-workspace-mode', workspaceMode);
+      window.localStorage.setItem('ai-factory-workspace-density', density);
     } catch {
       // Ignore persistence failures and keep the session interactive.
     }
@@ -122,46 +149,46 @@ export function ChatShell() {
 
   const latestResult = [...messages]
     .reverse()
-    .find((message) => message.role === "assistant" && message.result)?.result;
+    .find((message) => message.role === 'assistant' && message.result)?.result;
 
   function resetConversation() {
     setMessages(INITIAL_MESSAGES);
-    setQuestion("");
+    setQuestion('');
     setSelectedCandidateIndex(0);
   }
 
   function applyWorkspacePreset(mode: WorkspaceMode) {
     setWorkspaceMode(mode);
-    if (mode === "focus") {
-      setPromptPreset(pickPromptPreset(promptPresets, ["atlas_exam", "atlas_rigorous"]));
-      setDifficultyTarget("medium");
-      setSolverMode("exam");
+    if (mode === 'focus') {
+      setPromptPreset(pickPromptPreset(promptPresets, ['atlas_exam', 'atlas_rigorous']));
+      setDifficultyTarget('medium');
+      setSolverMode('exam');
       setShowReasoning(false);
       setUseCalculator(true);
       setNumSamples(1);
       setTemperature(0.0);
-      setOutputFormat("text");
+      setOutputFormat('text');
       return;
     }
-    if (mode === "verification") {
-      setPromptPreset(pickPromptPreset(promptPresets, ["atlas_verifier", "atlas_rigorous"]));
-      setDifficultyTarget("hard");
-      setSolverMode("verification");
+    if (mode === 'verification') {
+      setPromptPreset(pickPromptPreset(promptPresets, ['atlas_verifier', 'atlas_rigorous']));
+      setDifficultyTarget('hard');
+      setSolverMode('verification');
       setShowReasoning(true);
       setUseCalculator(true);
       setNumSamples(4);
       setTemperature(0.1);
-      setOutputFormat("json");
+      setOutputFormat('json');
       return;
     }
-    setPromptPreset(pickPromptPreset(promptPresets, ["atlas_rigorous"]));
-    setDifficultyTarget("olympiad");
-    setSolverMode("rigorous");
+    setPromptPreset(pickPromptPreset(promptPresets, ['atlas_rigorous']));
+    setDifficultyTarget('olympiad');
+    setSolverMode('rigorous');
     setShowReasoning(true);
     setUseCalculator(true);
     setNumSamples(3);
     setTemperature(0.2);
-    setOutputFormat("text");
+    setOutputFormat('text');
   }
 
   async function submitQuestion(submittedQuestion: string) {
@@ -171,11 +198,11 @@ export function ChatShell() {
     }
     const userMessage: ChatMessage = {
       id: `user-${Date.now()}`,
-      role: "user",
+      role: 'user',
       content: trimmed,
     };
     setMessages((current) => [...current, userMessage]);
-    setQuestion("");
+    setQuestion('');
     try {
       const response = await generateAnswer({
         question: trimmed,
@@ -199,18 +226,18 @@ export function ChatShell() {
         ...current,
         {
           id: `assistant-${Date.now()}`,
-          role: "assistant",
+          role: 'assistant',
           content: response.answer,
           result: response,
         },
       ]);
     } catch (error) {
-      const message = error instanceof Error ? error.message : "Unknown request failure.";
+      const message = error instanceof Error ? error.message : 'Unknown request failure.';
       setMessages((current) => [
         ...current,
         {
           id: `assistant-error-${Date.now()}`,
-          role: "assistant",
+          role: 'assistant',
           content: `The request failed.\n\n\`\`\`\n${message}\n\`\`\``,
         },
       ]);
@@ -225,19 +252,22 @@ export function ChatShell() {
           title="AI-Factory Assistant Console"
           description="A polished interface for the same verifier-aware inference system used in offline evaluation. Tune model routing, sampling, and reasoning visibility while inspecting candidates, workspace metadata, and benchmark signals in one place."
           metrics={[
-            { label: "Models", value: formatCount(metadata.models.length || availableModels.length) },
             {
-              label: "Benchmarks",
+              label: 'Models',
+              value: formatCount(metadata.models.length || availableModels.length),
+            },
+            {
+              label: 'Benchmarks',
               value: formatCount(metadata.benchmarks.length),
-              tone: "secondary",
+              tone: 'secondary',
             },
             {
-              label: "Runs",
+              label: 'Runs',
               value: formatCount(metadata.runs.length),
-              tone: "accent",
+              tone: 'accent',
             },
             {
-              label: "Cache entries",
+              label: 'Cache entries',
               value: formatCount(metadata.status?.cache.entries),
             },
           ]}
@@ -265,10 +295,10 @@ export function ChatShell() {
 
           <div className="control-bay-actions">
             <div className="control-chip-group">
-              {(["focus", "research", "verification"] as WorkspaceMode[]).map((mode) => (
+              {(['focus', 'research', 'verification'] as WorkspaceMode[]).map((mode) => (
                 <button
                   key={mode}
-                  className={clsx("ghost-button small", { active: workspaceMode === mode })}
+                  className={clsx('ghost-button small', { active: workspaceMode === mode })}
                   type="button"
                   aria-pressed={workspaceMode === mode}
                   onClick={() => applyWorkspacePreset(mode)}
@@ -278,10 +308,10 @@ export function ChatShell() {
               ))}
             </div>
             <div className="control-chip-group">
-              {(["compact", "balanced", "expanded"] as WorkspaceDensity[]).map((nextDensity) => (
+              {(['compact', 'balanced', 'expanded'] as WorkspaceDensity[]).map((nextDensity) => (
                 <button
                   key={nextDensity}
-                  className={clsx("secondary-button small", { active: density === nextDensity })}
+                  className={clsx('secondary-button small', { active: density === nextDensity })}
                   type="button"
                   aria-pressed={density === nextDensity}
                   onClick={() => setDensity(nextDensity)}
@@ -293,15 +323,19 @@ export function ChatShell() {
             <div className="badge-row">
               <MetricBadge label="Mode" value={workspaceMode} tone="accent" />
               <MetricBadge label="Density" value={density} tone="secondary" />
-              <MetricBadge label="Signals" value={showReasoning ? "full" : "minimal"} />
+              <MetricBadge label="Signals" value={showReasoning ? 'full' : 'minimal'} />
             </div>
           </div>
         </section>
 
         {metadata.error ? (
           <StatePanel
-            eyebrow={demoMode ? "Demo Metadata" : "Metadata Degraded"}
-            title={demoMode ? "The workspace is running with demo metadata." : "The workspace cannot trust live metadata."}
+            eyebrow={demoMode ? 'Demo Metadata' : 'Metadata Degraded'}
+            title={
+              demoMode
+                ? 'The workspace is running with demo metadata.'
+                : 'The workspace cannot trust live metadata.'
+            }
             description={metadata.error}
             tone="error"
             action={
@@ -326,15 +360,15 @@ export function ChatShell() {
             <div className="aside-section">
               <div className="section-title">Live Session</div>
               <p className="hero-copy">
-                Route queries through the specialist stack, enable verification hooks, and keep
-                the thread ready for direct model-vs-model inspection.
+                Route queries through the specialist stack, enable verification hooks, and keep the
+                thread ready for direct model-vs-model inspection.
               </p>
               <div className="badge-row">
                 <MetricBadge label="Primary" value={modelVariant} />
                 <MetricBadge label="Samples" value={`${numSamples}`} tone="secondary" />
                 <MetricBadge
                   label="Reasoning"
-                  value={showReasoning ? "visible" : "hidden"}
+                  value={showReasoning ? 'visible' : 'hidden'}
                   tone="accent"
                 />
               </div>
@@ -362,7 +396,7 @@ export function ChatShell() {
                     const nextModel = event.target.value as ModelVariant;
                     setModelVariant(nextModel);
                     if (compareToModel === nextModel) {
-                      setCompareToModel("");
+                      setCompareToModel('');
                     }
                   }}
                 >
@@ -544,7 +578,11 @@ export function ChatShell() {
                 </p>
               </div>
               <div className="action-row">
-                <button className="secondary-button small" type="button" onClick={resetConversation}>
+                <button
+                  className="secondary-button small"
+                  type="button"
+                  onClick={resetConversation}
+                >
                   New thread
                 </button>
                 <Link className="ghost-button small" href={ROUTES.compare}>
@@ -561,10 +599,10 @@ export function ChatShell() {
                 label="Cache"
                 value={
                   metadata.status?.cache.enabled === true
-                    ? "enabled"
+                    ? 'enabled'
                     : metadata.status?.cache.enabled === false
-                      ? "disabled"
-                      : "unknown"
+                      ? 'disabled'
+                      : 'unknown'
                 }
               />
             </div>
@@ -591,19 +629,19 @@ export function ChatShell() {
               {messages.map((message) => (
                 <article
                   key={message.id}
-                  className={clsx("message-card", {
-                    user: message.role === "user",
-                    assistant: message.role === "assistant",
-                    system: message.role === "system",
+                  className={clsx('message-card', {
+                    user: message.role === 'user',
+                    assistant: message.role === 'assistant',
+                    system: message.role === 'system',
                   })}
                 >
                   <div className="message-meta">
                     <span>
-                      {message.role === "user"
-                        ? "You"
-                        : message.role === "assistant"
-                          ? "AI-Factory"
-                          : "Session guide"}
+                      {message.role === 'user'
+                        ? 'You'
+                        : message.role === 'assistant'
+                          ? 'AI-Factory'
+                          : 'Session guide'}
                     </span>
                     <div className="pill-row">
                       {message.result?.prompt_preset ? (
@@ -620,7 +658,7 @@ export function ChatShell() {
                   {message.result ? (
                     <>
                       <div className="badge-row">
-                        <MetricBadge label="Final" value={message.result.final_answer ?? "n/a"} />
+                        <MetricBadge label="Final" value={message.result.final_answer ?? 'n/a'} />
                         <MetricBadge
                           label="Rerank"
                           value={message.result.selected_score.toFixed(2)}
@@ -671,22 +709,34 @@ export function ChatShell() {
                     <span className="hint-text">
                       {metadata.status?.cache.entries
                         ? `${metadata.status.cache.entries} cached generations ready for replay`
-                        : "Inference cache will warm as you explore prompts."}
+                        : 'Inference cache will warm as you explore prompts.'}
                     </span>
                     <div className="pill-row">
                       <span className="status-pill">
-                        {showReasoning ? "reasoning visible" : "reasoning hidden"}
+                        {showReasoning ? 'reasoning visible' : 'reasoning hidden'}
                       </span>
-                      <span className="status-pill">{outputFormat === "json" ? "structured" : "text"}</span>
-                      <span className="status-pill">{useCalculator ? "calculator on" : "calculator off"}</span>
+                      <span className="status-pill">
+                        {outputFormat === 'json' ? 'structured' : 'text'}
+                      </span>
+                      <span className="status-pill">
+                        {useCalculator ? 'calculator on' : 'calculator off'}
+                      </span>
                     </div>
                   </div>
                   <div className="action-row">
-                    <button className="ghost-button small" type="button" onClick={() => setQuestion("")}>
+                    <button
+                      className="ghost-button small"
+                      type="button"
+                      onClick={() => setQuestion('')}
+                    >
                       Clear draft
                     </button>
-                    <button className="primary-button" type="submit" disabled={isPending || !canSubmit}>
-                      {isPending ? "Solving..." : "Solve problem"}
+                    <button
+                      className="primary-button"
+                      type="submit"
+                      disabled={isPending || !canSubmit}
+                    >
+                      {isPending ? 'Solving...' : 'Solve problem'}
                     </button>
                   </div>
                 </div>
@@ -714,8 +764,8 @@ export function ChatShell() {
                       label="Verifier"
                       value={
                         latestResult.verification?.equivalent
-                          ? "match"
-                          : latestResult.verification?.error_type ?? "unknown"
+                          ? 'match'
+                          : (latestResult.verification?.error_type ?? 'unknown')
                       }
                       tone="secondary"
                     />
@@ -733,16 +783,16 @@ export function ChatShell() {
                     <MathBlock
                       content={
                         latestResult.structured?.reasoning ||
-                        latestResult.reasoning_steps.join("\n") ||
-                        "No reasoning available."
+                        latestResult.reasoning_steps.join('\n') ||
+                        'No reasoning available.'
                       }
                     />
                   </div>
                 </>
               ) : (
                 <p className="hero-copy">
-                  Latest reasoning traces, verifier signals, and candidate metadata will appear
-                  here after the first generation.
+                  Latest reasoning traces, verifier signals, and candidate metadata will appear here
+                  after the first generation.
                 </p>
               )}
             </section>

@@ -8,7 +8,9 @@ import subprocess
 from dataclasses import asdict, dataclass
 from importlib.util import find_spec
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
+
+import tomllib
 
 _APPLE_BANDWIDTH_GBPS = {
     "m1 max": 400,
@@ -45,10 +47,19 @@ class TitanStatus:
     silent_mode: bool
     gpu_cap_pct: int
     preferred_training_backend: str
+    runtime_source: str
     scheduler: dict[str, Any]
     quantization: dict[str, Any]
     telemetry: dict[str, Any]
     rust_core: dict[str, Any]
+    runtime: dict[str, Any]
+    engine: dict[str, Any]
+
+
+def _as_dict(value: Any) -> dict[str, Any]:
+    if isinstance(value, dict):
+        return cast(dict[str, Any], value)
+    return {}
 
 
 def _run_command(args: list[str]) -> str | None:
@@ -71,6 +82,17 @@ def _run_command(args: list[str]) -> str | None:
     if completed.returncode != 0:
         return None
     return completed.stdout.strip() or None
+
+
+def _run_json_command(args: list[str]) -> dict[str, Any] | None:
+    output = _run_command(args)
+    if not output:
+        return None
+    try:
+        payload = json.loads(output)
+    except json.JSONDecodeError:
+        return None
+    return payload if isinstance(payload, dict) else None
 
 
 def _detect_apple_gpu() -> tuple[str | None, float | None]:
@@ -145,13 +167,62 @@ def _bandwidth_for_silicon(silicon: str | None) -> int | None:
     return None
 
 
+def _default_layout() -> dict[str, Any]:
+    return {
+        "format": "q4_k",
+        "block_size": 32,
+        "bytes_per_block": 24,
+        "alignment_bytes": 64,
+        "storage": "blocked-row-major",
+    }
+
+
+def _load_cargo_features(crate_root: Path) -> list[str]:
+    cargo_toml = crate_root / "Cargo.toml"
+    if not cargo_toml.exists():
+        return []
+    try:
+        parsed = tomllib.loads(cargo_toml.read_text())
+    except (tomllib.TOMLDecodeError, OSError):
+        return []
+    features = parsed.get("features", {})
+    if not isinstance(features, dict):
+        return []
+    return sorted(str(name) for name in features.keys())
+
+
+def _find_titan_status_binary(repo_root: Path) -> Path | None:
+    crate_root = repo_root / "ai_factory_titan"
+    candidates = [
+        crate_root / "target" / "debug" / "titan-status",
+        crate_root / "target" / "release" / "titan-status",
+    ]
+    for candidate in candidates:
+        if candidate.exists() and candidate.is_file():
+            return candidate
+    return None
+
+
 def _rust_core_manifest(repo_root: Path) -> dict[str, Any]:
     crate_root = repo_root / "ai_factory_titan"
+    status_binary = _find_titan_status_binary(repo_root)
+    features = _load_cargo_features(crate_root)
     return {
         "crate_root": str(crate_root),
         "cargo_toml": str(crate_root / "Cargo.toml"),
         "toolchain_available": shutil.which("cargo") is not None,
         "python_bridge_stub": str(crate_root / "src" / "python.rs"),
+        "build_script": str(crate_root / "build.rs"),
+        "build_rs": str(crate_root / "build.rs"),
+        "cpp_bridge": str(crate_root / "src" / "cpp.rs"),
+        "gguf_module": str(crate_root / "src" / "gguf.rs"),
+        "kv_cache_module": str(crate_root / "src" / "kv_cache.rs"),
+        "runtime_module": str(crate_root / "src" / "runtime.rs"),
+        "sampler_module": str(crate_root / "src" / "sampler.rs"),
+        "features": features,
+        "cpp_feature_available": "cpp" in features,
+        "status_binary": str(status_binary) if status_binary else None,
+        "status_binary_available": status_binary is not None,
     }
 
 
@@ -162,6 +233,69 @@ def _detect_pyo3_bridge_support() -> bool:
         return find_spec("ai_factory_titan_py") is not None
     except (ImportError, ValueError):
         return False
+
+
+def _source_engine_manifest(repo_root: Path) -> dict[str, Any]:
+    crate_root = repo_root / "ai_factory_titan" / "src"
+    runtime_selected = (os.getenv("AI_FACTORY_TITAN_RUNTIME") or "python").strip().lower() or "python"
+    runtime_mode = (
+        "rust-primary"
+        if runtime_selected in {"rust", "rust-primary"}
+        else "rust-canary"
+        if runtime_selected == "rust-canary"
+        else "python-fallback"
+    )
+    return {
+        "architecture": "llm-runtime",
+        "decode_model": "llama.cpp-inspired",
+        "runtime_mode": runtime_mode,
+        "runtime_ready": runtime_mode != "python-fallback",
+        "runtime_reason": (
+            "Rust Titan runtime enabled via AI_FACTORY_TITAN_RUNTIME."
+            if runtime_mode != "python-fallback"
+            else "Python Transformers path remains primary until Titan runtime is promoted."
+        ),
+        "max_context_tokens": 8192,
+        "max_batch_tokens": 2048,
+        "cache_strategy": "paged_kv",
+        "scheduler_queue_depth": 64,
+        "runtime_env": "AI_FACTORY_TITAN_RUNTIME",
+        "supports_gguf": (crate_root / "gguf.rs").exists(),
+        "supports_kv_cache": (crate_root / "kv_cache.rs").exists(),
+        "supports_sampler_stack": (crate_root / "sampler.rs").exists(),
+        "gguf_support": (crate_root / "gguf.rs").exists(),
+        "kv_cache": (crate_root / "kv_cache.rs").exists(),
+        "sampler_stack": ["argmax", "temperature", "top_k", "top_p", "repetition_penalty"],
+        "supported_quantizations": ["q4_0", "q4_k", "q8_0", "f16"],
+        "default_layout": _default_layout(),
+        "acceleration": {
+            "rust_fallback": True,
+            "cpp_kernels": (crate_root / "cpp.rs").exists(),
+            "metal_backend": (repo_root / "ai_factory_titan" / "Cargo.toml").exists(),
+            "cuda_backend": (repo_root / "ai_factory_titan" / "Cargo.toml").exists(),
+        },
+    }
+
+
+def _load_rust_status(repo_root: Path) -> dict[str, Any] | None:
+    if _env_flag("AI_FACTORY_TITAN_DISABLE_STATUS_BINARY"):
+        return None
+    binary = _find_titan_status_binary(repo_root)
+    if binary is None:
+        return None
+    return _run_json_command([str(binary)])
+
+
+def _merge_dict(base: dict[str, Any], overlay: dict[str, Any] | None) -> dict[str, Any]:
+    if not overlay:
+        return base
+    merged = dict(base)
+    for key, value in overlay.items():
+        if isinstance(value, dict) and isinstance(merged.get(key), dict):
+            merged[key] = _merge_dict(merged[key], value)
+        else:
+            merged[key] = value
+    return merged
 
 
 def detect_titan_status(repo_root: str | Path | None = None) -> dict[str, Any]:
@@ -245,6 +379,90 @@ def detect_titan_status(repo_root: str | Path | None = None) -> dict[str, Any]:
     cpu_threads = os.cpu_count() or 1
     cpu_fallback_threads = min(cpu_threads, 64)
 
+    rust_core = _rust_core_manifest(resolved_root)
+    rust_status = _load_rust_status(resolved_root)
+    source_engine = _source_engine_manifest(resolved_root)
+    rust_engine = rust_status.get("engine") if rust_status else None
+    engine = _merge_dict(source_engine, rust_engine)
+
+    scheduler = {
+        "runtime": "tokio",
+        "queue_policy": "bounded-priority",
+        "ui_frame_budget_hz": 120,
+        "max_inflight_tasks": 64,
+        "priority_bands": 3,
+    }
+    if rust_status and isinstance(rust_status.get("scheduler"), dict):
+        rust_scheduler = dict(rust_status["scheduler"])
+        scheduler = _merge_dict(
+            scheduler,
+            {
+                "runtime": rust_scheduler.get("runtime"),
+                "queue_policy": rust_scheduler.get("queue_policy"),
+                "ui_frame_budget_hz": rust_scheduler.get("ui_budget_hz", rust_scheduler.get("ui_frame_budget_hz")),
+                "max_inflight_tasks": rust_scheduler.get("max_inflight_tasks"),
+                "priority_bands": rust_scheduler.get("priority_bands"),
+            },
+        )
+
+    quantization = {
+        "formats": ["4bit", "8bit", "q4_k", "q8_0", "f16"],
+        "memory_layout": _default_layout()["storage"],
+        "default_layout": _default_layout(),
+    }
+    if rust_status and isinstance(rust_status.get("quantization"), dict):
+        quantization = _merge_dict(
+            quantization,
+            {
+                "formats": rust_status["quantization"].get("formats"),
+                "default_layout": rust_status["quantization"].get("layout"),
+                "memory_layout": (rust_status["quantization"].get("layout") or {}).get("storage"),
+            },
+        )
+
+    telemetry = {
+        "bridge": "pyo3",
+        "target_latency_ms": 1,
+        "metrics": ["thermals", "memory_pressure", "flops", "queue_depth"],
+    }
+
+    runtime_selected = (os.getenv("AI_FACTORY_TITAN_RUNTIME") or "python").strip().lower() or "python"
+    runtime = {
+        "selected": runtime_selected,
+        "env_var": "AI_FACTORY_TITAN_RUNTIME",
+        "runtime_flag": "AI_FACTORY_TITAN_RUNTIME",
+        "runtime_enabled": runtime_selected in {"rust", "rust-primary", "rust-canary"},
+        "status_source": "rust-binary" if rust_status else "python-probe",
+        "status_binary_available": rust_core["status_binary_available"],
+        "gguf_support": bool(engine.get("supports_gguf", engine.get("gguf_support"))),
+        "kv_cache": {
+            "enabled": bool(engine.get("supports_kv_cache", engine.get("kv_cache"))),
+            "strategy": engine.get("cache_strategy") or "paged_kv",
+        },
+        "sampler": {
+            "stack": list(engine.get("sampler_stack") or []),
+        },
+        "sampler_stack": list(engine.get("sampler_stack") or []),
+    }
+    if rust_status and isinstance(rust_status.get("runtime"), dict):
+        runtime = _merge_dict(runtime, rust_status["runtime"])
+    engine = _merge_dict(
+        engine,
+        {
+            "runtime_mode": (
+                "rust-primary"
+                if runtime.get("selected") in {"rust", "rust-primary"}
+                else "rust-canary"
+                if runtime.get("selected") == "rust-canary"
+                else "python-fallback"
+            ),
+            "runtime_ready": bool(runtime.get("selected") in {"rust", "rust-primary", "rust-canary"}),
+            "supports_gguf": bool(runtime.get("gguf_support")),
+            "supports_kv_cache": bool(runtime.get("kv_cache")),
+            "supports_sampler_stack": bool(runtime.get("sampler_stack")),
+        },
+    )
+
     status = TitanStatus(
         silicon=silicon,
         platform=system,
@@ -270,26 +488,23 @@ def detect_titan_status(repo_root: str | Path | None = None) -> dict[str, Any]:
         silent_mode=silent_mode,
         gpu_cap_pct=gpu_cap_pct,
         preferred_training_backend=backend,
-        scheduler={
-            "runtime": "tokio",
-            "queue_policy": "bounded-priority",
-            "ui_frame_budget_hz": 120,
-        },
-        quantization={
-            "formats": ["4bit", "8bit"],
-            "memory_layout": "arrow-columnar",
-        },
-        telemetry={
-            "bridge": "pyo3",
-            "target_latency_ms": 1,
-            "metrics": ["thermals", "memory_pressure", "flops", "queue_depth"],
-        },
-        rust_core=_rust_core_manifest(resolved_root),
+        runtime_source=runtime.get("status_source", "python-probe"),
+        scheduler=scheduler,
+        quantization=quantization,
+        telemetry=telemetry,
+        rust_core=rust_core,
+        runtime=runtime,
+        engine=engine,
     )
     return asdict(status)
 
 
 def build_hardware_markdown(status: dict[str, Any]) -> str:
+    runtime = status.get("runtime") or {}
+    engine = status.get("engine") or {}
+    default_layout = (status.get("quantization") or {}).get("default_layout") or {}
+    kv_cache = runtime.get("kv_cache")
+    kv_cache_enabled = kv_cache if isinstance(kv_cache, bool) else bool((kv_cache or {}).get("enabled", kv_cache))
     lines = [
         "# HARDWARE",
         "",
@@ -327,11 +542,31 @@ def build_hardware_markdown(status: dict[str, Any]) -> str:
         "",
         "## Runtime Contracts",
         "",
+        f"- Runtime selection: {runtime.get('selected') or 'python'}",
+        f"- Runtime env var: {runtime.get('env_var') or 'AI_FACTORY_TITAN_RUNTIME'}",
+        f"- Runtime source: {runtime.get('status_source') or 'python-probe'}",
+        f"- GGUF support: {'yes' if runtime.get('gguf_support') else 'no'}",
+        f"- KV cache: {'yes' if kv_cache_enabled else 'no'}",
+        f"- Sampler stack: {', '.join(runtime.get('sampler_stack') or ['argmax'])}",
         f"- Scheduler runtime: {status['scheduler']['runtime']}",
         f"- Queue policy: {status['scheduler']['queue_policy']}",
         f"- UI frame budget: {status['scheduler']['ui_frame_budget_hz']} Hz",
+        f"- Max inflight tasks: {status['scheduler'].get('max_inflight_tasks') or 'n/a'}",
+        f"- Priority bands: {status['scheduler'].get('priority_bands') or 'n/a'}",
         f"- Quantization: {', '.join(status['quantization']['formats'])}",
         f"- Quantized layout: {status['quantization']['memory_layout']}",
+        f"- Layout block size: {default_layout.get('block_size') or 'n/a'}",
+        f"- Layout bytes/block: {default_layout.get('bytes_per_block') or 'n/a'}",
+        "",
+        "## Engine",
+        "",
+        f"- Architecture: {engine.get('architecture') or 'n/a'}",
+        f"- Decode model: {engine.get('decode_model') or 'n/a'}",
+        f"- Max context: {engine.get('max_context_tokens') or 'n/a'}",
+        f"- Max batch tokens: {engine.get('max_batch_tokens') or 'n/a'}",
+        f"- Cache strategy: {engine.get('cache_strategy') or 'n/a'}",
+        f"- Scheduler queue depth: {engine.get('scheduler_queue_depth') or 'n/a'}",
+        f"- C++ kernels: {'yes' if (engine.get('acceleration') or {}).get('cpp_kernels') else 'no'}",
         "",
         "## Rust Core",
         "",
@@ -339,6 +574,12 @@ def build_hardware_markdown(status: dict[str, Any]) -> str:
         f"- Cargo manifest: {status['rust_core']['cargo_toml']}",
         f"- Toolchain available: {'yes' if status['rust_core']['toolchain_available'] else 'no'}",
         f"- PyO3 bridge stub: {status['rust_core']['python_bridge_stub']}",
+        f"- Build script: {status['rust_core'].get('build_rs') or 'n/a'}",
+        f"- GGUF module: {status['rust_core'].get('gguf_module') or 'n/a'}",
+        f"- KV cache module: {status['rust_core'].get('kv_cache_module') or 'n/a'}",
+        f"- Runtime module: {status['rust_core'].get('runtime_module') or 'n/a'}",
+        f"- Sampler module: {status['rust_core'].get('sampler_module') or 'n/a'}",
+        f"- Status binary: {status['rust_core'].get('status_binary') or 'n/a'}",
         "",
         "## Raw Probe",
         "",
@@ -348,6 +589,37 @@ def build_hardware_markdown(status: dict[str, Any]) -> str:
         "",
     ]
     return "\n".join(lines)
+
+
+def titan_diagnostics(repo_root: str | Path | None = None) -> dict[str, Any]:
+    resolved_root = Path(repo_root or Path(__file__).resolve().parents[1]).resolve()
+    status = detect_titan_status(resolved_root)
+    rust_status = _load_rust_status(resolved_root)
+    runtime = _as_dict(status.get("runtime"))
+    engine = _as_dict(status.get("engine"))
+    return {
+        "status": status,
+        "rust_status": rust_status,
+        "runtime": {
+            "selected": runtime.get("selected"),
+            "status_source": runtime.get("status_source"),
+            "status_binary_available": runtime.get("status_binary_available"),
+            "gguf_support": runtime.get("gguf_support"),
+            "kv_cache": runtime.get("kv_cache"),
+            "sampler_stack": runtime.get("sampler_stack"),
+            "canary_generation_requested": runtime.get("runtime_enabled"),
+            "canary_generation_enabled": _env_flag("AI_FACTORY_TITAN_ENABLE_CANARY_GENERATION"),
+        },
+        "engine": {
+            "decode_model": engine.get("decode_model"),
+            "cache_strategy": engine.get("cache_strategy"),
+            "runtime_mode": engine.get("runtime_mode"),
+            "runtime_ready": engine.get("runtime_ready"),
+            "supports_gguf": engine.get("supports_gguf", engine.get("gguf_support")),
+            "supports_kv_cache": engine.get("supports_kv_cache", engine.get("kv_cache")),
+            "sampler_stack": engine.get("sampler_stack"),
+        },
+    }
 
 
 def write_hardware_markdown(

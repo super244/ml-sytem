@@ -42,7 +42,7 @@ class SecureExecutor:
         check: bool = True,
         cwd: str | Path | None = None,
         env: Mapping[str, str] | None = None,
-    ) -> subprocess.CompletedProcess:
+    ) -> subprocess.CompletedProcess[str]:
         """
         Execute a command with security constraints.
 

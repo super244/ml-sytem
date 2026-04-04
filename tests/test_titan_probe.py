@@ -24,6 +24,34 @@ def test_detect_titan_status_prefers_remote_cuda_when_configured(monkeypatch) ->
             "driver_version": None,
         },
     )
+    monkeypatch.setattr(
+        titan,
+        "_load_rust_status",
+        lambda repo_root: {
+            "scheduler": {
+                "runtime": "tokio",
+                "queue_policy": "bounded-priority",
+                "ui_budget_hz": 120,
+                "max_inflight_tasks": 64,
+                "priority_bands": 3,
+            },
+            "engine": {
+                "architecture": "llm-runtime",
+                "decode_model": "llama.cpp-inspired",
+            },
+            "runtime": {
+                "selected": "rust",
+                "status_source": "rust-binary",
+                "gguf_support": True,
+                "kv_cache": True,
+                "sampler_stack": ["argmax", "top_k"],
+            },
+            "quantization": {
+                "formats": ["q4_k", "q8_0"],
+                "layout": {"storage": "blocked-row-major"},
+            },
+        },
+    )
 
     status = titan.detect_titan_status("/tmp")
 
@@ -35,3 +63,13 @@ def test_detect_titan_status_prefers_remote_cuda_when_configured(monkeypatch) ->
     assert status["cuda_compute_capability"] == "9.0"
     assert status["cloud_provider"] == "runpod"
     assert status["remote_execution"] is True
+    assert status["runtime_source"] == "rust-binary"
+    assert status["scheduler"]["max_inflight_tasks"] == 64
+    assert status["quantization"]["memory_layout"] == "blocked-row-major"
+    assert status["runtime"]["selected"] == "rust"
+    assert status["runtime"]["gguf_support"] is True
+    assert status["engine"]["runtime_mode"] == "rust-primary"
+    assert status["engine"]["runtime_ready"] is True
+    assert status["engine"]["supports_gguf"] is True
+    assert status["engine"]["supports_kv_cache"] is True
+    assert status["engine"]["supports_sampler_stack"] is True

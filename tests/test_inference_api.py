@@ -40,7 +40,7 @@ def anyio_backend():
 async def test_generate_endpoint(monkeypatch) -> None:
     from inference.app.routers import generation as generation_router
 
-    monkeypatch.setattr(generation_router, "get_generation_service", lambda: DummyGenerationService())
+    app.dependency_overrides[generation_router.get_generation_service] = lambda: DummyGenerationService()
     transport = httpx.ASGITransport(app=app)
     async with httpx.AsyncClient(transport=transport, base_url="http://testserver") as client:
         response = await client.post(

@@ -1,37 +1,39 @@
-"use client";
+'use client';
 
-import Link from "next/link";
-import { useEffect, useState } from "react";
+import Link from 'next/link';
+import { useRouter } from 'next/navigation';
+import { useEffect, useState } from 'react';
 
-import {
-  getInstances,
-  evaluateManagedInstance,
-  type InstanceSummary,
-} from "@/lib/api";
+import { getInstances, evaluateManagedInstance, type InstanceSummary } from '@/lib/api';
 
 function formatMetric(val: unknown): string {
-  if (typeof val === "number") {
+  if (typeof val === 'number') {
     if (Math.abs(val) < 10) return val.toFixed(4);
     return val.toFixed(2);
   }
-  if (val === null || val === undefined) return "—";
+  if (val === null || val === undefined) return '—';
   return String(val);
 }
 
 export default function EvaluatePage() {
+  const router = useRouter();
   const [instances, setInstances] = useState<InstanceSummary[]>([]);
   const [loading, setLoading] = useState(true);
   const [selected, setSelected] = useState<string | null>(null);
   const [compareId, setCompareId] = useState<string | null>(null);
   const [launching, setLaunching] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     getInstances()
       .then((list) => {
-        const sorted = [...list].sort((a, b) => (b.updated_at || "").localeCompare(a.updated_at || ""));
+        const sorted = [...list].sort((a, b) =>
+          (b.updated_at || '').localeCompare(a.updated_at || ''),
+        );
         setInstances(sorted);
         // Auto-select most recent completed
-        const firstCompleted = sorted.find((i) => i.status === "completed");
+        const firstCompleted = sorted.find((i) => i.status === 'completed');
         if (firstCompleted) setSelected(firstCompleted.id);
       })
       .catch(() => null)
@@ -40,17 +42,23 @@ export default function EvaluatePage() {
 
   async function launchEval(instanceId: string) {
     setLaunching(instanceId);
+    setError(null);
+    setNotice(null);
     try {
-      await evaluateManagedInstance(instanceId, { start: true });
+      const detail = await evaluateManagedInstance(instanceId, { start: true });
+      setNotice(`Evaluation ${detail.name} launched.`);
+      router.push(`/runs/${detail.id}`);
+    } catch (launchError) {
+      setError(launchError instanceof Error ? launchError.message : 'Evaluation launch failed.');
     } finally {
       setLaunching(null);
     }
   }
 
   const evaluatable = instances.filter(
-    (i) => (i.type === "train" || i.type === "finetune") && i.status === "completed",
+    (i) => (i.type === 'train' || i.type === 'finetune') && i.status === 'completed',
   );
-  const evaluated = instances.filter((i) => i.type === "evaluate");
+  const evaluated = instances.filter((i) => i.type === 'evaluate');
   const selectedInstance = instances.find((i) => i.id === selected);
   const compareInstance = instances.find((i) => i.id === compareId);
 
@@ -59,7 +67,11 @@ export default function EvaluatePage() {
       ...Object.keys(selectedInstance?.metrics_summary ?? {}),
       ...Object.keys(compareInstance?.metrics_summary ?? {}),
     ]),
-  ).filter((k) => typeof (selectedInstance?.metrics_summary[k] ?? compareInstance?.metrics_summary[k]) === "number");
+  ).filter(
+    (k) =>
+      typeof (selectedInstance?.metrics_summary[k] ?? compareInstance?.metrics_summary[k]) ===
+      'number',
+  );
 
   return (
     <div className="dashboard-content">
@@ -69,24 +81,31 @@ export default function EvaluatePage() {
           <span className="eyebrow">Lifecycle → Evaluate</span>
           <h1 className="dash-page-title">Evaluation</h1>
           <p className="dash-page-desc">
-            Run standardized benchmarks, compare model performance, and review AI-assisted
-            decisions for the next lifecycle step.
+            Run standardized benchmarks, compare model performance, and review AI-assisted decisions
+            for the next lifecycle step.
           </p>
         </div>
       </div>
+
+      {notice ? <div className="dash-note-banner panel">◎ {notice}</div> : null}
+      {error ? <div className="dash-error-banner panel">⚠ {error}</div> : null}
 
       <div className="eval-grid">
         {/* Launch Evaluation */}
         {evaluatable.length > 0 && (
           <div className="eval-launch-panel panel">
             <h2 className="section-title">Launch Evaluation</h2>
-            <p className="control-label">Select a completed training or finetuning run to evaluate.</p>
+            <p className="control-label">
+              Select a completed training or finetuning run to evaluate.
+            </p>
             <div className="eval-launch-list">
               {evaluatable.slice(0, 6).map((inst) => (
                 <div key={inst.id} className="eval-launch-item">
                   <div className="eval-launch-info">
                     <span className="eval-launch-name">{inst.name}</span>
-                    <span className="eval-launch-type">{inst.type} · {inst.lifecycle?.learning_mode ?? "—"}</span>
+                    <span className="eval-launch-type">
+                      {inst.type} · {inst.lifecycle?.learning_mode ?? '—'}
+                    </span>
                   </div>
                   <button
                     type="button"
@@ -94,7 +113,7 @@ export default function EvaluatePage() {
                     disabled={launching === inst.id}
                     onClick={() => void launchEval(inst.id)}
                   >
-                    {launching === inst.id ? "⟳" : "◆ Evaluate"}
+                    {launching === inst.id ? '⟳' : '◆ Evaluate'}
                   </button>
                 </div>
               ))}
@@ -113,7 +132,7 @@ export default function EvaluatePage() {
                 return (
                   <div
                     key={inst.id}
-                    className={`eval-result-item ${isSelected ? "selected" : ""} ${isCompare ? "compare" : ""}`}
+                    className={`eval-result-item ${isSelected ? 'selected' : ''} ${isCompare ? 'compare' : ''}`}
                     onClick={() => {
                       if (isSelected) return;
                       if (isCompare) {
@@ -127,8 +146,10 @@ export default function EvaluatePage() {
                   >
                     <div className="eval-result-header">
                       <span className="eval-result-name">{inst.name}</span>
-                      <span className={`eval-result-badge ${isSelected ? "selected" : isCompare ? "compare" : ""}`}>
-                        {isSelected ? "Primary" : isCompare ? "Compare" : inst.status}
+                      <span
+                        className={`eval-result-badge ${isSelected ? 'selected' : isCompare ? 'compare' : ''}`}
+                      >
+                        {isSelected ? 'Primary' : isCompare ? 'Compare' : inst.status}
                       </span>
                     </div>
                     {inst.decision && (
@@ -143,7 +164,7 @@ export default function EvaluatePage() {
                     )}
                     <div className="eval-metrics-row">
                       {Object.entries(inst.metrics_summary)
-                        .filter(([, v]) => typeof v === "number")
+                        .filter(([, v]) => typeof v === 'number')
                         .slice(0, 3)
                         .map(([key, val]) => (
                           <div key={key} className="eval-metric-chip">
@@ -156,7 +177,9 @@ export default function EvaluatePage() {
                       <div className="eval-recommendations">
                         {inst.recommendations.slice(0, 2).map((rec, idx) => (
                           <div key={idx} className="eval-rec">
-                            <span className="eval-rec-priority">{"★".repeat(Math.min(rec.priority, 3))}</span>
+                            <span className="eval-rec-priority">
+                              {'★'.repeat(Math.min(rec.priority, 3))}
+                            </span>
                             <span className="eval-rec-action">{rec.action}</span>
                             <span className="eval-rec-reason">{rec.reason}</span>
                           </div>
@@ -168,9 +191,7 @@ export default function EvaluatePage() {
               })}
             </div>
             {selected && (
-              <p className="eval-compare-hint">
-                Click another result to compare side-by-side.
-              </p>
+              <p className="eval-compare-hint">Click another result to compare side-by-side.</p>
             )}
           </div>
         )}
@@ -199,14 +220,16 @@ export default function EvaluatePage() {
               {allMetricKeys.map((key) => {
                 const lv = selectedInstance.metrics_summary[key] as number | undefined;
                 const rv = compareInstance.metrics_summary[key] as number | undefined;
-                const delta = typeof lv === "number" && typeof rv === "number" ? rv - lv : null;
+                const delta = typeof lv === 'number' && typeof rv === 'number' ? rv - lv : null;
                 return (
                   <div key={key} className="comparison-table-row">
                     <span className="comparison-metric-key">{key}</span>
                     <span>{formatMetric(lv)}</span>
                     <span>{formatMetric(rv)}</span>
-                    <span className={`comparison-delta ${delta !== null ? (delta > 0 ? "positive" : "negative") : ""}`}>
-                      {delta !== null ? `${delta > 0 ? "+" : ""}${delta.toFixed(4)}` : "—"}
+                    <span
+                      className={`comparison-delta ${delta !== null ? (delta > 0 ? 'positive' : 'negative') : ''}`}
+                    >
+                      {delta !== null ? `${delta > 0 ? '+' : ''}${delta.toFixed(4)}` : '—'}
                     </span>
                   </div>
                 );

@@ -1,11 +1,11 @@
-import type { ReactNode } from "react";
+import type { ReactNode } from 'react';
 
-import { AppNav } from "@/components/layout/app-nav";
+import { AppNav } from '@/components/layout/app-nav';
 
 type AppShellProps = {
   children: ReactNode;
-  density?: "compact" | "balanced" | "expanded";
-  surfaceMode?: "focus" | "research" | "verification";
+  density?: 'compact' | 'balanced' | 'expanded';
+  surfaceMode?: 'focus' | 'research' | 'verification';
 };
 
 export function AppShell({ children, density, surfaceMode }: AppShellProps) {

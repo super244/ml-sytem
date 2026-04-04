@@ -24,6 +24,7 @@ dependencies = [
  "arrow-array",
  "arrow-buffer",
  "arrow-schema",
+ "cc",
  "cudarc",
  "metal",
  "objc",

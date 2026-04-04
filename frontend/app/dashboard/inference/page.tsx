@@ -1,8 +1,8 @@
-"use client";
+'use client';
 
-import Link from "next/link";
-import { useRouter } from "next/navigation";
-import { useEffect, useMemo, useRef, useState } from "react";
+import Link from 'next/link';
+import { useRouter } from 'next/navigation';
+import { useEffect, useMemo, useRef, useState } from 'react';
 
 import {
   compareModels,
@@ -17,9 +17,14 @@ import {
   type ModelInfo,
   type PromptPreset,
   type StatusInfo,
-} from "@/lib/api";
-import { FALLBACK_MODELS, FALLBACK_PROMPTS } from "@/lib/demo-content";
-import { isDemoMode, pickPrimaryModel, pickPromptPreset, pickSecondaryModel } from "@/lib/runtime-mode";
+} from '@/lib/api';
+import { FALLBACK_MODELS, FALLBACK_PROMPTS } from '@/lib/demo-content';
+import {
+  isDemoMode,
+  pickPrimaryModel,
+  pickPromptPreset,
+  pickSecondaryModel,
+} from '@/lib/runtime-mode';
 
 type AssistantVariant = {
   model: string;
@@ -31,11 +36,11 @@ type AssistantVariant = {
 
 type ChatMessage =
   | {
-      role: "user";
+      role: 'user';
       content: string;
     }
   | {
-      role: "assistant";
+      role: 'assistant';
       variants: AssistantVariant[];
     };
 
@@ -46,28 +51,28 @@ type FlagTarget = {
 
 const QUICK_PROMPTS = [
   {
-    label: "Derivatives",
-    prompt: "Differentiate f(x) = (3x^2 - 5x + 2)e^(2x). Show the steps and end with Final Answer.",
+    label: 'Derivatives',
+    prompt: 'Differentiate f(x) = (3x^2 - 5x + 2)e^(2x). Show the steps and end with Final Answer.',
   },
   {
-    label: "Integrals",
-    prompt: "Evaluate integral from 0 to 1 of (4x^3 - 2x + 1) dx. Explain every step.",
+    label: 'Integrals',
+    prompt: 'Evaluate integral from 0 to 1 of (4x^3 - 2x + 1) dx. Explain every step.',
   },
   {
-    label: "Proof",
-    prompt: "Prove that the derivative of ln(x) is 1/x for x > 0.",
+    label: 'Proof',
+    prompt: 'Prove that the derivative of ln(x) is 1/x for x > 0.',
   },
   {
-    label: "Olympiad",
-    prompt: "Solve the system x + y = 7 and x^2 + y^2 = 29. Show reasoning carefully.",
+    label: 'Olympiad',
+    prompt: 'Solve the system x + y = 7 and x^2 + y^2 = 29. Show reasoning carefully.',
   },
 ];
 
 function averageLatency(messages: ChatMessage[]): number | null {
   const latencies = messages
-    .flatMap((message) => (message.role === "assistant" ? message.variants : []))
+    .flatMap((message) => (message.role === 'assistant' ? message.variants : []))
     .map((variant) => variant.latency)
-    .filter((value): value is number => typeof value === "number");
+    .filter((value): value is number => typeof value === 'number');
   if (!latencies.length) {
     return null;
   }
@@ -83,12 +88,12 @@ export default function InferencePage() {
   const [status, setStatus] = useState<StatusInfo | null>(null);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
-  const [selectedModel, setSelectedModel] = useState("");
-  const [secondaryModel, setSecondaryModel] = useState("");
-  const [promptPreset, setPromptPreset] = useState("");
+  const [selectedModel, setSelectedModel] = useState('');
+  const [secondaryModel, setSecondaryModel] = useState('');
+  const [promptPreset, setPromptPreset] = useState('');
   const [compareMode, setCompareMode] = useState(false);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
-  const [input, setInput] = useState("");
+  const [input, setInput] = useState('');
   const [generating, setGenerating] = useState(false);
   const [temperature, setTemperature] = useState(0.7);
   const [maxTokens, setMaxTokens] = useState(512);
@@ -96,12 +101,16 @@ export default function InferencePage() {
   const [launching, setLaunching] = useState(false);
   const [launchNotice, setLaunchNotice] = useState<string | null>(null);
   const [flagTarget, setFlagTarget] = useState<FlagTarget>(null);
-  const [flagReason, setFlagReason] = useState("");
+  const [flagReason, setFlagReason] = useState('');
   const bottomRef = useRef<HTMLDivElement>(null);
   const demoMode = isDemoMode();
   const availableModels = models.length ? models : demoMode ? FALLBACK_MODELS : [];
-  const availablePromptPresets = promptPresets.length ? promptPresets : demoMode ? FALLBACK_PROMPTS : [];
-  const metadataDegraded = !demoMode && (status?.status === "degraded" || Boolean(loadError));
+  const availablePromptPresets = promptPresets.length
+    ? promptPresets
+    : demoMode
+      ? FALLBACK_PROMPTS
+      : [];
+  const metadataDegraded = !demoMode && (status?.status === 'degraded' || Boolean(loadError));
 
   useEffect(() => {
     let active = true;
@@ -114,67 +123,69 @@ export default function InferencePage() {
 
         const errors: string[] = [];
 
-        if (instancesResult.status === "fulfilled") {
+        if (instancesResult.status === 'fulfilled') {
           const list = instancesResult.value;
           setInstances(
             list.filter(
               (instance) =>
-                (instance.type === "inference" && instance.status === "running") ||
-                (instance.type === "deploy" && instance.status === "completed"),
+                (instance.type === 'inference' && instance.status === 'running') ||
+                (instance.type === 'deploy' && instance.status === 'completed'),
             ),
           );
           setLaunchSources(
             list.filter(
               (instance) =>
-                instance.status === "completed" &&
-                (instance.type === "train" || instance.type === "finetune" || instance.type === "deploy"),
+                instance.status === 'completed' &&
+                (instance.type === 'train' ||
+                  instance.type === 'finetune' ||
+                  instance.type === 'deploy'),
             ),
           );
         } else {
           errors.push(
             instancesResult.reason instanceof Error
               ? instancesResult.reason.message
-              : "Instances could not be loaded.",
+              : 'Instances could not be loaded.',
           );
         }
 
-        if (modelsResult.status === "fulfilled") {
+        if (modelsResult.status === 'fulfilled') {
           setModels(modelsResult.value);
         } else {
           errors.push(
             modelsResult.reason instanceof Error
               ? modelsResult.reason.message
-              : "Model registry could not be loaded.",
+              : 'Model registry could not be loaded.',
           );
         }
 
-        if (promptResult.status === "fulfilled") {
+        if (promptResult.status === 'fulfilled') {
           setPromptPresets(promptResult.value.presets);
-          if (promptResult.value.status === "degraded" && promptResult.value.errors?.length) {
+          if (promptResult.value.status === 'degraded' && promptResult.value.errors?.length) {
             errors.push(...promptResult.value.errors);
           }
         } else {
           errors.push(
             promptResult.reason instanceof Error
               ? promptResult.reason.message
-              : "Prompt metadata could not be loaded.",
+              : 'Prompt metadata could not be loaded.',
           );
         }
 
-        if (statusResult.status === "fulfilled") {
+        if (statusResult.status === 'fulfilled') {
           setStatus(statusResult.value);
-          if (statusResult.value.status === "degraded" && statusResult.value.errors?.length) {
+          if (statusResult.value.status === 'degraded' && statusResult.value.errors?.length) {
             errors.push(...statusResult.value.errors);
           }
         } else {
           errors.push(
             statusResult.reason instanceof Error
               ? statusResult.reason.message
-              : "Status metadata could not be loaded.",
+              : 'Status metadata could not be loaded.',
           );
         }
 
-        setLoadError(errors.length ? errors.join(" | ") : null);
+        setLoadError(errors.length ? errors.join(' | ') : null);
         setLoading(false);
       },
     );
@@ -193,11 +204,13 @@ export default function InferencePage() {
   }, [availableModels, selectedModel]);
 
   useEffect(() => {
-    setPromptPreset((current) => pickPromptPreset(availablePromptPresets, ["atlas_rigorous"], current));
+    setPromptPreset((current) =>
+      pickPromptPreset(availablePromptPresets, ['atlas_rigorous'], current),
+    );
   }, [availablePromptPresets]);
 
   useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: "smooth" });
+    bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages, generating]);
 
   useEffect(() => {
@@ -216,7 +229,7 @@ export default function InferencePage() {
   const flaggedCount = useMemo(
     () =>
       messages.reduce((count, message) => {
-        if (message.role !== "assistant") {
+        if (message.role !== 'assistant') {
           return count;
         }
         return count + message.variants.filter((variant) => variant.flagged).length;
@@ -228,11 +241,11 @@ export default function InferencePage() {
   function findPromptForMessage(messageIndex: number): string {
     for (let index = messageIndex - 1; index >= 0; index -= 1) {
       const candidate = messages[index];
-      if (candidate?.role === "user") {
+      if (candidate?.role === 'user') {
         return candidate.content;
       }
     }
-    return "";
+    return '';
   }
 
   async function send() {
@@ -241,8 +254,8 @@ export default function InferencePage() {
     }
 
     const question = input.trim();
-    setMessages((current) => [...current, { role: "user", content: question }]);
-    setInput("");
+    setMessages((current) => [...current, { role: 'user', content: question }]);
+    setInput('');
     setGenerating(true);
     const startedAt = Date.now();
 
@@ -257,17 +270,17 @@ export default function InferencePage() {
           top_p: 0.95,
           max_new_tokens: maxTokens,
           show_reasoning: false,
-          difficulty_target: "medium",
+          difficulty_target: 'medium',
           num_samples: 1,
           use_calculator: false,
-          solver_mode: "concise",
-          output_format: "text",
+          solver_mode: 'concise',
+          output_format: 'text',
           use_cache: false,
         });
         setMessages((current) => [
           ...current,
           {
-            role: "assistant",
+            role: 'assistant',
             variants: [
               {
                 model: selectedModel,
@@ -294,17 +307,17 @@ export default function InferencePage() {
           top_p: 0.95,
           max_new_tokens: maxTokens,
           show_reasoning: false,
-          difficulty_target: "medium",
+          difficulty_target: 'medium',
           num_samples: 1,
           use_calculator: false,
-          solver_mode: "concise",
-          output_format: "text",
+          solver_mode: 'concise',
+          output_format: 'text',
           use_cache: false,
         });
         setMessages((current) => [
           ...current,
           {
-            role: "assistant",
+            role: 'assistant',
             variants: [
               {
                 model: selectedModel,
@@ -320,12 +333,12 @@ export default function InferencePage() {
       setMessages((current) => [
         ...current,
         {
-          role: "assistant",
+          role: 'assistant',
           variants: [
             {
               model: selectedModel,
-              label: "System",
-              content: `Error: ${error instanceof Error ? error.message : "Inference failed"}`,
+              label: 'System',
+              content: `Error: ${error instanceof Error ? error.message : 'Inference failed'}`,
             },
           ],
         },
@@ -340,7 +353,7 @@ export default function InferencePage() {
       return;
     }
     const targetMessage = messages[flagTarget.messageIndex];
-    if (targetMessage?.role !== "assistant") {
+    if (targetMessage?.role !== 'assistant') {
       return;
     }
     const targetVariant = targetMessage.variants[flagTarget.variantIndex];
@@ -358,7 +371,7 @@ export default function InferencePage() {
 
     setMessages((current) =>
       current.map((message, messageIndex) => {
-        if (message.role !== "assistant" || messageIndex !== flagTarget.messageIndex) {
+        if (message.role !== 'assistant' || messageIndex !== flagTarget.messageIndex) {
           return message;
         }
         return {
@@ -369,7 +382,7 @@ export default function InferencePage() {
         };
       }),
     );
-    setFlagReason("");
+    setFlagReason('');
     setFlagTarget(null);
   }
 
@@ -397,8 +410,8 @@ export default function InferencePage() {
           <span className="eyebrow">Lifecycle → Inference</span>
           <h1 className="dash-page-title">Inference Studio</h1>
           <p className="dash-page-desc">
-            Ollama-style chat workspace for live prompting, model comparison, launch control,
-            and telemetry capture from the same AI-Factory dashboard.
+            Ollama-style chat workspace for live prompting, model comparison, launch control, and
+            telemetry capture from the same AI-Factory dashboard.
           </p>
         </div>
       </div>
@@ -425,8 +438,8 @@ export default function InferencePage() {
               </label>
               <select
                 id="response-mode"
-                value={compareMode ? "compare" : "single"}
-                onChange={(event) => setCompareMode(event.target.value === "compare")}
+                value={compareMode ? 'compare' : 'single'}
+                onChange={(event) => setCompareMode(event.target.value === 'compare')}
               >
                 <option value="single">Single model</option>
                 <option value="compare">Compare two models</option>
@@ -478,11 +491,13 @@ export default function InferencePage() {
             <div className="inference-stat-grid">
               <div className="inference-stat-card">
                 <span className="inference-stat-label">Turns</span>
-                <strong>{messages.filter((message) => message.role === "assistant").length}</strong>
+                <strong>{messages.filter((message) => message.role === 'assistant').length}</strong>
               </div>
               <div className="inference-stat-card">
                 <span className="inference-stat-label">Avg latency</span>
-                <strong>{sessionAverageLatency ? `${sessionAverageLatency.toFixed(2)}s` : "—"}</strong>
+                <strong>
+                  {sessionAverageLatency ? `${sessionAverageLatency.toFixed(2)}s` : '—'}
+                </strong>
               </div>
               <div className="inference-stat-card">
                 <span className="inference-stat-label">Flagged</span>
@@ -522,13 +537,15 @@ export default function InferencePage() {
                     <button
                       key={source.id}
                       type="button"
-                      className={`source-item ${launchingId === source.id ? "active" : ""}`}
+                      className={`source-item ${launchingId === source.id ? 'active' : ''}`}
                       disabled={launching || metadataDegraded}
-                      onClick={() => setLaunchingId((current) => (current === source.id ? null : source.id))}
+                      onClick={() =>
+                        setLaunchingId((current) => (current === source.id ? null : source.id))
+                      }
                     >
                       <span className="source-name">{source.name}</span>
                       <span className="source-type">
-                        {source.type} · {source.lifecycle.learning_mode ?? "—"}
+                        {source.type} · {source.lifecycle.learning_mode ?? '—'}
                       </span>
                     </button>
                   ))}
@@ -543,7 +560,11 @@ export default function InferencePage() {
                     }
                   }}
                 >
-                  {launching ? "⟳ Launching…" : launchingId ? "◎ Launch inference branch" : "Select a source"}
+                  {launching
+                    ? '⟳ Launching…'
+                    : launchingId
+                      ? '◎ Launch inference branch'
+                      : 'Select a source'}
                 </button>
               </>
             ) : (
@@ -601,12 +622,12 @@ export default function InferencePage() {
                 <button
                   key={model.name}
                   type="button"
-                  className={`model-catalog-item ${selectedModel === model.name ? "active" : ""}`}
+                  className={`model-catalog-item ${selectedModel === model.name ? 'active' : ''}`}
                   disabled={metadataDegraded}
                   onClick={() => setSelectedModel(model.name)}
                 >
                   <strong>{model.label ?? model.name}</strong>
-                  <span>{model.description ?? "Local registry model"}</span>
+                  <span>{model.description ?? 'Local registry model'}</span>
                 </button>
               ))}
             </div>
@@ -632,7 +653,9 @@ export default function InferencePage() {
             </div>
             <div className="inference-chat-status">
               <span>{modelLabelLookup.get(selectedModel) ?? selectedModel}</span>
-              {compareMode && secondaryModel && <span>vs {modelLabelLookup.get(secondaryModel) ?? secondaryModel}</span>}
+              {compareMode && secondaryModel && (
+                <span>vs {modelLabelLookup.get(secondaryModel) ?? secondaryModel}</span>
+              )}
             </div>
           </div>
 
@@ -642,14 +665,14 @@ export default function InferencePage() {
                 <span className="inference-empty-icon">◎</span>
                 <p>Start a conversation with your model stack.</p>
                 <p className="inference-empty-hint">
-                  Mode: <strong>{compareMode ? "Compare" : "Single"}</strong> · Primary model:{" "}
+                  Mode: <strong>{compareMode ? 'Compare' : 'Single'}</strong> · Primary model:{' '}
                   <strong>{modelLabelLookup.get(selectedModel) ?? selectedModel}</strong>
                 </p>
               </div>
             )}
 
             {messages.map((message, messageIndex) =>
-              message.role === "user" ? (
+              message.role === 'user' ? (
                 <div key={messageIndex} className="inference-message user">
                   <div className="inference-message-role">You</div>
                   <div className="inference-message-content">{message.content}</div>
@@ -660,7 +683,10 @@ export default function InferencePage() {
                   {message.variants.length > 1 ? (
                     <div className="inference-compare-grid">
                       {message.variants.map((variant, variantIndex) => (
-                        <div key={`${variant.model}-${variantIndex}`} className="inference-compare-card">
+                        <div
+                          key={`${variant.model}-${variantIndex}`}
+                          className="inference-compare-card"
+                        >
                           <div className="inference-compare-header">
                             <strong>{variant.label}</strong>
                             <button
@@ -669,19 +695,24 @@ export default function InferencePage() {
                               disabled={variant.flagged}
                               onClick={() => setFlagTarget({ messageIndex, variantIndex })}
                             >
-                              {variant.flagged ? "✓ Flagged" : "Flag"}
+                              {variant.flagged ? '✓ Flagged' : 'Flag'}
                             </button>
                           </div>
                           <div className="inference-message-content">{variant.content}</div>
                           <div className="inference-message-meta">
-                            {variant.latency != null ? `${variant.latency.toFixed(2)}s` : "No latency"}
+                            {variant.latency != null
+                              ? `${variant.latency.toFixed(2)}s`
+                              : 'No latency'}
                           </div>
                         </div>
                       ))}
                     </div>
                   ) : (
                     message.variants.map((variant, variantIndex) => (
-                      <div key={`${variant.model}-${variantIndex}`} className="inference-single-output">
+                      <div
+                        key={`${variant.model}-${variantIndex}`}
+                        className="inference-single-output"
+                      >
                         <div className="inference-output-actions">
                           <strong>{variant.label}</strong>
                           <button
@@ -690,12 +721,14 @@ export default function InferencePage() {
                             disabled={variant.flagged}
                             onClick={() => setFlagTarget({ messageIndex, variantIndex })}
                           >
-                            {variant.flagged ? "✓ Flagged for dataset" : "Flag as failure"}
+                            {variant.flagged ? '✓ Flagged for dataset' : 'Flag as failure'}
                           </button>
                         </div>
                         <div className="inference-message-content">{variant.content}</div>
                         {variant.latency != null && (
-                          <div className="inference-message-meta">{variant.latency.toFixed(2)}s</div>
+                          <div className="inference-message-meta">
+                            {variant.latency.toFixed(2)}s
+                          </div>
                         )}
                       </div>
                     ))
@@ -720,7 +753,8 @@ export default function InferencePage() {
           {flagTarget && (
             <div className="inference-flag-sheet">
               <div className="inference-flag-copy">
-                Capture this response as a failure case for future dataset synthesis or replay training.
+                Capture this response as a failure case for future dataset synthesis or replay
+                training.
               </div>
               <textarea
                 value={flagReason}
@@ -738,7 +772,11 @@ export default function InferencePage() {
                 >
                   Submit to telemetry
                 </button>
-                <button type="button" className="ghost-button small" onClick={() => setFlagTarget(null)}>
+                <button
+                  type="button"
+                  className="ghost-button small"
+                  onClick={() => setFlagTarget(null)}
+                >
                   Cancel
                 </button>
               </div>
@@ -753,7 +791,7 @@ export default function InferencePage() {
               rows={3}
               onChange={(event) => setInput(event.target.value)}
               onKeyDown={(event) => {
-                if (event.key === "Enter" && !event.shiftKey) {
+                if (event.key === 'Enter' && !event.shiftKey) {
                   event.preventDefault();
                   void send();
                 }
@@ -762,10 +800,12 @@ export default function InferencePage() {
             <button
               type="button"
               className="primary-button inference-send-btn"
-              disabled={generating || !input.trim() || metadataDegraded || !selectedModel || !promptPreset}
+              disabled={
+                generating || !input.trim() || metadataDegraded || !selectedModel || !promptPreset
+              }
               onClick={() => void send()}
             >
-              {generating ? "⟳" : compareMode ? "Compare →" : "Send →"}
+              {generating ? '⟳' : compareMode ? 'Compare →' : 'Send →'}
             </button>
           </div>
         </div>

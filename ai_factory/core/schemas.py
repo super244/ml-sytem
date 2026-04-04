@@ -5,7 +5,7 @@ from enum import Enum
 from pathlib import Path
 from typing import Any, Literal
 
-from pydantic import BaseModel, Field, field_validator, model_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 from ai_factory.core.hashing import normalize_text, stable_question_fingerprint
 
@@ -15,6 +15,7 @@ ReasoningStyle = Literal["chain_of_thought", "proof", "exam", "verification", "m
 
 
 class StepCheck(BaseModel):
+    model_config = ConfigDict(strict=True)
     id: str | None = None
     kind: Literal["substring", "regex", "expr_equiv", "numeric_tolerance"] = "substring"
     value: str
