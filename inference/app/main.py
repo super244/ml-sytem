@@ -22,9 +22,8 @@ app.add_middleware(
 
 def _register_v1_routers(application: FastAPI) -> None:
     from inference.app.routers.agents import router as agents_router
-    from inference.app.routers.autonomous import router as autonomous_router
-    from inference.app.routers.autonomous import router as autonomous_router
     from inference.app.routers.automl import router as automl_router
+    from inference.app.routers.autonomous import router as autonomous_router
     from inference.app.routers.cluster import router as cluster_router
     from inference.app.routers.datasets import router as datasets_router
     from inference.app.routers.generation import router as generation_router
@@ -48,7 +47,6 @@ def _register_v1_routers(application: FastAPI) -> None:
         datasets_router,
         agents_router,
         autonomous_router,
-        autonomous_router,
         automl_router,
         cluster_router,
         telemetry_router,
@@ -66,21 +64,6 @@ _register_v1_routers(app)
 @app.get("/")
 async def root() -> dict[str, str]:
     return {"message": "AI-Factory API", "status": "running"}
-
-
-@app.get("/health")
-async def health() -> dict[str, str]:
-    return {"status": "ok"}
-
-
-@app.get("/status")
-async def status() -> dict[str, str]:
-    return {
-        "title": settings.title,
-        "version": settings.version,
-        "status": "running",
-        "uptime": "0s",
-    }
 
 
 try:
@@ -102,3 +85,25 @@ try:
         )
 except ImportError:
     pass
+
+from fastapi import HTTPException, Request
+
+@app.exception_handler(HTTPException)
+async def custom_http_exception_handler(request: Request, exc: HTTPException) -> JSONResponse:
+    if exc.status_code == 503:
+        return JSONResponse(
+            status_code=503,
+            content={
+                "type": "about:blank",
+                "title": "Service Unavailable",
+                "status": 503,
+                "detail": exc.detail,
+                "instance": str(request.url),
+            },
+            headers={"Content-Type": "application/problem+json"}
+        )
+    return JSONResponse(
+        status_code=exc.status_code,
+        content={"detail": exc.detail},
+        headers=exc.headers
+    )

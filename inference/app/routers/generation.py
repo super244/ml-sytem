@@ -1,6 +1,8 @@
 from __future__ import annotations
 
-from fastapi import APIRouter, HTTPException
+from typing import Any
+
+from fastapi import APIRouter, Depends, HTTPException
 
 from inference.app.dependencies import get_generation_service
 from inference.app.parameters import GenerationParameters
@@ -38,8 +40,8 @@ def verify_answer(request: VerifyRequest) -> VerifyResponse:
 
 
 @router.post("/generate", response_model=GenerateResponse)
-def generate_answer(request: GenerateRequest) -> GenerateResponse:
-    service = get_generation_service()
+def generate_answer(request: GenerateRequest, service: Any = Depends(get_generation_service)) -> GenerateResponse:
+
     try:
         primary = service.generate(
             GenerationParameters(
@@ -95,8 +97,8 @@ def generate_answer(request: GenerateRequest) -> GenerateResponse:
 
 
 @router.post("/compare", response_model=CompareResponse)
-def compare_models(request: CompareRequest) -> CompareResponse:
-    service = get_generation_service()
+def compare_models(request: CompareRequest, service: Any = Depends(get_generation_service)) -> CompareResponse:
+
     try:
         comparison = service.compare(
             GenerationParameters(
@@ -144,6 +146,6 @@ def compare_models(request: CompareRequest) -> CompareResponse:
 
 
 @router.post("/generate/batch", response_model=GenerateBatchResponse)
-def generate_batch(request: GenerateBatchRequest) -> GenerateBatchResponse:
-    results = [generate_answer(item) for item in request.requests]
+def generate_batch(request: GenerateBatchRequest, service: Any = Depends(get_generation_service)) -> GenerateBatchResponse:
+    results = [generate_answer(item, service=service) for item in request.requests]
     return GenerateBatchResponse(results=results)

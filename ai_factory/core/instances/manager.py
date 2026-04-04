@@ -1137,7 +1137,7 @@ class InstanceManager:
             return manifest.lifecycle.deployment_targets[0]
         for hook in config.publish_hooks:
             if hook.target:
-                return cast(DeploymentTarget, hook.target)
+                return hook.target
         return "ollama"
 
     def execute_action(

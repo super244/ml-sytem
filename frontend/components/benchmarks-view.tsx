@@ -1,14 +1,14 @@
-"use client";
+'use client';
 
-import Link from "next/link";
+import Link from 'next/link';
 
-import { formatCount } from "@/lib/formatting";
-import { useLabMetadata } from "@/hooks/use-lab-metadata";
-import { ROUTES } from "@/lib/routes";
+import { formatCount } from '@/lib/formatting';
+import { useLabMetadata } from '@/hooks/use-lab-metadata';
+import { ROUTES } from '@/lib/routes';
 
-import { AppShell } from "@/components/layout/app-shell";
-import { PageHeader } from "@/components/ui/page-header";
-import { StatePanel } from "@/components/ui/state-panel";
+import { AppShell } from '@/components/layout/app-shell';
+import { PageHeader } from '@/components/ui/page-header';
+import { StatePanel } from '@/components/ui/state-panel';
 
 export function BenchmarksView() {
   const metadata = useLabMetadata();
@@ -21,9 +21,9 @@ export function BenchmarksView() {
           title="Held-out slices and verification suites"
           description="AI-Factory serves benchmark metadata directly from the same registry used by the offline evaluation pipeline."
           metrics={[
-            { label: "Benchmarks", value: formatCount(metadata.benchmarks.length) },
-            { label: "Models", value: formatCount(metadata.models.length), tone: "secondary" },
-            { label: "Runs", value: formatCount(metadata.runs.length), tone: "accent" },
+            { label: 'Benchmarks', value: formatCount(metadata.benchmarks.length) },
+            { label: 'Models', value: formatCount(metadata.models.length), tone: 'secondary' },
+            { label: 'Runs', value: formatCount(metadata.runs.length), tone: 'accent' },
           ]}
           actions={
             <>

@@ -1,14 +1,14 @@
-"use client";
+'use client';
 
-import Link from "next/link";
+import Link from 'next/link';
 
-import { formatBytes, formatCount } from "@/lib/formatting";
-import { useLabMetadata } from "@/hooks/use-lab-metadata";
-import { ROUTES } from "@/lib/routes";
+import { formatBytes, formatCount } from '@/lib/formatting';
+import { useLabMetadata } from '@/hooks/use-lab-metadata';
+import { ROUTES } from '@/lib/routes';
 
-import { AppShell } from "@/components/layout/app-shell";
-import { PageHeader } from "@/components/ui/page-header";
-import { StatePanel } from "@/components/ui/state-panel";
+import { AppShell } from '@/components/layout/app-shell';
+import { PageHeader } from '@/components/ui/page-header';
+import { StatePanel } from '@/components/ui/state-panel';
 
 export function DatasetsView() {
   const metadata = useLabMetadata();
@@ -26,9 +26,13 @@ export function DatasetsView() {
           title="Packs, adapters, and preview slices"
           description="Browse the synthetic families, public adapters, and derived training and benchmark packs that feed AI-Factory."
           metrics={[
-            { label: "Datasets", value: formatCount(dashboard?.summary.num_datasets) },
-            { label: "Total rows", value: formatCount(dashboard?.summary.total_rows), tone: "secondary" },
-            { label: "Pack files", value: formatCount(dashboard?.packs?.length), tone: "accent" },
+            { label: 'Datasets', value: formatCount(dashboard?.summary.num_datasets) },
+            {
+              label: 'Total rows',
+              value: formatCount(dashboard?.summary.total_rows),
+              tone: 'secondary',
+            },
+            { label: 'Pack files', value: formatCount(dashboard?.packs?.length), tone: 'accent' },
           ]}
           actions={
             <>
@@ -68,8 +72,8 @@ export function DatasetsView() {
                   <div>
                     <div className="section-title">Provenance Ledger</div>
                     <p className="hero-copy">
-                      The processed corpus now carries build metadata, lineage aggregation, and
-                      pack manifest details so you can inspect how the current dataset snapshot was
+                      The processed corpus now carries build metadata, lineage aggregation, and pack
+                      manifest details so you can inspect how the current dataset snapshot was
                       assembled.
                     </p>
                   </div>
@@ -87,7 +91,7 @@ export function DatasetsView() {
                     <div className="preview-block">
                       <strong>Git / config</strong>
                       <p>
-                        {processedManifest?.build?.git_sha ?? "unknown git sha"}
+                        {processedManifest?.build?.git_sha ?? 'unknown git sha'}
                         {processedManifest?.build?.config_path ? (
                           <>
                             <br />
@@ -124,7 +128,8 @@ export function DatasetsView() {
                     <h2>Source aggregation</h2>
                     <div className="badge-row">
                       <span className="status-pill">
-                        {formatCount(lineageSummary?.contamination?.contaminated_records)} contaminated
+                        {formatCount(lineageSummary?.contamination?.contaminated_records)}{' '}
+                        contaminated
                       </span>
                       <span className="status-pill">
                         {formatCount(lineageSummary?.contamination?.failure_cases)} failure cases
@@ -136,8 +141,8 @@ export function DatasetsView() {
                         {lineageSummary
                           ? Object.entries(lineageSummary.by_loader)
                               .map(([loader, count]) => `${loader}: ${count}`)
-                              .join(" · ")
-                          : "No lineage summary available"}
+                              .join(' · ')
+                          : 'No lineage summary available'}
                       </p>
                     </div>
                     <div className="preview-block subtle">
@@ -146,8 +151,8 @@ export function DatasetsView() {
                         {lineageSummary
                           ? Object.entries(lineageSummary.by_split)
                               .map(([split, count]) => `${split}: ${count}`)
-                              .join(" · ")
-                          : "No split summary available"}
+                              .join(' · ')
+                          : 'No split summary available'}
                       </p>
                     </div>
                   </article>
@@ -155,16 +160,21 @@ export function DatasetsView() {
                   <article className="panel catalog-panel">
                     <div className="message-meta">
                       <span>Pack manifests</span>
-                      <span className="status-pill">{formatCount(packManifests.length)} manifests</span>
+                      <span className="status-pill">
+                        {formatCount(packManifests.length)} manifests
+                      </span>
                     </div>
                     <h2>Derived pack provenance</h2>
                     {packManifests.slice(0, 3).map((packManifest) => (
-                      <div key={`${packManifest.pack_id ?? packManifest.description ?? "pack"}`} className="preview-block">
-                        <strong>{packManifest.pack_id ?? "pack"}</strong>
+                      <div
+                        key={`${packManifest.pack_id ?? packManifest.description ?? 'pack'}`}
+                        className="preview-block"
+                      >
+                        <strong>{packManifest.pack_id ?? 'pack'}</strong>
                         <p>
-                          {packManifest.description ?? "Derived pack"}
+                          {packManifest.description ?? 'Derived pack'}
                           <br />
-                          {packManifest.build?.build_id ?? "unknown build"}
+                          {packManifest.build?.build_id ?? 'unknown build'}
                         </p>
                       </div>
                     ))}
@@ -209,8 +219,10 @@ export function DatasetsView() {
                   </div>
                   <div className="badge-row">
                     {dataset.usage ? <span className="status-pill">{dataset.usage}</span> : null}
-                    {typeof dataset.default_weight === "number" ? (
-                      <span className="status-pill">weight {dataset.default_weight.toFixed(2)}</span>
+                    {typeof dataset.default_weight === 'number' ? (
+                      <span className="status-pill">
+                        weight {dataset.default_weight.toFixed(2)}
+                      </span>
                     ) : null}
                   </div>
                   {dataset.preview_examples.slice(0, 2).map((preview) => (
@@ -227,8 +239,8 @@ export function DatasetsView() {
               <div>
                 <div className="section-title">Derived Packs</div>
                 <p className="hero-copy">
-                  Derived packs are the ready-to-train or ready-to-benchmark slices created from
-                  the processed corpus.
+                  Derived packs are the ready-to-train or ready-to-benchmark slices created from the
+                  processed corpus.
                 </p>
               </div>
             </div>

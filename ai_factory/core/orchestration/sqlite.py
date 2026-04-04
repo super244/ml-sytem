@@ -158,8 +158,115 @@ class SqliteControlPlane:
                     last_error TEXT,
                     updated_at TEXT NOT NULL
                 );
+
+                CREATE TABLE IF NOT EXISTS dataset_telemetry (
+                    id TEXT PRIMARY KEY,
+                    payload_json TEXT NOT NULL,
+                    status TEXT NOT NULL,
+                    timestamp REAL NOT NULL,
+                    actioned_at REAL
+                );
+                CREATE INDEX IF NOT EXISTS idx_telemetry_status ON dataset_telemetry(status, timestamp DESC);
+
+                CREATE TABLE IF NOT EXISTS synth_jobs (
+                    job_id TEXT PRIMARY KEY,
+                    status TEXT NOT NULL,
+                    seed_prompt TEXT NOT NULL,
+                    num_variants INTEGER NOT NULL,
+                    model_variant TEXT NOT NULL,
+                    created_at REAL NOT NULL,
+                    estimated_time_s REAL NOT NULL,
+                    completed_rows INTEGER NOT NULL,
+                    output_path TEXT NOT NULL
+                );
                 """
             )
+
+    def upsert_telemetry_record(
+        self, record_id: str, payload: dict[str, Any], status: str, timestamp: float, actioned_at: float | None = None
+    ) -> None:
+        with self.connection() as connection:
+            connection.execute(
+                """
+                INSERT INTO dataset_telemetry (id, payload_json, status, timestamp, actioned_at)
+                VALUES (?, ?, ?, ?, ?)
+                ON CONFLICT(id) DO UPDATE SET
+                    payload_json=excluded.payload_json,
+                    status=excluded.status,
+                    timestamp=excluded.timestamp,
+                    actioned_at=excluded.actioned_at
+                """,
+                (record_id, _dump(payload), status, timestamp, actioned_at),
+            )
+
+    def list_telemetry(self, status: str) -> list[dict[str, Any]]:
+        with self.connection() as connection:
+            rows = connection.execute(
+                "SELECT * FROM dataset_telemetry WHERE status = ? ORDER BY timestamp DESC", (status,)
+            ).fetchall()
+        return [
+            {
+                "id": row["id"],
+                "status": row["status"],
+                "timestamp": row["timestamp"],
+                "actioned_at": row["actioned_at"],
+                **_load(row["payload_json"], {}),
+            }
+            for row in rows
+        ]
+
+    def update_telemetry_status(self, record_id: str, status: str, actioned_at: float) -> dict[str, Any] | None:
+        with self.connection() as connection:
+            row = connection.execute("SELECT * FROM dataset_telemetry WHERE id = ?", (record_id,)).fetchone()
+            if not row:
+                return None
+            connection.execute(
+                "UPDATE dataset_telemetry SET status = ?, actioned_at = ? WHERE id = ?",
+                (status, actioned_at, record_id),
+            )
+            return {
+                "id": record_id,
+                "status": status,
+                "timestamp": row["timestamp"],
+                "actioned_at": actioned_at,
+                **_load(row["payload_json"], {}),
+            }
+
+    def upsert_synth_job(self, job: dict[str, Any]) -> None:
+        with self.connection() as connection:
+            connection.execute(
+                """
+                INSERT INTO synth_jobs (
+                    job_id, status, seed_prompt, num_variants, model_variant, created_at,
+                    estimated_time_s, completed_rows, output_path
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ON CONFLICT(job_id) DO UPDATE SET
+                    status=excluded.status,
+                    seed_prompt=excluded.seed_prompt,
+                    num_variants=excluded.num_variants,
+                    model_variant=excluded.model_variant,
+                    created_at=excluded.created_at,
+                    estimated_time_s=excluded.estimated_time_s,
+                    completed_rows=excluded.completed_rows,
+                    output_path=excluded.output_path
+                """,
+                (
+                    job["job_id"],
+                    job["status"],
+                    job["seed_prompt"],
+                    job["num_variants"],
+                    job["model_variant"],
+                    job["created_at"],
+                    job["estimated_time_s"],
+                    job["completed_rows"],
+                    job["output_path"],
+                ),
+            )
+
+    def get_synth_job(self, job_id: str) -> dict[str, Any] | None:
+        with self.connection() as connection:
+            row = connection.execute("SELECT * FROM synth_jobs WHERE job_id = ?", (job_id,)).fetchone()
+        return dict(row) if row else None
 
     def upsert_run(self, run: OrchestrationRun) -> OrchestrationRun:
         with self.connection() as connection:

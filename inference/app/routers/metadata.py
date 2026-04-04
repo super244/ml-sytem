@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 
 from inference.app.dependencies import get_metadata_service
 
@@ -23,18 +23,25 @@ def _openai_model_record(model: dict[str, Any]) -> dict[str, Any]:
 
 
 @router.get("/models")
-def list_models() -> dict:
-    models = get_metadata_service().models()
-    return {
-        "object": "list",
-        "data": [_openai_model_record(model) for model in models],
-        "models": models,
-    }
+def list_models(service: Any = Depends(get_metadata_service)) -> dict:
+    try:
+        models = service.models()
+        return {
+            "object": "list",
+            "data": [_openai_model_record(model) for model in models],
+            "models": models,
+        }
+    except Exception as exc:
+        raise HTTPException(status_code=503, detail=f"Metadata service unavailable: {str(exc)}") from exc
 
 
 @router.get("/models/{model_id}")
-def get_model(model_id: str) -> dict:
-    models = get_metadata_service().models()
+def get_model(model_id: str, service: Any = Depends(get_metadata_service)) -> dict:
+    try:
+        models = service.models()
+    except Exception as exc:
+        raise HTTPException(status_code=503, detail=f"Metadata service unavailable: {str(exc)}") from exc
+        
     for model in models:
         if model["name"] == model_id:
             return _openai_model_record(model)
@@ -42,15 +49,24 @@ def get_model(model_id: str) -> dict:
 
 
 @router.get("/prompts")
-def list_prompts(limit: int = 12) -> dict:
-    return get_metadata_service().prompt_library(limit=limit)
+def list_prompts(limit: int = 12, service: Any = Depends(get_metadata_service)) -> dict:
+    try:
+        return service.prompt_library(limit=limit)
+    except Exception as exc:
+        raise HTTPException(status_code=503, detail=f"Prompt library unavailable: {str(exc)}") from exc
 
 
 @router.get("/benchmarks")
 def list_benchmarks() -> dict:
-    return {"benchmarks": get_metadata_service().benchmark_library()}
+    try:
+        return {"benchmarks": get_metadata_service().benchmark_library()}
+    except Exception as exc:
+        raise HTTPException(status_code=503, detail=f"Benchmark library unavailable: {str(exc)}") from exc
 
 
 @router.get("/runs")
 def list_runs() -> dict:
-    return {"runs": get_metadata_service().runs()}
+    try:
+        return {"runs": get_metadata_service().runs()}
+    except Exception as exc:
+        raise HTTPException(status_code=503, detail=f"Runs library unavailable: {str(exc)}") from exc

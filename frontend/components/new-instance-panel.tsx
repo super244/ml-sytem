@@ -1,6 +1,6 @@
-"use client";
+'use client';
 
-import { useMemo, useState } from "react";
+import { useMemo, useState } from 'react';
 
 import {
   createManagedInstance,
@@ -9,44 +9,49 @@ import {
   type InstanceDetail,
   type LifecycleStage,
   type WorkspaceOrchestrationTemplate,
-} from "@/lib/api";
+} from '@/lib/api';
 
 const DEPLOYMENT_TARGETS: DeploymentTarget[] = [
-  "ollama",
-  "huggingface",
-  "lmstudio",
-  "openai_compatible_api",
+  'ollama',
+  'huggingface',
+  'lmstudio',
+  'openai_compatible_api',
 ];
 
 function parsePortForwards(raw: string) {
   return raw
-    .split("\n")
+    .split('\n')
     .map((line) => line.trim())
     .filter(Boolean)
     .map((line) => {
-      const parts = line.split(":").map((part) => part.trim()).filter(Boolean);
+      const parts = line
+        .split(':')
+        .map((part) => part.trim())
+        .filter(Boolean);
       if (parts.length < 2) {
         return null;
       }
       return {
         local_port: Number(parts[0]),
         remote_port: Number(parts[1]),
-        bind_host: parts[2] || "127.0.0.1",
+        bind_host: parts[2] || '127.0.0.1',
       };
     })
-    .filter((value): value is { local_port: number; remote_port: number; bind_host: string } => Boolean(value));
+    .filter((value): value is { local_port: number; remote_port: number; bind_host: string } =>
+      Boolean(value),
+    );
 }
 
 function stageFromTemplate(
   template: WorkspaceOrchestrationTemplate | undefined,
-): Extract<LifecycleStage, "train" | "finetune"> {
+): Extract<LifecycleStage, 'train' | 'finetune'> {
   if (!template) {
-    return "train";
+    return 'train';
   }
-  if (template.instance_type === "finetune") {
-    return "finetune";
+  if (template.instance_type === 'finetune') {
+    return 'finetune';
   }
-  return "train";
+  return 'train';
 }
 
 export function NewInstancePanel({
@@ -57,39 +62,50 @@ export function NewInstancePanel({
   onCreated: (detail: InstanceDetail) => void;
 }) {
   const trainingTemplates = useMemo(
-    () => templates.filter((template) => ["train", "finetune"].includes(template.instance_type)),
+    () => templates.filter((template) => ['train', 'finetune'].includes(template.instance_type)),
     [templates],
   );
   const defaultTemplate = trainingTemplates[0];
 
-  const [configPath, setConfigPath] = useState(defaultTemplate?.path ?? "configs/train.yaml");
-  const [name, setName] = useState("");
-  const [userLevel, setUserLevel] = useState<"beginner" | "hobbyist" | "dev">("hobbyist");
-  const [environmentKind, setEnvironmentKind] = useState<"local" | "cloud">("local");
-  const [cloudHost, setCloudHost] = useState("");
-  const [cloudUser, setCloudUser] = useState("");
-  const [cloudPort, setCloudPort] = useState("22");
-  const [cloudKeyPath, setCloudKeyPath] = useState("");
-  const [remoteRepoRoot, setRemoteRepoRoot] = useState("/tmp/ai-factory");
-  const [portForwards, setPortForwards] = useState("6006:6006");
-  const [origin, setOrigin] = useState<"existing_model" | "from_scratch">("existing_model");
+  const [configPath, setConfigPath] = useState(defaultTemplate?.path ?? 'configs/train.yaml');
+  const [name, setName] = useState('');
+  const [userLevel, setUserLevel] = useState<'beginner' | 'hobbyist' | 'dev'>('hobbyist');
+  const [environmentKind, setEnvironmentKind] = useState<'local' | 'cloud'>('local');
+  const [cloudHost, setCloudHost] = useState('');
+  const [cloudUser, setCloudUser] = useState('');
+  const [cloudPort, setCloudPort] = useState('22');
+  const [cloudKeyPath, setCloudKeyPath] = useState('');
+  const [remoteRepoRoot, setRemoteRepoRoot] = useState('/tmp/ai-factory');
+  const [portForwards, setPortForwards] = useState('6006:6006');
+  const [origin, setOrigin] = useState<'existing_model' | 'from_scratch'>('existing_model');
   const [learningMode, setLearningMode] = useState<
-    "supervised" | "unsupervised" | "rlhf" | "dpo" | "orpo" | "ppo" | "lora" | "qlora" | "full_finetune"
-  >("qlora");
-  const [sourceModel, setSourceModel] = useState("Qwen/Qwen2.5-Math-1.5B-Instruct");
-  const [architectureFamily, setArchitectureFamily] = useState("transformer");
-  const [hiddenSize, setHiddenSize] = useState("");
-  const [layers, setLayers] = useState("");
-  const [heads, setHeads] = useState("");
-  const [contextWindow, setContextWindow] = useState("");
-  const [parameterSizeB, setParameterSizeB] = useState("");
-  const [quantization, setQuantization] = useState<"4bit" | "8bit" | "16bit" | "none">("none");
-  const [evaluationSuite, setEvaluationSuite] = useState("evaluation/configs/base_vs_finetuned.yaml");
-  const [deploymentTargets, setDeploymentTargets] = useState<DeploymentTarget[]>(["ollama"]);
+    | 'supervised'
+    | 'unsupervised'
+    | 'rlhf'
+    | 'dpo'
+    | 'orpo'
+    | 'ppo'
+    | 'lora'
+    | 'qlora'
+    | 'full_finetune'
+  >('qlora');
+  const [sourceModel, setSourceModel] = useState('Qwen/Qwen2.5-Math-1.5B-Instruct');
+  const [architectureFamily, setArchitectureFamily] = useState('transformer');
+  const [hiddenSize, setHiddenSize] = useState('');
+  const [layers, setLayers] = useState('');
+  const [heads, setHeads] = useState('');
+  const [contextWindow, setContextWindow] = useState('');
+  const [parameterSizeB] = useState('');
+  const [quantization] = useState<'4bit' | '8bit' | '16bit' | 'none'>('none');
+  const [evaluationSuite, setEvaluationSuite] = useState(
+    'evaluation/configs/base_vs_finetuned.yaml',
+  );
+  const [deploymentTargets, setDeploymentTargets] = useState<DeploymentTarget[]>(['ollama']);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const selectedTemplate = trainingTemplates.find((template) => template.path === configPath) ?? defaultTemplate;
+  const selectedTemplate =
+    trainingTemplates.find((template) => template.path === configPath) ?? defaultTemplate;
 
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -102,9 +118,9 @@ export function NewInstancePanel({
         name: name || undefined,
         user_level: userLevel,
         environment:
-          environmentKind === "cloud"
+          environmentKind === 'cloud'
             ? {
-                kind: "cloud",
+                kind: 'cloud',
                 host: cloudHost || undefined,
                 user: cloudUser || undefined,
                 port: Number(cloudPort) || 22,
@@ -112,16 +128,16 @@ export function NewInstancePanel({
                 remote_repo_root: remoteRepoRoot || undefined,
                 port_forwards: parsePortForwards(portForwards),
               }
-            : { kind: "local" },
+            : { kind: 'local' },
         lifecycle: {
           stage: stageFromTemplate(selectedTemplate),
           origin,
           learning_mode: learningMode,
-          source_model: origin === "existing_model" ? sourceModel : undefined,
+          source_model: origin === 'existing_model' ? sourceModel : undefined,
           architecture:
-            origin === "from_scratch"
+            origin === 'from_scratch'
               ? {
-                  base_model: architectureFamily || "transformer",
+                  base_model: architectureFamily || 'transformer',
                   context_window: contextWindow ? Number(contextWindow) : undefined,
                   parameter_size_b: parameterSizeB ? Number(parameterSizeB) : undefined,
                   quantization: quantization,
@@ -129,23 +145,25 @@ export function NewInstancePanel({
               : undefined,
           evaluation_suite: evaluationSuite
             ? {
-                id: evaluationSuite.split("/").pop()?.replace(".yaml", ""),
-                label: evaluationSuite.split("/").pop()?.replace(".yaml", "").replace(/[_-]/g, " "),
+                id: evaluationSuite.split('/').pop()?.replace('.yaml', ''),
+                label: evaluationSuite.split('/').pop()?.replace('.yaml', '').replace(/[_-]/g, ' '),
                 benchmark_config: evaluationSuite,
-                compare_to_models: ["base"],
+                compare_to_models: ['base'],
               }
             : undefined,
           deployment_targets: deploymentTargets,
         },
         metadata: {
-          source: "control_center_form",
+          source: 'control_center_form',
         },
       };
       const detail = await createManagedInstance(payload);
       onCreated(detail);
-      setName("");
+      setName('');
     } catch (nextError) {
-      setError(nextError instanceof Error ? nextError.message : "Failed to create the managed instance.");
+      setError(
+        nextError instanceof Error ? nextError.message : 'Failed to create the managed instance.',
+      );
     } finally {
       setSubmitting(false);
     }
@@ -191,7 +209,10 @@ export function NewInstancePanel({
 
           <label className="field-stack">
             <span>Experience level</span>
-            <select value={userLevel} onChange={(event) => setUserLevel(event.target.value as typeof userLevel)}>
+            <select
+              value={userLevel}
+              onChange={(event) => setUserLevel(event.target.value as typeof userLevel)}
+            >
               <option value="beginner">Beginner</option>
               <option value="hobbyist">Hobbyist</option>
               <option value="dev">Dev</option>
@@ -211,7 +232,10 @@ export function NewInstancePanel({
 
           <label className="field-stack">
             <span>Training origin</span>
-            <select value={origin} onChange={(event) => setOrigin(event.target.value as typeof origin)}>
+            <select
+              value={origin}
+              onChange={(event) => setOrigin(event.target.value as typeof origin)}
+            >
               <option value="existing_model">Existing model</option>
               <option value="from_scratch">From scratch</option>
             </select>
@@ -235,7 +259,7 @@ export function NewInstancePanel({
             </select>
           </label>
 
-          {origin === "existing_model" ? (
+          {origin === 'existing_model' ? (
             <label className="field-stack control-form-span-2">
               <span>Source model</span>
               <input
@@ -256,15 +280,27 @@ export function NewInstancePanel({
               </label>
               <label className="field-stack">
                 <span>Hidden size</span>
-                <input type="number" value={hiddenSize} onChange={(event) => setHiddenSize(event.target.value)} />
+                <input
+                  type="number"
+                  value={hiddenSize}
+                  onChange={(event) => setHiddenSize(event.target.value)}
+                />
               </label>
               <label className="field-stack">
                 <span>Layers</span>
-                <input type="number" value={layers} onChange={(event) => setLayers(event.target.value)} />
+                <input
+                  type="number"
+                  value={layers}
+                  onChange={(event) => setLayers(event.target.value)}
+                />
               </label>
               <label className="field-stack">
                 <span>Attention heads</span>
-                <input type="number" value={heads} onChange={(event) => setHeads(event.target.value)} />
+                <input
+                  type="number"
+                  value={heads}
+                  onChange={(event) => setHeads(event.target.value)}
+                />
               </label>
               <label className="field-stack">
                 <span>Context window</span>
@@ -287,23 +323,39 @@ export function NewInstancePanel({
           </label>
         </div>
 
-        {environmentKind === "cloud" ? (
+        {environmentKind === 'cloud' ? (
           <div className="control-form-grid">
             <label className="field-stack">
               <span>SSH host</span>
-              <input type="text" value={cloudHost} onChange={(event) => setCloudHost(event.target.value)} />
+              <input
+                type="text"
+                value={cloudHost}
+                onChange={(event) => setCloudHost(event.target.value)}
+              />
             </label>
             <label className="field-stack">
               <span>SSH user</span>
-              <input type="text" value={cloudUser} onChange={(event) => setCloudUser(event.target.value)} />
+              <input
+                type="text"
+                value={cloudUser}
+                onChange={(event) => setCloudUser(event.target.value)}
+              />
             </label>
             <label className="field-stack">
               <span>SSH port</span>
-              <input type="number" value={cloudPort} onChange={(event) => setCloudPort(event.target.value)} />
+              <input
+                type="number"
+                value={cloudPort}
+                onChange={(event) => setCloudPort(event.target.value)}
+              />
             </label>
             <label className="field-stack">
               <span>SSH key path</span>
-              <input type="text" value={cloudKeyPath} onChange={(event) => setCloudKeyPath(event.target.value)} />
+              <input
+                type="text"
+                value={cloudKeyPath}
+                onChange={(event) => setCloudKeyPath(event.target.value)}
+              />
             </label>
             <label className="field-stack control-form-span-2">
               <span>Remote repo root</span>
@@ -330,11 +382,11 @@ export function NewInstancePanel({
             {DEPLOYMENT_TARGETS.map((target) => (
               <button
                 key={target}
-                className={`selection-chip${deploymentTargets.includes(target) ? " active" : ""}`}
+                className={`selection-chip${deploymentTargets.includes(target) ? ' active' : ''}`}
                 type="button"
                 onClick={() => toggleTarget(target)}
               >
-                {target.replace(/_/g, " ")}
+                {target.replace(/_/g, ' ')}
               </button>
             ))}
           </div>
@@ -344,7 +396,7 @@ export function NewInstancePanel({
 
         <div className="action-row">
           <button className="primary-button" type="submit" disabled={submitting}>
-            {submitting ? "Launching..." : "Launch managed instance"}
+            {submitting ? 'Launching...' : 'Launch managed instance'}
           </button>
         </div>
       </form>
