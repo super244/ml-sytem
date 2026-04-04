@@ -1,10 +1,12 @@
 from __future__ import annotations
 
+import os
 import time
 from typing import Any
 
 import torch
 
+from ai_factory.titan import titan_diagnostics
 from ai_factory.core.answers import (
     candidate_agreement,
     choose_best_candidate,
@@ -33,6 +35,40 @@ class MathGenerator:
         self.prompt_presets = prompt_presets
         self.cache = cache
         self.telemetry = telemetry
+
+    def _runtime_metadata(self) -> dict[str, Any]:
+        diagnostics = titan_diagnostics()
+        runtime = diagnostics.get("runtime") or {}
+        engine = diagnostics.get("engine") or {}
+        selected = str(runtime.get("selected") or "python")
+        canary_requested = selected.startswith("rust")
+        canary_enabled = os.getenv("AI_FACTORY_TITAN_ENABLE_CANARY_GENERATION", "0").strip().lower() not in {
+            "0",
+            "false",
+            "no",
+        }
+        execution_path = "python-transformers"
+        reason = "Python Transformers path remains active."
+        if canary_requested and canary_enabled:
+            execution_path = "rust-canary-preflight"
+            reason = "Rust canary was requested; generation remains Python-backed while Titan preflight is active."
+        elif canary_requested:
+            execution_path = "python-fallback"
+            reason = "Rust runtime was requested but canary generation is not enabled."
+        return {
+            "selected": selected,
+            "execution_path": execution_path,
+            "source": str(runtime.get("status_source") or "python-probe"),
+            "canary_requested": canary_requested,
+            "canary_active": canary_requested and canary_enabled,
+            "gguf_support": bool(runtime.get("gguf_support") or engine.get("supports_gguf") or engine.get("gguf_support")),
+            "kv_cache": bool(
+                runtime.get("kv_cache") if isinstance(runtime.get("kv_cache"), bool) else
+                (runtime.get("kv_cache") or {}).get("enabled", engine.get("supports_kv_cache", engine.get("kv_cache")))
+            ),
+            "sampler_stack": list(runtime.get("sampler_stack") or engine.get("sampler_stack") or []),
+            "reason": reason,
+        }
 
     def _resolve_preset(self, preset_id: str) -> PromptPreset:
         return self.prompt_presets.get(preset_id) or self.prompt_presets[DEFAULT_PROMPT_PRESET_ID]
@@ -145,6 +181,7 @@ class MathGenerator:
                 return cached
 
         start = time.perf_counter()
+        runtime_metadata = self._runtime_metadata()
         prompt, preset, candidates = self._sample_candidates(params)
         winner = choose_best_candidate(candidates)
         verification = winner.get("verification")
@@ -170,6 +207,7 @@ class MathGenerator:
             "latency_s": latency_s,
             "prompt_preset": preset.id,
             "candidate_agreement": candidate_agreement(candidates),
+            "runtime": runtime_metadata,
         }
         prompt_tokens = winner.get("prompt_tokens")
         completion_tokens = winner.get("completion_tokens")
@@ -192,6 +230,7 @@ class MathGenerator:
                     "tokens_per_s": tokens_per_s,
                     "candidate_agreement": result["candidate_agreement"],
                     "candidate_count": len(candidates),
+                    "runtime": runtime_metadata,
                 },
             )
         return result

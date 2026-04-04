@@ -32,33 +32,36 @@ async def test_dataset_telemetry_routes_support_promote_and_discard(
     monkeypatch: pytest.MonkeyPatch,
 ):
     from inference.app.routers import datasets as datasets_router
+    from ai_factory.core.orchestration.sqlite import SqliteControlPlane
 
-    telemetry_dir = tmp_path / "data" / "telemetry"
-    promoted_file = telemetry_dir / "promoted.jsonl"
-    discarded_file = telemetry_dir / "discarded.jsonl"
-    _write_jsonl(
-        telemetry_dir / "flagged.jsonl",
-        [
-            {
-                "timestamp": 101.0,
-                "prompt": "bad prompt",
-                "assistant_output": "wrong answer",
-                "expected_output": "right answer",
-                "model_variant": "demo",
-            },
-            {
-                "timestamp": 99.0,
-                "prompt": "another prompt",
-                "assistant_output": "bad answer",
-                "expected_output": "better answer",
-                "model_variant": "demo-2",
-            },
-        ],
-    )
+    # Use a real DB in the tmp_path
+    control_db_path = tmp_path / "control_plane.db"
+    db = SqliteControlPlane(control_db_path)
+
+    # Insert test records
+    import time
+    from inference.app.routers.datasets import _telemetry_record_id
+    
+    rec1 = {
+        "timestamp": 101.0,
+        "prompt": "bad prompt",
+        "assistant_output": "wrong answer",
+        "expected_output": "right answer",
+        "model_variant": "demo",
+    }
+    rec2 = {
+        "timestamp": 99.0,
+        "prompt": "another prompt",
+        "assistant_output": "bad answer",
+        "expected_output": "better answer",
+        "model_variant": "demo-2",
+    }
+    db.upsert_telemetry_record(_telemetry_record_id(rec1), rec1, status="flagged", timestamp=101.0)
+    db.upsert_telemetry_record(_telemetry_record_id(rec2), rec2, status="flagged", timestamp=99.0)
+
+    # Mock _get_db in the router to return our local DB
+    monkeypatch.setattr(datasets_router, "_get_db", lambda: db)
     monkeypatch.setattr(datasets_router, "REPO_ROOT", tmp_path)
-    monkeypatch.setattr(datasets_router, "TELEMETRY_DIR", telemetry_dir)
-    monkeypatch.setattr(datasets_router, "PROMOTED_TELEMETRY_FILE", promoted_file)
-    monkeypatch.setattr(datasets_router, "DISCARDED_TELEMETRY_FILE", discarded_file)
 
     transport = httpx.ASGITransport(app=app)
     async with httpx.AsyncClient(transport=transport, base_url="http://testserver") as client:
@@ -74,12 +77,16 @@ async def test_dataset_telemetry_routes_support_promote_and_discard(
 
     assert promote_response.status_code == 200
     assert promote_response.json()["status"] == "promoted"
-    assert "promoted.jsonl" in promote_response.json()["destination"]
-    assert promoted_file.exists()
+    assert "db:promoted" in promote_response.json()["destination"]
+    
+    promoted = db.list_telemetry("promoted")
+    assert len(promoted) == 1
 
     assert discard_response.status_code == 200
     assert discard_response.json()["status"] == "discarded"
-    assert discarded_file.exists()
+    
+    discarded = db.list_telemetry("discarded")
+    assert len(discarded) == 1
 
     assert remaining_response.status_code == 200
     assert remaining_response.json()["telemetry"] == []

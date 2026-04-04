@@ -27,6 +27,5 @@ def _mission_control_snapshot() -> MissionControlSnapshot:
 
 
 @router.get("/lab/mission-control", response_model=MissionControlSnapshot)
-@router.get("/mission-control", response_model=MissionControlSnapshot)
 def mission_control() -> MissionControlSnapshot:
     return _mission_control_snapshot()

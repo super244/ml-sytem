@@ -66,21 +66,6 @@ async def root() -> dict[str, str]:
     return {"message": "AI-Factory API", "status": "running"}
 
 
-@app.get("/health")
-async def health() -> dict[str, str]:
-    return {"status": "ok"}
-
-
-@app.get("/status")
-async def status() -> dict[str, str]:
-    return {
-        "title": settings.title,
-        "version": settings.version,
-        "status": "running",
-        "uptime": "0s",
-    }
-
-
 try:
     from inference.app.services.openai_service import OpenAIError
 
