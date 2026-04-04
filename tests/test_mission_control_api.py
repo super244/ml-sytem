@@ -160,10 +160,10 @@ async def test_mission_control_endpoint_aggregates_lab_surfaces(
     instance_service = InstanceService(settings)
     instance_service.create_instance(InstanceCreateRequest(config_path="configs/finetune.yaml", start=False))
 
-    monkeypatch.setattr(lab_router, "get_settings", lambda: settings)
-    monkeypatch.setattr(lab_router, "get_instance_service", lambda: instance_service)
-    monkeypatch.setattr(autonomous_router, "get_settings", lambda: settings)
-    monkeypatch.setattr(autonomous_router, "get_instance_service", lambda: instance_service)
+    app.dependency_overrides[lab_router.get_settings] = lambda: settings
+    app.dependency_overrides[lab_router.get_instance_service] = lambda: instance_service
+    app.dependency_overrides[autonomous_router.get_settings] = lambda: settings
+    app.dependency_overrides[autonomous_router.get_instance_service] = lambda: instance_service
     monkeypatch.setattr(
         mission_control_service,
         "detect_titan_status",

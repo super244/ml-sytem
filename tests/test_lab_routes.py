@@ -60,7 +60,7 @@ async def test_dataset_telemetry_routes_support_promote_and_discard(
     db.upsert_telemetry_record(_telemetry_record_id(rec2), rec2, status="flagged", timestamp=99.0)
 
     # Mock _get_db in the router to return our local DB
-    monkeypatch.setattr(datasets_router, "_get_db", lambda: db)
+    app.dependency_overrides[datasets_router._get_db] = lambda: db
     monkeypatch.setattr(datasets_router, "REPO_ROOT", tmp_path)
 
     transport = httpx.ASGITransport(app=app)
@@ -219,8 +219,8 @@ async def test_autonomous_routes_plan_and_persist_campaigns(
         telemetry_enabled=False,
     )
     service = InstanceService(settings)
-    monkeypatch.setattr(autonomous_router, "get_settings", lambda: settings)
-    monkeypatch.setattr(autonomous_router, "get_instance_service", lambda: service)
+    app.dependency_overrides[autonomous_router.get_settings] = lambda: settings
+    app.dependency_overrides[autonomous_router.get_instance_service] = lambda: service
 
     transport = httpx.ASGITransport(app=app)
     async with httpx.AsyncClient(transport=transport, base_url="http://testserver") as client:
@@ -408,7 +408,7 @@ async def test_dataset_dashboard_exposes_processed_and_pack_provenance(
         telemetry_enabled=False,
     )
     metadata_service = MetadataService(settings, [], {}, None)
-    monkeypatch.setattr(datasets_router, "get_metadata_service", lambda: metadata_service)
+    app.dependency_overrides[datasets_router.get_metadata_service] = lambda: metadata_service
 
     transport = httpx.ASGITransport(app=app)
     async with httpx.AsyncClient(transport=transport, base_url="http://testserver") as client:

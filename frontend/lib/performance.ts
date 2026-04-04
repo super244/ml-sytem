@@ -7,8 +7,8 @@ export interface PerformanceMetrics {
 }
 
 function toMetricName(entryName: string): keyof PerformanceMetrics | undefined {
-  if (entryName === "first-contentful-paint") return "fcp";
-  if (entryName === "largest-contentful-paint") return "lcp";
+  if (entryName === 'first-contentful-paint') return 'fcp';
+  if (entryName === 'largest-contentful-paint') return 'lcp';
   return undefined;
 }
 
@@ -16,11 +16,13 @@ export class PerformanceMonitor {
   private readonly metrics: PerformanceMetrics = {};
 
   start(): void {
-    if (typeof window === "undefined" || typeof PerformanceObserver === "undefined") {
+    if (typeof window === 'undefined' || typeof PerformanceObserver === 'undefined') {
       return;
     }
 
-    const nav = performance.getEntriesByType("navigation")[0] as PerformanceNavigationTiming | undefined;
+    const nav = performance.getEntriesByType('navigation')[0] as
+      | PerformanceNavigationTiming
+      | undefined;
     if (nav) {
       this.metrics.ttfb = nav.responseStart;
     }
@@ -33,7 +35,7 @@ export class PerformanceMonitor {
         }
       }
     });
-    paintObserver.observe({ type: "paint", buffered: true });
+    paintObserver.observe({ type: 'paint', buffered: true });
 
     const lcpObserver = new PerformanceObserver((list) => {
       const entries = list.getEntries();
@@ -42,17 +44,17 @@ export class PerformanceMonitor {
         this.metrics.lcp = last.startTime;
       }
     });
-    lcpObserver.observe({ type: "largest-contentful-paint", buffered: true });
+    lcpObserver.observe({ type: 'largest-contentful-paint', buffered: true });
 
     const clsObserver = new PerformanceObserver((list) => {
       for (const entry of list.getEntries() as PerformanceEntry[]) {
         const shifted = entry as PerformanceEntry & { hadRecentInput?: boolean; value?: number };
-        if (!shifted.hadRecentInput && typeof shifted.value === "number") {
+        if (!shifted.hadRecentInput && typeof shifted.value === 'number') {
           this.metrics.cls = (this.metrics.cls ?? 0) + shifted.value;
         }
       }
     });
-    clsObserver.observe({ type: "layout-shift", buffered: true });
+    clsObserver.observe({ type: 'layout-shift', buffered: true });
   }
 
   getMetrics(): PerformanceMetrics {

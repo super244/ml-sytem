@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends
 
 from inference.app.dependencies import get_metadata_service
 
@@ -16,10 +16,9 @@ def healthcheck() -> dict[str, str]:
 
 
 @router.get("/status")
-def status() -> dict[str, Any]:
+def status(service: Any = Depends(get_metadata_service)) -> dict[str, Any]:
     """Get system status with caching to avoid performance issues."""
     try:
-        service = get_metadata_service()
         return service.status()
     except Exception as exc:
         return {

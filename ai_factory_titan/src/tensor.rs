@@ -67,3 +67,32 @@ impl QuantizedTensorLayout {
         blocks.saturating_mul(self.bytes_per_block)
     }
 }
+
+#[allow(non_camel_case_types)]
+pub type f16 = u16;
+
+#[repr(C, packed)]
+#[derive(Clone, Copy)]
+pub struct BlockQ4_0 {
+    pub d: f16,
+    pub qs: [u8; 16],
+}
+
+#[repr(C, packed)]
+#[derive(Clone, Copy)]
+pub struct BlockQ8_0 {
+    pub d: f16,
+    pub qs: [i8; 32],
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_block_sizes() {
+        assert_eq!(std::mem::size_of::<BlockQ4_0>(), 18);
+        assert_eq!(std::mem::size_of::<BlockQ8_0>(), 34);
+    }
+}
+

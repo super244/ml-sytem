@@ -1,4 +1,4 @@
-import { BenchmarksView } from "@/components/benchmarks-view";
+import { BenchmarksView } from '@/components/benchmarks-view';
 
 export default function BenchmarksPage() {
   return <BenchmarksView />;

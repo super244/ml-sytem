@@ -6,7 +6,6 @@ from typing import Any
 
 import torch
 
-from ai_factory.titan import titan_diagnostics
 from ai_factory.core.answers import (
     candidate_agreement,
     choose_best_candidate,
@@ -16,6 +15,7 @@ from ai_factory.core.answers import (
     verify_prediction,
 )
 from ai_factory.core.tokens import approximate_token_count
+from ai_factory.titan import titan_diagnostics
 from inference.app.cache import FileResponseCache
 from inference.app.model_loader import MathModelRegistry
 from inference.app.parameters import GenerationParameters

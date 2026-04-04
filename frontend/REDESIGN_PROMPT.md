@@ -4,27 +4,28 @@
 
 Transform AI-Factory from a functional research interface into an **industrial cyberpunk mission control center** that embodies the raw power of autonomous ML orchestration. The design should feel like piloting a next-generation research vessel where every component serves both form and function.
 
-**Aesthetic Direction**: *Industrial Cyberpunk + Apple Pro* - Dark mode sophistication with glassmorphism, real-time telemetry, and precision-crafted interactions that make complex ML operations feel intuitive and powerful.
+**Aesthetic Direction**: _Industrial Cyberpunk + Apple Pro_ - Dark mode sophistication with glassmorphism, real-time telemetry, and precision-crafted interactions that make complex ML operations feel intuitive and powerful.
 
 ---
 
 ## Design System & Visual Language
 
 ### Color Palette
+
 ```css
 /* Core Dark Theme */
---bg-primary: #0a0a0f;          /* Deep space black */
---bg-secondary: #111119;        /* Slightly lighter black */
---bg-tertiary: #1a1a2e;         /* Dark blue-gray */
+--bg-primary: #0a0a0f; /* Deep space black */
+--bg-secondary: #111119; /* Slightly lighter black */
+--bg-tertiary: #1a1a2e; /* Dark blue-gray */
 --surface-glass: rgba(255, 255, 255, 0.05); /* Glassmorphism base */
 --surface-glass-border: rgba(255, 255, 255, 0.1);
 
 /* Accent System */
---accent-primary: #00ff88;      /* Matrix green - active states */
---accent-secondary: #00d4ff;    /* Cyber blue - data flows */
---accent-warning: #ff6b35;     /* Industrial orange - warnings */
---accent-danger: #ff0040;      /* Neon red - critical errors */
---accent-success: #00ff88;      /* Same as primary for consistency */
+--accent-primary: #00ff88; /* Matrix green - active states */
+--accent-secondary: #00d4ff; /* Cyber blue - data flows */
+--accent-warning: #ff6b35; /* Industrial orange - warnings */
+--accent-danger: #ff0040; /* Neon red - critical errors */
+--accent-success: #00ff88; /* Same as primary for consistency */
 
 /* Text Hierarchy */
 --text-primary: rgba(255, 255, 255, 0.95);
@@ -41,6 +42,7 @@ Transform AI-Factory from a functional research interface into an **industrial c
 ```
 
 ### Typography System
+
 ```css
 /* Font Stack */
 --font-primary: 'Inter Variable', 'SF Pro Display', system-ui, sans-serif;
@@ -48,14 +50,14 @@ Transform AI-Factory from a functional research interface into an **industrial c
 --font-display: 'Inter Display', 'SF Pro Display', system-ui, sans-serif;
 
 /* Type Scale */
---text-xs: 0.75rem;     /* 12px - UI labels */
---text-sm: 0.875rem;    /* 14px - Secondary text */
---text-base: 1rem;      /* 16px - Body text */
---text-lg: 1.125rem;    /* 18px - Emphasized */
---text-xl: 1.25rem;     /* 20px - Small headers */
---text-2xl: 1.5rem;     /* 24px - Section headers */
---text-3xl: 1.875rem;   /* 30px - Page headers */
---text-4xl: 2.25rem;    /* 36px - Display */
+--text-xs: 0.75rem; /* 12px - UI labels */
+--text-sm: 0.875rem; /* 14px - Secondary text */
+--text-base: 1rem; /* 16px - Body text */
+--text-lg: 1.125rem; /* 18px - Emphasized */
+--text-xl: 1.25rem; /* 20px - Small headers */
+--text-2xl: 1.5rem; /* 24px - Section headers */
+--text-3xl: 1.875rem; /* 30px - Page headers */
+--text-4xl: 2.25rem; /* 36px - Display */
 
 /* Font Weights */
 --font-light: 300;
@@ -67,6 +69,7 @@ Transform AI-Factory from a functional research interface into an **industrial c
 ```
 
 ### Glassmorphism Design Tokens
+
 ```css
 /* Glass Effects */
 --glass-blur: 12px;
@@ -91,6 +94,7 @@ Transform AI-Factory from a functional research interface into an **industrial c
 **Purpose**: Central command hub with real-time system status and quick actions
 
 **Components**:
+
 ```typescript
 interface MissionControlSidebar {
   // System Status Gauges
@@ -100,13 +104,13 @@ interface MissionControlSidebar {
     temperature: number; // Celsius
     memoryUsage: number; // GB
   };
-  
+
   // Cluster Health
   clusterNodes: ClusterNodeStatus[];
-  
+
   // Active Operations Queue
   activeOperations: OperationStatus[];
-  
+
   // Quick Launch Actions
   quickActions: {
     launchTraining: () => void;
@@ -117,6 +121,7 @@ interface MissionControlSidebar {
 ```
 
 **Visual Design**:
+
 - Fixed 320px width, full height
 - Glassmorphism panels with subtle blur
 - Real-time animated gauges and progress rings
@@ -128,18 +133,19 @@ interface MissionControlSidebar {
 **Purpose**: Live system metrics with data visualization
 
 **Components**:
+
 ```typescript
 interface TelemetryDashboard {
   // GPU Metrics
   gpuUtilization: TimeSeriesData[];
   vramUsage: TimeSeriesData[];
   temperatureCurve: TimeSeriesData[];
-  
+
   // Training Metrics
   lossCurve: TimeSeriesData[];
   accuracyMetrics: TimeSeriesData[];
   learningRateSchedule: TimeSeriesData[];
-  
+
   // System Performance
   networkThroughput: NetworkMetrics;
   diskIO: IOMetrics;
@@ -148,6 +154,7 @@ interface TelemetryDashboard {
 ```
 
 **Visual Design**:
+
 - Animated line charts with gradient fills
 - Real-time updating gauges (circular progress)
 - Heat maps for cluster utilization
@@ -159,6 +166,7 @@ interface TelemetryDashboard {
 **Purpose**: Interactive 3D representation of model architecture and training progress
 
 **Components**:
+
 ```typescript
 interface ModelVisualizer {
   // Model Architecture
@@ -167,14 +175,14 @@ interface ModelVisualizer {
     connections: ConnectionData[];
     activations: ActivationMap;
   };
-  
+
   // Training Dynamics
   trainingProgress: {
     epoch: number;
     loss: number;
     gradientFlow: VectorField[];
   };
-  
+
   // Interactive Controls
   camera: CameraControls;
   selection: LayerSelection;
@@ -183,6 +191,7 @@ interface ModelVisualizer {
 ```
 
 **Visual Design**:
+
 - 3D neural network visualization with animated data flow
 - Interactive layer inspection on hover/click
 - Real-time gradient flow visualization
@@ -194,13 +203,14 @@ interface ModelVisualizer {
 **Purpose**: Advanced instance orchestration with visual status indicators
 
 **Components**:
+
 ```typescript
 interface InstanceGrid {
   instances: ManagedInstance[];
   filters: InstanceFilters;
   sortBy: SortOptions;
   viewMode: 'grid' | 'list' | 'timeline';
-  
+
   // Bulk Operations
   bulkActions: {
     selected: string[];
@@ -210,6 +220,7 @@ interface InstanceGrid {
 ```
 
 **Visual Design**:
+
 - Card-based layout with glassmorphism
 - Status indicators with animated glow effects
 - Progress bars with gradient fills
@@ -223,6 +234,7 @@ interface InstanceGrid {
 ### 1. Mission Control Dashboard (`/dashboard`)
 
 **Layout**:
+
 ```
 ┌─────────────────────────────────────────────────────────────┐
 │ Sidebar │           Main Dashboard Area                      │
@@ -242,6 +254,7 @@ interface InstanceGrid {
 ```
 
 **Key Features**:
+
 - Real-time system telemetry with animated gauges
 - Interactive 3D model visualization in center panel
 - Operation timeline with live updates
@@ -249,6 +262,7 @@ interface InstanceGrid {
 - Quick action buttons with haptic feedback
 
 **State Management Integration**:
+
 ```typescript
 // Enhanced state for dashboard
 interface DashboardState {
@@ -258,14 +272,14 @@ interface DashboardState {
     cluster: ClusterMetrics;
     network: NetworkStatus;
   };
-  
+
   // 3D visualization
   modelViz: {
     scene: ThreeScene;
     camera: CameraState;
     animations: AnimationState[];
   };
-  
+
   // Operations queue
   operations: {
     active: Operation[];
@@ -278,6 +292,7 @@ interface DashboardState {
 ### 2. Solve Workspace (`/solve`)
 
 **Layout**:
+
 ```
 ┌─────────────────────────────────────────────────────────────┐
 │ Sidebar │           Interactive Solve Space                  │
@@ -299,6 +314,7 @@ interface DashboardState {
 ```
 
 **Key Features**:
+
 - Split-screen model comparison with 3D visualizations
 - Advanced math input with LaTeX rendering
 - Real-time reasoning flow visualization
@@ -308,6 +324,7 @@ interface DashboardState {
 ### 3. Monitoring Dashboard (`/dashboard/monitoring`)
 
 **Layout**:
+
 ```
 ┌─────────────────────────────────────────────────────────────┐
 │ Sidebar │           Advanced Monitoring                     │
@@ -327,6 +344,7 @@ interface DashboardState {
 ```
 
 **Key Features**:
+
 - Real-time performance matrix with heat maps
 - Advanced log streaming with syntax highlighting and filtering
 - 3D instance state visualization
@@ -340,12 +358,14 @@ interface DashboardState {
 ### 1. Gesture-Based Navigation
 
 **Touch/Mouse Gestures**:
+
 - **Swipe from left**: Reveal mission control sidebar
 - **Pinch-to-zoom**: In 3D model visualizer
 - **Drag to reorder**: Instance cards in management grid
 - **Long press**: Context menus with advanced options
 
 **Keyboard Shortcuts**:
+
 ```
 Ctrl/Cmd + K: Quick command palette
 Ctrl/Cmd + /: Show/hide sidebar
@@ -358,18 +378,21 @@ Esc: Cancel current action/close modal
 ### 2. Micro-Interactions & Animations
 
 **Loading States**:
+
 - Skeleton screens with shimmer effects
 - Progress rings with smooth animations
 - Particle systems for data processing
 - Pulsing glow effects for active operations
 
 **State Transitions**:
+
 - Smooth page transitions with Framer Motion
 - Component mount/unmount animations
 - Data change animations (number counting, chart updates)
 - Hover states with elevation and glow effects
 
 **Feedback Systems**:
+
 - Haptic feedback for critical actions
 - Sound effects for operation completion
 - Visual notifications with priority-based styling
@@ -378,16 +401,18 @@ Esc: Cancel current action/close modal
 ### 3. Responsive Design Strategy
 
 **Breakpoints**:
+
 ```css
 /* Mobile First Approach */
---breakpoint-sm: 640px;   /* Tablet portrait */
---breakpoint-md: 768px;   /* Tablet landscape */
---breakpoint-lg: 1024px;  /* Desktop */
---breakpoint-xl: 1280px;  /* Large desktop */
+--breakpoint-sm: 640px; /* Tablet portrait */
+--breakpoint-md: 768px; /* Tablet landscape */
+--breakpoint-lg: 1024px; /* Desktop */
+--breakpoint-xl: 1280px; /* Large desktop */
 --breakpoint-2xl: 1536px; /* Ultra-wide */
 ```
 
 **Adaptive Layouts**:
+
 - **Mobile**: Collapsible sidebar, stacked components
 - **Tablet**: Side-by-side layout, reduced detail density
 - **Desktop**: Full mission control experience
@@ -400,6 +425,7 @@ Esc: Cancel current action/close modal
 ### 1. React 19 Integration
 
 **New Features to Leverage**:
+
 ```typescript
 // React Server Components for static content
 export async function ServerComponent() {
@@ -419,7 +445,7 @@ function ConcurrentFeatures() {
 // Actions & Forms
 function ActionForm() {
   const [state, formAction] = useFormState(submitAction, initialState);
-  
+
   return (
     <form action={formAction}>
       {/* Form content */}
@@ -431,6 +457,7 @@ function ActionForm() {
 ### 2. Tailwind v4 Upgrade
 
 **New Configuration**:
+
 ```javascript
 // tailwind.config.js
 export default {
@@ -460,16 +487,14 @@ export default {
       },
     },
   },
-  plugins: [
-    require('@tailwindcss/forms'),
-    require('@tailwindcss/typography'),
-  ],
+  plugins: [require('@tailwindcss/forms'), require('@tailwindcss/typography')],
 };
 ```
 
 ### 3. Framer Motion Integration
 
 **Animation Library**:
+
 ```typescript
 // Core animation components
 export const animations = {
@@ -480,16 +505,16 @@ export const animations = {
     exit: { opacity: 0, y: -20 },
     transition: { duration: 0.3, ease: 'easeInOut' },
   },
-  
+
   // Component animations
   cardHover: {
-    whileHover: { 
-      scale: 1.02, 
-      boxShadow: '0 10px 40px rgba(0, 255, 136, 0.2)' 
+    whileHover: {
+      scale: 1.02,
+      boxShadow: '0 10px 40px rgba(0, 255, 136, 0.2)',
     },
     whileTap: { scale: 0.98 },
   },
-  
+
   // Data visualization
   chartAnimation: {
     initial: { pathLength: 0 },
@@ -514,6 +539,7 @@ export const modelAnimations = {
 ### 4. Three.js 3D Visualization
 
 **Scene Setup**:
+
 ```typescript
 // 3D visualization components
 interface ThreeJSIntegration {
@@ -523,14 +549,14 @@ interface ThreeJSIntegration {
     connections: ConnectionLines[];
     dataFlow: ParticleSystem;
   };
-  
+
   // Training progress visualization
   TrainingProgress: {
     lossSurface: MeshGeometry;
     gradientField: VectorField;
     optimizationPath: Line3;
   };
-  
+
   // Cluster visualization
   ClusterMap: {
     nodes: NodeMesh[];
@@ -555,24 +581,25 @@ const threeConfig = {
 ### 1. Rust Backend Communication
 
 **WebSocket Integration**:
+
 ```typescript
 // Real-time data streaming from Titan Engine
 interface TitanWebSocket {
   // Training metrics
   onTrainingMetrics: (metrics: TrainingMetrics) => void;
-  
+
   // System status
   onSystemStatus: (status: SystemStatus) => void;
-  
+
   // GPU telemetry
   onGPUTelemetry: (gpu: GPUStatus) => void;
-  
+
   // Model updates
   onModelUpdate: (model: ModelState) => void;
 }
 
 // Message types for Rust integration
-type TitanMessage = 
+type TitanMessage =
   | { type: 'training_metrics'; data: TrainingMetrics }
   | { type: 'system_status'; data: SystemStatus }
   | { type: 'gpu_telemetry'; data: GPUStatus }
@@ -587,19 +614,19 @@ type TitanMessage =
 export function useTitanPerformance() {
   const [metrics, setMetrics] = useState<TitanMetrics>();
   const [isConnected, setIsConnected] = useState(false);
-  
+
   useEffect(() => {
     // WebSocket connection to Titan Engine
     const ws = new WebSocket('ws://localhost:8080/titan');
-    
+
     ws.onmessage = (event) => {
       const message = JSON.parse(event.data) as TitanMessage;
       handleTitanMessage(message);
     };
-    
+
     return () => ws.close();
   }, []);
-  
+
   return { metrics, isConnected };
 }
 ```
@@ -611,12 +638,15 @@ export function useTitanPerformance() {
 export function useModelState(modelId: string) {
   const [model, setModel] = useState<ModelState>();
   const [training, setTraining] = useState<TrainingState>();
-  
-  const updateModel = useCallback((updates: ModelUpdates) => {
-    // Send updates to Titan Engine
-    titanAPI.updateModel(modelId, updates);
-  }, [modelId]);
-  
+
+  const updateModel = useCallback(
+    (updates: ModelUpdates) => {
+      // Send updates to Titan Engine
+      titanAPI.updateModel(modelId, updates);
+    },
+    [modelId],
+  );
+
   return { model, training, updateModel };
 }
 ```
@@ -628,10 +658,11 @@ export function useModelState(modelId: string) {
 ### 1. Rendering Optimization
 
 **React Optimizations**:
+
 ```typescript
 // Memoized components for performance
 const MemoizedModelViz = memo(ModelVisualizer, (prev, next) => {
-  return prev.modelId === next.modelId && 
+  return prev.modelId === next.modelId &&
          prev.timestamp === next.timestamp;
 });
 
@@ -651,6 +682,7 @@ const VirtualizedInstanceList = () => {
 ```
 
 **Three.js Optimizations**:
+
 ```typescript
 // LOD (Level of Detail) for 3D models
 const lod = new THREE.LOD();
@@ -665,6 +697,7 @@ const instancedMesh = new THREE.InstancedMesh(geometry, material, count);
 ### 2. Data Management
 
 **Efficient State Updates**:
+
 ```typescript
 // Immutable state updates for performance
 const updateTelemetry = (current: TelemetryState, updates: Partial<TelemetryState>) => {
@@ -676,20 +709,18 @@ const updateTelemetry = (current: TelemetryState, updates: Partial<TelemetryStat
 };
 
 // Debounced API calls
-const debouncedApiCall = debounce(
-  (params: ApiParams) => api.call(params),
-  300
-);
+const debouncedApiCall = debounce((params: ApiParams) => api.call(params), 300);
 ```
 
 ### 3. Memory Management
 
 **Cleanup Strategies**:
+
 ```typescript
 // Component cleanup
 useEffect(() => {
   const interval = setInterval(updateData, 1000);
-  
+
   return () => {
     clearInterval(interval);
     // Cleanup Three.js resources
@@ -701,7 +732,7 @@ useEffect(() => {
 // WebSocket cleanup
 useEffect(() => {
   const ws = new WebSocket(url);
-  
+
   return () => {
     if (ws.readyState === WebSocket.OPEN) {
       ws.close();
@@ -717,6 +748,7 @@ useEffect(() => {
 ### 1. Accessibility Features
 
 **WCAG 2.1 AA Compliance**:
+
 - Semantic HTML structure
 - ARIA labels and descriptions
 - Keyboard navigation support
@@ -724,17 +756,18 @@ useEffect(() => {
 - High contrast mode support
 
 **Focus Management**:
+
 ```typescript
 // Focus trap for modals
 const useFocusTrap = (isActive: boolean) => {
   const ref = useRef<HTMLDivElement>(null);
-  
+
   useEffect(() => {
     if (isActive && ref.current) {
       trapFocus(ref.current);
     }
   }, [isActive]);
-  
+
   return ref;
 };
 ```
@@ -742,12 +775,14 @@ const useFocusTrap = (isActive: boolean) => {
 ### 2. User Experience Enhancements
 
 **Progressive Enhancement**:
+
 - Core functionality without JavaScript
 - Enhanced experience with modern browsers
 - Graceful degradation for older systems
 - Offline capability for critical features
 
 **Internationalization**:
+
 ```typescript
 // i18n support
 const { t, i18n } = useTranslation();
@@ -762,6 +797,7 @@ const isRTL = i18n.dir() === 'rtl';
 ## Implementation Roadmap
 
 ### Phase 1: Foundation (Weeks 1-2)
+
 1. **Design System Setup**
    - Color palette and typography implementation
    - Glassmorphism component library
@@ -773,6 +809,7 @@ const isRTL = i18n.dir() === 'rtl';
    - Framer Motion integration
 
 ### Phase 2: Mission Control (Weeks 3-4)
+
 1. **Sidebar Development**
    - Real-time telemetry gauges
    - System status indicators
@@ -784,6 +821,7 @@ const isRTL = i18n.dir() === 'rtl';
    - Interactive operation timeline
 
 ### Phase 3: Advanced Features (Weeks 5-6)
+
 1. **3D Visualization**
    - Neural network rendering
    - Training progress visualization
@@ -795,6 +833,7 @@ const isRTL = i18n.dir() === 'rtl';
    - Historical trend analysis
 
 ### Phase 4: Integration & Polish (Weeks 7-8)
+
 1. **Titan Engine Integration**
    - WebSocket communication
    - Performance monitoring hooks
@@ -810,18 +849,21 @@ const isRTL = i18n.dir() === 'rtl';
 ## Success Metrics
 
 ### Performance Targets
+
 - **Page Load**: < 2 seconds initial load
 - **Interaction**: < 100ms response time
 - **Animation**: 60fps smooth animations
 - **Memory**: < 500MB peak usage
 
 ### User Experience Goals
+
 - **Learnability**: < 5 minutes to core features
 - **Efficiency**: 50% faster task completion
 - **Satisfaction**: 4.5/5 user rating
 - **Accessibility**: 100% WCAG 2.1 AA compliance
 
 ### Technical Excellence
+
 - **Code Quality**: 90%+ test coverage
 - **Bundle Size**: < 2MB optimized
 - **SEO Score**: 95+ Lighthouse performance

@@ -59,7 +59,7 @@ async def test_orchestration_routes_expose_runs_tasks_and_summary(tmp_path: Path
             start=False,
         )
     )
-    monkeypatch.setattr(orchestration_router, "get_instance_service", lambda: service)
+    app.dependency_overrides[orchestration_router.get_instance_service] = lambda: service
 
     transport = httpx.ASGITransport(app=app)
     async with httpx.AsyncClient(transport=transport, base_url="http://testserver") as client:
@@ -137,7 +137,7 @@ async def test_instance_routes_support_control_center_creation_and_inference(tmp
         telemetry_enabled=False,
     )
     service = InstanceService(settings)
-    monkeypatch.setattr(instances_router, "get_instance_service", lambda: service)
+    app.dependency_overrides[instances_router.get_instance_service] = lambda: service
 
     transport = httpx.ASGITransport(app=app)
     async with httpx.AsyncClient(transport=transport, base_url="http://testserver") as client:
@@ -216,7 +216,7 @@ async def test_instance_live_stream_and_foundation_routes(tmp_path: Path, monkey
         telemetry_enabled=False,
     )
     service = InstanceService(settings)
-    monkeypatch.setattr(instances_router, "get_instance_service", lambda: service)
+    app.dependency_overrides[instances_router.get_instance_service] = lambda: service
 
     created = service.create_instance(
         instances_router.InstanceCreateRequest(
@@ -278,7 +278,7 @@ async def test_instance_action_route_supports_generic_follow_up_actions(tmp_path
         telemetry_enabled=False,
     )
     service = InstanceService(settings)
-    monkeypatch.setattr(instances_router, "get_instance_service", lambda: service)
+    app.dependency_overrides[instances_router.get_instance_service] = lambda: service
 
     source = service.create_instance(
         instances_router.InstanceCreateRequest(

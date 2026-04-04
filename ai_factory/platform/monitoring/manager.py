@@ -28,7 +28,7 @@ class MonitoringManager:
         self.metrics_collector = MetricsCollector(config)
         self.alert_manager = AlertManager(config)
         self._running = False
-        self._monitoring_task: asyncio.Task | None = None
+        self._monitoring_task: asyncio.Task[Any] | None = None
         self._metrics_buffer: dict[str, Any] = {}
 
     async def start_monitoring(self) -> None:

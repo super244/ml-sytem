@@ -1,6 +1,6 @@
-"use client";
+'use client';
 
-import { useEffect, useState } from "react";
+import { useEffect, useState } from 'react';
 
 import {
   getBenchmarks,
@@ -15,7 +15,7 @@ import {
   type PromptLibrary,
   type RunInfo,
   type StatusInfo,
-} from "@/lib/api";
+} from '@/lib/api';
 
 type LabMetadataState = {
   datasets: DatasetDashboard | null;
@@ -69,38 +69,40 @@ export function useLabMetadata() {
           return;
         }
         const errors: string[] = [];
-        const resolveResult = <T,>(
+        const resolveResult = <T>(
           result: PromiseSettledResult<T>,
           fallback: T,
           label: string,
         ): T => {
-          if (result.status === "fulfilled") {
+          if (result.status === 'fulfilled') {
             return result.value;
           }
           errors.push(
             `${label}: ${
-              result.reason instanceof Error ? result.reason.message : "request failed"
+              result.reason instanceof Error ? result.reason.message : 'request failed'
             }`,
           );
           return fallback;
         };
         setState({
-          datasets: resolveResult(datasetsResult, null, "datasets"),
-          promptLibrary: resolveResult(promptLibraryResult, null, "prompts"),
-          models: resolveResult(modelsResult, [], "models"),
-          benchmarks: resolveResult(benchmarksResult, [], "benchmarks"),
-          runs: resolveResult(runsResult, [], "runs"),
-          status: resolveResult(statusResult, null, "status"),
+          datasets: resolveResult(datasetsResult, null, 'datasets'),
+          promptLibrary: resolveResult(promptLibraryResult, null, 'prompts'),
+          models: resolveResult(modelsResult, [], 'models'),
+          benchmarks: resolveResult(benchmarksResult, [], 'benchmarks'),
+          runs: resolveResult(runsResult, [], 'runs'),
+          status: resolveResult(statusResult, null, 'status'),
           loading: false,
-          error: [
-            ...errors,
-            ...(statusResult.status === "fulfilled" && statusResult.value?.status === "degraded"
-              ? statusResult.value.errors ?? ["status metadata is degraded"]
-              : []),
-            ...(promptLibraryResult.status === "fulfilled" && promptLibraryResult.value?.status === "degraded"
-              ? promptLibraryResult.value.errors ?? ["prompt metadata is degraded"]
-              : []),
-          ].join(" | ") || null,
+          error:
+            [
+              ...errors,
+              ...(statusResult.status === 'fulfilled' && statusResult.value?.status === 'degraded'
+                ? (statusResult.value.errors ?? ['status metadata is degraded'])
+                : []),
+              ...(promptLibraryResult.status === 'fulfilled' &&
+              promptLibraryResult.value?.status === 'degraded'
+                ? (promptLibraryResult.value.errors ?? ['prompt metadata is degraded'])
+                : []),
+            ].join(' | ') || null,
         });
       } catch (error) {
         if (!active) {
@@ -109,7 +111,7 @@ export function useLabMetadata() {
         setState((current) => ({
           ...current,
           loading: false,
-          error: error instanceof Error ? error.message : "Failed to load metadata.",
+          error: error instanceof Error ? error.message : 'Failed to load metadata.',
         }));
       }
     }
@@ -123,12 +125,12 @@ export function useLabMetadata() {
     const onFocus = () => {
       void load();
     };
-    window.addEventListener("focus", onFocus);
+    window.addEventListener('focus', onFocus);
 
     return () => {
       active = false;
       window.clearInterval(intervalId);
-      window.removeEventListener("focus", onFocus);
+      window.removeEventListener('focus', onFocus);
     };
   }, []);
 

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Any, Literal
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, ConfigDict
 
 from ai_factory.core.control.models import (
     FoundationOverview,
@@ -27,6 +27,7 @@ OutputFormat = Literal["text", "json"]
 
 
 class CandidateVerification(BaseModel):
+    model_config = ConfigDict(strict=True)
     final_answer: str | None = None
     equivalent: bool | None = None
     step_correctness: float | None = None
@@ -37,6 +38,7 @@ class CandidateVerification(BaseModel):
 
 
 class Candidate(BaseModel):
+    model_config = ConfigDict(strict=True)
     text: str
     display_text: str
     reasoning: str
@@ -50,6 +52,7 @@ class Candidate(BaseModel):
 
 
 class GenerateRequest(BaseModel):
+    model_config = ConfigDict(strict=True)
     question: str = Field(..., min_length=3)
     model_variant: ModelVariant = "base"
     compare_to_base: bool = False
@@ -71,12 +74,14 @@ class GenerateRequest(BaseModel):
 
 
 class StructuredAnswer(BaseModel):
+    model_config = ConfigDict(strict=True)
     reasoning: str
     final_answer: str | None
     verification: CandidateVerification | None = None
 
 
 class GenerateRuntimeMetadata(BaseModel):
+    model_config = ConfigDict(strict=True)
     selected: str
     execution_path: str
     source: str
@@ -89,6 +94,7 @@ class GenerateRuntimeMetadata(BaseModel):
 
 
 class GenerateResult(BaseModel):
+    model_config = ConfigDict(strict=True)
     model_variant: str
     prompt: str
     answer: str
@@ -108,10 +114,12 @@ class GenerateResult(BaseModel):
 
 
 class GenerateResponse(GenerateResult):
+    model_config = ConfigDict(strict=True)
     comparison: GenerateResult | None = None
 
 
 class CompareRequest(BaseModel):
+    model_config = ConfigDict(strict=True)
     question: str = Field(..., min_length=3)
     primary_model: str = "finetuned"
     secondary_model: str = "base"
@@ -131,19 +139,23 @@ class CompareRequest(BaseModel):
 
 
 class CompareResponse(BaseModel):
+    model_config = ConfigDict(strict=True)
     primary: GenerateResult
     secondary: GenerateResult
 
 
 class GenerateBatchRequest(BaseModel):
+    model_config = ConfigDict(strict=True)
     requests: list[GenerateRequest] = Field(..., min_length=1, max_length=64)
 
 
 class GenerateBatchResponse(BaseModel):
+    model_config = ConfigDict(strict=True)
     results: list[GenerateResponse]
 
 
 class VerifyRequest(BaseModel):
+    model_config = ConfigDict(strict=True)
     candidate_answer: str
     reference_answer: str
     prediction_text: str | None = None
@@ -151,6 +163,7 @@ class VerifyRequest(BaseModel):
 
 
 class VerifyResponse(BaseModel):
+    model_config = ConfigDict(strict=True)
     equivalent: bool
     step_correctness: float | None
     formatting_failure: bool = False
@@ -160,6 +173,7 @@ class VerifyResponse(BaseModel):
 
 
 class InstanceCreateRequest(BaseModel):
+    model_config = ConfigDict(strict=True)
     config_path: str = Field(..., min_length=1)
     start: bool = True
     environment: EnvironmentSpec | None = None
@@ -172,22 +186,26 @@ class InstanceCreateRequest(BaseModel):
 
 
 class InstanceEvaluateRequest(BaseModel):
+    model_config = ConfigDict(strict=True)
     config_path: str | None = None
     start: bool = True
 
 
 class InstanceInferenceRequest(BaseModel):
+    model_config = ConfigDict(strict=True)
     config_path: str | None = None
     start: bool = True
 
 
 class InstanceDeployRequest(BaseModel):
+    model_config = ConfigDict(strict=True)
     target: Literal["huggingface", "ollama", "lmstudio", "api", "custom_api", "openai_compatible_api"]
     config_path: str | None = None
     start: bool = True
 
 
 class InstanceActionRequest(BaseModel):
+    model_config = ConfigDict(strict=True)
     action: str = Field(..., min_length=1)
     config_path: str | None = None
     deployment_target: (
@@ -197,14 +215,17 @@ class InstanceActionRequest(BaseModel):
 
 
 class InstanceLogsResponse(InstanceLogsView):
+    model_config = ConfigDict(strict=True)
     pass
 
 
 class InstanceMetricsResponse(InstanceMetricsView):
+    model_config = ConfigDict(strict=True)
     pass
 
 
 class InstanceActionDescriptor(BaseModel):
+    model_config = ConfigDict(strict=True)
     action: str
     label: str
     description: str
@@ -214,30 +235,37 @@ class InstanceActionDescriptor(BaseModel):
 
 
 class InstanceDetail(ManagedInstanceDetail):
+    model_config = ConfigDict(strict=True)
     available_actions: list[InstanceActionDescriptor] = Field(default_factory=list)
 
 
 class InstanceListResponse(BaseModel):
+    model_config = ConfigDict(strict=True)
     instances: list[InstanceManifest]
 
 
 class InstanceStreamResponse(LiveInstanceSnapshot):
+    model_config = ConfigDict(strict=True)
     available_actions: list[InstanceActionDescriptor] = Field(default_factory=list)
 
 
 class OrchestrationRunListResponse(BaseModel):
+    model_config = ConfigDict(strict=True)
     runs: list[OrchestrationRun]
 
 
 class OrchestrationTaskListResponse(BaseModel):
+    model_config = ConfigDict(strict=True)
     tasks: list[OrchestrationTask | dict[str, Any]]
 
 
 class OrchestrationEventListResponse(BaseModel):
+    model_config = ConfigDict(strict=True)
     events: list[OrchestrationEvent | dict[str, Any]]
 
 
 class OrchestrationRunDetail(BaseModel):
+    model_config = ConfigDict(strict=True)
     run: OrchestrationRun | dict[str, Any]
     tasks: list[OrchestrationTask | dict[str, Any]] = Field(default_factory=list)
     events: list[OrchestrationEvent | dict[str, Any]] = Field(default_factory=list)
@@ -245,8 +273,10 @@ class OrchestrationRunDetail(BaseModel):
 
 
 class OrchestrationSummaryResponse(BaseModel):
+    model_config = ConfigDict(strict=True)
     summary: dict[str, Any] = Field(default_factory=dict)
 
 
 class FoundationOverviewResponse(FoundationOverview):
+    model_config = ConfigDict(strict=True)
     pass

@@ -11,7 +11,24 @@ pub struct HardwareProfile {
     pub gpu_vendor: Option<String>,
     pub unified_memory: bool,
     pub bandwidth_gbps: Option<u64>,
+    pub simd_features: Vec<String>,
+    pub vram_usage_mb: Option<u64>,
     pub backend: TitanBackend,
+}
+
+fn detect_simd() -> Vec<String> {
+    let mut features = Vec::new();
+    #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
+    {
+        if std::is_x86_feature_detected!("avx") { features.push("avx".to_string()); }
+        if std::is_x86_feature_detected!("avx2") { features.push("avx2".to_string()); }
+        if std::is_x86_feature_detected!("avx512f") { features.push("avx512f".to_string()); }
+    }
+    #[cfg(target_arch = "aarch64")]
+    {
+        if std::arch::is_aarch64_feature_detected!("neon") { features.push("neon".to_string()); }
+    }
+    features
 }
 
 pub fn detect_hardware() -> HardwareProfile {
@@ -21,14 +38,17 @@ pub fn detect_hardware() -> HardwareProfile {
     let memory_gb = sys_info::mem_info()
         .map(|info| info.total / 1024 / 1024)
         .unwrap_or(0);
+    let simd_features = detect_simd();
 
     #[cfg(target_os = "macos")]
-    if let Some(profile) = detect_apple(cpu_cores, memory_gb) {
+    if let Some(mut profile) = detect_apple(cpu_cores, memory_gb) {
+        profile.simd_features = simd_features.clone();
         return profile;
     }
 
     #[cfg(feature = "cuda")]
-    if let Some(profile) = detect_cuda(cpu_cores, memory_gb) {
+    if let Some(mut profile) = detect_cuda(cpu_cores, memory_gb) {
+        profile.simd_features = simd_features.clone();
         return profile;
     }
 
@@ -40,6 +60,8 @@ pub fn detect_hardware() -> HardwareProfile {
         gpu_vendor: None,
         unified_memory: false,
         bandwidth_gbps: None,
+        simd_features,
+        vram_usage_mb: None,
         backend: TitanBackend::new(BackendKind::CpuFallback, 100),
     }
 }
@@ -55,6 +77,8 @@ fn detect_apple(cpu_cores: usize, memory_gb: u64) -> Option<HardwareProfile> {
         } else {
             None
         };
+        // Very basic mock of VRAM usage for Apple Silicon (unified memory)
+        let vram_usage_mb = Some(0); // We'd need IOKit to get real memory usage
         return Some(HardwareProfile {
             silicon: name.clone(),
             cpu_cores,
@@ -63,6 +87,8 @@ fn detect_apple(cpu_cores: usize, memory_gb: u64) -> Option<HardwareProfile> {
             gpu_vendor: Some("Apple".to_string()),
             unified_memory: true,
             bandwidth_gbps,
+            simd_features: Vec::new(),
+            vram_usage_mb,
             backend: TitanBackend::new(BackendKind::Metal, 90),
         });
     }
@@ -78,6 +104,8 @@ fn detect_apple(cpu_cores: usize, memory_gb: u64) -> Option<HardwareProfile> {
             gpu_vendor: Some("Apple".to_string()),
             unified_memory: true,
             bandwidth_gbps: apple_bandwidth_gbps(&name),
+            simd_features: Vec::new(),
+            vram_usage_mb: None,
             backend: TitanBackend::new(BackendKind::CpuFallback, 90),
         });
     }
@@ -111,6 +139,8 @@ fn detect_cuda(cpu_cores: usize, memory_gb: u64) -> Option<HardwareProfile> {
         gpu_vendor: Some("NVIDIA".to_string()),
         unified_memory: false,
         bandwidth_gbps: bus_width_bits.or(Some(((major * 100) + minor) as u64)),
+        simd_features: Vec::new(), // will be overwritten in detect_hardware
+        vram_usage_mb: None, // could be obtained via nvml or cudarc
         backend: TitanBackend::new(BackendKind::Cuda, 100),
     })
 }

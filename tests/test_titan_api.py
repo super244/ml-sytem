@@ -32,7 +32,7 @@ async def test_titan_status_route_returns_probe_payload(monkeypatch: pytest.Monk
         cache_enabled=False,
         telemetry_enabled=False,
     )
-    monkeypatch.setattr(titan_router, "get_settings", lambda: settings)
+    app.dependency_overrides[titan_router.get_settings] = lambda: settings
     monkeypatch.setattr(
         titan_router,
         "detect_titan_status",
@@ -73,7 +73,7 @@ async def test_titan_hardware_doc_route_returns_generated_path(monkeypatch: pyte
     )
     output_path = tmp_path / "HARDWARE.md"
 
-    monkeypatch.setattr(titan_router, "get_settings", lambda: settings)
+    app.dependency_overrides[titan_router.get_settings] = lambda: settings
     monkeypatch.setattr(titan_router, "write_hardware_markdown", lambda repo_root: output_path)
 
     transport = httpx.ASGITransport(app=app)
@@ -103,7 +103,7 @@ async def test_titan_diagnostics_route_returns_runtime_payload(monkeypatch: pyte
         telemetry_enabled=False,
     )
 
-    monkeypatch.setattr(titan_router, "get_settings", lambda: settings)
+    app.dependency_overrides[titan_router.get_settings] = lambda: settings
     monkeypatch.setattr(
         titan_router,
         "titan_diagnostics",

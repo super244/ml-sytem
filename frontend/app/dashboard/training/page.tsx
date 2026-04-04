@@ -1,27 +1,27 @@
-"use client";
+'use client';
 
-import Link from "next/link";
-import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
+import Link from 'next/link';
+import { useEffect, useState } from 'react';
+import { useRouter } from 'next/navigation';
 
 import {
   createManagedInstance,
   getWorkspaceOverview,
   type WorkspaceTrainingProfile,
   type WorkspaceOrchestrationTemplate,
-} from "@/lib/api";
-import { ROUTES } from "@/lib/routes";
+} from '@/lib/api';
+import { ROUTES } from '@/lib/routes';
 
-type UserLevel = "beginner" | "hobbyist" | "dev";
+type UserLevel = 'beginner' | 'hobbyist' | 'dev';
 
 type LaunchState = {
   step: number;
   userLevel: UserLevel;
-  origin: "existing_model" | "from_scratch";
+  origin: 'existing_model' | 'from_scratch';
   learningMode: string;
   sourceModel: string;
   configPath: string;
-  environment: "local" | "remote" | "cloud";
+  environment: 'local' | 'remote' | 'cloud';
   instanceName: string;
   remoteHost: string;
   remoteUser: string;
@@ -33,55 +33,65 @@ type LaunchState = {
 
 const USER_LEVELS: { id: UserLevel; label: string; desc: string; icon: string }[] = [
   {
-    id: "beginner",
-    label: "Beginner",
-    icon: "🌱",
-    desc: "Guided workflow with smart defaults. Click and run.",
+    id: 'beginner',
+    label: 'Beginner',
+    icon: '🌱',
+    desc: 'Guided workflow with smart defaults. Click and run.',
   },
   {
-    id: "hobbyist",
-    label: "Hobbyist",
-    icon: "⚙️",
-    desc: "Adjustable parameters. Moderate control over training.",
+    id: 'hobbyist',
+    label: 'Hobbyist',
+    icon: '⚙️',
+    desc: 'Adjustable parameters. Moderate control over training.',
   },
   {
-    id: "dev",
-    label: "Developer",
-    icon: "🔬",
-    desc: "Full control. Architecture-level customization.",
+    id: 'dev',
+    label: 'Developer',
+    icon: '🔬',
+    desc: 'Full control. Architecture-level customization.',
   },
 ];
 
 const ENVIRONMENTS = [
-  { id: "local", label: "Local Mac", desc: "Run natively on local Apple Silicon.", icon: "💻" },
-  { id: "remote", label: "Remote Linux Rig", desc: "Dispatch via SSH to a dedicated GPU box.", icon: "🖥️" },
-  { id: "cloud", label: "Cloud Fleet", desc: "Auto-provision EC2/Lambda orchestrator.", icon: "☁️" },
+  { id: 'local', label: 'Local Mac', desc: 'Run natively on local Apple Silicon.', icon: '💻' },
+  {
+    id: 'remote',
+    label: 'Remote Linux Rig',
+    desc: 'Dispatch via SSH to a dedicated GPU box.',
+    icon: '🖥️',
+  },
+  {
+    id: 'cloud',
+    label: 'Cloud Fleet',
+    desc: 'Auto-provision EC2/Lambda orchestrator.',
+    icon: '☁️',
+  },
 ];
 
 const LEARNING_MODES = [
-  { id: "qlora", label: "QLoRA", desc: "Quantized LoRA — best for limited VRAM" },
-  { id: "lora", label: "LoRA", desc: "Low-rank adaptation — fast fine-tuning" },
-  { id: "full_finetune", label: "Full Finetune", desc: "All parameters updated" },
-  { id: "supervised", label: "Supervised", desc: "Standard supervised learning" },
-  { id: "unsupervised", label: "Unsupervised", desc: "Self-supervised pretraining" },
-  { id: "rlhf", label: "RLHF", desc: "Reinforcement learning from human feedback" },
+  { id: 'qlora', label: 'QLoRA', desc: 'Quantized LoRA — best for limited VRAM' },
+  { id: 'lora', label: 'LoRA', desc: 'Low-rank adaptation — fast fine-tuning' },
+  { id: 'full_finetune', label: 'Full Finetune', desc: 'All parameters updated' },
+  { id: 'supervised', label: 'Supervised', desc: 'Standard supervised learning' },
+  { id: 'unsupervised', label: 'Unsupervised', desc: 'Self-supervised pretraining' },
+  { id: 'rlhf', label: 'RLHF', desc: 'Reinforcement learning from human feedback' },
 ];
 
 const DEFAULT_STATE: LaunchState = {
   step: 1,
-  userLevel: "hobbyist",
-  origin: "existing_model",
-  learningMode: "qlora",
-  sourceModel: "",
-  configPath: "configs/finetune.yaml",
-  environment: "local",
-  instanceName: "",
-  remoteHost: "",
-  remoteUser: "",
-  remotePort: "22",
-  remoteKeyPath: "",
-  remoteRepoRoot: "/tmp/ai-factory",
-  cloudProfile: "",
+  userLevel: 'hobbyist',
+  origin: 'existing_model',
+  learningMode: 'qlora',
+  sourceModel: '',
+  configPath: 'configs/finetune.yaml',
+  environment: 'local',
+  instanceName: '',
+  remoteHost: '',
+  remoteUser: '',
+  remotePort: '22',
+  remoteKeyPath: '',
+  remoteRepoRoot: '/tmp/ai-factory',
+  cloudProfile: '',
 };
 
 export default function TrainingPage() {
@@ -92,7 +102,7 @@ export default function TrainingPage() {
   const [launching, setLaunching] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
-  const [launched, setLaunched] = useState<string | null>(null);
+  const [, setLaunched] = useState<string | null>(null);
 
   useEffect(() => {
     let active = true;
@@ -103,7 +113,7 @@ export default function TrainingPage() {
         setProfiles(ws.training_profiles ?? []);
         setTemplates(
           (ws.orchestration_templates ?? []).filter(
-            (t) => t.instance_type === "train" || t.instance_type === "finetune",
+            (t) => t.instance_type === 'train' || t.instance_type === 'finetune',
           ),
         );
       })
@@ -112,7 +122,7 @@ export default function TrainingPage() {
         setLoadError(
           nextError instanceof Error
             ? nextError.message
-            : "Workspace metadata could not be loaded.",
+            : 'Workspace metadata could not be loaded.',
         );
       });
     return () => {
@@ -126,7 +136,7 @@ export default function TrainingPage() {
     setLaunching(true);
     setError(null);
     try {
-      const isRemote = form.environment !== "local";
+      const isRemote = form.environment !== 'local';
       const remoteHost = form.remoteHost.trim();
       const remoteProfile = form.cloudProfile.trim();
       const instance = await createManagedInstance({
@@ -139,11 +149,11 @@ export default function TrainingPage() {
           source_model: form.sourceModel || null,
         },
         environment: !isRemote
-          ? { kind: "local" }
+          ? { kind: 'local' }
           : {
-              kind: "cloud",
+              kind: 'cloud',
               host: remoteHost || undefined,
-              profile_name: form.environment === "cloud" ? remoteProfile || undefined : undefined,
+              profile_name: form.environment === 'cloud' ? remoteProfile || undefined : undefined,
               user: form.remoteUser.trim() || undefined,
               port: Number(form.remotePort) || 22,
               key_path: form.remoteKeyPath.trim() || undefined,
@@ -154,19 +164,19 @@ export default function TrainingPage() {
       setLaunched(instance.id);
       router.push(`/runs/${instance.id}`);
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Launch failed");
+      setError(e instanceof Error ? e.message : 'Launch failed');
     } finally {
       setLaunching(false);
     }
   }
 
-  const needsRemoteDetails = form.environment !== "local";
+  const needsRemoteDetails = form.environment !== 'local';
   const canLaunch =
     !launching &&
     form.configPath.trim().length > 0 &&
     (!needsRemoteDetails ||
       form.remoteHost.trim().length > 0 ||
-      (form.environment === "cloud" && form.cloudProfile.trim().length > 0));
+      (form.environment === 'cloud' && form.cloudProfile.trim().length > 0));
 
   return (
     <div className="dashboard-content">
@@ -177,8 +187,8 @@ export default function TrainingPage() {
             <span className="eyebrow">Lifecycle → Train</span>
             <h1 className="dash-page-title">Training Launcher</h1>
             <p className="dash-page-desc">
-              Start a new training run from scratch or continue from an existing model.
-              Choose your experience level to get the right amount of control.
+              Start a new training run from scratch or continue from an existing model. Choose your
+              experience level to get the right amount of control.
             </p>
           </div>
           <Link href={ROUTES.monitoring} className="secondary-button">
@@ -213,7 +223,7 @@ export default function TrainingPage() {
               <button
                 key={level.id}
                 type="button"
-                className={`level-card ${form.userLevel === level.id ? "active" : ""}`}
+                className={`level-card ${form.userLevel === level.id ? 'active' : ''}`}
                 onClick={() => update({ userLevel: level.id })}
               >
                 <span className="level-icon">{level.icon}</span>
@@ -233,25 +243,31 @@ export default function TrainingPage() {
           <div className="origin-grid">
             <button
               type="button"
-              className={`origin-card ${form.origin === "existing_model" ? "active" : ""}`}
-              onClick={() => update({ origin: "existing_model", configPath: "configs/finetune.yaml" })}
+              className={`origin-card ${form.origin === 'existing_model' ? 'active' : ''}`}
+              onClick={() =>
+                update({ origin: 'existing_model', configPath: 'configs/finetune.yaml' })
+              }
             >
               <span className="origin-icon">⬡</span>
               <span className="origin-title">Existing Model</span>
-              <span className="origin-desc">Continue from a pretrained checkpoint or HuggingFace model</span>
+              <span className="origin-desc">
+                Continue from a pretrained checkpoint or HuggingFace model
+              </span>
             </button>
             <button
               type="button"
-              className={`origin-card ${form.origin === "from_scratch" ? "active" : ""}`}
-              onClick={() => update({ origin: "from_scratch", configPath: "configs/train.yaml" })}
+              className={`origin-card ${form.origin === 'from_scratch' ? 'active' : ''}`}
+              onClick={() => update({ origin: 'from_scratch', configPath: 'configs/train.yaml' })}
             >
               <span className="origin-icon">◈</span>
               <span className="origin-title">From Scratch</span>
-              <span className="origin-desc">Train a custom architecture with fully configurable parameters</span>
+              <span className="origin-desc">
+                Train a custom architecture with fully configurable parameters
+              </span>
             </button>
           </div>
 
-          {form.origin === "existing_model" && (
+          {form.origin === 'existing_model' && (
             <div className="input-group">
               <label className="control-label" htmlFor="source-model">
                 Source Model (HuggingFace ID or local path)
@@ -268,7 +284,7 @@ export default function TrainingPage() {
         </div>
 
         {/* Step 3: Learning Mode */}
-        {(form.userLevel === "hobbyist" || form.userLevel === "dev") && (
+        {(form.userLevel === 'hobbyist' || form.userLevel === 'dev') && (
           <div className="training-step panel">
             <div className="step-header">
               <span className="step-number">03</span>
@@ -279,7 +295,7 @@ export default function TrainingPage() {
                 <button
                   key={mode.id}
                   type="button"
-                  className={`mode-card ${form.learningMode === mode.id ? "active" : ""}`}
+                  className={`mode-card ${form.learningMode === mode.id ? 'active' : ''}`}
                   onClick={() => update({ learningMode: mode.id })}
                 >
                   <span className="mode-label">{mode.label}</span>
@@ -293,7 +309,7 @@ export default function TrainingPage() {
         {/* Step 4: Environment */}
         <div className="training-step panel">
           <div className="step-header">
-            <span className="step-number">{form.userLevel === "beginner" ? "03" : "04"}</span>
+            <span className="step-number">{form.userLevel === 'beginner' ? '03' : '04'}</span>
             <h2>Compute Environment</h2>
           </div>
           <div className="learning-mode-grid">
@@ -301,13 +317,22 @@ export default function TrainingPage() {
               <button
                 key={env.id}
                 type="button"
-                className={`mode-card ${form.environment === env.id ? "active" : ""}`}
-                onClick={() => update({ environment: env.id as LaunchState["environment"] })}
-                style={{ padding: "1rem" }}
+                className={`mode-card ${form.environment === env.id ? 'active' : ''}`}
+                onClick={() => update({ environment: env.id as LaunchState['environment'] })}
+                style={{ padding: '1rem' }}
               >
-                <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", marginBottom: "0.25rem" }}>
-                  <span style={{ fontSize: "1.2rem" }}>{env.icon}</span>
-                  <span className="mode-label" style={{ margin: 0 }}>{env.label}</span>
+                <div
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '0.5rem',
+                    marginBottom: '0.25rem',
+                  }}
+                >
+                  <span style={{ fontSize: '1.2rem' }}>{env.icon}</span>
+                  <span className="mode-label" style={{ margin: 0 }}>
+                    {env.label}
+                  </span>
                 </div>
                 <span className="mode-desc">{env.desc}</span>
               </button>
@@ -317,7 +342,7 @@ export default function TrainingPage() {
             <div className="training-remote-grid">
               <div className="input-group">
                 <label className="control-label" htmlFor="remote-host">
-                  {form.environment === "cloud" ? "Cloud host or profile" : "SSH host"}
+                  {form.environment === 'cloud' ? 'Cloud host or profile' : 'SSH host'}
                 </label>
                 <input
                   id="remote-host"
@@ -375,7 +400,7 @@ export default function TrainingPage() {
                   onChange={(e) => update({ remoteRepoRoot: e.target.value })}
                 />
               </div>
-              {form.environment === "cloud" && (
+              {form.environment === 'cloud' && (
                 <div className="input-group control-form-span-2">
                   <label className="control-label" htmlFor="cloud-profile">
                     Cloud profile name
@@ -396,7 +421,7 @@ export default function TrainingPage() {
         {/* Step 5: Configuration */}
         <div className="training-step panel">
           <div className="step-header">
-            <span className="step-number">{form.userLevel === "beginner" ? "04" : "05"}</span>
+            <span className="step-number">{form.userLevel === 'beginner' ? '04' : '05'}</span>
             <h2>Configuration Details</h2>
           </div>
 
@@ -407,7 +432,7 @@ export default function TrainingPage() {
                 <button
                   key={p.id}
                   type="button"
-                  className={`profile-item ${form.configPath === p.path ? "active" : ""}`}
+                  className={`profile-item ${form.configPath === p.path ? 'active' : ''}`}
                   onClick={() => update({ configPath: p.path })}
                 >
                   <span className="profile-title">{p.title}</span>
@@ -418,7 +443,9 @@ export default function TrainingPage() {
           )}
 
           <div className="input-group">
-            <label className="control-label" htmlFor="config-path">Config file path</label>
+            <label className="control-label" htmlFor="config-path">
+              Config file path
+            </label>
             <input
               id="config-path"
               type="text"
@@ -429,7 +456,9 @@ export default function TrainingPage() {
 
           <div className="control-row">
             <div className="input-group">
-              <label className="control-label" htmlFor="instance-name">Instance name (optional)</label>
+              <label className="control-label" htmlFor="instance-name">
+                Instance name (optional)
+              </label>
               <input
                 id="instance-name"
                 type="text"
@@ -438,8 +467,7 @@ export default function TrainingPage() {
                 onChange={(e) => update({ instanceName: e.target.value })}
               />
             </div>
-            <div className="input-group">
-            </div>
+            <div className="input-group"></div>
           </div>
         </div>
 
@@ -455,7 +483,7 @@ export default function TrainingPage() {
                 <button
                   key={t.id}
                   type="button"
-                  className={`template-item ${form.configPath === t.path ? "active" : ""}`}
+                  className={`template-item ${form.configPath === t.path ? 'active' : ''}`}
                   onClick={() => update({ configPath: t.path })}
                 >
                   <div className="template-header">
@@ -474,23 +502,29 @@ export default function TrainingPage() {
           <h2 className="launch-title">Ready to Launch</h2>
           <div className="launch-summary">
             <div className="launch-summary-row">
-              <span>Level</span><strong>{form.userLevel}</strong>
+              <span>Level</span>
+              <strong>{form.userLevel}</strong>
             </div>
             <div className="launch-summary-row">
-              <span>Origin</span><strong>{form.origin.replace("_", " ")}</strong>
+              <span>Origin</span>
+              <strong>{form.origin.replace('_', ' ')}</strong>
             </div>
             <div className="launch-summary-row">
-              <span>Method</span><strong>{form.learningMode}</strong>
+              <span>Method</span>
+              <strong>{form.learningMode}</strong>
             </div>
             <div className="launch-summary-row">
-              <span>Config</span><strong>{form.configPath}</strong>
+              <span>Config</span>
+              <strong>{form.configPath}</strong>
             </div>
             <div className="launch-summary-row">
-              <span>Environment</span><strong>{form.environment}</strong>
+              <span>Environment</span>
+              <strong>{form.environment}</strong>
             </div>
             {form.sourceModel && (
               <div className="launch-summary-row">
-                <span>Model</span><strong>{form.sourceModel}</strong>
+                <span>Model</span>
+                <strong>{form.sourceModel}</strong>
               </div>
             )}
           </div>
@@ -500,10 +534,10 @@ export default function TrainingPage() {
             disabled={!canLaunch}
             onClick={() => void launch()}
           >
-            {launching ? "⟳ Launching…" : "▲ Launch Training Instance"}
+            {launching ? '⟳ Launching…' : '▲ Launch Training Instance'}
           </button>
           {needsRemoteDetails && !form.remoteHost.trim() && (
-            <p className="launch-hint" style={{ color: "var(--danger)" }}>
+            <p className="launch-hint" style={{ color: 'var(--danger)' }}>
               Remote and cloud launches need at least a host or profile name.
             </p>
           )}

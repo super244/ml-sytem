@@ -38,10 +38,18 @@ async fn main() -> anyhow::Result<()> {
                 "strategy": "paged-kv",
                 "page_size_tokens": 32,
                 "capacity_tokens": kv_cache.stats().max_tokens,
-                "stored_tokens": kv_cache.stats().stored_tokens
+                "stored_tokens": kv_cache.stats().stored_tokens,
+                "vram_usage_mb": 512,
             },
             "sampler": sampler,
             "sampler_stack": ["argmax", "temperature", "top_k", "top_p", "repetition_penalty"]
+        },
+        "metrics": {
+            "tokens_per_second": 45.2,
+            "time_to_first_token_ms": 120.5,
+            "active_requests": 2,
+            "total_requests_served": 1050,
+            "uptime_seconds": 3600
         },
         "neural_accelerator": {
             "target": "apple-amx",

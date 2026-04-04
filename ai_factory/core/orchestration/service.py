@@ -5,7 +5,10 @@ import hashlib
 import secrets
 import uuid
 from datetime import datetime, timedelta, timezone
-from typing import Any, Literal, cast
+from typing import Any, Literal, cast, TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from ai_factory.core.orchestration.sqlite import SqliteControlPlane
 
 from ai_factory.core.instances.models import InstanceManifest
 from ai_factory.core.orchestration.agents import AgentRegistry
@@ -44,7 +47,7 @@ EventLevel = Literal["debug", "info", "warning", "error"]
 
 
 class OrchestrationService:
-    def __init__(self, control_plane: Any, settings: PlatformSettings) -> None:
+    def __init__(self, control_plane: SqliteControlPlane, settings: PlatformSettings) -> None:
         self.control_plane = control_plane
         self.settings = settings
         self.registry = AgentRegistry()
@@ -210,9 +213,9 @@ class OrchestrationService:
             run_id=run.id,
             legacy_instance_id=manifest.id,
             task_type=cast(TaskType, manifest.type),
-            agent_type=cast(AgentType, self._agent_for_manifest(manifest)),
+            agent_type=self._agent_for_manifest(manifest),
             status="queued",
-            resource_class=cast(ResourceClass, self._resource_for_manifest(manifest)),
+            resource_class=self._resource_for_manifest(manifest),
             retry_policy=self._retry_policy_for_manifest(manifest, snapshot),
             input=TaskInputEnvelope(
                 task_type=cast(TaskType, manifest.type),
@@ -225,7 +228,7 @@ class OrchestrationService:
                 environment=manifest.environment.model_dump(mode="json"),
                 labels=list((snapshot.get("subsystem") or {}).get("labels") or []),
                 idempotency_key=(snapshot.get("metadata") or {}).get("idempotency_key"),
-                resource_class=cast(ResourceClass, self._resource_for_manifest(manifest)),
+                resource_class=self._resource_for_manifest(manifest),
             ),
             metadata={
                 "agent_capabilities": [

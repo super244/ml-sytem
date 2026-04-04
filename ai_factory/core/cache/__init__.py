@@ -7,7 +7,7 @@ import json
 import logging
 import threading
 from collections.abc import Awaitable, Callable
-from typing import Any, ParamSpec, TypeVar
+from typing import Any, ParamSpec, TypeVar, cast
 
 from .memory_cache import MemoryCache
 
@@ -216,7 +216,7 @@ def cached(
             # Try to get from cache
             cached_result = await cache_manager.get(cache_key, category)
             if cached_result is not None:
-                return cached_result
+                return cast(T, cached_result)
 
             # Execute function and cache result
             result = await func(*args, **kwargs)

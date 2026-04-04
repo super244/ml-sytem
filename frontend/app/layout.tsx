@@ -1,11 +1,11 @@
-import type { Metadata } from "next";
-import type { ReactNode } from "react";
+import type { Metadata } from 'next';
+import type { ReactNode } from 'react';
 
-import "./globals.css";
+import './globals.css';
 
 export const metadata: Metadata = {
-  title: "AI-Factory",
-  description: "Unified control center for training, evaluating, and deploying model workflows.",
+  title: 'AI-Factory',
+  description: 'Unified control center for training, evaluating, and deploying model workflows.',
 };
 
 export default function RootLayout({

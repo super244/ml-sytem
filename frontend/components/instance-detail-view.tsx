@@ -1,26 +1,26 @@
-"use client";
+'use client';
 
-import Link from "next/link";
-import { useRouter } from "next/navigation";
-import { useEffect, useMemo, useState } from "react";
+import Link from 'next/link';
+import { useRouter } from 'next/navigation';
+import { useEffect, useMemo, useState } from 'react';
 
 import {
   getInstanceDetail,
   runManagedInstanceAction,
   type InstanceActionDescriptor,
   type InstanceDetail,
-} from "@/lib/api";
-import { formatCount, formatFixed, formatLatency, formatPercent } from "@/lib/formatting";
-import { ROUTES } from "@/lib/routes";
+} from '@/lib/api';
+import { formatCount, formatFixed, formatLatency, formatPercent } from '@/lib/formatting';
+import { ROUTES } from '@/lib/routes';
 
-import { MetricsTrendChart } from "@/components/metrics-trend-chart";
-import { MetricBadge } from "@/components/panels/metric-badge";
-import { PageHeader } from "@/components/ui/page-header";
-import { StatePanel } from "@/components/ui/state-panel";
+import { MetricsTrendChart } from '@/components/metrics-trend-chart';
+import { MetricBadge } from '@/components/panels/metric-badge';
+import { PageHeader } from '@/components/ui/page-header';
+import { StatePanel } from '@/components/ui/state-panel';
 
 function formatTimestamp(value?: string | null) {
   if (!value) {
-    return "n/a";
+    return 'n/a';
   }
   const parsed = new Date(value);
   if (Number.isNaN(parsed.getTime())) {
@@ -31,9 +31,9 @@ function formatTimestamp(value?: string | null) {
 
 function lifecycleValue(value?: string | null) {
   if (!value) {
-    return "n/a";
+    return 'n/a';
   }
-  return value.replace(/_/g, " ");
+  return value.replace(/_/g, ' ');
 }
 
 export function InstanceDetailView({ instanceId }: { instanceId: string }) {
@@ -42,7 +42,7 @@ export function InstanceDetailView({ instanceId }: { instanceId: string }) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
-  const [stream, setStream] = useState<"stdout" | "stderr">("stdout");
+  const [stream, setStream] = useState<'stdout' | 'stderr'>('stdout');
   const [busyAction, setBusyAction] = useState<string | null>(null);
 
   useEffect(() => {
@@ -60,7 +60,9 @@ export function InstanceDetailView({ instanceId }: { instanceId: string }) {
         if (!active) {
           return;
         }
-        setError(nextError instanceof Error ? nextError.message : "Failed to load instance detail.");
+        setError(
+          nextError instanceof Error ? nextError.message : 'Failed to load instance detail.',
+        );
       } finally {
         if (active) {
           setLoading(false);
@@ -79,10 +81,7 @@ export function InstanceDetailView({ instanceId }: { instanceId: string }) {
     };
   }, [instanceId]);
 
-  const latestEvents = useMemo(
-    () => (detail?.events ?? []).slice(-8).reverse(),
-    [detail?.events],
-  );
+  const latestEvents = useMemo(() => (detail?.events ?? []).slice(-8).reverse(), [detail?.events]);
 
   async function triggerAction(action: InstanceActionDescriptor) {
     if (!detail) {
@@ -101,7 +100,7 @@ export function InstanceDetailView({ instanceId }: { instanceId: string }) {
       setNotice(`Created ${nextDetail.type} instance ${nextDetail.name}.`);
       router.push(`/runs/${nextDetail.id}`);
     } catch (nextError) {
-      setError(nextError instanceof Error ? nextError.message : "Failed to launch the action.");
+      setError(nextError instanceof Error ? nextError.message : 'Failed to launch the action.');
     } finally {
       setBusyAction(null);
     }
@@ -134,7 +133,7 @@ export function InstanceDetailView({ instanceId }: { instanceId: string }) {
   }
 
   const metrics = detail.metrics.summary ?? {};
-  const logText = stream === "stdout" ? detail.logs?.stdout ?? "" : detail.logs?.stderr ?? "";
+  const logText = stream === 'stdout' ? (detail.logs?.stdout ?? '') : (detail.logs?.stderr ?? '');
 
   return (
     <section className="route-stack">
@@ -143,22 +142,22 @@ export function InstanceDetailView({ instanceId }: { instanceId: string }) {
         title={detail.name}
         description="Inspect lifecycle intent, logs, metric streams, lineage, and managed follow-up actions from one place."
         metrics={[
-          { label: "Type", value: detail.type },
-          { label: "Status", value: detail.status, tone: "secondary" },
+          { label: 'Type', value: detail.type },
+          { label: 'Status', value: detail.status, tone: 'secondary' },
           {
-            label: "Lifecycle",
+            label: 'Lifecycle',
             value: lifecycleValue(detail.lifecycle.stage ?? detail.progress?.stage ?? detail.type),
-            tone: "accent",
+            tone: 'accent',
           },
-          { label: "Children", value: formatCount(detail.children.length) },
-          { label: "Accuracy", value: formatPercent(Number(metrics.accuracy ?? NaN), 1) },
+          { label: 'Children', value: formatCount(detail.children.length) },
+          { label: 'Accuracy', value: formatPercent(Number(metrics.accuracy ?? NaN), 1) },
         ]}
         actions={
           <>
             <Link className="ghost-button small" href={ROUTES.runs}>
               Back to runs
             </Link>
-            {detail.type === "inference" ? (
+            {detail.type === 'inference' ? (
               <Link className="primary-button small" href={ROUTES.solve}>
                 Open chat workspace
               </Link>
@@ -172,7 +171,12 @@ export function InstanceDetailView({ instanceId }: { instanceId: string }) {
       ) : null}
 
       {error ? (
-        <StatePanel eyebrow="Action Error" title="A control action failed." description={error} tone="error" />
+        <StatePanel
+          eyebrow="Action Error"
+          title="A control action failed."
+          description={error}
+          tone="error"
+        />
       ) : null}
 
       <section className="detail-grid">
@@ -185,13 +189,21 @@ export function InstanceDetailView({ instanceId }: { instanceId: string }) {
           </div>
           <div className="badge-row">
             <MetricBadge label="Stage" value={lifecycleValue(detail.lifecycle.stage)} />
-            <MetricBadge label="Origin" value={lifecycleValue(detail.lifecycle.origin)} tone="secondary" />
-            <MetricBadge label="Mode" value={lifecycleValue(detail.lifecycle.learning_mode)} tone="accent" />
+            <MetricBadge
+              label="Origin"
+              value={lifecycleValue(detail.lifecycle.origin)}
+              tone="secondary"
+            />
+            <MetricBadge
+              label="Mode"
+              value={lifecycleValue(detail.lifecycle.learning_mode)}
+              tone="accent"
+            />
             <MetricBadge label="Environment" value={detail.environment.kind} />
           </div>
           <div className="preview-block subtle">
             <strong>Source model</strong>
-            <p>{detail.lifecycle.source_model ?? "Inherited from the config/profile."}</p>
+            <p>{detail.lifecycle.source_model ?? 'Inherited from the config/profile.'}</p>
           </div>
           {detail.lifecycle.architecture?.base_model ? (
             <div className="preview-block subtle">
@@ -200,13 +212,13 @@ export function InstanceDetailView({ instanceId }: { instanceId: string }) {
                 {detail.lifecycle.architecture.base_model}
                 {detail.lifecycle.architecture.context_window
                   ? ` • context ${detail.lifecycle.architecture.context_window}`
-                  : ""}
+                  : ''}
                 {detail.lifecycle.architecture.parameter_size_b
                   ? ` • params ${detail.lifecycle.architecture.parameter_size_b}B`
-                  : ""}
+                  : ''}
                 {detail.lifecycle.architecture.quantization
                   ? ` • quant ${detail.lifecycle.architecture.quantization}`
-                  : ""}
+                  : ''}
               </p>
             </div>
           ) : null}
@@ -215,11 +227,11 @@ export function InstanceDetailView({ instanceId }: { instanceId: string }) {
             <p>Created {formatTimestamp(detail.created_at)}</p>
             <p>Updated {formatTimestamp(detail.updated_at)}</p>
             <p>
-              Parent{" "}
+              Parent{' '}
               {detail.parent_instance_id ? (
                 <Link href={`/runs/${detail.parent_instance_id}`}>{detail.parent_instance_id}</Link>
               ) : (
-                "root"
+                'root'
               )}
             </p>
           </div>
@@ -235,13 +247,15 @@ export function InstanceDetailView({ instanceId }: { instanceId: string }) {
           <div className="action-row">
             {detail.available_actions.map((action) => (
               <button
-                key={`${action.action}-${action.label}-${action.deployment_target ?? "default"}`}
-                className={action.action === "deploy" ? "secondary-button small" : "primary-button small"}
+                key={`${action.action}-${action.label}-${action.deployment_target ?? 'default'}`}
+                className={
+                  action.action === 'deploy' ? 'secondary-button small' : 'primary-button small'
+                }
                 type="button"
                 disabled={busyAction === action.label}
                 onClick={() => void triggerAction(action)}
               >
-                {busyAction === action.label ? "Working..." : action.label}
+                {busyAction === action.label ? 'Working...' : action.label}
               </button>
             ))}
           </div>
@@ -268,7 +282,10 @@ export function InstanceDetailView({ instanceId }: { instanceId: string }) {
             </div>
           </div>
           <div className="badge-row">
-            <MetricBadge label="Accuracy" value={formatPercent(Number(metrics.accuracy ?? NaN), 1)} />
+            <MetricBadge
+              label="Accuracy"
+              value={formatPercent(Number(metrics.accuracy ?? NaN), 1)}
+            />
             <MetricBadge
               label="Parse rate"
               value={formatPercent(Number(metrics.parse_rate ?? NaN), 1)}
@@ -279,7 +296,10 @@ export function InstanceDetailView({ instanceId }: { instanceId: string }) {
               value={formatLatency(Number(metrics.avg_latency_s ?? NaN))}
               tone="accent"
             />
-            <MetricBadge label="Latest step" value={formatFixed(Number(metrics.latest_step ?? NaN), 0)} />
+            <MetricBadge
+              label="Latest step"
+              value={formatFixed(Number(metrics.latest_step ?? NaN), 0)}
+            />
           </div>
           <MetricsTrendChart points={detail.metrics.points ?? []} />
         </article>
@@ -303,7 +323,7 @@ export function InstanceDetailView({ instanceId }: { instanceId: string }) {
                   </div>
                   <strong>{child.name}</strong>
                   <p>
-                    {lifecycleValue(child.lifecycle.stage)} • {child.environment.kind} • updated{" "}
+                    {lifecycleValue(child.lifecycle.stage)} • {child.environment.kind} • updated{' '}
                     {formatTimestamp(child.updated_at)}
                   </p>
                 </Link>
@@ -322,23 +342,23 @@ export function InstanceDetailView({ instanceId }: { instanceId: string }) {
             </div>
             <div className="action-row">
               <button
-                className={`secondary-button small${stream === "stdout" ? " active-button" : ""}`}
+                className={`secondary-button small${stream === 'stdout' ? ' active-button' : ''}`}
                 type="button"
-                onClick={() => setStream("stdout")}
+                onClick={() => setStream('stdout')}
               >
                 Stdout
               </button>
               <button
-                className={`secondary-button small${stream === "stderr" ? " active-button" : ""}`}
+                className={`secondary-button small${stream === 'stderr' ? ' active-button' : ''}`}
                 type="button"
-                onClick={() => setStream("stderr")}
+                onClick={() => setStream('stderr')}
               >
                 Stderr
               </button>
             </div>
           </div>
           <pre className="log-shell">
-            <code>{logText || "No log output yet."}</code>
+            <code>{logText || 'No log output yet.'}</code>
           </pre>
         </article>
 
@@ -352,12 +372,14 @@ export function InstanceDetailView({ instanceId }: { instanceId: string }) {
           <div className="event-list">
             {latestEvents.length ? (
               latestEvents.map((event, index) => (
-                <article key={`${String(event.id ?? "event")}-${index}`} className="event-card">
+                <article key={`${String(event.id ?? 'event')}-${index}`} className="event-card">
                   <div className="message-meta">
-                    <span>{String(event.type ?? event.event_type ?? "event")}</span>
-                    <span className="status-pill">{formatTimestamp(String(event.created_at ?? ""))}</span>
+                    <span>{String(event.type ?? event.event_type ?? 'event')}</span>
+                    <span className="status-pill">
+                      {formatTimestamp(String(event.created_at ?? ''))}
+                    </span>
                   </div>
-                  <p>{String(event.message ?? "No message available.")}</p>
+                  <p>{String(event.message ?? 'No message available.')}</p>
                 </article>
               ))
             ) : (

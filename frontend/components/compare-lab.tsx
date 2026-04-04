@@ -1,22 +1,33 @@
-"use client";
+'use client';
 
-import Link from "next/link";
-import { useEffect, useState, useTransition } from "react";
+import Link from 'next/link';
+import { useEffect, useState, useTransition } from 'react';
 
-import { compareModels, type CompareResponse, type Difficulty, type OutputFormat, type SolverMode } from "@/lib/api";
-import { FALLBACK_EXAMPLES, FALLBACK_MODELS, FALLBACK_PROMPTS } from "@/lib/demo-content";
-import { formatCount, formatLatency, formatPercent } from "@/lib/formatting";
-import { DIFFICULTY_OPTIONS, OUTPUT_FORMAT_OPTIONS, SOLVER_MODE_OPTIONS } from "@/lib/options";
-import { isDemoMode, pickPrimaryModel, pickPromptPreset, pickSecondaryModel } from "@/lib/runtime-mode";
-import { ROUTES } from "@/lib/routes";
-import { useLabMetadata } from "@/hooks/use-lab-metadata";
+import {
+  compareModels,
+  type CompareResponse,
+  type Difficulty,
+  type OutputFormat,
+  type SolverMode,
+} from '@/lib/api';
+import { FALLBACK_EXAMPLES, FALLBACK_MODELS, FALLBACK_PROMPTS } from '@/lib/demo-content';
+import { formatCount, formatLatency, formatPercent } from '@/lib/formatting';
+import { DIFFICULTY_OPTIONS, OUTPUT_FORMAT_OPTIONS, SOLVER_MODE_OPTIONS } from '@/lib/options';
+import {
+  isDemoMode,
+  pickPrimaryModel,
+  pickPromptPreset,
+  pickSecondaryModel,
+} from '@/lib/runtime-mode';
+import { ROUTES } from '@/lib/routes';
+import { useLabMetadata } from '@/hooks/use-lab-metadata';
 
-import { MathBlock } from "@/components/math-block";
-import { AppShell } from "@/components/layout/app-shell";
-import { MetricBadge } from "@/components/panels/metric-badge";
-import { ModelChip } from "@/components/panels/model-chip";
-import { PageHeader } from "@/components/ui/page-header";
-import { StatePanel } from "@/components/ui/state-panel";
+import { MathBlock } from '@/components/math-block';
+import { AppShell } from '@/components/layout/app-shell';
+import { MetricBadge } from '@/components/panels/metric-badge';
+import { ModelChip } from '@/components/panels/model-chip';
+import { PageHeader } from '@/components/ui/page-header';
+import { StatePanel } from '@/components/ui/state-panel';
 
 export function CompareLab() {
   const metadata = useLabMetadata();
@@ -30,16 +41,21 @@ export function CompareLab() {
         ? FALLBACK_EXAMPLES
         : [];
   const promptPresets =
-    promptLibrary && promptLibrary.presets.length > 0 ? promptLibrary.presets : demoMode ? FALLBACK_PROMPTS : [];
-  const metadataDegraded = !demoMode && (metadata.status?.status === "degraded" || Boolean(metadata.error));
+    promptLibrary && promptLibrary.presets.length > 0
+      ? promptLibrary.presets
+      : demoMode
+        ? FALLBACK_PROMPTS
+        : [];
+  const metadataDegraded =
+    !demoMode && (metadata.status?.status === 'degraded' || Boolean(metadata.error));
 
-  const [question, setQuestion] = useState("Evaluate \\int_0^1 x e^{x^2} dx.");
-  const [primaryModel, setPrimaryModel] = useState("");
-  const [secondaryModel, setSecondaryModel] = useState("");
-  const [difficultyTarget, setDifficultyTarget] = useState<Difficulty>("hard");
-  const [solverMode, setSolverMode] = useState<SolverMode>("rigorous");
-  const [outputFormat, setOutputFormat] = useState<OutputFormat>("text");
-  const [promptPreset, setPromptPreset] = useState("");
+  const [question, setQuestion] = useState('Evaluate \\int_0^1 x e^{x^2} dx.');
+  const [primaryModel, setPrimaryModel] = useState('');
+  const [secondaryModel, setSecondaryModel] = useState('');
+  const [difficultyTarget, setDifficultyTarget] = useState<Difficulty>('hard');
+  const [solverMode, setSolverMode] = useState<SolverMode>('rigorous');
+  const [outputFormat, setOutputFormat] = useState<OutputFormat>('text');
+  const [promptPreset, setPromptPreset] = useState('');
   const [result, setResult] = useState<CompareResponse | null>(null);
   const [requestError, setRequestError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
@@ -61,7 +77,7 @@ export function CompareLab() {
   }, [models, primaryModel]);
 
   useEffect(() => {
-    setPromptPreset((current) => pickPromptPreset(promptPresets, ["atlas_rigorous"], current));
+    setPromptPreset((current) => pickPromptPreset(promptPresets, ['atlas_rigorous'], current));
   }, [promptPresets]);
 
   return (
@@ -72,9 +88,13 @@ export function CompareLab() {
           title="Base vs Specialist"
           description="Run the same prompt through two model variants and inspect how answer quality, verification behavior, and latency diverge under identical solver settings."
           metrics={[
-            { label: "Models", value: formatCount(models.length) },
-            { label: "Prompt presets", value: formatCount(promptPresets.length), tone: "secondary" },
-            { label: "Benchmarks", value: formatCount(metadata.benchmarks.length), tone: "accent" },
+            { label: 'Models', value: formatCount(models.length) },
+            {
+              label: 'Prompt presets',
+              value: formatCount(promptPresets.length),
+              tone: 'secondary',
+            },
+            { label: 'Benchmarks', value: formatCount(metadata.benchmarks.length), tone: 'accent' },
           ]}
           actions={
             <>
@@ -90,8 +110,12 @@ export function CompareLab() {
 
         {metadata.error ? (
           <StatePanel
-            eyebrow={demoMode ? "Demo Metadata" : "Metadata Degraded"}
-            title={demoMode ? "The compare lab is using demo metadata." : "The compare lab cannot trust live metadata."}
+            eyebrow={demoMode ? 'Demo Metadata' : 'Metadata Degraded'}
+            title={
+              demoMode
+                ? 'The compare lab is using demo metadata.'
+                : 'The compare lab cannot trust live metadata.'
+            }
             description={metadata.error}
             tone="error"
           />
@@ -111,8 +135,8 @@ export function CompareLab() {
             <div>
               <div className="section-title">Comparison setup</div>
               <p>
-                Use the same prompt envelope for both models, then inspect the answer cards side
-                by side with latency and agreement metadata.
+                Use the same prompt envelope for both models, then inspect the answer cards side by
+                side with latency and agreement metadata.
               </p>
             </div>
           </div>
@@ -126,7 +150,10 @@ export function CompareLab() {
           <div className="control-row compare-controls">
             <div className="control-group">
               <label className="control-label">Primary model</label>
-              <select value={primaryModel} onChange={(event) => setPrimaryModel(event.target.value)}>
+              <select
+                value={primaryModel}
+                onChange={(event) => setPrimaryModel(event.target.value)}
+              >
                 {models.map((model) => (
                   <option key={model.name} value={model.name}>
                     {model.label ?? model.name}
@@ -136,7 +163,10 @@ export function CompareLab() {
             </div>
             <div className="control-group">
               <label className="control-label">Secondary model</label>
-              <select value={secondaryModel} onChange={(event) => setSecondaryModel(event.target.value)}>
+              <select
+                value={secondaryModel}
+                onChange={(event) => setSecondaryModel(event.target.value)}
+              >
                 {models.map((model) => (
                   <option key={model.name} value={model.name}>
                     {model.label ?? model.name}
@@ -146,7 +176,10 @@ export function CompareLab() {
             </div>
             <div className="control-group">
               <label className="control-label">Prompt preset</label>
-              <select value={promptPreset} onChange={(event) => setPromptPreset(event.target.value)}>
+              <select
+                value={promptPreset}
+                onChange={(event) => setPromptPreset(event.target.value)}
+              >
                 {promptPresets.map((preset) => (
                   <option key={preset.id} value={preset.id}>
                     {preset.title}
@@ -169,7 +202,10 @@ export function CompareLab() {
             </div>
             <div className="control-group">
               <label className="control-label">Mode</label>
-              <select value={solverMode} onChange={(event) => setSolverMode(event.target.value as SolverMode)}>
+              <select
+                value={solverMode}
+                onChange={(event) => setSolverMode(event.target.value as SolverMode)}
+              >
                 {SOLVER_MODE_OPTIONS.map((option) => (
                   <option key={option.value} value={option.value}>
                     {option.label}
@@ -179,7 +215,10 @@ export function CompareLab() {
             </div>
             <div className="control-group">
               <label className="control-label">Output</label>
-              <select value={outputFormat} onChange={(event) => setOutputFormat(event.target.value as OutputFormat)}>
+              <select
+                value={outputFormat}
+                onChange={(event) => setOutputFormat(event.target.value as OutputFormat)}
+              >
                 {OUTPUT_FORMAT_OPTIONS.map((option) => (
                   <option key={option.value} value={option.value}>
                     {option.label}
@@ -189,7 +228,11 @@ export function CompareLab() {
             </div>
           </div>
 
-          <textarea value={question} rows={5} onChange={(event) => setQuestion(event.target.value)} />
+          <textarea
+            value={question}
+            rows={5}
+            onChange={(event) => setQuestion(event.target.value)}
+          />
 
           <div className="starter-grid compact">
             {examples.map((example) => (
@@ -212,11 +255,11 @@ export function CompareLab() {
           <div className="composer-actions">
             <div className="hint-text">
               {primaryModel === secondaryModel
-                ? "Choose two different model variants to run a meaningful side-by-side comparison."
-                : "Structured output is useful for inspecting verifier metadata in the comparison cards."}
+                ? 'Choose two different model variants to run a meaningful side-by-side comparison.'
+                : 'Structured output is useful for inspecting verifier metadata in the comparison cards.'}
             </div>
             <div className="action-row">
-              <button className="ghost-button small" type="button" onClick={() => setQuestion("")}>
+              <button className="ghost-button small" type="button" onClick={() => setQuestion('')}>
                 Clear prompt
               </button>
               <button
@@ -246,13 +289,13 @@ export function CompareLab() {
                       setResult(response);
                     } catch (error) {
                       setRequestError(
-                        error instanceof Error ? error.message : "Unknown comparison failure.",
+                        error instanceof Error ? error.message : 'Unknown comparison failure.',
                       );
                     }
                   })
                 }
               >
-                {isPending ? "Running..." : "Compare models"}
+                {isPending ? 'Running...' : 'Compare models'}
               </button>
             </div>
           </div>
@@ -265,18 +308,26 @@ export function CompareLab() {
                 <div className="message-meta">
                   <span>{entry.model_variant}</span>
                   <div className="pill-row">
-                    {entry.prompt_preset ? <span className="status-pill">{entry.prompt_preset}</span> : null}
-                    {entry.final_answer ? <span className="status-pill success">{entry.final_answer}</span> : null}
+                    {entry.prompt_preset ? (
+                      <span className="status-pill">{entry.prompt_preset}</span>
+                    ) : null}
+                    {entry.final_answer ? (
+                      <span className="status-pill success">{entry.final_answer}</span>
+                    ) : null}
                   </div>
                 </div>
                 <div className="badge-row">
-                  <MetricBadge label="Final" value={entry.final_answer ?? "n/a"} />
+                  <MetricBadge label="Final" value={entry.final_answer ?? 'n/a'} />
                   <MetricBadge
                     label="Agreement"
                     value={formatPercent(entry.candidate_agreement ?? 0, 0)}
                     tone="secondary"
                   />
-                  <MetricBadge label="Latency" value={formatLatency(entry.latency_s)} tone="accent" />
+                  <MetricBadge
+                    label="Latency"
+                    value={formatLatency(entry.latency_s)}
+                    tone="accent"
+                  />
                 </div>
                 <MathBlock content={entry.answer} />
               </article>
