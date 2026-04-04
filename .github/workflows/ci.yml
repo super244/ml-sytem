@@ -131,7 +131,20 @@ jobs:
       - name: Install frontend dependencies
         working-directory: frontend
         run: |
-          npm ci --legacy-peer-deps || npm install --legacy-peer-deps
+          echo "Installing frontend dependencies..."
+          echo "Current directory: $(pwd)"
+          echo "Files in directory:"
+          ls -la
+          if [ -f package-lock.json ]; then
+            echo "Found package-lock.json, running npm ci with legacy peer deps..."
+            npm ci --legacy-peer-deps
+          elif [ -f package.json ]; then
+            echo "No package-lock.json found, running npm install with legacy peer deps..."
+            npm install --legacy-peer-deps
+          else
+            echo "No package.json found, skipping frontend dependencies"
+            exit 1
+          fi
 
       - name: Type check
         working-directory: frontend
@@ -163,10 +176,19 @@ jobs:
       - name: Install desktop dependencies
         working-directory: desktop
         run: |
+          echo "Installing desktop dependencies..."
+          echo "Current directory: $(pwd)"
+          echo "Files in directory:"
+          ls -la
           if [ -f package-lock.json ]; then
+            echo "Found package-lock.json, running npm ci with legacy peer deps..."
             npm ci --legacy-peer-deps
-          else
+          elif [ -f package.json ]; then
+            echo "No package-lock.json found, running npm install with legacy peer deps..."
             npm install --legacy-peer-deps
+          else
+            echo "No package.json found, skipping desktop dependencies"
+            exit 1
           fi
 
       - name: Build desktop (if possible)
