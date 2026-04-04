@@ -42,8 +42,12 @@ def main() -> int:
 
     # Frontend dependencies
     frontend_path = Path("frontend")
+    node_modules_path = frontend_path / "node_modules"
     if frontend_path.exists():
-        checks.append(("cd frontend && npm list --depth=0 >/dev/null", "Frontend dependencies"))
+        if node_modules_path.exists():
+            checks.append(("cd frontend && npm list --depth=0 >/dev/null", "Frontend dependencies"))
+        else:
+            print("! Skipping frontend dependency check (node_modules not found)")
 
     # Configuration files
     config_files = [
