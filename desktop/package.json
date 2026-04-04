@@ -6,10 +6,12 @@
   "main": "main.js",
   "scripts": {
     "start": "electron .",
+    "build": "electron-builder --mac --win --linux",
     "native:build": "cd macos/AIFactoryNative && swift build",
     "native:run": "cd macos/AIFactoryNative && swift run"
   },
   "devDependencies": {
-    "electron": "^37.0.0"
+    "electron": "^37.0.0",
+    "electron-builder": "^24.0.0"
   }
 }
