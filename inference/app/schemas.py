@@ -76,6 +76,18 @@ class StructuredAnswer(BaseModel):
     verification: CandidateVerification | None = None
 
 
+class GenerateRuntimeMetadata(BaseModel):
+    selected: str
+    execution_path: str
+    source: str
+    canary_requested: bool = False
+    canary_active: bool = False
+    gguf_support: bool = False
+    kv_cache: bool = False
+    sampler_stack: list[str] = Field(default_factory=list)
+    reason: str | None = None
+
+
 class GenerateResult(BaseModel):
     model_variant: str
     prompt: str
@@ -92,6 +104,7 @@ class GenerateResult(BaseModel):
     latency_s: float | None = None
     prompt_preset: str | None = None
     candidate_agreement: float = 0.0
+    runtime: GenerateRuntimeMetadata | None = None
 
 
 class GenerateResponse(GenerateResult):

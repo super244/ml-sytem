@@ -1,5 +1,6 @@
 use crate::backend::{BackendKind, TitanBackend};
 use serde::Serialize;
+use std::process::Command;
 
 #[derive(Clone, Debug, Serialize)]
 pub struct HardwareProfile {
@@ -68,8 +69,17 @@ fn detect_apple(cpu_cores: usize, memory_gb: u64) -> Option<HardwareProfile> {
 
     #[cfg(not(feature = "metal"))]
     {
-        let _ = (cpu_cores, memory_gb);
-        None
+        let name = probe_apple_silicon_name()?;
+        return Some(HardwareProfile {
+            silicon: name.clone(),
+            cpu_cores,
+            memory_gb,
+            gpu_name: Some(name.clone()),
+            gpu_vendor: Some("Apple".to_string()),
+            unified_memory: true,
+            bandwidth_gbps: apple_bandwidth_gbps(&name),
+            backend: TitanBackend::new(BackendKind::CpuFallback, 90),
+        });
     }
 }
 
@@ -109,4 +119,35 @@ fn detect_cuda(cpu_cores: usize, memory_gb: u64) -> Option<HardwareProfile> {
 #[allow(dead_code)]
 fn detect_cuda(_cpu_cores: usize, _memory_gb: u64) -> Option<HardwareProfile> {
     None
+}
+
+#[cfg(target_os = "macos")]
+fn probe_apple_silicon_name() -> Option<String> {
+    let output = Command::new("sysctl")
+        .args(["-n", "machdep.cpu.brand_string"])
+        .output()
+        .ok()?;
+    if !output.status.success() {
+        return None;
+    }
+    let name = String::from_utf8_lossy(&output.stdout).trim().to_string();
+    if name.is_empty() {
+        None
+    } else {
+        Some(name)
+    }
+}
+
+#[cfg(target_os = "macos")]
+fn apple_bandwidth_gbps(name: &str) -> Option<u64> {
+    let normalized = name.to_lowercase();
+    if normalized.contains("m5 max") {
+        Some(614)
+    } else if normalized.contains("m4 max") {
+        Some(546)
+    } else if normalized.contains("m3 max") || normalized.contains("m2 max") || normalized.contains("m1 max") {
+        Some(400)
+    } else {
+        None
+    }
 }

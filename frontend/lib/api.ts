@@ -162,6 +162,17 @@ export type GenerateResult = {
   latency_s?: number | null;
   prompt_preset?: string | null;
   candidate_agreement?: number;
+  runtime?: {
+    selected: string;
+    execution_path: string;
+    source: string;
+    canary_requested?: boolean;
+    canary_active?: boolean;
+    gguf_support?: boolean;
+    kv_cache?: boolean;
+    sampler_stack?: string[];
+    reason?: string | null;
+  } | null;
 };
 
 export type GenerateResponse = GenerateResult & {

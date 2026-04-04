@@ -591,6 +591,37 @@ def build_hardware_markdown(status: dict[str, Any]) -> str:
     return "\n".join(lines)
 
 
+def titan_diagnostics(repo_root: str | Path | None = None) -> dict[str, Any]:
+    resolved_root = Path(repo_root or Path(__file__).resolve().parents[1]).resolve()
+    status = detect_titan_status(resolved_root)
+    rust_status = _load_rust_status(resolved_root)
+    runtime = _as_dict(status.get("runtime"))
+    engine = _as_dict(status.get("engine"))
+    return {
+        "status": status,
+        "rust_status": rust_status,
+        "runtime": {
+            "selected": runtime.get("selected"),
+            "status_source": runtime.get("status_source"),
+            "status_binary_available": runtime.get("status_binary_available"),
+            "gguf_support": runtime.get("gguf_support"),
+            "kv_cache": runtime.get("kv_cache"),
+            "sampler_stack": runtime.get("sampler_stack"),
+            "canary_generation_requested": runtime.get("runtime_enabled"),
+            "canary_generation_enabled": _env_flag("AI_FACTORY_TITAN_ENABLE_CANARY_GENERATION"),
+        },
+        "engine": {
+            "decode_model": engine.get("decode_model"),
+            "cache_strategy": engine.get("cache_strategy"),
+            "runtime_mode": engine.get("runtime_mode"),
+            "runtime_ready": engine.get("runtime_ready"),
+            "supports_gguf": engine.get("supports_gguf", engine.get("gguf_support")),
+            "supports_kv_cache": engine.get("supports_kv_cache", engine.get("kv_cache")),
+            "sampler_stack": engine.get("sampler_stack"),
+        },
+    }
+
+
 def write_hardware_markdown(
     path: str | Path = "HARDWARE.md",
     *,
