@@ -372,3 +372,20 @@ def test_resolve_benchmark_file_raises_for_unknown_id(tmp_path: Path) -> None:
     registry_path.write_text("benchmarks: []\n")
     with pytest.raises(KeyError):
         resolve_benchmark_file(registry_path, benchmark_id="nonexistent")
+
+
+def test_resolve_benchmark_file_by_id_from_nested_registry_supports_repo_relative_path(tmp_path: Path) -> None:
+    from evaluation.benchmark_registry import resolve_benchmark_file
+
+    (tmp_path / "pyproject.toml").write_text("[project]\nname = 'tmp'\nversion = '0.0.0'\n")
+    benchmark_path = tmp_path / "data" / "processed" / "eval.jsonl"
+    benchmark_path.parent.mkdir(parents=True, exist_ok=True)
+    benchmark_path.write_text("[]\n")
+    registry_path = tmp_path / "evaluation" / "benchmarks" / "registry.yaml"
+    registry_path.parent.mkdir(parents=True, exist_ok=True)
+    registry_path.write_text("benchmarks:\n  - id: core_eval\n    path: data/processed/eval.jsonl\n")
+
+    path, entry = resolve_benchmark_file(registry_path, benchmark_id="core_eval")
+
+    assert path == "data/processed/eval.jsonl"
+    assert entry["id"] == "core_eval"

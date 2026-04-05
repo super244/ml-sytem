@@ -47,7 +47,30 @@ def _require_mapping(config: dict[str, Any], key: str) -> dict[str, Any]:
     return value
 
 
-def build_generator(config: dict[str, Any]) -> MathGenerator:
+def _resolve_repo_path(value: str) -> str:
+    path = Path(value).expanduser()
+    if path.is_absolute():
+        return str(path)
+    return str((REPO_ROOT / path).resolve())
+
+
+def validate_model_availability(registry: MathModelRegistry, model_names: list[str]) -> None:
+    missing: list[str] = []
+    for name in model_names:
+        runtime = registry.get_runtime(name)
+        if runtime.spec.adapter_path and not runtime.is_available():
+            missing.append(f"{name} -> {runtime.spec.adapter_path}")
+    if missing:
+        missing_lines = "\n".join(f"  - {item}" for item in missing)
+        raise FileNotFoundError(
+            "Model artifacts required for evaluation are missing:\n"
+            f"{missing_lines}\n"
+            "Run training and packaging first (for example `make train`) or point the model registry "
+            "to an existing adapter artifact."
+        )
+
+
+def build_generator(config: dict[str, Any]) -> tuple[MathGenerator, MathModelRegistry]:
     models = _require_mapping(config, "models")
     registry_path = models.get("registry_path")
     if not registry_path:
@@ -55,9 +78,9 @@ def build_generator(config: dict[str, Any]) -> MathGenerator:
     prompt_library_path = config.get("prompt_library_path")
     if not prompt_library_path:
         raise ValueError("Evaluation config must define prompt_library_path.")
-    model_registry = MathModelRegistry(load_registry_from_yaml(registry_path))
-    prompt_presets = load_prompt_presets(prompt_library_path)
-    return MathGenerator(model_registry, prompt_presets=prompt_presets)
+    model_registry = MathModelRegistry(load_registry_from_yaml(_resolve_repo_path(str(registry_path))))
+    prompt_presets = load_prompt_presets(_resolve_repo_path(str(prompt_library_path)))
+    return MathGenerator(model_registry, prompt_presets=prompt_presets), model_registry
 
 
 def merged_generation_config(config: dict[str, Any], side: str) -> dict[str, Any]:
@@ -141,17 +164,18 @@ def main() -> None:
     if "primary_model" not in models_config or "secondary_model" not in models_config:
         raise ValueError("Evaluation config must define models.primary_model and models.secondary_model.")
     benchmark_file, benchmark_entry = resolve_benchmark_file(
-        registry_path=registry_path,
+        registry_path=_resolve_repo_path(str(registry_path)),
         benchmark_id=benchmark_config.get("benchmark_id"),
         benchmark_file=benchmark_config.get("benchmark_file"),
     )
     benchmark = read_jsonl(benchmark_file)
-    generator = build_generator(config)
+    generator, model_registry = build_generator(config)
     output_dir = Path(output_dir_value).expanduser()
     output_dir.mkdir(parents=True, exist_ok=True)
 
     primary_model = models_config["primary_model"]
     secondary_model = models_config["secondary_model"]
+    validate_model_availability(model_registry, [primary_model, secondary_model])
     labels = {
         "primary": models_config.get("primary_label", primary_model),
         "secondary": models_config.get("secondary_label", secondary_model),
@@ -215,4 +239,7 @@ def main() -> None:
 
 
 if __name__ == "__main__":
-    main()
+    try:
+        main()
+    except Exception as exc:
+        raise SystemExit(f"Evaluation failed: {exc}") from exc
