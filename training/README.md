@@ -96,3 +96,5 @@ Every run now writes:
 - `metrics/tracking_summary.json`
 
 The new `ai-factory train-preflight --config <profile>` command validates artifacts, disk headroom, tokenizer readiness, model source resolution, CUDA visibility, and the active attention backend before a real launch. For scratch pretraining, a real run now requires the local tokenizer artifact referenced by `model.tokenizer_path`; dry-runs still allow a fallback tokenizer so you can validate the rest of the path first.
+
+On CPU-only machines, `python -m training.train --config <profile> --dry-run` now builds `transformers.TrainingArguments` in CPU mode automatically so config validation and artifact checks succeed without a CUDA device. Mixed-precision flags from the profile are still honored automatically when the same config is launched on a CUDA host.
