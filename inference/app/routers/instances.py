@@ -17,7 +17,9 @@ from inference.app.schemas import (
     InstanceListResponse,
     InstanceLogsResponse,
     InstanceMetricsResponse,
+    InstanceStatusFilter,
     InstanceStreamResponse,
+    InstanceTypeFilter,
 )
 
 router = APIRouter(tags=["instances"])
@@ -25,10 +27,11 @@ router = APIRouter(tags=["instances"])
 
 @router.get("/instances", response_model=InstanceListResponse)
 def list_instances(
-    instance_type: str | None = Query(default=None),
-    status: str | None = Query(default=None),
-    parent_instance_id: str | None = Query(default=None),
-    service: Any = Depends(get_instance_service)) -> InstanceListResponse:
+    instance_type: InstanceTypeFilter | None = Query(default=None),
+    status: InstanceStatusFilter | None = Query(default=None),
+    parent_instance_id: str | None = Query(default=None, min_length=1),
+    service: Any = Depends(get_instance_service),
+) -> InstanceListResponse:
 
     return InstanceListResponse(
         instances=service.list_instances(
@@ -40,11 +43,13 @@ def list_instances(
 
 
 @router.post("/instances", response_model=InstanceDetail)
-def create_instance(request: InstanceCreateRequest, background_tasks: BackgroundTasks, service: Any = Depends(get_instance_service)) -> InstanceDetail:
-
+def create_instance(
+    request: InstanceCreateRequest,
+    background_tasks: BackgroundTasks,
+    service: Any = Depends(get_instance_service),
+) -> InstanceDetail:
     should_start = request.start
-    request.start = False
-    instance = service.create_instance(request)
+    instance = service.create_instance(request.model_copy(update={"start": False}))
     if should_start:
         background_tasks.add_task(service.control.manager.start_instance, instance.id)
     return instance
@@ -101,12 +106,11 @@ def evaluate_instance(
     instance_id: str,
     background_tasks: BackgroundTasks,
     request: InstanceEvaluateRequest | None = None,
-    service: Any = Depends(get_instance_service)) -> InstanceDetail:
-
+    service: Any = Depends(get_instance_service),
+) -> InstanceDetail:
     request = request or InstanceEvaluateRequest()
     should_start = request.start
-    request.start = False
-    instance = service.evaluate_instance(instance_id, request)
+    instance = service.evaluate_instance(instance_id, request.model_copy(update={"start": False}))
     if should_start:
         background_tasks.add_task(service.control.manager.start_instance, instance.id)
     return instance
@@ -117,12 +121,11 @@ def start_inference_instance(
     instance_id: str,
     background_tasks: BackgroundTasks,
     request: InstanceInferenceRequest | None = None,
-    service: Any = Depends(get_instance_service)) -> InstanceDetail:
-
+    service: Any = Depends(get_instance_service),
+) -> InstanceDetail:
     request = request or InstanceInferenceRequest()
     should_start = request.start
-    request.start = False
-    instance = service.start_inference_instance(instance_id, request)
+    instance = service.start_inference_instance(instance_id, request.model_copy(update={"start": False}))
     if should_start:
         background_tasks.add_task(service.control.manager.start_instance, instance.id)
     return instance
@@ -130,12 +133,13 @@ def start_inference_instance(
 
 @router.post("/instances/{instance_id}/deploy", response_model=InstanceDetail)
 def deploy_instance(
-    instance_id: str, request: InstanceDeployRequest, background_tasks: BackgroundTasks,
-    service: Any = Depends(get_instance_service)) -> InstanceDetail:
-
+    instance_id: str,
+    request: InstanceDeployRequest,
+    background_tasks: BackgroundTasks,
+    service: Any = Depends(get_instance_service),
+) -> InstanceDetail:
     should_start = request.start
-    request.start = False
-    instance = service.deploy_instance(instance_id, request)
+    instance = service.deploy_instance(instance_id, request.model_copy(update={"start": False}))
     if should_start:
         background_tasks.add_task(service.control.manager.start_instance, instance.id)
     return instance
@@ -143,12 +147,13 @@ def deploy_instance(
 
 @router.post("/instances/{instance_id}/actions", response_model=InstanceDetail)
 def run_instance_action(
-    instance_id: str, request: InstanceActionRequest, background_tasks: BackgroundTasks,
-    service: Any = Depends(get_instance_service)) -> InstanceDetail:
-
+    instance_id: str,
+    request: InstanceActionRequest,
+    background_tasks: BackgroundTasks,
+    service: Any = Depends(get_instance_service),
+) -> InstanceDetail:
     should_start = request.start
-    request.start = False
-    instance = service.run_instance_action(instance_id, request)
+    instance = service.run_instance_action(instance_id, request.model_copy(update={"start": False}))
     if should_start:
         background_tasks.add_task(service.control.manager.start_instance, instance.id)
     return instance
