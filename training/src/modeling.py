@@ -9,7 +9,8 @@ from peft import LoraConfig, get_peft_model, prepare_model_for_kbit_training
 from transformers import AutoConfig, AutoModelForCausalLM, AutoTokenizer, BitsAndBytesConfig
 from transformers.utils import is_flash_attn_2_available
 
-from training.src.config import ExperimentConfig
+from training.src.config import ExperimentConfig, resolve_path_reference
+from training.src.scaling import resolve_scratch_architecture
 
 logger = logging.getLogger(__name__)
 
@@ -41,18 +42,32 @@ def build_quantization_config(config: ExperimentConfig) -> BitsAndBytesConfig | 
     return None
 
 
-def resolve_tokenizer_reference(config: ExperimentConfig) -> str:
+def resolve_tokenizer_reference(config: ExperimentConfig, *, require_local_path: bool = False) -> str:
     if config.model.tokenizer_path:
-        tokenizer_path = Path(config.model.tokenizer_path).expanduser()
+        tokenizer_path = (
+            resolve_path_reference(config.model.tokenizer_path, config.config_path)
+            or Path(config.model.tokenizer_path).expanduser()
+        )
         if tokenizer_path.exists():
             return str(tokenizer_path)
+        if require_local_path:
+            raise FileNotFoundError(
+                "Scratch training requires a local tokenizer artifact at "
+                f"{tokenizer_path}. Run `python training/scripts/train_tokenizer.py --config "
+                f"{config.config_path} --output-dir {config.model.tokenizer_path}` first."
+            )
+        logger.warning(
+            "Tokenizer path %s does not exist; falling back to tokenizer_name=%s.",
+            tokenizer_path,
+            config.model.tokenizer_name or config.model.base_model_name,
+        )
     if config.model.tokenizer_name:
         return config.model.tokenizer_name
     return config.model.base_model_name
 
 
-def load_tokenizer(config: ExperimentConfig) -> Any:
-    tokenizer_name = resolve_tokenizer_reference(config)
+def load_tokenizer(config: ExperimentConfig, *, require_local_path: bool = False) -> Any:
+    tokenizer_name = resolve_tokenizer_reference(config, require_local_path=require_local_path)
     tokenizer = AutoTokenizer.from_pretrained(
         tokenizer_name,
         trust_remote_code=config.model.trust_remote_code,
@@ -78,7 +93,11 @@ def resolve_attention_implementation(config: ExperimentConfig) -> str | None:
 
 
 def build_model_from_scratch(config: ExperimentConfig, tokenizer: Any | None = None) -> Any:
-    architecture = dict(config.model.architecture)
+    architecture, estimated_parameters = resolve_scratch_architecture(
+        model_type=config.model.model_type or "",
+        architecture_overrides=config.model.architecture,
+        target_parameters=config.model.target_parameters,
+    )
     if tokenizer is not None:
         architecture.setdefault("vocab_size", len(tokenizer))
         if tokenizer.pad_token_id is not None:
@@ -91,12 +110,21 @@ def build_model_from_scratch(config: ExperimentConfig, tokenizer: Any | None = N
     model_type = config.model.model_type or architecture.get("model_type")
     if not model_type:
         raise ValueError("Scratch model initialization requires model.model_type.")
+    if estimated_parameters is not None:
+        logger.info(
+            "Resolved scratch architecture for %s target %s -> hidden=%s layers=%s estimated_parameters=%s",
+            model_type,
+            config.model.target_parameters,
+            architecture.get("hidden_size"),
+            architecture.get("num_hidden_layers"),
+            estimated_parameters,
+        )
 
     hf_config = AutoConfig.for_model(model_type, **architecture)
     attention_implementation = resolve_attention_implementation(config)
     if attention_implementation:
-        setattr(hf_config, "_attn_implementation", attention_implementation)
-        setattr(hf_config, "attn_implementation", attention_implementation)
+        hf_config._attn_implementation = attention_implementation
+        hf_config.attn_implementation = attention_implementation
 
     model = AutoModelForCausalLM.from_config(
         hf_config,

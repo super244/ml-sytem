@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import sqlite3
 from pathlib import Path
 from typing import Any
 
@@ -35,6 +36,30 @@ def load_jsonl(path: str) -> list[dict[str, Any]]:
             )
         records.append(record)
     return records
+
+
+def load_sqlite(path: str, *, split: str | None = None) -> list[dict[str, Any]]:
+    path_obj = Path(path).expanduser()
+    if not path_obj.exists():
+        raise FileNotFoundError(f"SQLite dataset not found: {path_obj}")
+    connection = sqlite3.connect(path_obj)
+    try:
+        query = "SELECT payload_json FROM records"
+        params: list[Any] = []
+        if split:
+            query += " WHERE dataset_split = ?"
+            params.append(split)
+        query += " ORDER BY sequence_id ASC"
+        return [json.loads(row[0]) for row in connection.execute(query, params).fetchall()]
+    finally:
+        connection.close()
+
+
+def load_records(path: str, *, split: str | None = None) -> list[dict[str, Any]]:
+    suffix = Path(path).expanduser().suffix.lower()
+    if suffix in {".sqlite", ".db"}:
+        return load_sqlite(path, split=split)
+    return load_jsonl(path)
 
 
 def curriculum_sort(records: list[dict[str, Any]], phases: list[str]) -> list[dict[str, Any]]:
@@ -209,7 +234,7 @@ def tokenize_example(record: dict[str, Any], tokenizer: Any, data_config: DataCo
 
 
 def build_dataset(file_path: str, tokenizer: Any, data_config: DataConfig, split: str) -> Dataset:
-    records = load_jsonl(file_path)
+    records = load_records(file_path, split=split)
     if split == "train" and data_config.max_train_samples:
         records = records[: data_config.max_train_samples]
     if split == "eval" and data_config.max_eval_samples:

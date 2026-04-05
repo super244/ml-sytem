@@ -1,6 +1,7 @@
 # 📊 AI-Factory Data Layer
 
 The data layer transforms heterogeneous AI corpora into a unified research-grade schema with reproducible packs. Built around canonical `v2` records, lineage tracking, deduplication, contamination checks, quality scoring, and domain-specific slices.
+Processed corpora now ship in two parallel forms: JSONL splits for portability and `corpus.sqlite` for indexed local querying and DB-backed training reads.
 
 ## 🏗️ **Architecture Overview**
 
@@ -75,16 +76,16 @@ sources:
     name: "mathematics_mix"
     sources: ["derivatives", "integrals"]
     ratios: [0.6, 0.4]
+emit_sqlite: true
+sqlite_output_path: corpus.sqlite
 ```
 
 ### **Generation Config** (`data/configs/generation.yaml`)
 ```yaml
-generator_family: "derivatives"
-parameters:
-  difficulty_range: ["medium", "hard"]
-  topics: ["polynomials", "trigonometry"]
-  output_format: "v2"
-  count: 1000
+custom_total_size_gb: 2.0
+dataset_specs:
+  - id: custom_derivative_mastery
+    target_share: 0.1666666667
 ```
 
 ## 📋 **Dataset Families**
@@ -112,12 +113,14 @@ python data/prepare_dataset.py --config data/configs/processing.yaml
 
 # Validate processed datasets
 python data/tools/validate_dataset.py --input data/processed/*.jsonl
+python data/tools/validate_dataset.py --input data/processed/corpus.sqlite --split train
 ```
 
 ### **Quality Analysis**
 ```bash
 # Preview dataset statistics
 python data/tools/preview_dataset.py --input data/processed/train.jsonl
+python data/tools/preview_dataset.py --input data/processed/corpus.sqlite --split train
 
 # Audit dataset quality
 python data/tools/audit_dataset.py --input data/processed/normalized_all.jsonl
@@ -200,3 +203,8 @@ The data layer integrates seamlessly with:
 - **Evaluation**: Benchmark pack creation for testing
 - **Inference**: Real-time data validation and formatting
 - **Monitoring**: Data quality metrics and alerts
+
+SQLite note:
+
+- `data/processed/corpus.sqlite` is for corpus rows and dataset inspection
+- `artifacts/control_plane/control_plane.db` is a separate SQLite database for orchestration state, runs, leases, and events

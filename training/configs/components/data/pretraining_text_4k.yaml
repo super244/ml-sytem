@@ -1,6 +1,6 @@
-train_file: data/processed/train.jsonl
-eval_file: data/processed/eval.jsonl
-test_file: data/processed/test.jsonl
+train_file: data/processed/corpus.sqlite
+eval_file: data/processed/corpus.sqlite
+test_file: data/processed/corpus.sqlite
 pack_manifest: data/processed/manifest.json
 max_length: 4096
 format: pretraining_text

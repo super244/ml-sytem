@@ -221,7 +221,17 @@ def main() -> None:
         )
         results.append(result)
 
-    summary = build_summary(results, labels=labels)
+    summary = build_summary(
+        results,
+        labels=labels,
+        metadata={
+            "benchmark_id": benchmark_entry.get("id"),
+            "benchmark_path": benchmark_file,
+            "benchmark_resolved_path": benchmark_entry.get("resolved_path"),
+            "run_name": output_dir.name,
+            "output_dir": str(output_dir),
+        },
+    )
     write_jsonl(output_dir / "per_example.jsonl", results)
     write_json(output_dir / "summary.json", summary)
     write_json(

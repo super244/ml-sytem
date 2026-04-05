@@ -61,10 +61,15 @@ class MathGenerator:
             "source": str(runtime.get("status_source") or "python-probe"),
             "canary_requested": canary_requested,
             "canary_active": canary_requested and canary_enabled,
-            "gguf_support": bool(runtime.get("gguf_support") or engine.get("supports_gguf") or engine.get("gguf_support")),
+            "gguf_support": bool(
+                runtime.get("gguf_support") or engine.get("supports_gguf") or engine.get("gguf_support")
+            ),
             "kv_cache": bool(
-                runtime.get("kv_cache") if isinstance(runtime.get("kv_cache"), bool) else
-                (runtime.get("kv_cache") or {}).get("enabled", engine.get("supports_kv_cache", engine.get("kv_cache")))
+                runtime.get("kv_cache")
+                if isinstance(runtime.get("kv_cache"), bool)
+                else (runtime.get("kv_cache") or {}).get(
+                    "enabled", engine.get("supports_kv_cache", engine.get("kv_cache"))
+                )
             ),
             "sampler_stack": list(runtime.get("sampler_stack") or engine.get("sampler_stack") or []),
             "reason": reason,

@@ -17,7 +17,7 @@ def process_file(fpath: str) -> None:
 
     # Add imports
     if "from typing import Any" not in content:
-        content = re.sub(r'(from __future__ import annotations\n+)', r'\1from typing import Any\n', content)
+        content = re.sub(r"(from __future__ import annotations\n+)", r"\1from typing import Any\n", content)
 
     if "Depends" not in content and "from fastapi import" in content:
         content = re.sub(
@@ -28,13 +28,13 @@ def process_file(fpath: str) -> None:
 
     # Refactor direct calls
     # For def func(..., arg: type = ...): \n    service = get_service()
-    
+
     # Simple strategy: Find functions that use get_service, modify signature and body
     # Using regex for function signatures: def func(args) -> return_type:
     # This can be multi-line
-    
+
     # We will use a simpler approach: run my script over the remaining files
-    
+
     # orchestrations.py uses get_instance_service() directly on return
     # e.g., return get_instance_service().list_orchestration_runs()
     content = re.sub(

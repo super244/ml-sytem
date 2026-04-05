@@ -353,11 +353,24 @@ docker compose up --build
 
 ## 3. Training Profiles And When To Use Them
 
+The canonical scratch ladder in this repository is:
+
+- `1b`
+- `2b`
+- `4b`
+- `9b`
+- `12b`
+- `20b`
+- `27b`
+- `30b`
+- `70b`
+- `120b`
+
 ### `fast_iteration_small_model`
 
-Base model:
+Scale tier:
 
-- `Qwen/Qwen2.5-0.5B-Instruct`
+- `1b`
 
 Use when:
 
@@ -374,9 +387,9 @@ python -m training.train --config training/configs/profiles/fast_iteration_small
 
 ### `baseline_qlora`
 
-Base model:
+Scale tier:
 
-- `Qwen/Qwen2.5-Math-1.5B-Instruct`
+- `2b`
 
 Use when:
 
@@ -392,9 +405,9 @@ python -m training.train --config training/configs/profiles/baseline_qlora.yaml
 
 ### `calculus_specialist`
 
-Base model:
+Scale tier:
 
-- `Qwen/Qwen2.5-Math-1.5B-Instruct`
+- `4b`
 
 Use when:
 
@@ -424,9 +437,9 @@ python -m training.train --config training/configs/profiles/failure_aware.yaml
 
 ### `long_context`
 
-Base model:
+Scale tier:
 
-- `Qwen/Qwen2.5-Math-7B-Instruct`
+- `9b`
 
 Use when:
 

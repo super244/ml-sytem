@@ -188,9 +188,7 @@ class SqliteControlPlane:
                 );
                 """
             )
-            connection.execute(
-                "CREATE INDEX IF NOT EXISTS idx_leases_expires_at ON orchestration_leases(expires_at)"
-            )
+            connection.execute("CREATE INDEX IF NOT EXISTS idx_leases_expires_at ON orchestration_leases(expires_at)")
 
     def upsert_telemetry_record(
         self, record_id: str, payload: dict[str, Any], status: str, timestamp: float, actioned_at: float | None = None

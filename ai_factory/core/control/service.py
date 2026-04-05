@@ -163,11 +163,7 @@ class FactoryControlService:
                 task_events = list(self.list_orchestration_events(run.id, limit=25))
         latest_event = task_events[-1] if task_events else None
 
-        completed_task_ids = {
-            _value(item, "id")
-            for item in task_objects
-            if _value(item, "status") == "completed"
-        }
+        completed_task_ids = {_value(item, "id") for item in task_objects if _value(item, "status") == "completed"}
         dependency_ids = [_value(dependency, "depends_on_task_id") for dependency in dependencies]
         ready_dependency_count = sum(1 for dependency_id in dependency_ids if dependency_id in completed_task_ids)
 

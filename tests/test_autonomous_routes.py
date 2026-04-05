@@ -94,9 +94,7 @@ def _seed_workspace(tmp_path: Path) -> AppSettings:
 
 
 @pytest.mark.anyio
-async def test_autonomous_overview_exposes_real_loop_actions(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
+async def test_autonomous_overview_exposes_real_loop_actions(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     from ai_factory.platform.monitoring import hardware
     from inference.app import workspace as workspace_module
     from inference.app.routers import autonomous as autonomous_router

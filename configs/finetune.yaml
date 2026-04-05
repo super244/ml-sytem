@@ -10,7 +10,7 @@ lifecycle:
   stage: finetune
   origin: existing_model
   learning_mode: qlora
-  source_model: Qwen/Qwen2.5-Math-1.5B-Instruct
+  source_model: artifacts/foundation/qwen2-2b
   evaluation_suite:
     id: base_vs_finetuned
     label: Baseline Vs Finetuned

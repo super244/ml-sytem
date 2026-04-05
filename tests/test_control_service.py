@@ -128,12 +128,20 @@ class _FakeManager:
         return [task.model_dump(mode="json") for task in self.orchestration.control_plane.list_tasks(target)]
 
     def list_orchestration_runs(self) -> list[dict[str, object]]:
-        return [self.orchestration.control_plane.get_run(self._manifest.orchestration_run_id or self._manifest.id).model_dump(mode="json")]
+        return [
+            self.orchestration.control_plane.get_run(
+                self._manifest.orchestration_run_id or self._manifest.id
+            ).model_dump(mode="json")
+        ]
 
     def get_orchestration_run(self, target: str) -> dict[str, object]:
         run = self.orchestration.control_plane.get_run(target)
         assert run is not None
-        return {"run": run.model_dump(mode="json"), "tasks": self.list_tasks(run.id), "events": self.list_orchestration_events(run.id)}
+        return {
+            "run": run.model_dump(mode="json"),
+            "tasks": self.list_tasks(run.id),
+            "events": self.list_orchestration_events(run.id),
+        }
 
     def list_orchestration_events(self, target: str, *, limit: int | None = None) -> list[dict[str, object]]:
         events = self.orchestration.control_plane.list_events(run_id=target, limit=limit)
@@ -204,7 +212,13 @@ def _build_service(tmp_path: Path) -> tuple[FactoryControlService, InstanceManif
         root_run_id="run-001",
     )
     attempts = [
-        TaskAttempt(id="att-001", task_id="task-001", sequence=1, lease_owner="worker-1", finished_at="2026-04-04T00:58:00+00:00"),
+        TaskAttempt(
+            id="att-001",
+            task_id="task-001",
+            sequence=1,
+            lease_owner="worker-1",
+            finished_at="2026-04-04T00:58:00+00:00",
+        ),
         TaskAttempt(
             id="att-002",
             task_id="task-001",

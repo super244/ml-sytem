@@ -41,3 +41,11 @@ export function formatFixed(value?: number | null, digits = 3): string {
   }
   return value.toFixed(digits);
 }
+
+export function formatParameterSize(value?: number | null): string {
+  if (typeof value !== 'number' || Number.isNaN(value)) {
+    return 'n/a';
+  }
+  const normalized = Number.isInteger(value) ? `${value}` : value.toFixed(1).replace(/\.0$/, '');
+  return `${normalized}B`;
+}
