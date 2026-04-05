@@ -6,6 +6,8 @@ echo "Running quality gate checks..."
 coverage_json="artifacts/metrics/coverage.json"
 bandit_json="artifacts/metrics/bandit.json"
 
+mkdir -p artifacts/metrics
+
 pytest --cov=ai_factory --cov-report="json:${coverage_json}" -q
 bandit -r ai_factory -f json -o "${bandit_json}" >/dev/null
 
@@ -34,4 +36,3 @@ if issues > 25:
     raise SystemExit(f"Security gate failed: {issues} issues > 25")
 print(f"Quality gates passed (coverage={coverage:.2f}%, security_issues={issues})")
 PY
-

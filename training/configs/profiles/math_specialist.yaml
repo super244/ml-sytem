@@ -12,7 +12,7 @@ refs:
   packaging: ../components/packaging/default.yaml
 model:
   initialization: pretrained
-  base_model_name: artifacts/foundation/qwen2-2b
+  base_model_name: Qwen/Qwen2.5-Math-1.5B-Instruct
   trust_remote_code: false
   use_4bit: true
   use_8bit: false

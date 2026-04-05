@@ -1,7 +1,7 @@
 models:
   - name: base
     label: Base 2B
-    base_model: artifacts/foundation/qwen2-2b
+    base_model: Qwen/Qwen2.5-Math-1.5B-Instruct
     adapter_path:
     load_in_4bit: true
     load_in_8bit: false
@@ -15,7 +15,7 @@ models:
     scale_tags: [2b, baseline, local]
   - name: finetuned
     label: Atlas Failure-Aware 2B
-    base_model: artifacts/foundation/qwen2-2b
+    base_model: Qwen/Qwen2.5-Math-1.5B-Instruct
     adapter_path: artifacts/models/atlas-math-failure-aware/latest
     load_in_4bit: true
     load_in_8bit: false
@@ -29,7 +29,7 @@ models:
     scale_tags: [2b, specialist, failure_aware, local]
   - name: calculus_specialist
     label: Atlas Calculus Specialist 2B
-    base_model: artifacts/foundation/qwen2-2b
+    base_model: Qwen/Qwen2.5-Math-1.5B-Instruct
     adapter_path: artifacts/models/atlas-math-calculus-specialist/latest
     load_in_4bit: true
     load_in_8bit: false
@@ -43,7 +43,7 @@ models:
     scale_tags: [2b, specialist, calculus, local]
   - name: curriculum_specialist
     label: Atlas Curriculum Specialist 2B
-    base_model: artifacts/foundation/qwen2-2b
+    base_model: Qwen/Qwen2.5-Math-1.5B-Instruct
     adapter_path: artifacts/models/atlas-math-curriculum-specialist/latest
     load_in_4bit: true
     load_in_8bit: false
@@ -57,7 +57,7 @@ models:
     scale_tags: [2b, specialist, curriculum, local]
   - name: verifier_augmented
     label: Atlas Verifier Augmented 2B
-    base_model: artifacts/foundation/qwen2-2b
+    base_model: Qwen/Qwen2.5-Math-1.5B-Instruct
     adapter_path: artifacts/models/atlas-math-verifier-augmented/latest
     load_in_4bit: true
     load_in_8bit: false
@@ -71,7 +71,7 @@ models:
     scale_tags: [2b, specialist, verification, local]
   - name: fast_iteration
     label: Atlas Fast Iteration 1B
-    base_model: artifacts/foundation/qwen2-1b
+    base_model: Qwen/Qwen2.5-Math-1.5B-Instruct
     adapter_path: artifacts/models/atlas-math-fast-iteration/latest
     load_in_4bit: true
     load_in_8bit: false

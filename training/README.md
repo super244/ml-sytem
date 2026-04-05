@@ -65,6 +65,7 @@ For the default pretraining path, `training/configs/components/models/qwen2_scra
 ## Example Commands
 
 ```bash
+python3 -m ai_factory.cli train-preflight --config training/configs/profiles/failure_aware.yaml
 python3 -m training.train --config training/configs/profiles/baseline_qlora.yaml --dry-run
 python3 -m training.train --config training/configs/profiles/baseline_qlora.yaml --resume-from-latest-checkpoint
 python3 -m training.train --config training/configs/profiles/math_specialist.yaml
@@ -93,3 +94,5 @@ Every run now writes:
 - `manifests/tracking_context.json`
 - `logs/tracking_events.jsonl`
 - `metrics/tracking_summary.json`
+
+The new `ai-factory train-preflight --config <profile>` command validates artifacts, disk headroom, tokenizer readiness, model source resolution, CUDA visibility, and the active attention backend before a real launch. For scratch pretraining, a real run now requires the local tokenizer artifact referenced by `model.tokenizer_path`; dry-runs still allow a fallback tokenizer so you can validate the rest of the path first.

@@ -280,6 +280,53 @@ def _find_project_root(start_path: Path) -> Path:
     return start_path
 
 
+def resolve_path_reference(path_like: str | None, base_path: str | None = None) -> Path | None:
+    """Resolve a config path against the config file, project root, and cwd."""
+    if not path_like:
+        return None
+
+    path = Path(path_like).expanduser()
+    if path.is_absolute():
+        return path
+
+    candidates: list[Path] = []
+    if base_path:
+        base_dir = Path(base_path).resolve().parent
+        project_root = _find_project_root(base_dir)
+        base_candidate = (base_dir / path).resolve()
+        project_candidate = (project_root / path).resolve()
+        repo_root_relative_prefixes = {
+            "artifacts",
+            "configs",
+            "data",
+            "desktop",
+            "docs",
+            "evaluation",
+            "frontend",
+            "inference",
+            "scripts",
+            "training",
+        }
+        if path.parts and path.parts[0] in repo_root_relative_prefixes:
+            candidates.extend([project_candidate, base_candidate])
+        else:
+            candidates.extend([base_candidate, project_candidate])
+
+    cwd_candidate = (Path.cwd() / path).resolve()
+    if cwd_candidate not in candidates:
+        candidates.append(cwd_candidate)
+
+    deduped_candidates: list[Path] = []
+    for candidate in candidates:
+        if candidate not in deduped_candidates:
+            deduped_candidates.append(candidate)
+
+    for candidate in deduped_candidates:
+        if candidate.exists():
+            return candidate
+    return deduped_candidates[0] if deduped_candidates else path.resolve()
+
+
 def _path_exists(path_like: str | None, base_path: str | None = None) -> bool:
     """Check if a path exists, handling relative paths intelligently.
 
@@ -292,52 +339,28 @@ def _path_exists(path_like: str | None, base_path: str | None = None) -> bool:
     """
     if not path_like:
         return True
-
-    path = Path(path_like)
-
-    # If absolute, just check existence
-    if path.is_absolute():
-        return path.exists()
-
-    # If no base path provided, check relative to current working directory
-    if not base_path:
-        return path.exists()
-
-    base_dir = Path(base_path).parent
-
-    # First try resolving relative to config file directory
-    resolved = base_dir / path
+    resolved = resolve_path_reference(path_like, base_path)
+    if resolved is None:
+        return False
     if resolved.exists():
         return True
 
-    # For data/ paths, try resolving from project root
-    # This handles the case where data files are relative to project root
-    # but config files are in subdirectories
-    if path_like.startswith("data/"):
-        # Find project root dynamically
-        project_root = _find_project_root(base_dir)
-        resolved = project_root / path
+    if not base_path:
+        return False
 
-        # In test environments, be more permissive about data files
-        # Check if we're in a test environment
-        is_test_env = (
-            "PYTEST_CURRENT_TEST" in os.environ
-            or "TESTING" in os.environ
-            or "pytest" in sys.modules
-            or "test" in Path.cwd().name.lower()
-        )
+    # In test environments, be more permissive about generated data files.
+    is_test_env = (
+        "PYTEST_CURRENT_TEST" in os.environ
+        or "TESTING" in os.environ
+        or "pytest" in sys.modules
+        or "test" in Path.cwd().name.lower()
+    )
+    if is_test_env and path_like.startswith("data/processed/"):
+        project_root = _find_project_root(Path(base_path).resolve().parent)
+        data_dir = project_root / "data" / "processed"
+        return data_dir.exists() and data_dir.is_dir()
 
-        if is_test_env and path_like.startswith("data/processed/"):
-            # For test environments, check if the data directory structure exists
-            # rather than requiring specific files
-            data_dir = project_root / "data" / "processed"
-            return data_dir.exists() and data_dir.is_dir()
-
-        return resolved.exists()
-
-    # Try other common relative patterns
-    # Check relative to current working directory as fallback
-    return path.exists()
+    return False
 
 
 def _resolve_model_scale_spec(config: ExperimentConfig) -> Any | None:
@@ -511,10 +534,18 @@ def validate_experiment_config(config: ExperimentConfig) -> list[str]:
         if not tokenizer_path_exists and not config.model.tokenizer_name:
             errors.append(f"tokenizer path not found: {config.model.tokenizer_path}")
         if not tokenizer_path_exists and config.model.tokenizer_name:
-            warnings.append(
-                f"Tokenizer path {config.model.tokenizer_path} does not exist yet; "
-                f"falling back to tokenizer_name={config.model.tokenizer_name}."
-            )
+            if config.model.initialization.lower() == "scratch":
+                warnings.append(
+                    f"Scratch tokenizer path {config.model.tokenizer_path} does not exist yet; "
+                    f"dry-runs may fall back to tokenizer_name={config.model.tokenizer_name}, "
+                    "but a real training run should first build the local tokenizer with "
+                    "`python training/scripts/train_tokenizer.py --config <profile> --output-dir <tokenizer_dir>`."
+                )
+            else:
+                warnings.append(
+                    f"Tokenizer path {config.model.tokenizer_path} does not exist yet; "
+                    f"falling back to tokenizer_name={config.model.tokenizer_name}."
+                )
     _require(
         _path_exists(config.data.train_file, config.config_path),
         f"training data file not found: {config.data.train_file}",

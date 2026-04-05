@@ -332,6 +332,19 @@ You can also run the repo refresh flow:
 ai-factory refresh-lab --skip-tests --skip-notebooks --skip-generate
 ```
 
+Before a real long-running launch, run the hard preflight:
+
+```bash
+ai-factory train-preflight --config training/configs/profiles/pretraining.yaml
+ai-factory train-preflight --config training/configs/profiles/failure_aware.yaml
+```
+
+Important:
+
+- scratch training now expects the local tokenizer artifact under `artifacts/tokenizers/...` for a real run
+- if that tokenizer is missing, `train-preflight` will fail and tell you exactly how to build it
+- dry-runs can still fall back to the configured tokenizer name so you can validate the rest of the stack first
+
 ## 9. Run The First Real Training Job
 
 ### 9.1 Scratch training from zero
@@ -366,8 +379,9 @@ Recommended operator order:
 1. `python data/generator/generate_calculus_datasets.py --config data/configs/generation.yaml`
 2. `python data/prepare_dataset.py --config data/configs/processing.yaml`
 3. `python training/scripts/train_tokenizer.py --config training/configs/profiles/pretraining.yaml --output-dir artifacts/tokenizers/qwen2_math_2b`
-4. `python -m training.train --config training/configs/profiles/pretraining.yaml --dry-run --validate-model-load`
-5. `python -m training.train --config training/configs/profiles/pretraining.yaml`
+4. `ai-factory train-preflight --config training/configs/profiles/pretraining.yaml`
+5. `python -m training.train --config training/configs/profiles/pretraining.yaml --dry-run --validate-model-load`
+6. `python -m training.train --config training/configs/profiles/pretraining.yaml`
 
 ### 9.2 Continued pretraining
 
@@ -408,6 +422,10 @@ Why this profile first:
 - it publishes to `artifacts/models/atlas-math-failure-aware/latest`
 - the default `finetuned` model registry entry points there
 - the default `base_vs_finetuned` evaluation config expects that artifact
+
+Operator recommendation:
+
+- run `ai-factory train-preflight --config training/configs/profiles/failure_aware.yaml` before the first real launch
 
 ### Faster local smoke run
 
