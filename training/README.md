@@ -1,6 +1,6 @@
 # Training Layer
 
-The training layer is a composed experiment engine for math-specialist adaptation. It supports local QLoRA-first iteration, curriculum and failure-aware weighting, optional full-precision export, and run packaging for downstream inference and evaluation.
+The training layer is a composed experiment engine for math-specialist adaptation and scratch-model pretraining. It supports local QLoRA-first iteration, curriculum and failure-aware weighting, scratch initialization from an explicit architecture config, tokenizer training, optional full-precision export, and run packaging for downstream inference and evaluation.
 It now also performs stricter config validation, emits richer run reports/manifests, and can resume from the latest checkpoint on demand.
 
 ## Core Modules
@@ -9,7 +9,7 @@ It now also performs stricter config validation, emits richer run reports/manife
 - `src/config.py`: composed experiment configuration and profile loading.
 - `src/data.py`: dataset loading, prompt formatting, weighting, and curriculum ordering.
 - `src/collators.py`: weighted data collator support.
-- `src/modeling.py`: model/tokenizer loading, LoRA/QLoRA prep, merged export helpers.
+- `src/modeling.py`: model/tokenizer loading, scratch-model construction, LoRA/QLoRA prep, merged export helpers.
 - `src/trainer.py`: weighted-loss trainer integration.
 - `src/validation.py`: dry-run tokenization and data validation.
 - `src/analysis.py`: parameter reports, dataset diagnostics, run summaries.
@@ -17,6 +17,7 @@ It now also performs stricter config validation, emits richer run reports/manife
 - `src/comparison.py`: run-vs-run comparison helpers and report generation.
 - `src/environment.py`: reproducibility snapshots for Python, platform, packages, files, and runtime context.
 - `src/tracking.py`: optional tracker adapters plus always-on local tracking artifacts.
+- `scripts/train_tokenizer.py`: local BPE tokenizer training over the configured corpus.
 
 ## Config Layout
 
@@ -30,6 +31,8 @@ It now also performs stricter config validation, emits richer run reports/manife
 - `configs/profiles/`
 
 Legacy top-level config names are retained as wrappers for compatibility, but the primary entry points are the profile configs.
+
+The parameter budget for a scratch run now lives in the model component YAML. For the default pretraining path, see `training/configs/components/models/qwen2_scratch_2b.yaml`, which defines the 24-layer / 2560-hidden / ~2.00B-parameter architecture, plus tokenizer settings.
 
 ## Named Profiles
 
@@ -50,9 +53,19 @@ Legacy top-level config names are retained as wrappers for compatibility, but th
 python3 -m training.train --config training/configs/profiles/baseline_qlora.yaml --dry-run
 python3 -m training.train --config training/configs/profiles/baseline_qlora.yaml --resume-from-latest-checkpoint
 python3 -m training.train --config training/configs/profiles/math_specialist.yaml
+python3 training/scripts/train_tokenizer.py --config training/configs/profiles/pretraining.yaml --output-dir artifacts/tokenizers/qwen2_math_2b
+python3 -m training.train --config training/configs/profiles/pretraining.yaml --dry-run --validate-model-load
+python3 -m training.train --config training/configs/profiles/pretraining.yaml
 python3 training/scripts/export_merged_model.py --run-dir artifacts/runs/<run_id>
 python3 training/scripts/compare_runs.py --left artifacts/runs/<run_a> --right artifacts/runs/<run_b> --markdown-output artifacts/runs/comparison.md
 ```
+
+For the scratch-pretraining path:
+
+- `training/configs/profiles/pretraining.yaml` is now a real scratch run, not a mislabeled fine-tune.
+- `training/configs/components/data/pretraining_text_4k.yaml` switches the data objective to causal next-token modeling over plain math documents instead of masked instruction tuning.
+- `training/configs/components/models/qwen2_scratch_2b.yaml` is where you change the architecture, and therefore the parameter count.
+- `training/scripts/train_tokenizer.py` can build a local tokenizer that matches the configured vocab budget before the first full run.
 
 Every run now writes:
 

@@ -40,7 +40,7 @@ _TRAINING_ARGUMENT_PARAMETERS = set(inspect.signature(TrainingArguments.__init__
 
 
 def parse_args() -> argparse.Namespace:
-    parser = argparse.ArgumentParser(description="Fine-tune a math model with QLoRA and research-grade artifacts.")
+    parser = argparse.ArgumentParser(description="Train or fine-tune a causal language model with research-grade artifacts.")
     parser.add_argument("--config", required=True, help="Path to the YAML config file.")
     parser.add_argument("--resume-from-checkpoint", default=None)
     parser.add_argument(
@@ -296,7 +296,7 @@ def main() -> None:
             if validate_model_load:
                 logger.info("Validating model load.")
                 tokenizer = tokenizer or load_tokenizer(config)
-                model = load_model_for_training(config)
+                model = load_model_for_training(config, tokenizer=tokenizer)
                 parameter_report = trainable_parameter_report(model)
                 write_json(layout.metrics_dir / "model_report.json", parameter_report)
                 tracker.log_metrics({"trainable_ratio": parameter_report["trainable_ratio"]})
@@ -373,7 +373,7 @@ def main() -> None:
 
         logger.info("Initializing full training run.")
         tokenizer = tokenizer or load_tokenizer(config)
-        model = load_model_for_training(config)
+        model = load_model_for_training(config, tokenizer=tokenizer)
 
         parameter_report = trainable_parameter_report(model)
         write_json(layout.metrics_dir / "model_report.json", parameter_report)

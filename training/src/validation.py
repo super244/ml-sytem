@@ -5,7 +5,7 @@ from typing import Any
 from ai_factory.core.tokens import approximate_token_count
 from training.src.analysis import dataset_summary
 from training.src.config import DataConfig, ExperimentConfig
-from training.src.data import build_dataset, build_messages, curriculum_sort, load_jsonl, render_chat
+from training.src.data import build_dataset, build_messages, build_training_text, curriculum_sort, load_jsonl, render_chat
 
 
 def build_validation_data_config(config: ExperimentConfig) -> DataConfig:
@@ -94,10 +94,15 @@ def _prompt_preview(
 ) -> dict[str, Any]:
     previews: list[dict[str, Any]] = []
     for record in records[:max_samples]:
-        messages = build_messages(record, data_config)
-        prompt_text = render_chat(tokenizer, messages[:-1], add_generation_prompt=True)
-        completion_text = messages[-1]["content"]
-        full_text = render_chat(tokenizer, messages, add_generation_prompt=False)
+        if data_config.format == "pretraining_text":
+            prompt_text = ""
+            completion_text = build_training_text(record, data_config)
+            full_text = completion_text
+        else:
+            messages = build_messages(record, data_config)
+            prompt_text = render_chat(tokenizer, messages[:-1], add_generation_prompt=True)
+            completion_text = messages[-1]["content"]
+            full_text = render_chat(tokenizer, messages, add_generation_prompt=False)
         previews.append(
             {
                 "id": record.get("id"),

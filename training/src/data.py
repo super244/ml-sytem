@@ -64,6 +64,10 @@ def render_chat(tokenizer: Any, messages: list[dict[str, str]], add_generation_p
     return "".join(segments)
 
 
+def render_plain_chat(messages: list[dict[str, str]], add_generation_prompt: bool = False) -> str:
+    return render_chat(tokenizer=None, messages=messages, add_generation_prompt=add_generation_prompt)
+
+
 def compute_sample_weight(record: dict[str, Any], data_config: DataConfig) -> float:
     weight = float(record.get("weight", 1.0) or 1.0)
     weight *= float(data_config.source_weights.get(record.get("source", ""), 1.0))
@@ -119,7 +123,59 @@ def build_messages(record: dict[str, Any], data_config: DataConfig) -> list[dict
     ]
 
 
+def build_pretraining_text(record: dict[str, Any], data_config: DataConfig) -> str:
+    raw_text = record.get("text")
+    if isinstance(raw_text, str) and raw_text.strip():
+        return raw_text.strip()
+    question = record.get("question")
+    solution = record.get("solution")
+    if not isinstance(question, str) or not question.strip():
+        raise ValueError(f"Dataset record is missing a non-empty question field: {record.get('id', '<unknown>')}")
+    if not isinstance(solution, str) or not solution.strip():
+        raise ValueError(f"Dataset record is missing a non-empty solution field: {record.get('id', '<unknown>')}")
+
+    prefix_lines: list[str] = []
+    if data_config.include_topic_prefix and record.get("topic"):
+        prefix_lines.append(f"Topic: {record['topic']}")
+    if data_config.include_source_tag and record.get("source"):
+        prefix_lines.append(f"Source: {record['source']}")
+    if record.get("difficulty"):
+        prefix_lines.append(f"Difficulty: {record['difficulty']}")
+
+    sections = []
+    if prefix_lines:
+        sections.append("\n".join(prefix_lines))
+    sections.append(f"Problem:\n{question.strip()}")
+    sections.append(f"Solution:\n{solution.strip()}")
+    final_answer = record.get("final_answer")
+    if isinstance(final_answer, str) and final_answer.strip():
+        sections.append(f"Final Answer:\n{final_answer.strip()}")
+    return "\n\n".join(sections)
+
+
+def build_training_text(record: dict[str, Any], data_config: DataConfig) -> str:
+    if data_config.format == "pretraining_text":
+        return build_pretraining_text(record, data_config)
+    return render_plain_chat(build_messages(record, data_config), add_generation_prompt=False)
+
+
 def tokenize_example(record: dict[str, Any], tokenizer: Any, data_config: DataConfig) -> dict[str, Any]:
+    if data_config.format == "pretraining_text":
+        text = build_pretraining_text(record, data_config)
+        encoded = tokenizer(
+            text,
+            max_length=data_config.max_length,
+            truncation=True,
+            add_special_tokens=True,
+        )
+        input_ids = encoded["input_ids"]
+        return {
+            "input_ids": input_ids,
+            "attention_mask": encoded["attention_mask"],
+            "labels": list(input_ids),
+            "sample_weight": compute_sample_weight(record, data_config),
+        }
+
     messages = build_messages(record, data_config)
     prompt_messages = messages[:-1]
     full_text = render_chat(tokenizer, messages, add_generation_prompt=False)

@@ -23,6 +23,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--config", default="data/configs/generation.yaml")
     parser.add_argument("--seed", type=int, default=None)
     parser.add_argument("--target-size-mb", type=float, default=None)
+    parser.add_argument("--custom-total-size-gb", type=float, default=None)
     return parser.parse_args()
 
 
@@ -75,6 +76,44 @@ def _load_public_entries(registry_path: str) -> list[dict[str, Any]]:
     return entries
 
 
+def _resolve_dataset_targets(specs: list[DatasetSpec], config: dict[str, Any], args: argparse.Namespace) -> dict[str, int]:
+    explicit_targets = {}
+    for spec in specs:
+        if spec.target_size_bytes is not None:
+            explicit_targets[spec.id] = int(spec.target_size_bytes)
+        elif spec.target_size_mb is not None:
+            explicit_targets[spec.id] = int(spec.target_size_mb * 1024 * 1024)
+    if explicit_targets:
+        fallback_bytes = int((args.target_size_mb or config.get("target_size_mb", 3.1)) * 1024 * 1024)
+        return {spec.id: explicit_targets.get(spec.id, fallback_bytes) for spec in specs}
+
+    total_size_gb = args.custom_total_size_gb
+    if total_size_gb is None:
+        total_size_gb = config.get("custom_total_size_gb")
+    if total_size_gb is not None:
+        total_size_bytes = int(float(total_size_gb) * 1024 * 1024 * 1024)
+    else:
+        total_size_mb = config.get("custom_total_size_mb")
+        total_size_bytes = int(float(total_size_mb) * 1024 * 1024) if total_size_mb is not None else None
+
+    if total_size_bytes is None:
+        legacy_bytes = int((args.target_size_mb or config.get("target_size_mb", 3.1)) * 1024 * 1024)
+        return {spec.id: legacy_bytes for spec in specs}
+
+    weights = [float(spec.target_share or 1.0) for spec in specs]
+    total_weight = sum(weights) or float(len(specs) or 1)
+    targets: dict[str, int] = {}
+    allocated = 0
+    for index, spec in enumerate(specs):
+        if index == len(specs) - 1:
+            target_bytes = total_size_bytes - allocated
+        else:
+            target_bytes = max(1, int(round(total_size_bytes * (weights[index] / total_weight))))
+            allocated += target_bytes
+        targets[spec.id] = target_bytes
+    return targets
+
+
 def write_catalog(path: Path, datasets: list[dict[str, Any]]) -> None:
     summary = {
         "num_datasets": len(datasets),
@@ -91,18 +130,19 @@ def main() -> None:
     args = parse_args()
     config = load_config(args.config)
     seed = args.seed if args.seed is not None else config.get("seed", 42)
-    target_size_mb = args.target_size_mb or config.get("target_size_mb", 3.1)
-    target_size_bytes = int(target_size_mb * 1024 * 1024)
 
     output_dir = Path(config.get("output_dir", "data/custom"))
     catalog_path = Path(config.get("catalog_path", "data/catalog.json"))
     registry_path = str(config.get("public_registry_path", "data/public/registry.yaml"))
     output_dir.mkdir(parents=True, exist_ok=True)
 
+    specs = [DatasetSpec(**payload) for payload in config.get("dataset_specs", [])]
+    target_sizes = _resolve_dataset_targets(specs, config, args)
+
     datasets: list[dict[str, Any]] = []
     repo_root = Path(__file__).resolve().parents[2]
-    for offset, spec_payload in enumerate(config.get("dataset_specs", [])):
-        spec = DatasetSpec(**spec_payload)
+    for offset, spec in enumerate(specs):
+        target_size_bytes = target_sizes[spec.id]
         records = generate_records(spec, target_size_bytes=target_size_bytes, seed=seed + offset * 101)
         output_path = output_dir / f"{spec.id}.jsonl"
         write_jsonl(output_path, records)
@@ -125,7 +165,10 @@ def main() -> None:
             metadata={"card_path": str(output_path.with_suffix(".md"))},
         )
         write_json(output_path.with_suffix(".manifest.json"), manifest.model_dump())
-        print(f"Generated {entry['id']} with {entry['num_rows']} rows at {entry['path']}")
+        print(
+            f"Generated {entry['id']} with {entry['num_rows']} rows at {entry['path']} "
+            f"(target={target_size_bytes} bytes)"
+        )
 
     datasets.extend(_load_public_entries(registry_path))
     write_catalog(catalog_path, datasets)
