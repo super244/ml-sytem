@@ -47,6 +47,7 @@ from ai_factory.core.instances.utils import (
     _stage_for_instance_type,
 )
 from ai_factory.core.io import write_json
+from ai_factory.core.model_scales import DEFAULT_FOUNDATION_MODEL
 from ai_factory.core.monitoring.collectors import collect_metrics_for_instance
 from ai_factory.core.monitoring.events import InstanceEvent
 from ai_factory.core.orchestration.service import OrchestrationService
@@ -947,7 +948,7 @@ class InstanceManager:
             {
                 "name": generated_name,
                 "label": source.name,
-                "base_model": source.artifact_refs.get("base_model", "Qwen/Qwen2.5-Math-1.5B-Instruct"),
+                "base_model": source.artifact_refs.get("base_model", DEFAULT_FOUNDATION_MODEL),
                 "adapter_path": source_artifact,
                 "load_in_4bit": True,
                 "load_in_8bit": False,
@@ -1422,9 +1423,9 @@ class InstanceManager:
 
     def cancel_instance(self, instance_id: str) -> InstanceManifest:
         legacy_instance_id = self._legacy_instance_id(instance_id)
-        run = self.orchestration.control_plane.get_run(legacy_instance_id) or self.orchestration.control_plane.get_run_by_legacy_instance(
+        run = self.orchestration.control_plane.get_run(
             legacy_instance_id
-        )
+        ) or self.orchestration.control_plane.get_run_by_legacy_instance(legacy_instance_id)
         if run is not None and run.status in {"completed", "failed", "cancelled"}:
             return self._project_manifest(self.store.load(legacy_instance_id))
         self.orchestration.cancel_run(legacy_instance_id)

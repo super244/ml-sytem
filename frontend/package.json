@@ -6,7 +6,7 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "typecheck": "node -e \"require('fs').rmSync('tsconfig.tsbuildinfo',{force:true})\" && next typegen && tsc --noEmit",
+    "typecheck": "node -e \"const fs=require('fs'); fs.rmSync('tsconfig.tsbuildinfo',{force:true}); fs.mkdirSync('.next/types',{recursive:true}); fs.closeSync(fs.openSync('.next/types/cache-life.d.ts','a'));\" && next typegen && tsc --noEmit",
     "lint": "eslint . --max-warnings=0",
     "format": "prettier --write ."
   },

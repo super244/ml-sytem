@@ -6,7 +6,13 @@ from pathlib import Path
 import pytest
 
 from ai_factory.core.instances.models import EnvironmentSpec, InstanceManifest
-from ai_factory.core.orchestration.models import CircuitState, OrchestrationEvent, OrchestrationRun, RetryPolicy
+from ai_factory.core.orchestration.models import (
+    CircuitState,
+    OrchestrationEvent,
+    OrchestrationRun,
+    RetryPolicy,
+    TaskAttempt,
+)
 from ai_factory.core.orchestration.service import OrchestrationService
 from ai_factory.core.orchestration.sqlite import SqliteControlPlane
 from ai_factory.core.platform.settings import PlatformSettings
@@ -31,7 +37,9 @@ def _make_service(tmp_path: Path, *, worker_concurrency: int = 4, stale_after_s:
     return OrchestrationService(control_plane=SqliteControlPlane(settings.control_db_path), settings=settings)
 
 
-def _upsert_run(service: OrchestrationService, run_id: str, *, legacy_instance_id: str | None = None) -> OrchestrationRun:
+def _upsert_run(
+    service: OrchestrationService, run_id: str, *, legacy_instance_id: str | None = None
+) -> OrchestrationRun:
     run = OrchestrationRun(id=run_id, legacy_instance_id=legacy_instance_id, name=run_id)
     service.control_plane.upsert_run(run)
     return run
@@ -82,9 +90,12 @@ def test_generic_task_lifecycle_supports_task_ids_and_pragmatic_run_aggregation(
     )
 
     described = service.describe_task(generic.id)
+    run_summary = service.summarize_run(run.id)
     assert completed_run.status == "completed"
     assert len(described["attempts"]) == 2
     assert described["readiness"]["ready"] is False
+    assert run_summary["lineage"]["legacy_instance_id"] == "legacy-001"
+    assert run_summary["last_event_type"] == "task.completed"
 
 
 def test_cancel_run_cleans_up_running_attempts_and_leases(tmp_path: Path) -> None:
@@ -144,6 +155,30 @@ def test_beginning_heartbeat_and_finalize_rejects_stale_leases(tmp_path: Path) -
 
     with pytest.raises(ValueError, match="active lease"):
         service.finalize_task_attempt(task_id=task.id, attempt_id=attempt.id, exit_code=0)
+
+
+def test_task_readiness_blocks_when_active_lease_exists(tmp_path: Path) -> None:
+    service = _make_service(tmp_path)
+    run = _upsert_run(service, "run-active-lease", legacy_instance_id="legacy-active-lease")
+    task = service.create_task(run_id=run.id, task_type="train", legacy_instance_id="legacy-active-lease")
+
+    orphan_attempt = TaskAttempt(id="att-orphan", task_id=task.id, sequence=1, status="running")
+    service.control_plane.upsert_attempt(orphan_attempt)
+    service.control_plane.write_lease(
+        task_id=task.id,
+        attempt_id=orphan_attempt.id,
+        lease_owner="local-runner",
+        acquired_at=orphan_attempt.started_at,
+        heartbeat_at=orphan_attempt.heartbeat_at,
+        expires_at=orphan_attempt.started_at,
+    )
+
+    readiness = service.task_readiness(task.id)
+    dispatchable = asyncio.run(service.dispatch_ready_tasks())
+
+    assert readiness["ready"] is False
+    assert "active_lease" in readiness["blockers"]
+    assert dispatchable == []
 
 
 def test_list_events_limit_returns_most_recent_events_in_chronological_order(tmp_path: Path) -> None:
@@ -218,6 +253,31 @@ def test_recover_stalled_tasks_marks_retry_waiting_and_updates_summary(tmp_path:
     assert recovered_attempt is not None and recovered_attempt.status == "failed"
     assert summary["retry_waiting_tasks"] == 1
     assert run_summary["retry_waiting_tasks"] == 1
+
+
+def test_recover_stalled_tasks_drops_orphan_leases(tmp_path: Path) -> None:
+    service = _make_service(tmp_path)
+    run = _upsert_run(service, "run-orphan-lease", legacy_instance_id="legacy-orphan-lease")
+    task = service.create_task(run_id=run.id, task_type="train", legacy_instance_id="legacy-orphan-lease")
+
+    orphan_attempt = TaskAttempt(id="att-orphan-recovery", task_id=task.id, sequence=1, status="running")
+    service.control_plane.upsert_attempt(orphan_attempt)
+    service.control_plane.write_lease(
+        task_id=task.id,
+        attempt_id=orphan_attempt.id,
+        lease_owner="local-runner",
+        acquired_at=orphan_attempt.started_at,
+        heartbeat_at=orphan_attempt.heartbeat_at,
+        expires_at=orphan_attempt.started_at,
+    )
+    with service.control_plane.connection() as connection:
+        connection.execute("PRAGMA foreign_keys = OFF")
+        connection.execute("DELETE FROM orchestration_attempts WHERE id = ?", (orphan_attempt.id,))
+
+    recovered = service.recover_stalled_tasks()
+
+    assert recovered == []
+    assert service.control_plane.get_lease(task.id) is None
 
 
 def test_sub_agent_workflow_dependencies_remain_correct_when_workloads_are_out_of_order(tmp_path: Path) -> None:

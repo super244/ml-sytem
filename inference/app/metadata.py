@@ -7,7 +7,7 @@ from typing import Any
 from ai_factory.core.datasets import list_sample_prompts, load_catalog, load_dataset_provenance
 from ai_factory.core.discovery import list_training_runs, load_benchmark_registry
 from inference.app.config import AppSettings
-from inference.app.model_catalog import list_model_catalog
+from inference.app.model_catalog import list_model_catalog, summarize_model_catalog
 from inference.app.prompts import PromptPreset, load_prompt_presets
 
 _START_TIME = time.monotonic()
@@ -174,6 +174,11 @@ class MetadataService:
         models, _ = self._refresh_models_catalog()
         return models
 
+    def model_inventory_summary(self) -> dict[str, Any]:
+        """Summarize the live model inventory for dashboards and status payloads."""
+        models, _ = self._refresh_models_catalog()
+        return summarize_model_catalog(models)
+
     def _instance_counts(self) -> tuple[int, int, list[str]]:
         """Get instance counts and explicit load errors."""
         try:
@@ -214,6 +219,7 @@ class MetadataService:
             "status": "available" if not errors else "degraded",
             "errors": errors,
             "models": models,
+            "model_inventory": summarize_model_catalog(models),
             "cache": cache_stats,
             "benchmarks": len(benchmarks),
             "runs": len(runs),

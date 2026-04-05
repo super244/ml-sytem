@@ -7,6 +7,8 @@ import sys
 from pathlib import Path
 from typing import Any
 
+from pydantic import ValidationError
+
 if __package__ in {None, ""}:
     sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 
@@ -15,7 +17,9 @@ from ai_factory.core.schemas import DatasetManifest, MathRecord, PackagedMathRec
 
 
 def parse_args() -> argparse.Namespace:
-    parser = argparse.ArgumentParser(description="Validate raw or packaged dataset JSONL or SQLite files and optional manifests.")
+    parser = argparse.ArgumentParser(
+        description="Validate raw or packaged dataset JSONL or SQLite files and optional manifests."
+    )
     parser.add_argument("--input", required=True, help="Path/glob to JSONL file(s) or a SQLite corpus file.")
     parser.add_argument("--manifest", default=None, help="Optional manifest path to validate.")
     parser.add_argument("--schema", choices=["auto", "record", "packaged"], default="auto")
@@ -73,7 +77,7 @@ def main() -> None:
                 ok += 1
             except Exception as exc:  # noqa: BLE001
                 if len(errors) < args.max_errors:
-                    errors.append({"file": str(path), "line": idx, "error": str(exc)})
+                    errors.append({"file": str(path), "line": idx, "error": _format_validation_error(exc)})
     manifest_ok = None
     if args.manifest:
         try:
@@ -81,7 +85,7 @@ def main() -> None:
             manifest_ok = True
         except Exception as exc:  # noqa: BLE001
             manifest_ok = False
-            errors.append({"file": args.manifest, "line": 1, "error": str(exc)})
+            errors.append({"file": args.manifest, "line": 1, "error": _format_validation_error(exc)})
 
     summary = {
         "total": total,
@@ -106,6 +110,18 @@ def _validate_payload(payload: dict[str, Any], schema: str) -> None:
         PackagedMathRecord.model_validate(payload)
         return
     MathRecord.model_validate(payload)
+
+
+def _format_validation_error(exc: Exception) -> str:
+    if isinstance(exc, ValidationError):
+        first_error = exc.errors()[0] if exc.errors() else None
+        if first_error:
+            location = ".".join(str(part) for part in first_error.get("loc", []) if part is not None)
+            message = first_error.get("msg", str(exc))
+            if location:
+                return f"{location}: {message}"
+            return message
+    return str(exc)
 
 
 if __name__ == "__main__":

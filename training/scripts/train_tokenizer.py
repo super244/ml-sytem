@@ -2,8 +2,8 @@ from __future__ import annotations
 
 import argparse
 import json
+from collections.abc import Iterator
 from pathlib import Path
-from typing import Iterator
 
 from tokenizers import Tokenizer, decoders, models, normalizers, pre_tokenizers, processors, trainers
 from transformers import PreTrainedTokenizerFast

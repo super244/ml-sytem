@@ -8,6 +8,16 @@ export const FALLBACK_MODELS: ModelInfo[] = [
     base_model: 'Qwen2.5-Math-1.5B-Instruct',
     available: true,
     tags: ['specialist', 'verification'],
+    scale_tags: ['specialist', 'verification'],
+    parameter_size_b: 1.5,
+    parameter_size_label: '1.5B',
+    quantization: '4bit',
+    tier: 'specialist',
+    availability_context: {
+      state: 'available',
+      detail: 'demo fallback model',
+      source: 'demo',
+    },
   },
   {
     name: 'base',
@@ -16,6 +26,16 @@ export const FALLBACK_MODELS: ModelInfo[] = [
     base_model: 'Qwen2.5-Math-1.5B-Instruct',
     available: true,
     tags: ['baseline'],
+    scale_tags: ['baseline'],
+    parameter_size_b: 1.5,
+    parameter_size_label: '1.5B',
+    quantization: '4bit',
+    tier: 'baseline',
+    availability_context: {
+      state: 'available',
+      detail: 'demo fallback model',
+      source: 'demo',
+    },
   },
 ];
 

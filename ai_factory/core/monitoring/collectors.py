@@ -10,7 +10,7 @@ from typing import Any, cast
 from ai_factory.core.discovery import latest_training_run, list_training_runs
 from ai_factory.core.instances.models import InstanceManifest, MetricPoint, ProgressSnapshot
 from ai_factory.core.io import load_json, read_jsonl
-from ai_factory.core.monitoring.metrics import metric_points_from_summary
+from ai_factory.core.monitoring.metrics import build_observability_summary, metric_points_from_summary
 
 logger = logging.getLogger(__name__)
 
@@ -52,7 +52,10 @@ def _prepare_metrics(snapshot: dict[str, Any]) -> tuple[dict[str, Any], list[Met
         "pack_summary_json": str(output_dir / "pack_summary.json"),
         "card_markdown": str(output_dir / "card.md"),
     }
-    return summary, metric_points_from_summary(summary, stage="prepare"), refs
+    points = metric_points_from_summary(summary, stage="prepare")
+    summary["observability"] = build_observability_summary(points, summary, stage="prepare")
+    summary["utilization_rollup"] = summary["observability"]["utilization_rollup"]
+    return summary, points, refs
 
 
 def _prepare_progress(snapshot: dict[str, Any]) -> ProgressSnapshot:
@@ -126,6 +129,8 @@ def _training_metrics(
     published = (run_manifest.get("metadata") or {}).get("published", {})
     if published:
         refs["published"] = published
+    summary["observability"] = build_observability_summary(points, summary, stage=str(manifest.type))
+    summary["utilization_rollup"] = summary["observability"]["utilization_rollup"]
     return summary, points, refs
 
 
@@ -189,7 +194,11 @@ def _evaluation_metrics(snapshot: dict[str, Any]) -> tuple[dict[str, Any], list[
         "leaderboard": str(output_dir / "leaderboard.json"),
         "per_example": str(output_dir / "per_example.jsonl"),
     }
-    return compact, metric_points_from_summary(compact, stage="evaluate"), refs
+    points = metric_points_from_summary(compact, stage="evaluate")
+    observability = build_observability_summary(points, compact, stage="evaluate")
+    compact["observability"] = observability
+    compact["utilization_rollup"] = observability.get("utilization_rollup")
+    return compact, points, refs
 
 
 def _evaluation_progress(snapshot: dict[str, Any]) -> ProgressSnapshot | None:
@@ -236,7 +245,7 @@ def _inference_metrics(snapshot: dict[str, Any]) -> tuple[dict[str, Any], list[M
     total_prompt_tokens = sum(prompt_tokens)
     total_completion_tokens = sum(completion_tokens)
     total_latency_s = sum(latencies) if latencies else None
-    summary = {
+    summary: dict[str, Any] = {
         "requests": len(rows),
         "cache_hits": cache_hits,
         "avg_latency_s": (sum(latencies) / len(latencies)) if latencies else None,
@@ -250,7 +259,11 @@ def _inference_metrics(snapshot: dict[str, Any]) -> tuple[dict[str, Any], list[M
         else None,
     }
     refs = {"telemetry": telemetry_path}
-    return summary, metric_points_from_summary(summary, stage="inference"), refs
+    points = metric_points_from_summary(summary, stage="inference")
+    observability = build_observability_summary(points, summary, stage="inference")
+    summary["observability"] = observability
+    summary["utilization_rollup"] = observability.get("utilization_rollup")
+    return summary, points, refs
 
 
 def _inference_progress(snapshot: dict[str, Any]) -> ProgressSnapshot | None:
@@ -264,7 +277,7 @@ def _inference_progress(snapshot: dict[str, Any]) -> ProgressSnapshot | None:
     ]
     total_latency_s = sum(latencies) if latencies else None
     total_completion_tokens = sum(completion_tokens)
-    summary = {
+    summary: dict[str, Any] = {
         "requests": len(rows),
         "cache_hits": sum(1 for row in rows if row.get("cache_hit")),
         "avg_tokens_per_second": (
@@ -280,24 +293,32 @@ def _inference_progress(snapshot: dict[str, Any]) -> ProgressSnapshot | None:
 
 
 def _deploy_metrics(manifest: InstanceManifest) -> tuple[dict[str, Any], list[MetricPoint], dict[str, Any]]:
-    summary = {"status": manifest.status}
-    return summary, metric_points_from_summary(summary, stage="deploy"), {}
+    summary: dict[str, Any] = {"status": manifest.status}
+    points = metric_points_from_summary(summary, stage="deploy")
+    observability = build_observability_summary(points, summary, stage="deploy")
+    summary["observability"] = observability
+    summary["utilization_rollup"] = observability.get("utilization_rollup")
+    return summary, points, {}
 
 
 def _report_metrics(snapshot: dict[str, Any]) -> tuple[dict[str, Any], list[MetricPoint], dict[str, Any]]:
     raw = snapshot.get("subsystem") or {}
     output_path = Path(str(raw.get("output_dir_override") or "evaluation/results/failure_analysis.json"))
     payload = load_json(output_path, default={}) or {}
-    summary = {
+    summary: dict[str, Any] = {
         "report_exists": output_path.exists(),
         "taxonomy_buckets": len(payload) if isinstance(payload, dict) else 0,
     }
     refs = {"report_json": str(output_path)}
-    return summary, metric_points_from_summary(summary, stage="report"), refs
+    points = metric_points_from_summary(summary, stage="report")
+    observability = build_observability_summary(points, summary, stage="report")
+    summary["observability"] = observability
+    summary["utilization_rollup"] = observability.get("utilization_rollup")
+    return summary, points, refs
 
 
 def _deploy_progress(manifest: InstanceManifest) -> ProgressSnapshot:
-    status_map = {
+    status_map: dict[str, tuple[str, float | None, str | None]] = {
         "pending": ("queued", 0.0, "Deployment is queued."),
         "running": ("deploying", 0.5, "Deployment is in progress."),
         "completed": ("deployed", 1.0, "Deployment completed."),

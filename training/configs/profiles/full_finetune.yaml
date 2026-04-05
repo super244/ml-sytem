@@ -2,13 +2,19 @@ profile_name: full_finetune
 run_name: atlas_full_finetune
 seed: 42
 refs:
-  model: ../components/models/qwen25_math_1p5b.yaml
+  model: ../components/models/qwen2_scratch_2b.yaml
   adapter: ../components/adapters/full_finetune.yaml
   data: ../components/data/baseline.yaml
   runtime: ../components/runtime/hybrid_local.yaml
   logging: ../components/logging/default.yaml
   tracking: ../components/tracking/default.yaml
   packaging: ../components/packaging/default.yaml
+model:
+  initialization: pretrained
+  base_model_name: artifacts/foundation/qwen2-2b
+  trust_remote_code: false
+  recommended_runtime_profile: hybrid_local
+  recommended_quantization: none
 training:
   num_train_epochs: 3.0
   learning_rate: 0.00001

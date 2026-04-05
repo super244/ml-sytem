@@ -16,6 +16,22 @@ class DeploymentTarget(ABC):
         self.name = self.__class__.__name__
         self.description = "Base deployment target"
         self.capabilities: list[str] = []
+        self.supports_staged_rollout = False
+        self.supports_rollback = False
+        self.supports_lineage_manifests = True
+
+    def _build_status_payload(self, status: str, *, errors: list[str] | None = None) -> dict[str, Any]:
+        return {
+            "name": self.name,
+            "status": status,
+            "capabilities": list(self.capabilities),
+            "features": {
+                "staged_rollout": self.supports_staged_rollout,
+                "rollback": self.supports_rollback,
+                "lineage_manifests": self.supports_lineage_manifests,
+            },
+            "errors": list(errors or []),
+        }
 
     @abstractmethod
     async def prepare_model(self, model: ModelArtifact, spec: DeploymentSpec) -> ModelArtifact:
@@ -44,15 +60,13 @@ class DeploymentTarget(ABC):
 
     async def get_target_status(self) -> dict[str, Any]:
         """Get target status."""
-        return {
-            "name": self.name,
-            "status": "degraded",
-            "capabilities": self.capabilities,
-            "errors": [
+        return self._build_status_payload(
+            "degraded",
+            errors=[
                 "Legacy platform deployment targets are informational only. "
-                "Use managed deployment instances for production publishing."
+                "Use managed deployment instances for production publishing.",
             ],
-        }
+        )
 
 
 class HuggingFaceTarget(DeploymentTarget):
@@ -63,6 +77,8 @@ class HuggingFaceTarget(DeploymentTarget):
         self.name = "HuggingFace"
         self.description = "Deploy models to HuggingFace Hub"
         self.capabilities = ["public", "private", "model_cards", "versioning"]
+        self.supports_staged_rollout = True
+        self.supports_rollback = True
 
     async def prepare_model(self, model: ModelArtifact, spec: DeploymentSpec) -> ModelArtifact:
         """Prepare model for HuggingFace deployment."""
@@ -106,6 +122,8 @@ class OllamaTarget(DeploymentTarget):
         self.name = "Ollama"
         self.description = "Deploy models to Ollama local registry"
         self.capabilities = ["local", "gguf", "quantization"]
+        self.supports_staged_rollout = True
+        self.supports_rollback = True
 
     async def prepare_model(self, model: ModelArtifact, spec: DeploymentSpec) -> ModelArtifact:
         """Prepare model for Ollama deployment."""
@@ -147,6 +165,7 @@ class LMStudioTarget(DeploymentTarget):
         self.name = "LM Studio"
         self.description = "Export models for LM Studio import"
         self.capabilities = ["gguf", "quantization", "local_import"]
+        self.supports_rollback = True
 
     async def prepare_model(self, model: ModelArtifact, spec: DeploymentSpec) -> ModelArtifact:
         """Prepare model for LM Studio."""
@@ -187,6 +206,8 @@ class CustomAPITarget(DeploymentTarget):
         self.name = "Custom API"
         self.description = "Deploy models to custom API endpoints"
         self.capabilities = ["rest_api", "grpc", "websocket"]
+        self.supports_staged_rollout = True
+        self.supports_rollback = True
 
     async def prepare_model(self, model: ModelArtifact, spec: DeploymentSpec) -> ModelArtifact:
         """Prepare model for custom API deployment."""
@@ -230,6 +251,7 @@ class EdgeDeviceTarget(DeploymentTarget):
         self.name = "Edge Device"
         self.description = "Deploy models to edge devices"
         self.capabilities = ["mobile", "iot", "embedded", "quantization"]
+        self.supports_rollback = True
 
     async def prepare_model(self, model: ModelArtifact, spec: DeploymentSpec) -> ModelArtifact:
         """Prepare model for edge deployment."""

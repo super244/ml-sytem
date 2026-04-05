@@ -6,7 +6,7 @@ Status as validated on April 5, 2026:
 
 - `pytest` passes.
 - `ruff check .` passes.
-- `mypy .` passes.
+- `mypy ai_factory/ --no-incremental` passes.
 - `python scripts/doctor.py` passes.
 - `ai-factory serve` and `ai-factory api-smoke` pass.
 - Dataset generation, corpus preparation, SQLite corpus export, tokenizer training smoke test, and scratch-training dry-run pass.
@@ -161,39 +161,120 @@ Important note on SQLite:
 - the existing JSONL outputs remain in place because they are simple to diff, inspect, and reuse with external tooling
 - this SQLite corpus is separate from the orchestration control-plane SQLite database under `artifacts/control_plane/`
 
-## 5. Choose The Scratch Model Size
+## 5. Choose Your Training Mode
 
-The scratch-model path now supports target parameter counts directly.
+Before you pick a profile, decide which training mode you want.
+
+### 5.1 Scratch training from zero
+
+Use this when you want to create a brand-new model with random initialization.
+
+This path:
+
+- uses `model.initialization: scratch`
+- resolves the architecture from `target_parameters`
+- does not load pretrained weights from disk or Hugging Face
+
+Use this profile as the starting point:
+
+- `training/configs/profiles/pretraining.yaml`
+
+### 5.2 Continued pretraining
+
+Use this when you already have a model checkpoint and want to continue next-token training on your own corpus.
+
+This path:
+
+- keeps the plain-text causal language-modeling objective
+- loads an existing checkpoint first
+- is not a separate built-in profile yet
+
+The usual workflow is:
+
+1. start from `training/configs/profiles/pretraining.yaml`
+2. change `model.initialization` to `pretrained`
+3. set `model.base_model_name` to your real checkpoint or model ID
+4. keep the same dry-run and tokenizer-validation steps before the real run
+
+### 5.3 Training from a base model
+
+Use this when you want QLoRA, LoRA, or full fine-tuning on an existing model.
+
+This path:
+
+- uses `model.initialization: pretrained`
+- loads base weights first
+- applies adapter training or full fine-tuning depending on the profile
+
+Examples:
+
+- `training/configs/profiles/baseline_qlora.yaml`
+- `training/configs/profiles/failure_aware.yaml`
+- `training/configs/profiles/math_specialist.yaml`
+- `training/configs/profiles/full_finetune.yaml`
+
+Important:
+
+- the pretrained profiles in this repo now point at local foundation checkpoints such as `artifacts/foundation/qwen2-2b`
+- if those folders do not exist yet, those profiles will fail at model load
+- if you do not have local checkpoints yet, either create them first or edit the profile to use the real base model you want
+
+## 6. Choose The Scratch Model Size
+
+The scratch-model path now supports target parameter counts directly, and the canonical ladder is:
+
+- `1b`
+- `2b`
+- `4b`
+- `9b`
+- `12b`
+- `20b`
+- `27b`
+- `30b`
+- `70b`
+- `120b`
 
 To plan a model around a parameter budget:
 
 ```bash
+python training/scripts/plan_model_scale.py --target-parameters 1b
 python training/scripts/plan_model_scale.py --target-parameters 2b
-python training/scripts/plan_model_scale.py --target-parameters 1.3b
-python training/scripts/plan_model_scale.py --target-parameters 3b
+python training/scripts/plan_model_scale.py --target-parameters 4b
 ```
 
-The default scratch model component is:
+The canonical scratch model components now live under:
 
+- `training/configs/components/models/qwen2_scratch_1b.yaml`
 - `training/configs/components/models/qwen2_scratch_2b.yaml`
+- `training/configs/components/models/qwen2_scratch_4b.yaml`
+- `training/configs/components/models/qwen2_scratch_9b.yaml`
+- `training/configs/components/models/qwen2_scratch_12b.yaml`
+- `training/configs/components/models/qwen2_scratch_20b.yaml`
+- `training/configs/components/models/qwen2_scratch_27b.yaml`
+- `training/configs/components/models/qwen2_scratch_30b.yaml`
+- `training/configs/components/models/qwen2_scratch_70b.yaml`
+- `training/configs/components/models/qwen2_scratch_120b.yaml`
 
-It uses:
+The default scratch entry remains:
 
 - `model_type: qwen2`
 - `target_parameters: 2b`
 - `vocab_size: 50257`
 
-If you want a different model size, edit that file and change `target_parameters` to the budget you want, for example:
+If you want a different model size, switch to the matching template and keep the tokenizer vocab size aligned with the same component.
 
-```yaml
-target_parameters: 1.3b
-```
-
-Then keep the tokenizer vocab size aligned with the same component.
-
-## 6. Train The Tokenizer For Scratch Pretraining
+## 7. Train The Tokenizer For Scratch Training Or Continued Pretraining
 
 Before the first real scratch run, train a local tokenizer that matches the configured vocab budget.
+
+You usually need this for:
+
+- scratch training from zero
+- continued pretraining on your own corpus
+
+You usually do not need this for:
+
+- QLoRA / LoRA / full fine-tuning against an existing base model that already has its tokenizer
 
 ```bash
 python training/scripts/train_tokenizer.py \
@@ -201,11 +282,13 @@ python training/scripts/train_tokenizer.py \
   --output-dir artifacts/tokenizers/qwen2_math_2b
 ```
 
-If you want a different vocab size, update `training/configs/components/models/qwen2_scratch_2b.yaml` first, then pass the same setting through the profile.
+If you want a different vocab size, update the matching `training/configs/components/models/qwen2_scratch_<size>.yaml` template first, then pass the same setting through the profile.
 
-## 7. Validate The Scratch Training Path First
+## 8. Validate The Right Training Path First
 
-Always start with a dry-run.
+Always start with a dry-run that matches the mode you chose.
+
+### 8.1 Scratch training dry-run
 
 ```bash
 python -m training.train --config training/configs/profiles/pretraining.yaml --dry-run
@@ -224,13 +307,34 @@ This validates:
 
 For SQLite-backed training data, point the data component at `data/processed/corpus.sqlite` for train/eval/test if you prefer DB-backed reads over JSONL.
 
+### 8.2 Base-model fine-tuning dry-run
+
+Use this for QLoRA, LoRA, or full fine-tuning:
+
+```bash
+python -m training.train --config training/configs/profiles/baseline_qlora.yaml --dry-run
+python -m training.train --config training/configs/profiles/full_finetune.yaml --dry-run
+```
+
+This validates:
+
+- config composition
+- dataset paths
+- tokenizer loading from the configured base model
+- base checkpoint resolution
+- adapter or full-tuning wiring
+
+If this fails at model load, the usual cause is that the configured `artifacts/foundation/...` checkpoint does not exist yet.
+
 You can also run the repo refresh flow:
 
 ```bash
 ai-factory refresh-lab --skip-tests --skip-notebooks --skip-generate
 ```
 
-## 8. Run The First Real 2B Scratch Pretraining Job
+## 9. Run The First Real Training Job
+
+### 9.1 Scratch training from zero
 
 The default scratch-pretraining profile is:
 
@@ -265,7 +369,31 @@ Recommended operator order:
 4. `python -m training.train --config training/configs/profiles/pretraining.yaml --dry-run --validate-model-load`
 5. `python -m training.train --config training/configs/profiles/pretraining.yaml`
 
-## 9. Run The First Real Fine-Tune
+### 9.2 Continued pretraining
+
+To do continued pretraining:
+
+1. copy `training/configs/profiles/pretraining.yaml`
+2. keep the pretraining data objective
+3. change `model.initialization` to `pretrained`
+4. set `model.base_model_name` to your real checkpoint or model ID
+5. run the same dry-run checks before the real launch
+
+This gives you more corpus exposure on an existing model instead of a fresh random initialization.
+
+### 9.3 Train from a base model
+
+This is the fastest path to a specialist model if you already have a usable base checkpoint.
+
+Recommended first command:
+
+```bash
+python -m training.train --config training/configs/profiles/baseline_qlora.yaml
+```
+
+Use this only after confirming the configured base checkpoint exists.
+
+## 10. Run The First Real Fine-Tune
 
 ### Recommended first real production run
 
@@ -317,7 +445,7 @@ Useful command:
 ai-factory latest-run
 ```
 
-## 10. Evaluate
+## 11. Evaluate
 
 ### 7.1 Bootstrap evaluation before any adapter exists
 
@@ -342,7 +470,7 @@ Expected outputs:
 - `evaluation/results/base_vs_finetuned/summary.md`
 - `evaluation/results/base_vs_finetuned/leaderboard.json`
 
-## 11. Optimization Loop
+## 12. Optimization Loop
 
 ### 8.1 Mine failures into new training examples
 
@@ -378,7 +506,7 @@ A common loop is:
 4. rerun with `math_specialist.yaml` or `verifier_augmented.yaml`
 5. compare runs
 
-## 12. Serve And Run Inference
+## 13. Serve And Run Inference
 
 ### 9.1 Start the API
 
@@ -414,7 +542,7 @@ curl -s http://127.0.0.1:8000/v1/generate \
 
 If that returns an adapter-path error, your first real fine-tune has not published yet.
 
-## 13. Local Deployment Options
+## 14. Local Deployment Options
 
 ### 10.1 Demo stack with Docker Compose
 
@@ -441,7 +569,7 @@ For a real publish you must:
 
 This repository is ready for local serving now. External model publishing is a post-training, provider-specific step.
 
-## 11. Cloud GPU Workflow
+## 15. Cloud GPU Workflow
 
 The exact commands stay the same on a cloud box.
 
@@ -466,7 +594,7 @@ Use cloud mainly for:
 - `long_context.yaml`
 - `full_finetune.yaml`
 
-## 12. Done Means Done
+## 16. Done Means Done
 
 You are in a good state when all of these are true:
 

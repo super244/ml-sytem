@@ -28,11 +28,24 @@ Profiles combine these pieces to define the full experiment.
 - resume from checkpoints
 - adapter packaging and merged export
 
-## Default Base Model
+## Model Scale Ladder
 
-The default runnable path uses `Qwen2.5-Math-1.5B-Instruct`. Larger 7B templates are included for scale-up scenarios, but not required for local validation.
+The default runnable path uses the registry-backed baseline entry, while scratch work is organized around a canonical scale ladder instead of a single hard-coded size.
 
-For actual from-scratch training, the repo now includes a dedicated 2B-profile path:
+The repository now includes dedicated scratch templates for:
+
+- `1b`
+- `2b`
+- `4b`
+- `9b`
+- `12b`
+- `20b`
+- `27b`
+- `30b`
+- `70b`
+- `120b`
+
+For actual from-scratch training, the repo includes a dedicated 2B-profile path:
 
 - `training/configs/profiles/pretraining.yaml`
 - `training/configs/components/models/qwen2_scratch_2b.yaml`
@@ -40,11 +53,7 @@ For actual from-scratch training, the repo now includes a dedicated 2B-profile p
 
 The architecture YAML is the place where you specify model scale. The current default is a 24-layer Qwen2-style decoder with `hidden_size=2560`, `intermediate_size=6912`, `num_attention_heads=20`, `num_key_value_heads=10`, and `vocab_size=50257`, which instantiates to about 2.00B parameters.
 
-You can now specify the model size directly through `target_parameters`, for example:
-
-```yaml
-target_parameters: 2b
-```
+You can specify the model size directly through `target_parameters`, for example `2b`, or switch to the matching template in `training/configs/components/models/` for the size you want.
 
 Use this helper to preview the resolved architecture:
 

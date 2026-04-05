@@ -40,7 +40,9 @@ _TRAINING_ARGUMENT_PARAMETERS = set(inspect.signature(TrainingArguments.__init__
 
 
 def parse_args() -> argparse.Namespace:
-    parser = argparse.ArgumentParser(description="Train or fine-tune a causal language model with research-grade artifacts.")
+    parser = argparse.ArgumentParser(
+        description="Train or fine-tune a causal language model with research-grade artifacts."
+    )
     parser.add_argument("--config", required=True, help="Path to the YAML config file.")
     parser.add_argument("--resume-from-checkpoint", default=None)
     parser.add_argument(

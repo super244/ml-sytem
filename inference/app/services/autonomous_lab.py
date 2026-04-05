@@ -135,7 +135,9 @@ class AutonomousLabService:
             for item in campaigns.values():
                 handle.write(json.dumps(item.model_dump(mode="json")) + "\n")
 
-    def _status_counts(self, values: list[dict[str, Any]] | list[AutonomousCampaign], field: str = "status") -> dict[str, int]:
+    def _status_counts(
+        self, values: list[dict[str, Any]] | list[AutonomousCampaign], field: str = "status"
+    ) -> dict[str, int]:
         counts: dict[str, int] = {}
         for item in values:
             if isinstance(item, BaseModel):
@@ -163,7 +165,8 @@ class AutonomousLabService:
         model_instances = [
             item
             for item in instances
-            if item.get("status") == "completed" and item.get("type") in {"train", "finetune", "evaluate", "deploy", "inference"}
+            if item.get("status") == "completed"
+            and item.get("type") in {"train", "finetune", "evaluate", "deploy", "inference"}
         ]
         gaps = [item for item in model_instances if item.get("id") not in covered_instance_ids]
         return {
@@ -185,11 +188,11 @@ class AutonomousLabService:
 
     def _cluster_summary(self, instances: list[dict[str, Any]]) -> dict[str, Any]:
         nodes = hardware.get_cluster_nodes()
-        idle_nodes = [node for node in nodes if node.get("status") == "idle" or int(node.get("activeJobs", 0) or 0) == 0]
+        idle_nodes = [
+            node for node in nodes if node.get("status") == "idle" or int(node.get("activeJobs", 0) or 0) == 0
+        ]
         running_gpu = [
-            item
-            for item in instances
-            if item.get("status") == "running" and item.get("type") in {"train", "finetune"}
+            item for item in instances if item.get("status") == "running" and item.get("type") in {"train", "finetune"}
         ]
         queued_eval = [
             item
@@ -199,7 +202,9 @@ class AutonomousLabService:
         placements = []
         for node in nodes:
             node_type = str(node.get("type", "")).lower()
-            preferred_workload = "gpu-heavy" if "nvidia" in node_type or "mps" in node_type or "gpu" in node_type else "cpu-telemetry"
+            preferred_workload = (
+                "gpu-heavy" if "nvidia" in node_type or "mps" in node_type or "gpu" in node_type else "cpu-telemetry"
+            )
             placements.append(
                 {
                     "node_id": node.get("id"),
@@ -221,7 +226,9 @@ class AutonomousLabService:
             },
         }
 
-    def _latest(self, instances: list[dict[str, Any]], *, kind: str, status: str = "completed") -> dict[str, Any] | None:
+    def _latest(
+        self, instances: list[dict[str, Any]], *, kind: str, status: str = "completed"
+    ) -> dict[str, Any] | None:
         for item in instances:
             if item.get("type") == kind and item.get("status") == status:
                 return item
@@ -401,11 +408,7 @@ class AutonomousLabService:
             job_id=manifest.id,
             training_config=snapshot.get("subsystem", {}),
             snapshot_config=snapshot,
-            metrics={
-                key: float(value)
-                for key, value in progress_metrics.items()
-                if isinstance(value, (int, float))
-            },
+            metrics={key: float(value) for key, value in progress_metrics.items() if isinstance(value, (int, float))},
             metadata={
                 "instance_id": manifest.id,
                 "instance_type": manifest.type,
@@ -438,7 +441,11 @@ class AutonomousLabService:
                 parent_instance_id=action.source_instance_id,
                 metadata_updates={**metadata, **action.metadata},
             )
-            return {"instance_id": manifest.id, "instance_type": manifest.type, "source_instance_id": action.source_instance_id}
+            return {
+                "instance_id": manifest.id,
+                "instance_type": manifest.type,
+                "source_instance_id": action.source_instance_id,
+            }
         if action.kind in {"evaluate", "inference", "deploy"}:
             action_name = {
                 "evaluate": "evaluate",
@@ -452,9 +459,17 @@ class AutonomousLabService:
                 deployment_target=action.metadata.get("deployment_target"),
                 start=True,
             )
-            return {"instance_id": manifest.id, "instance_type": manifest.type, "source_instance_id": action.source_instance_id}
+            return {
+                "instance_id": manifest.id,
+                "instance_type": manifest.type,
+                "source_instance_id": action.source_instance_id,
+            }
         if action.kind == "lineage":
-            records = [self._record_lineage(instance_id) for instance_id in action.metadata.get("instance_ids", []) if instance_id]
+            records = [
+                self._record_lineage(instance_id)
+                for instance_id in action.metadata.get("instance_ids", [])
+                if instance_id
+            ]
             return {"records": records, "record_count": len(records)}
         raise ValueError(f"Unsupported autonomous action kind: {action.kind}")
 
@@ -486,7 +501,9 @@ class AutonomousLabService:
                 "running_instances": sum(1 for item in instances if item.get("status") == "running"),
                 "open_circuits": len(orchestration_summary.get("open_circuits", [])),
                 "ready_tasks": int(orchestration_summary.get("ready_tasks", 0) or 0),
-                "running_sweeps": sum(1 for item in self._load_jsonl(self.sweeps_file) if item.get("status") == "running"),
+                "running_sweeps": sum(
+                    1 for item in self._load_jsonl(self.sweeps_file) if item.get("status") == "running"
+                ),
             },
             lineage=lineage_summary,
             cluster=cluster_summary,

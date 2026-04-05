@@ -197,10 +197,9 @@ def test_manager_defers_primary_start_until_preprocess_dependency_clears(
     monkeypatch.setattr(
         manager_mod.LocalExecutor,
         "start",
-        lambda self, manifest, command, *, artifacts_dir, stdout_path, stderr_path: started.append(
-            (manifest.id, manifest.type)
-        )
-        or fake_handle,
+        lambda self, manifest, command, *, artifacts_dir, stdout_path, stderr_path: (
+            started.append((manifest.id, manifest.type)) or fake_handle
+        ),
     )
 
     created = manager.create_instance(str(train_config), start=True)

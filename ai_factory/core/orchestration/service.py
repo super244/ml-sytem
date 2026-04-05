@@ -31,6 +31,9 @@ from ai_factory.core.orchestration.models import (
 )
 from ai_factory.core.platform.settings import PlatformSettings
 
+DEFAULT_CIRCUIT_FAILURE_THRESHOLD = 3
+DEFAULT_CIRCUIT_REOPEN_AFTER_S = 60
+
 
 def _now() -> datetime:
     return datetime.now(timezone.utc)
@@ -92,18 +95,62 @@ class OrchestrationService:
     def _retry_policy_for_manifest(self, manifest: InstanceManifest, snapshot: dict[str, Any]) -> RetryPolicy:
         execution = snapshot.get("execution") or {}
         sub_agents = snapshot.get("sub_agents") or {}
+        resilience = snapshot.get("resilience") or {}
         retry_limit = max(
             int(execution.get("retry_limit") or 0),
             int(sub_agents.get("retry_limit") or 0),
             1,
         )
-        base_delay_s = int((snapshot.get("resilience") or {}).get("base_delay_s") or 5)
-        max_delay_s = int((snapshot.get("resilience") or {}).get("max_delay_s") or 300)
+        base_delay_s = int(resilience.get("base_delay_s") or 5)
+        max_delay_s = int(resilience.get("max_delay_s") or 300)
         return RetryPolicy(
             max_attempts=max(retry_limit, 1),
             base_delay_s=base_delay_s,
             max_delay_s=max_delay_s,
+            multiplier=float(resilience.get("multiplier") or 2.0),
+            jitter_s=float(resilience.get("jitter_s") or 0.25),
         )
+
+    def _task_lineage_context(
+        self,
+        task: OrchestrationTask,
+        run: OrchestrationRun | None,
+        attempt: TaskAttempt | None = None,
+    ) -> dict[str, Any]:
+        lineage: dict[str, Any] = {
+            "run_id": task.run_id,
+            "legacy_instance_id": task.legacy_instance_id,
+            "task_id": task.id,
+            "task_type": task.task_type,
+            "agent_type": task.agent_type,
+            "parent_task_id": task.parent_task_id,
+        }
+        if run is not None:
+            lineage.update(
+                {
+                    "run_status": run.status,
+                    "root_run_id": run.root_run_id,
+                    "parent_run_id": run.parent_run_id,
+                    "run_legacy_instance_id": run.legacy_instance_id,
+                }
+            )
+        if attempt is not None:
+            lineage.update(
+                {
+                    "attempt_id": attempt.id,
+                    "attempt_sequence": attempt.sequence,
+                    "attempt_status": attempt.status,
+                }
+            )
+        return lineage
+
+    def _circuit_failure_threshold(self, agent_type: AgentType) -> int:
+        descriptor = self.registry.get(agent_type)
+        return max(descriptor.retry_policy.max_attempts, DEFAULT_CIRCUIT_FAILURE_THRESHOLD)
+
+    def _circuit_reopen_after_s(self, agent_type: AgentType) -> int:
+        descriptor = self.registry.get(agent_type)
+        return max(descriptor.retry_policy.max_delay_s, DEFAULT_CIRCUIT_REOPEN_AFTER_S)
 
     def _workload_to_task_type(self, workload: str) -> TaskType | None:
         mapping: dict[str, TaskType] = {
@@ -151,6 +198,7 @@ class OrchestrationService:
                 run_id=run.id,
                 task_type=task_type,
                 dependencies=dependencies,
+                parent_task_id=primary_task.id,
                 idempotency_key=f"{run.id}:sub-agent:{workload}",
                 input_payload={
                     "source_instance_id": manifest.id,
@@ -211,6 +259,11 @@ class OrchestrationService:
             "environment": manifest.environment.model_dump(mode="json"),
             "parent_instance_id": manifest.parent_instance_id,
             "config_path": manifest.config_path,
+            "lineage": {
+                "legacy_instance_id": manifest.id,
+                "root_run_id": run_id,
+                "parent_run_id": None,
+            },
         }
         run = OrchestrationRun(
             id=run_id,
@@ -272,7 +325,11 @@ class OrchestrationService:
                     None,
                     event_type="run.lineage.attached",
                     message="Attached run to parent orchestration lineage.",
-                    payload={"parent_run_id": parent_run.id},
+                    payload={
+                        "parent_run_id": parent_run.id,
+                        "root_run_id": parent_run.root_run_id or parent_run.id,
+                        "legacy_parent_instance_id": manifest.parent_instance_id,
+                    },
                 )
         self._seed_sub_agent_tasks(run, task, manifest, snapshot)
         return run, task
@@ -284,6 +341,7 @@ class OrchestrationService:
         task_type: TaskType,
         input_payload: dict[str, Any] | None = None,
         dependencies: list[str] | None = None,
+        parent_task_id: str | None = None,
         legacy_instance_id: str | None = None,
         idempotency_key: str | None = None,
         metadata: dict[str, Any] | None = None,
@@ -299,6 +357,7 @@ class OrchestrationService:
             id=task_id,
             run_id=run_id,
             legacy_instance_id=legacy_instance_id,
+            parent_task_id=parent_task_id,
             task_type=task_type,
             agent_type=descriptor.agent_type,
             status=status,
@@ -323,7 +382,12 @@ class OrchestrationService:
             event_type="task.created",
             message=f"Queued {task.task_type} task for {descriptor.label}.",
             agent_type=descriptor.agent_type,
-            payload={"dependencies": dependencies or []},
+            payload={
+                "dependencies": dependencies or [],
+                "parent_task_id": parent_task_id,
+                "lineage": self._task_lineage_context(task, self.control_plane.get_run(run_id)),
+                "registry_candidate": self.registry.describe_task_type(task_type),
+            },
         )
         return task
 
@@ -346,6 +410,8 @@ class OrchestrationService:
                 continue
             dependencies = self.control_plane.list_dependencies(task.id)
             if any(dep.depends_on_task_id not in completed for dep in dependencies):
+                continue
+            if self.control_plane.get_lease(task.id) is not None:
                 continue
             if self.is_circuit_open(task.agent_type):
                 continue
@@ -446,6 +512,8 @@ class OrchestrationService:
             blockers.append("waiting_on_dependencies")
         if task.status not in {"queued", "ready", "retry_waiting", "blocked"}:
             blockers.append(f"status:{task.status}")
+        if self.control_plane.get_lease(task.id) is not None:
+            blockers.append("active_lease")
         if self.is_circuit_open(task.agent_type):
             blockers.append(f"circuit_open:{task.agent_type}")
         if _parse_iso(task.available_at) > _now():
@@ -699,6 +767,10 @@ class OrchestrationService:
                 "exit_code": exit_code,
                 "retry_allowed": task.status == "retry_waiting",
                 "checkpoint_hint": checkpoint_hint,
+                "next_available_at": task.available_at if task.status == "retry_waiting" else None,
+                "current_attempt": task.current_attempt,
+                "retry_policy": task.retry_policy.model_dump(mode="json"),
+                "lineage": self._task_lineage_context(task, run, attempt),
             },
         )
         run = self._sync_run_status(task.run_id)
@@ -761,6 +833,11 @@ class OrchestrationService:
             level="warning",
             message="Manual retry requested.",
             agent_type=task.agent_type,
+            payload={
+                "current_attempt": task.current_attempt,
+                "available_at": task.available_at,
+                "lineage": self._task_lineage_context(task, run),
+            },
         )
         return task
 
@@ -771,8 +848,13 @@ class OrchestrationService:
             task = self.control_plane.get_task(str(lease["task_id"]))
             attempt = self.control_plane.get_attempt(str(lease["attempt_id"]))
             if task is None or attempt is None:
+                self.control_plane.drop_lease(str(lease["task_id"]))
                 continue
-            if task.status != "running" or attempt.status != "running":
+            if task.status in {"completed", "failed", "cancelled", "dead_lettered"}:
+                self.control_plane.drop_lease(task.id)
+                continue
+            if attempt.status != "running":
+                self.control_plane.drop_lease(task.id)
                 continue
             attempt.status = "failed"
             attempt.finished_at = utc_now_iso()
@@ -794,6 +876,7 @@ class OrchestrationService:
             recovered.append(task)
             self.record_agent_failure(task.agent_type, task.last_error_message)
             run = self._sync_run_status(task.run_id)
+            retry_delay_s = self.compute_retry_delay(task.retry_policy, task.current_attempt) if retry_allowed else None
             self.append_event(
                 run.id,
                 task.id,
@@ -802,7 +885,13 @@ class OrchestrationService:
                 level="warning",
                 message="Recovered stalled task after heartbeat expiry.",
                 agent_type=task.agent_type,
-                payload={"retry_allowed": retry_allowed},
+                payload={
+                    "retry_allowed": retry_allowed,
+                    "lease_owner": attempt.lease_owner,
+                    "expires_at": lease["expires_at"],
+                    "retry_delay_s": retry_delay_s,
+                    "lineage": self._task_lineage_context(task, run, attempt),
+                },
             )
         return recovered
 
@@ -818,10 +907,13 @@ class OrchestrationService:
     def record_agent_failure(self, agent_type: AgentType, message: str) -> CircuitState:
         circuit = self.control_plane.get_circuit(agent_type) or CircuitState(agent_type=agent_type)
         circuit.failure_count += 1
-        if circuit.failure_count >= 3:
+        threshold = self._circuit_failure_threshold(agent_type)
+        cooldown_s = self._circuit_reopen_after_s(agent_type)
+        if circuit.failure_count >= threshold:
+            if circuit.status != "open":
+                circuit.opened_at = utc_now_iso()
             circuit.status = "open"
-            circuit.opened_at = utc_now_iso()
-            circuit.reopen_after = _iso_plus(60)
+            circuit.reopen_after = _iso_plus(cooldown_s)
         circuit.last_error = message
         circuit.updated_at = utc_now_iso()
         return self.control_plane.upsert_circuit(circuit)
@@ -908,6 +1000,11 @@ class OrchestrationService:
         return {
             "run_id": run.id,
             "status": run.status,
+            "lineage": {
+                "legacy_instance_id": run.legacy_instance_id,
+                "root_run_id": run.root_run_id,
+                "parent_run_id": run.parent_run_id,
+            },
             "tasks": len(tasks),
             "task_status_counts": task_status_counts,
             "task_type_counts": task_type_counts,
@@ -918,6 +1015,7 @@ class OrchestrationService:
             "dead_lettered_tasks": task_status_counts.get("dead_lettered", 0),
             "active_leases": len(run_leases),
             "last_event_at": events[-1].created_at if events else None,
+            "last_event_type": events[-1].event_type if events else None,
             "last_heartbeat_at": attempts[-1].heartbeat_at if attempts else None,
             "open_circuits": sorted({task.agent_type for task in tasks if self.is_circuit_open(task.agent_type)}),
         }
@@ -942,7 +1040,9 @@ class OrchestrationService:
         dispatchable_by_agent = dict(Counter(task.agent_type for task in dispatchable_tasks))
         for task in ready_tasks:
             ready_by_resource[task.resource_class] = ready_by_resource.get(task.resource_class, 0) + 1
-        circuits = {circuit.agent_type: circuit.model_dump(mode="json") for circuit in self.control_plane.list_circuits()}
+        circuits = {
+            circuit.agent_type: circuit.model_dump(mode="json") for circuit in self.control_plane.list_circuits()
+        }
         return {
             "runs": len(runs),
             "tasks": len(tasks),
@@ -960,18 +1060,9 @@ class OrchestrationService:
             "retry_waiting_tasks": status_counts.get("retry_waiting", 0),
             "stale_leases": len(self.control_plane.list_stale_leases(stale_before=utc_now_iso())),
             "circuits": circuits,
-            "open_circuits": [
-                circuit.agent_type
-                for circuit in (
-                    self.control_plane.get_circuit("data_processing"),
-                    self.control_plane.get_circuit("training_orchestration"),
-                    self.control_plane.get_circuit("evaluation_benchmarking"),
-                    self.control_plane.get_circuit("monitoring_telemetry"),
-                    self.control_plane.get_circuit("optimization_feedback"),
-                    self.control_plane.get_circuit("deployment"),
-                )
-                if circuit is not None and circuit.status == "open"
-            ],
+            "open_circuits": sorted(
+                agent_type for agent_type, circuit in circuits.items() if circuit["status"] == "open"
+            ),
         }
 
     def projection_for_instance(self, legacy_instance_id: str) -> dict[str, Any]:
@@ -986,6 +1077,7 @@ class OrchestrationService:
             }
         attempts = self.control_plane.list_attempts(task.id)
         last_heartbeat_at = attempts[-1].heartbeat_at if attempts else None
+        latest_attempt = attempts[-1] if attempts else None
         active_agents = [task.agent_type] if task.status == "running" else []
         task_summary = {
             "status": task.status,
@@ -993,6 +1085,12 @@ class OrchestrationService:
             "attempts": len(attempts),
             "resource_class": task.resource_class,
             "current_attempt": task.current_attempt,
+            "parent_task_id": task.parent_task_id,
+            "checkpoint_hint": task.checkpoint_hint,
+            "last_error_code": task.last_error_code,
+            "last_error_message": task.last_error_message,
+            "latest_attempt_status": latest_attempt.status if latest_attempt else None,
+            "lineage": self._task_lineage_context(task, run, latest_attempt),
         }
         return {
             "orchestration_run_id": run.id,

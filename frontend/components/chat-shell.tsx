@@ -19,6 +19,7 @@ import {
   RESEARCH_RESOURCES,
 } from '@/lib/demo-content';
 import { formatCount, formatLatency, formatPercent } from '@/lib/formatting';
+import { formatModelTitle } from '@/lib/model-metadata';
 import {
   DIFFICULTY_OPTIONS,
   OUTPUT_FORMAT_OPTIONS,
@@ -250,8 +251,8 @@ export function ChatShell() {
           description="A polished interface for the same verifier-aware inference system used in offline evaluation. Tune model routing, sampling, and reasoning visibility while inspecting candidates, workspace metadata, and benchmark signals in one place."
           metrics={[
             {
-              label: 'Models',
-              value: formatCount(metadata.models.length || availableModels.length),
+              label: 'Ready models',
+              value: formatCount(metadata.status?.model_inventory?.ready ?? availableModels.length),
             },
             {
               label: 'Benchmarks',
@@ -399,7 +400,7 @@ export function ChatShell() {
                 >
                   {availableModels.map((model) => (
                     <option key={model.name} value={model.name}>
-                      {model.label ?? model.name}
+                      {formatModelTitle(model)}
                     </option>
                   ))}
                 </select>
@@ -419,7 +420,7 @@ export function ChatShell() {
                     .filter((model) => model.name !== activeModelVariant)
                     .map((model) => (
                       <option key={model.name} value={model.name}>
-                        {model.label ?? model.name}
+                        {formatModelTitle(model)}
                       </option>
                     ))}
                 </select>

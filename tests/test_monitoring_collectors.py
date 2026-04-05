@@ -108,3 +108,29 @@ def test_collect_metrics_for_evaluation_instance(tmp_path: Path, monkeypatch: py
     assert refs["summary_json"].endswith("summary.json")
     assert progress is not None
     assert progress.percent == 1.0
+
+
+def test_observability_helpers_build_rollups_and_anomalies(monkeypatch: pytest.MonkeyPatch) -> None:
+    _prime_monitoring_packages(monkeypatch)
+    models = importlib.import_module("ai_factory.core.instances.models")
+    metrics = importlib.import_module("ai_factory.core.monitoring.metrics")
+
+    rollup = metrics.build_utilization_rollup(
+        {
+            "cpu_usage": 0.92,
+            "memory_usage": 0.81,
+            "gpu_usage": [0.76, 0.94],
+        }
+    )
+    assert rollup["metric_count"] == 4
+    assert rollup["peak_pct"] == 94.0
+
+    points = [
+        models.MetricPoint(name="loss", value=1.0, tags={"stage": "train"}),
+        models.MetricPoint(name="loss", value=1.1, tags={"stage": "train"}),
+        models.MetricPoint(name="loss", value=4.0, tags={"stage": "train"}),
+    ]
+    summary = metrics.summarize_metric_series(points, "loss", min_points=3)
+    assert summary["status"] == "anomalous"
+    assert summary["anomaly_count"] == 1
+    assert summary["anomalies"][0]["reasons"]

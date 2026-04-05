@@ -31,8 +31,15 @@ async def test_monitoring_manager_system_health_responds_to_alerts(tmp_path: Pat
     )
     manager = MonitoringManager(config, tmp_path)
 
-    async def _fake_system_metrics():
-        return {"system": {"cpu_usage": 95, "memory_usage": 92}}
+    async def _fake_metrics():
+        return {
+            "system": {"cpu_usage": 95, "memory_usage": 92},
+            "utilization_rollup": {"peak_pct": 95.0, "average_pct": 93.5},
+            "observability": {
+                "anomalies": [{"metric": "cpu_usage", "value": 95.0}],
+                "utilization_rollup": {"peak_pct": 95.0},
+            },
+        }
 
     async def _fake_alerts():
         return [
@@ -45,12 +52,14 @@ async def test_monitoring_manager_system_health_responds_to_alerts(tmp_path: Pat
             )
         ]
 
-    manager.metrics_collector.get_system_metrics = _fake_system_metrics  # type: ignore[assignment]
+    manager.metrics_collector.collect_all_metrics = _fake_metrics  # type: ignore[assignment]
     manager.alert_manager.get_active_alerts = _fake_alerts  # type: ignore[assignment]
 
     health = await manager.get_system_health()
     assert health["status"] == "unhealthy"
     assert health["critical_alerts"] == 1
+    assert health["utilization_rollup"]["peak_pct"] == 95.0
+    assert health["anomaly_summary"]
 
 
 @pytest.mark.asyncio

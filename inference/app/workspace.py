@@ -148,10 +148,7 @@ def _build_readiness_checks(repo_root: Path) -> list[dict[str, Any]]:
             "detail": (
                 "Training and dataset browsing expect valid processed manifest and pack summary outputs."
                 if manifest_status["ok"] and pack_summary_status["ok"]
-                else (
-                    f"manifest: {manifest_status['detail']}; "
-                    f"pack summary: {pack_summary_status['detail']}"
-                )
+                else (f"manifest: {manifest_status['detail']}; pack summary: {pack_summary_status['detail']}")
             ),
         },
         {

@@ -77,3 +77,9 @@ async def test_models_endpoint_still_exposes_legacy_models_key(monkeypatch) -> N
     assert "models" in body
     assert body["object"] == "list"
     assert isinstance(body["data"], list)
+    assert any(
+        model["metadata"]["parameter_size_label"] == "2B"
+        and "2b" in (model["metadata"].get("scale_tags") or [])
+        and model["metadata"]["availability_context"]["state"] == "available"
+        for model in body["data"]
+    )

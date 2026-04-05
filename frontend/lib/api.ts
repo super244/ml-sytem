@@ -451,6 +451,14 @@ export type PromptLibrary = {
   examples: PromptExample[];
 };
 
+export type ModelAvailabilityContext = {
+  state: 'available' | 'missing' | 'degraded' | 'unknown';
+  detail?: string | null;
+  adapter_path?: string | null;
+  adapter_path_exists?: boolean | null;
+  source?: string | null;
+};
+
 export type ModelInfo = {
   name: ModelVariant;
   label?: string;
@@ -459,6 +467,17 @@ export type ModelInfo = {
   adapter_path?: string | null;
   available: boolean;
   tags?: string[];
+  scale_tags?: string[];
+  parameter_size_b?: number | null;
+  parameter_size_label?: string | null;
+  quantization?: '4bit' | '8bit' | '16bit' | 'none' | string | null;
+  tier?: string | null;
+  load_in_4bit?: boolean;
+  load_in_8bit?: boolean;
+  dtype?: string | null;
+  trust_remote_code?: boolean;
+  metadata?: Record<string, unknown>;
+  availability_context?: ModelAvailabilityContext;
 };
 
 export type BenchmarkInfo = {
@@ -490,6 +509,15 @@ export type StatusInfo = {
   status?: 'available' | 'degraded';
   errors?: string[];
   models: ModelInfo[];
+  model_inventory?: {
+    total: number;
+    ready: number;
+    missing: number;
+    quantization_counts?: Record<string, number>;
+    tier_counts?: Record<string, number>;
+    scale_tags?: string[];
+    parameter_sizes_b?: number[];
+  };
   cache: {
     enabled?: boolean;
     entries?: number;

@@ -44,6 +44,7 @@ AI-Factory is a comprehensive platform designed to manage the entire lifecycle o
 - **Distributed Training**: Multi-node scaling with resource management
 - **Experiment Tracking**: Comprehensive run manifests and metadata
 - **Model Comparison**: Side-by-side performance analysis
+- **Scale Ladder**: Canonical scratch templates for `1b`, `2b`, `4b`, `9b`, `12b`, `20b`, `27b`, `30b`, `70b`, and `120b`
 
 ### **🔍 Evaluation & Monitoring**
 - **Benchmark Registry**: Standardized evaluation benchmarks
@@ -120,8 +121,10 @@ cd ..
 
 # Run checks
 ruff check .
-mypy .
+mypy ai_factory/ --no-incremental
 pytest
+cd frontend && npm run lint && npm run typecheck
+cd ..
 
 # Build the frontend
 cd frontend && npm run build
@@ -203,6 +206,7 @@ export CORS_ORIGINS="http://localhost:3000"
 - `configs/eval.yaml` - Evaluation settings
 - `configs/inference.yaml` - Inference server settings
 - `data/configs/processing.yaml` - Data processing pipeline
+- `training/configs/components/models/` - Canonical scratch scale templates
 - `training/configs/profiles/` - Training profiles
 
 ## 🌟 **Community & Support**
