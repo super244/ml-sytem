@@ -15,28 +15,38 @@ def _mean(values: list[float | None]) -> float:
     return mean(filtered) if filtered else 0.0
 
 
+def _metric_entries(results: list[dict[str, Any]], key: str) -> list[dict[str, Any]]:
+    entries: list[dict[str, Any]] = []
+    for result in results:
+        entry = result.get(key)
+        if isinstance(entry, dict):
+            entries.append(entry)
+    return entries
+
+
 def aggregate_metrics(results: list[dict[str, Any]], key: str) -> dict[str, Any]:
-    entries = [result[key] for result in results]
+    entries = _metric_entries(results, key)
     return {
-        "accuracy": sum(1 for item in entries if item["correct"]) / len(entries) if entries else 0.0,
-        "solve_rate": sum(1 for item in entries if item["solve"]) / len(entries) if entries else 0.0,
-        "parse_rate": _mean([item["parse_rate"] for item in entries]),
-        "step_correctness": _mean([item["step_correctness"] for item in entries]),
+        "num_examples": len(entries),
+        "accuracy": sum(1 for item in entries if item.get("correct")) / len(entries) if entries else 0.0,
+        "solve_rate": sum(1 for item in entries if item.get("solve")) / len(entries) if entries else 0.0,
+        "parse_rate": _mean([item.get("parse_rate") for item in entries]),
+        "step_correctness": _mean([item.get("step_correctness") for item in entries]),
         "verifier_agreement_rate": (
-            sum(1 for item in entries if item["verifier_agreement"]) / len(entries) if entries else 0.0
+            sum(1 for item in entries if item.get("verifier_agreement")) / len(entries) if entries else 0.0
         ),
         "formatting_failure_rate": (
-            sum(1 for item in entries if item["formatting_failure"]) / len(entries) if entries else 0.0
+            sum(1 for item in entries if item.get("formatting_failure")) / len(entries) if entries else 0.0
         ),
         "arithmetic_slip_rate": (
-            sum(1 for item in entries if item["arithmetic_slip"]) / len(entries) if entries else 0.0
+            sum(1 for item in entries if item.get("arithmetic_slip")) / len(entries) if entries else 0.0
         ),
-        "no_answer_rate": (sum(1 for item in entries if item["no_answer"]) / len(entries) if entries else 0.0),
-        "avg_latency_s": _mean([item["latency_s"] for item in entries]),
-        "avg_prompt_tokens": _mean([item["prompt_tokens"] for item in entries]),
-        "avg_completion_tokens": _mean([item["completion_tokens"] for item in entries]),
-        "avg_estimated_cost_usd": _mean([item["estimated_cost_usd"] for item in entries]),
-        "avg_candidate_agreement": _mean([item["candidate_agreement"] for item in entries]),
+        "no_answer_rate": (sum(1 for item in entries if item.get("no_answer")) / len(entries) if entries else 0.0),
+        "avg_latency_s": _mean([item.get("latency_s") for item in entries]),
+        "avg_prompt_tokens": _mean([item.get("prompt_tokens") for item in entries]),
+        "avg_completion_tokens": _mean([item.get("completion_tokens") for item in entries]),
+        "avg_estimated_cost_usd": _mean([item.get("estimated_cost_usd") for item in entries]),
+        "avg_candidate_agreement": _mean([item.get("candidate_agreement") for item in entries]),
     }
 
 
@@ -54,7 +64,14 @@ def by_group(results: list[dict[str, Any]], field: str) -> dict[str, Any]:
 
 
 def collect_win_cases(results: list[dict[str, Any]], limit: int = 10) -> list[dict[str, Any]]:
-    win_cases = [result for result in results if result["primary"]["correct"] and not result["secondary"]["correct"]]
+    win_cases = []
+    for result in results:
+        primary = result.get("primary")
+        secondary = result.get("secondary")
+        if not isinstance(primary, dict) or not isinstance(secondary, dict):
+            continue
+        if primary.get("correct") and not secondary.get("correct"):
+            win_cases.append(result)
     return win_cases[:limit]
 
 
@@ -87,6 +104,8 @@ def write_markdown_report(path: Path, summary: dict[str, Any]) -> None:
         "# Evaluation Report",
         "",
         f"- Examples: {summary['num_examples']}",
+        f"- {primary_label} examples scored: {summary['primary']['num_examples']}",
+        f"- {secondary_label} examples scored: {summary['secondary']['num_examples']}",
         f"- {primary_label} accuracy: {summary['primary']['accuracy']:.3f}",
         f"- {secondary_label} accuracy: {summary['secondary']['accuracy']:.3f}",
         f"- Accuracy delta: {summary['delta_accuracy']:+.3f}",
@@ -110,12 +129,12 @@ def write_markdown_report(path: Path, summary: dict[str, Any]) -> None:
         for case in summary["win_cases"]:
             lines.extend(
                 [
-                    f"### {case['id']}",
-                    case["question"],
+                    f"### {case.get('id', 'unknown')}",
+                    str(case.get("question", "")),
                     "",
-                    f"- Reference answer: `{case['reference_answer']}`",
-                    f"- {primary_label}: `{case['primary']['final_answer']}`",
-                    f"- {secondary_label}: `{case['secondary']['final_answer']}`",
+                    f"- Reference answer: `{case.get('reference_answer')}`",
+                    f"- {primary_label}: `{(case.get('primary') or {}).get('final_answer')}`",
+                    f"- {secondary_label}: `{(case.get('secondary') or {}).get('final_answer')}`",
                     "",
                 ]
             )

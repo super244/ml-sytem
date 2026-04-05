@@ -17,11 +17,23 @@ def difficulty_score(level: str | None) -> int:
 
 
 def load_jsonl(path: str) -> list[dict[str, Any]]:
+    path_obj = Path(path).expanduser()
+    if not path_obj.exists():
+        raise FileNotFoundError(f"JSONL dataset not found: {path_obj}")
     records: list[dict[str, Any]] = []
-    for line in Path(path).read_text().splitlines():
+    for line_number, line in enumerate(path_obj.read_text().splitlines(), start=1):
         line = line.strip()
-        if line:
-            records.append(json.loads(line))
+        if not line:
+            continue
+        try:
+            record = json.loads(line)
+        except json.JSONDecodeError as exc:
+            raise ValueError(f"Invalid JSONL record in {path_obj} at line {line_number}: {exc.msg}") from exc
+        if not isinstance(record, dict):
+            raise ValueError(
+                f"Expected object record in {path_obj} at line {line_number}, got {type(record).__name__}."
+            )
+        records.append(record)
     return records
 
 
@@ -52,6 +64,10 @@ def render_chat(tokenizer: Any, messages: list[dict[str, str]], add_generation_p
     return "".join(segments)
 
 
+def render_plain_chat(messages: list[dict[str, str]], add_generation_prompt: bool = False) -> str:
+    return render_chat(tokenizer=None, messages=messages, add_generation_prompt=add_generation_prompt)
+
+
 def compute_sample_weight(record: dict[str, Any], data_config: DataConfig) -> float:
     weight = float(record.get("weight", 1.0) or 1.0)
     weight *= float(data_config.source_weights.get(record.get("source", ""), 1.0))
@@ -71,7 +87,16 @@ def compute_sample_weight(record: dict[str, Any], data_config: DataConfig) -> fl
 
 def build_messages(record: dict[str, Any], data_config: DataConfig) -> list[dict[str, str]]:
     if "messages" in record:
-        return record["messages"]
+        messages = record["messages"]
+        if not isinstance(messages, list):
+            raise ValueError(f"Dataset record messages field must be a list: {record.get('id', '<unknown>')}")
+        return messages
+    question = record.get("question")
+    solution = record.get("solution")
+    if not isinstance(question, str) or not question.strip():
+        raise ValueError(f"Dataset record is missing a non-empty question field: {record.get('id', '<unknown>')}")
+    if not isinstance(solution, str) or not solution.strip():
+        raise ValueError(f"Dataset record is missing a non-empty solution field: {record.get('id', '<unknown>')}")
     topic_line = f"Topic: {record.get('topic', 'general')}.\n" if data_config.include_topic_prefix else ""
     difficulty_line = f"Difficulty: {record.get('difficulty', 'hard')}.\n"
     source_line = f"Source style: {record.get('source', 'unknown')}.\n" if data_config.include_source_tag else ""
@@ -89,16 +114,68 @@ def build_messages(record: dict[str, Any], data_config: DataConfig) -> list[dict
         "Solve the following math problem. Show the reasoning step by step and end with "
         "`Final Answer: ...`.\n"
         f"{topic_line}{source_line}{difficulty_line}{failure_line}{verification_line}\n"
-        f"Problem:\n{record['question']}"
+        f"Problem:\n{question}"
     )
     return [
         {"role": "system", "content": data_config.system_prompt},
         {"role": "user", "content": user_prompt},
-        {"role": "assistant", "content": record["solution"]},
+        {"role": "assistant", "content": solution},
     ]
 
 
+def build_pretraining_text(record: dict[str, Any], data_config: DataConfig) -> str:
+    raw_text = record.get("text")
+    if isinstance(raw_text, str) and raw_text.strip():
+        return raw_text.strip()
+    question = record.get("question")
+    solution = record.get("solution")
+    if not isinstance(question, str) or not question.strip():
+        raise ValueError(f"Dataset record is missing a non-empty question field: {record.get('id', '<unknown>')}")
+    if not isinstance(solution, str) or not solution.strip():
+        raise ValueError(f"Dataset record is missing a non-empty solution field: {record.get('id', '<unknown>')}")
+
+    prefix_lines: list[str] = []
+    if data_config.include_topic_prefix and record.get("topic"):
+        prefix_lines.append(f"Topic: {record['topic']}")
+    if data_config.include_source_tag and record.get("source"):
+        prefix_lines.append(f"Source: {record['source']}")
+    if record.get("difficulty"):
+        prefix_lines.append(f"Difficulty: {record['difficulty']}")
+
+    sections = []
+    if prefix_lines:
+        sections.append("\n".join(prefix_lines))
+    sections.append(f"Problem:\n{question.strip()}")
+    sections.append(f"Solution:\n{solution.strip()}")
+    final_answer = record.get("final_answer")
+    if isinstance(final_answer, str) and final_answer.strip():
+        sections.append(f"Final Answer:\n{final_answer.strip()}")
+    return "\n\n".join(sections)
+
+
+def build_training_text(record: dict[str, Any], data_config: DataConfig) -> str:
+    if data_config.format == "pretraining_text":
+        return build_pretraining_text(record, data_config)
+    return render_plain_chat(build_messages(record, data_config), add_generation_prompt=False)
+
+
 def tokenize_example(record: dict[str, Any], tokenizer: Any, data_config: DataConfig) -> dict[str, Any]:
+    if data_config.format == "pretraining_text":
+        text = build_pretraining_text(record, data_config)
+        encoded = tokenizer(
+            text,
+            max_length=data_config.max_length,
+            truncation=True,
+            add_special_tokens=True,
+        )
+        input_ids = encoded["input_ids"]
+        return {
+            "input_ids": input_ids,
+            "attention_mask": encoded["attention_mask"],
+            "labels": list(input_ids),
+            "sample_weight": compute_sample_weight(record, data_config),
+        }
+
     messages = build_messages(record, data_config)
     prompt_messages = messages[:-1]
     full_text = render_chat(tokenizer, messages, add_generation_prompt=False)

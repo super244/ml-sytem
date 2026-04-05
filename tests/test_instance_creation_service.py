@@ -116,3 +116,28 @@ def test_instance_service_rejects_config_paths_outside_repo(tmp_path: Path) -> N
         service._ensure_config_path(str(outside))
 
     assert exc.value.status_code == 403
+
+
+def test_instance_service_rejects_config_directories(tmp_path: Path) -> None:
+    settings = AppSettings(
+        title="test",
+        version="0.0.0",
+        repo_root=str(tmp_path),
+        cors_origins=["*"],
+        model_registry_path=str(tmp_path / "inference" / "configs" / "model_registry.yaml"),
+        prompt_library_path=str(tmp_path / "inference" / "configs" / "prompt_presets.yaml"),
+        benchmark_registry_path=str(tmp_path / "evaluation" / "benchmarks" / "registry.yaml"),
+        artifacts_dir=str(tmp_path / "artifacts"),
+        cache_dir=str(tmp_path / "artifacts" / "cache"),
+        telemetry_path=str(tmp_path / "artifacts" / "telemetry.jsonl"),
+        cache_enabled=False,
+        telemetry_enabled=False,
+    )
+    service = InstanceService(settings)
+    config_dir = tmp_path / "configs"
+    config_dir.mkdir()
+
+    with pytest.raises(HTTPException) as exc:
+        service._ensure_config_path(str(config_dir))
+
+    assert exc.value.status_code == 400

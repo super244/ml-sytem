@@ -16,8 +16,11 @@ class ConfigValidationError(ValueError):
 class ModelConfig(BaseModel):
     model_config = ConfigDict(strict=True)
     name: str = "qwen25_math_1p5b"
+    initialization: str = "pretrained"
+    model_type: str | None = None
     base_model_name: str = "Qwen/Qwen2.5-Math-1.5B-Instruct"
     tokenizer_name: str | None = None
+    tokenizer_path: str | None = None
     trust_remote_code: bool = True
     use_4bit: bool = True
     use_8bit: bool = False
@@ -28,6 +31,7 @@ class ModelConfig(BaseModel):
     gradient_checkpointing: bool = True
     use_flash_attention: bool = True
     device_map: str = "auto"
+    architecture: dict[str, Any] = Field(default_factory=dict)
     input_cost_per_million: float | None = None
     output_cost_per_million: float | None = None
 
@@ -39,6 +43,7 @@ class DataConfig(BaseModel):
     test_file: str | None = "data/processed/test.jsonl"
     pack_manifest: str | None = "data/processed/manifest.json"
     max_length: int = 2048
+    format: str = "chat_sft"
     curriculum_learning: bool = False
     sequential_curriculum: bool = False
     curriculum_phases: list[str] = Field(default_factory=lambda: ["easy", "medium", "hard", "olympiad"])
@@ -196,6 +201,8 @@ SUPPORTED_ADAPTER_METHODS = {"qlora", "lora", "full", "sft"}
 SUPPORTED_DTYPE_NAMES = {"bf16", "bfloat16", "fp16", "float16", "fp32", "float32"}
 SUPPORTED_TRACKING_PROVIDERS = {"none", "jsonl", "mlflow", "wandb"}
 SUPPORTED_STRATEGIES = {"no", "steps", "epoch"}
+SUPPORTED_MODEL_INITIALIZATIONS = {"pretrained", "scratch"}
+SUPPORTED_DATA_FORMATS = {"chat_sft", "pretraining_text"}
 
 
 def _deep_merge(left: dict[str, Any], right: dict[str, Any]) -> dict[str, Any]:
@@ -381,10 +388,16 @@ def validate_experiment_config(config: ExperimentConfig) -> list[str]:
         errors,
     )
     _require(
+        config.model.initialization.lower() in SUPPORTED_MODEL_INITIALIZATIONS,
+        f"model.initialization must be one of {sorted(SUPPORTED_MODEL_INITIALIZATIONS)}.",
+        errors,
+    )
+    _require(
         config.model.bnb_compute_dtype.lower() in SUPPORTED_DTYPE_NAMES,
         "model.bnb_compute_dtype must be one of bf16, fp16, or fp32.",
         errors,
     )
+    _require(config.data.format in SUPPORTED_DATA_FORMATS, f"data.format must be one of {sorted(SUPPORTED_DATA_FORMATS)}.", errors)
     _require(
         config.adapter.method.lower() in SUPPORTED_ADAPTER_METHODS,
         f"adapter.method must be one of {sorted(SUPPORTED_ADAPTER_METHODS)}.",
@@ -429,6 +442,30 @@ def validate_experiment_config(config: ExperimentConfig) -> list[str]:
         "data.sequential_curriculum requires data.curriculum_learning.",
         errors,
     )
+    if config.model.initialization.lower() == "pretrained":
+        _require(bool(config.model.base_model_name.strip()), "model.base_model_name must be non-empty.", errors)
+    if config.model.initialization.lower() == "scratch":
+        _require(bool(config.model.model_type), "scratch initialization requires model.model_type.", errors)
+        _require(bool(config.model.architecture), "scratch initialization requires model.architecture.", errors)
+        _require(
+            config.adapter.method.lower() in {"full", "sft"},
+            "scratch initialization currently supports adapter.method=full or sft only.",
+            errors,
+        )
+        _require(
+            not config.model.use_4bit and not config.model.use_8bit,
+            "scratch initialization cannot be combined with 4-bit or 8-bit loading.",
+            errors,
+        )
+    if config.model.tokenizer_path:
+        tokenizer_path_exists = _path_exists(config.model.tokenizer_path, config.config_path)
+        if not tokenizer_path_exists and not config.model.tokenizer_name:
+            errors.append(f"tokenizer path not found: {config.model.tokenizer_path}")
+        if not tokenizer_path_exists and config.model.tokenizer_name:
+            warnings.append(
+                f"Tokenizer path {config.model.tokenizer_path} does not exist yet; "
+                f"falling back to tokenizer_name={config.model.tokenizer_name}."
+            )
     _require(
         _path_exists(config.data.train_file, config.config_path),
         f"training data file not found: {config.data.train_file}",
@@ -504,10 +541,14 @@ def describe_experiment_config(config: ExperimentConfig, *, warnings: list[str] 
         },
         "model": {
             "name": config.model.name,
+            "initialization": config.model.initialization,
+            "model_type": config.model.model_type,
             "base_model_name": config.model.base_model_name,
             "tokenizer_name": config.model.tokenizer_name,
+            "tokenizer_path": config.model.tokenizer_path,
             "mode": model_mode,
             "adapter_method": config.adapter.method,
+            "architecture": dict(config.model.architecture),
         },
         "data": {
             "train_file": config.data.train_file,
@@ -515,6 +556,7 @@ def describe_experiment_config(config: ExperimentConfig, *, warnings: list[str] 
             "test_file": config.data.test_file,
             "pack_manifest": config.data.pack_manifest,
             "max_length": config.data.max_length,
+            "format": config.data.format,
             "curriculum_learning": config.data.curriculum_learning,
             "sequential_curriculum": config.data.sequential_curriculum,
         },
