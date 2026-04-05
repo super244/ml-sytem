@@ -9,7 +9,10 @@ require_final_answer: false
 sources:
   - data/examples/math_reasoning_examples.jsonl
   - data/custom/*.jsonl
-  - data/public/normalized/*.jsonl
+  - id: public_normalized
+    kind: local
+    path: data/public/normalized/*.jsonl
+    optional: true
 failure_logs: []
 topic_allowlist: []
 source_allowlist: []

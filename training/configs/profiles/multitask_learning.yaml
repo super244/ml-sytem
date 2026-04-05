@@ -3,8 +3,8 @@ run_name: atlas_multitask_learning
 seed: 42
 refs:
   model: ../components/models/qwen25_math_1p5b.yaml
-  adapter: ../components/adapters/multitask.yaml
-  data: ../components/data/multitask_mix.yaml
+  adapter: ../components/adapters/qlora_math.yaml
+  data: ../components/data/baseline.yaml
   runtime: ../components/runtime/hybrid_local.yaml
   logging: ../components/logging/default.yaml
   tracking: ../components/tracking/default.yaml

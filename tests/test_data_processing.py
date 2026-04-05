@@ -184,6 +184,30 @@ def test_optional_source_load_failure_is_skipped(monkeypatch) -> None:
     assert warnings and "Skipped optional source" in warnings[0]
 
 
+def test_load_source_records_warns_on_empty_required_source(monkeypatch) -> None:
+    monkeypatch.setattr(corpus_builder, "load_source_rows", lambda spec: [])
+    loaded, summaries, warnings = load_source_records(
+        [corpus_builder.SourceSpec(id="empty-local", kind="local", path="data/public/normalized/*.jsonl")],
+        seed=1,
+    )
+
+    assert loaded == []
+    assert summaries[0]["rows_loaded"] == 0
+    assert warnings == ["Source 'empty-local' loaded 0 rows from data/public/normalized/*.jsonl."]
+
+
+def test_load_source_records_warns_on_empty_optional_source(monkeypatch) -> None:
+    monkeypatch.setattr(corpus_builder, "load_source_rows", lambda spec: [])
+    loaded, summaries, warnings = load_source_records(
+        [corpus_builder.SourceSpec(id="optional-empty", kind="local", path="data/public/normalized/*.jsonl", optional=True)],
+        seed=1,
+    )
+
+    assert loaded == []
+    assert summaries[0]["optional"] is True
+    assert warnings == ["Optional source 'optional-empty' loaded 0 rows from data/public/normalized/*.jsonl."]
+
+
 def test_preview_rows_includes_tokenization_preview() -> None:
     class FakeTokenizer:
         def tokenize(self, text: str):

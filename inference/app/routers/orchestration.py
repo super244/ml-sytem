@@ -1,7 +1,8 @@
 from __future__ import annotations
 
 from typing import Any
-from fastapi import APIRouter, HTTPException, Query, Depends
+
+from fastapi import APIRouter, Depends, HTTPException, Query
 
 from inference.app.dependencies import get_instance_service
 from inference.app.schemas import (

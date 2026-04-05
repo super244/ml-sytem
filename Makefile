@@ -136,13 +136,13 @@ docker-down:
 
 # Legacy Aliases (for backward compatibility)
 refresh-lab:
-	$(PYTHON) scripts/refresh_lab.py
+	$(PYTHON) -m ai_factory.cli refresh-lab
 
 latest-run:
-	$(PYTHON) scripts/latest_run.py
+	$(PYTHON) -m ai_factory.cli latest-run
 
 api-smoke:
-	$(PYTHON) scripts/api_smoke.py
+	$(PYTHON) -m ai_factory.cli api-smoke
 
 titan-status:
 	$(PYTHON) -m ai_factory.cli titan status

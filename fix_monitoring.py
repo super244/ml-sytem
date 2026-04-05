@@ -1,4 +1,4 @@
-with open("frontend/app/dashboard/monitoring/page.tsx", "r") as f:
+with open("frontend/app/dashboard/monitoring/page.tsx") as f:
     c = f.read()
 
 c = c.replace("const lines = logText\n    ? logText\n        .split('\\n')\n        .filter((line) => line.trim())\n        .slice(-200)\n    : ['No log output yet — instance is initializing…'];", "const lines = useMemo(() => logText\n    ? logText\n        .split('\\n')\n        .filter((line) => line.trim())\n        .slice(-200)\n    : ['No log output yet — instance is initializing…'], [logText]);")
