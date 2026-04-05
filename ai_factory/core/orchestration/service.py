@@ -4,6 +4,7 @@ import asyncio
 import hashlib
 import secrets
 import uuid
+from collections import Counter
 from datetime import datetime, timedelta, timezone
 from typing import TYPE_CHECKING, Any, Literal, cast
 
@@ -23,6 +24,7 @@ from ai_factory.core.orchestration.models import (
     TaskAttempt,
     TaskDependency,
     TaskInputEnvelope,
+    TaskLease,
     TaskOutputEnvelope,
     TaskType,
     utc_now_iso,
@@ -36,6 +38,10 @@ def _now() -> datetime:
 
 def _iso_plus(seconds: float) -> str:
     return (_now() + timedelta(seconds=seconds)).isoformat()
+
+
+def _parse_iso(value: str) -> datetime:
+    return datetime.fromisoformat(value.replace("Z", "+00:00"))
 
 
 def _stable_hash(parts: list[str]) -> str:
@@ -178,6 +184,14 @@ class OrchestrationService:
                 agent_type=primary_task.agent_type,
                 payload={"depends_on": preprocess_task.id},
             )
+        deploy_task = created_by_workload.get("publish")
+        evaluation_task = created_by_workload.get("evaluation")
+        if deploy_task is not None and evaluation_task is not None:
+            self.control_plane.create_dependency(
+                TaskDependency(task_id=deploy_task.id, depends_on_task_id=evaluation_task.id)
+            )
+            deploy_task.updated_at = utc_now_iso()
+            self.control_plane.upsert_task(deploy_task)
 
     def ensure_run_for_instance(
         self,
@@ -313,11 +327,21 @@ class OrchestrationService:
         )
         return task
 
-    def ready_tasks(self, run_id: str | None = None) -> list[OrchestrationTask]:
+    def _resolve_task(self, target: str) -> OrchestrationTask | None:
+        return self.control_plane.get_task(target) or self.control_plane.get_task_by_legacy_instance(target)
+
+    def _candidate_ready_tasks(
+        self,
+        run_id: str | None = None,
+        *,
+        legacy_only: bool = False,
+    ) -> list[OrchestrationTask]:
         tasks = self.control_plane.list_tasks(run_id=run_id)
         completed = {task.id for task in tasks if task.status == "completed"}
         ready: list[OrchestrationTask] = []
         for task in tasks:
+            if legacy_only and task.legacy_instance_id is None:
+                continue
             if task.status not in {"ready", "queued", "retry_waiting", "blocked"}:
                 continue
             dependencies = self.control_plane.list_dependencies(task.id)
@@ -325,7 +349,7 @@ class OrchestrationService:
                 continue
             if self.is_circuit_open(task.agent_type):
                 continue
-            if datetime.fromisoformat(task.available_at.replace("Z", "+00:00")) > _now():
+            if _parse_iso(task.available_at) > _now():
                 continue
             if task.status != "ready":
                 task.status = "ready"
@@ -334,6 +358,127 @@ class OrchestrationService:
             ready.append(task)
         ready.sort(key=lambda item: (item.priority, item.available_at, item.created_at))
         return ready
+
+    def _dispatchable_ready_tasks(
+        self,
+        *,
+        run_id: str | None = None,
+        limit: int | None = None,
+        legacy_only: bool = False,
+    ) -> list[OrchestrationTask]:
+        ready = self._candidate_ready_tasks(run_id=run_id, legacy_only=legacy_only)
+        running_tasks = self.control_plane.list_tasks(status="running")
+        remaining_global_slots = max(self.settings.worker_concurrency - len(running_tasks), 0)
+        running_by_agent = Counter(task.agent_type for task in running_tasks)
+        dispatchable: list[OrchestrationTask] = []
+
+        for task in ready:
+            descriptor = self.registry.get(task.agent_type)
+            if running_by_agent[task.agent_type] >= descriptor.max_concurrency:
+                continue
+            if remaining_global_slots <= 0:
+                break
+            dispatchable.append(task)
+            running_by_agent[task.agent_type] += 1
+            remaining_global_slots -= 1
+            if limit is not None and len(dispatchable) >= limit:
+                break
+        return dispatchable
+
+    def _task_counts_toward_run(self, task: OrchestrationTask) -> bool:
+        if task.legacy_instance_id is not None:
+            return True
+        if task.current_attempt > 0:
+            return True
+        return task.status not in {"queued", "ready", "blocked"}
+
+    def _sync_run_status(self, run_id: str) -> OrchestrationRun:
+        run = self.control_plane.get_run(run_id)
+        if run is None:
+            raise FileNotFoundError(f"Unknown orchestration run: {run_id}")
+
+        tasks = self.control_plane.list_tasks(run_id=run_id)
+        relevant_tasks = [task for task in tasks if self._task_counts_toward_run(task)] or tasks
+
+        if not relevant_tasks:
+            run.status = "queued"
+        elif all(task.status == "cancelled" for task in relevant_tasks):
+            run.status = "cancelled"
+        elif any(task.status in {"failed", "dead_lettered"} for task in relevant_tasks):
+            run.status = "failed"
+        elif any(task.status in {"running", "retry_waiting"} for task in relevant_tasks):
+            run.status = "running"
+        elif all(task.status == "completed" for task in relevant_tasks):
+            run.status = "completed"
+        elif any(task.status in {"ready", "blocked", "queued"} for task in relevant_tasks):
+            run.status = "queued"
+        run.updated_at = utc_now_iso()
+        self.control_plane.upsert_run(run)
+        return run
+
+    def _require_active_attempt(self, task: OrchestrationTask, attempt: TaskAttempt) -> TaskLease:
+        if attempt.task_id != task.id:
+            raise ValueError(f"Attempt {attempt.id} does not belong to task {task.id}")
+        if task.status != "running":
+            raise ValueError(f"Task {task.id} is not running")
+        if task.current_attempt != attempt.sequence:
+            raise ValueError(f"Attempt {attempt.id} is no longer active for task {task.id}")
+        lease = self.control_plane.get_lease(task.id)
+        if lease is None:
+            raise ValueError(f"Task {task.id} does not have an active lease")
+        if lease.attempt_id != attempt.id:
+            raise ValueError(f"Lease for task {task.id} belongs to a different attempt")
+        return lease
+
+    def task_readiness(self, task_id: str) -> dict[str, Any]:
+        task = self.control_plane.get_task(task_id)
+        if task is None:
+            raise FileNotFoundError(f"Unknown orchestration task: {task_id}")
+
+        blockers: list[str] = []
+        dependency_ids: list[str] = []
+        for dependency in self.control_plane.list_dependencies(task.id):
+            dependency_task = self.control_plane.get_task(dependency.depends_on_task_id)
+            if dependency_task is None or dependency_task.status != "completed":
+                dependency_ids.append(dependency.depends_on_task_id)
+
+        if dependency_ids:
+            blockers.append("waiting_on_dependencies")
+        if task.status not in {"queued", "ready", "retry_waiting", "blocked"}:
+            blockers.append(f"status:{task.status}")
+        if self.is_circuit_open(task.agent_type):
+            blockers.append(f"circuit_open:{task.agent_type}")
+        if _parse_iso(task.available_at) > _now():
+            blockers.append("waiting_for_backoff")
+
+        return {
+            "task_id": task.id,
+            "ready": len(blockers) == 0,
+            "blockers": blockers,
+            "dependency_ids": dependency_ids,
+            "available_at": task.available_at,
+        }
+
+    def describe_task(self, task_id: str) -> dict[str, Any]:
+        task = self.control_plane.get_task(task_id)
+        if task is None:
+            raise FileNotFoundError(f"Unknown orchestration task: {task_id}")
+        dependencies = self.control_plane.list_dependencies(task.id)
+        dependents = [item for item in self.control_plane.list_dependencies() if item.depends_on_task_id == task.id]
+        lease = self.control_plane.get_lease(task.id)
+        run = self.control_plane.get_run(task.run_id)
+        return {
+            "task": task.model_dump(mode="json"),
+            "run": run.model_dump(mode="json") if run else None,
+            "attempts": [item.model_dump(mode="json") for item in self.control_plane.list_attempts(task.id)],
+            "dependencies": [item.model_dump(mode="json") for item in dependencies],
+            "dependents": [item.model_dump(mode="json") for item in dependents],
+            "lease": lease.model_dump(mode="json") if lease else None,
+            "readiness": self.task_readiness(task.id),
+        }
+
+    def ready_tasks(self, run_id: str | None = None) -> list[OrchestrationTask]:
+        return self._candidate_ready_tasks(run_id=run_id)
 
     def begin_attempt(
         self,
@@ -344,16 +489,40 @@ class OrchestrationService:
         lease_owner: str = "local-runner",
         metadata: dict[str, Any] | None = None,
     ) -> tuple[OrchestrationRun, OrchestrationTask, TaskAttempt]:
-        run = self.control_plane.get_run_by_legacy_instance(legacy_instance_id)
         task = self.control_plane.get_task_by_legacy_instance(legacy_instance_id)
-        if run is None or task is None:
+        if task is None:
             raise FileNotFoundError(f"No orchestration task found for {legacy_instance_id}")
+        return self.begin_task_attempt(
+            task_id=task.id,
+            stdout_path=stdout_path,
+            stderr_path=stderr_path,
+            lease_owner=lease_owner,
+            metadata=metadata,
+        )
+
+    def begin_task_attempt(
+        self,
+        *,
+        task_id: str,
+        stdout_path: str | None = None,
+        stderr_path: str | None = None,
+        lease_owner: str = "local-runner",
+        metadata: dict[str, Any] | None = None,
+    ) -> tuple[OrchestrationRun, OrchestrationTask, TaskAttempt]:
+        task = self.control_plane.get_task(task_id)
+        if task is None:
+            raise FileNotFoundError(f"Unknown orchestration task: {task_id}")
+        readiness = self.task_readiness(task.id)
+        if not readiness["ready"]:
+            blocker_text = ", ".join(str(item) for item in readiness["blockers"])
+            raise ValueError(f"Task {task.id} is not ready to start: {blocker_text}")
+        run = self.control_plane.get_run(task.run_id)
+        if run is None:
+            raise FileNotFoundError(f"Unknown orchestration run: {task.run_id}")
         task.current_attempt += 1
         task.status = "running"
         task.started_at = task.started_at or utc_now_iso()
         task.updated_at = utc_now_iso()
-        run.status = "running"
-        run.updated_at = utc_now_iso()
         attempt = TaskAttempt(
             id=self._attempt_id(),
             task_id=task.id,
@@ -364,7 +533,6 @@ class OrchestrationService:
             stderr_path=stderr_path,
             metadata=metadata or {},
         )
-        self.control_plane.upsert_run(run)
         self.control_plane.upsert_task(task)
         self.control_plane.upsert_attempt(attempt)
         self.control_plane.write_lease(
@@ -384,12 +552,17 @@ class OrchestrationService:
             agent_type=task.agent_type,
             payload={"attempt": attempt.sequence, "lease_owner": lease_owner},
         )
+        run = self._sync_run_status(task.run_id)
         return run, task, attempt
 
     def heartbeat(self, attempt_id: str) -> TaskAttempt:
         attempt = self.control_plane.get_attempt(attempt_id)
         if attempt is None:
             raise FileNotFoundError(f"Unknown attempt: {attempt_id}")
+        task = self.control_plane.get_task(attempt.task_id)
+        if task is None:
+            raise FileNotFoundError(f"Unknown orchestration task: {attempt.task_id}")
+        self._require_active_attempt(task, attempt)
         attempt.heartbeat_at = utc_now_iso()
         self.control_plane.upsert_attempt(attempt)
         self.control_plane.write_lease(
@@ -429,11 +602,49 @@ class OrchestrationService:
         error_code: str | None = None,
         error_message: str | None = None,
     ) -> tuple[OrchestrationRun, OrchestrationTask, TaskAttempt]:
-        run = self.control_plane.get_run_by_legacy_instance(legacy_instance_id)
         task = self.control_plane.get_task_by_legacy_instance(legacy_instance_id)
-        attempt = self.control_plane.get_attempt(attempt_id)
-        if run is None or task is None or attempt is None:
+        if task is None:
             raise FileNotFoundError(f"Unknown orchestration state for {legacy_instance_id}")
+        return self.finalize_task_attempt(
+            task_id=task.id,
+            attempt_id=attempt_id,
+            exit_code=exit_code,
+            summary=summary,
+            metrics=metrics,
+            artifacts=artifacts,
+            recommendations=recommendations,
+            checkpoint_hint=checkpoint_hint,
+            error_code=error_code,
+            error_message=error_message,
+        )
+
+    def finalize_task_attempt(
+        self,
+        *,
+        task_id: str,
+        attempt_id: str,
+        exit_code: int,
+        summary: dict[str, Any] | None = None,
+        metrics: dict[str, Any] | None = None,
+        artifacts: dict[str, Any] | None = None,
+        recommendations: list[dict[str, Any]] | None = None,
+        checkpoint_hint: str | None = None,
+        error_code: str | None = None,
+        error_message: str | None = None,
+    ) -> tuple[OrchestrationRun, OrchestrationTask, TaskAttempt]:
+        task = self.control_plane.get_task(task_id)
+        attempt = self.control_plane.get_attempt(attempt_id)
+        if task is None or attempt is None:
+            raise FileNotFoundError(f"Unknown orchestration task or attempt: {task_id}")
+        run = self.control_plane.get_run(task.run_id)
+        if run is None:
+            raise FileNotFoundError(f"Unknown orchestration run: {task.run_id}")
+        if attempt.finished_at is not None:
+            if task.current_attempt != attempt.sequence:
+                raise ValueError(f"Attempt {attempt_id} is no longer active for task {task_id}")
+            return run, task, attempt
+
+        self._require_active_attempt(task, attempt)
 
         attempt.status = "completed" if exit_code == 0 else "failed"
         attempt.finished_at = utc_now_iso()
@@ -460,7 +671,6 @@ class OrchestrationService:
             task.finished_at = task.updated_at
             task.last_error_code = None
             task.last_error_message = None
-            run.status = "completed"
             self.record_agent_success(task.agent_type)
         else:
             task.last_error_code = error_code or "execution_failed"
@@ -470,15 +680,11 @@ class OrchestrationService:
                 delay_s = self.compute_retry_delay(task.retry_policy, task.current_attempt)
                 task.status = "retry_waiting"
                 task.available_at = _iso_plus(delay_s)
-                run.status = "running"
             else:
                 task.status = "dead_lettered"
                 task.finished_at = task.updated_at
-                run.status = "failed"
             self.record_agent_failure(task.agent_type, task.last_error_message)
-        run.updated_at = utc_now_iso()
         self.control_plane.upsert_task(task)
-        self.control_plane.upsert_run(run)
         self.append_event(
             run.id,
             task.id,
@@ -495,6 +701,7 @@ class OrchestrationService:
                 "checkpoint_hint": checkpoint_hint,
             },
         )
+        run = self._sync_run_status(task.run_id)
         return run, task, attempt
 
     def cancel_run(self, legacy_or_run_id: str) -> OrchestrationRun:
@@ -509,6 +716,15 @@ class OrchestrationService:
         for task in self.control_plane.list_tasks(run_id=run.id):
             if task.status in {"completed", "failed", "dead_lettered"}:
                 continue
+            active_attempt = self.control_plane.get_active_attempt_for_task(task.id)
+            if active_attempt is not None:
+                active_attempt.status = "cancelled"
+                active_attempt.finished_at = utc_now_iso()
+                active_attempt.heartbeat_at = active_attempt.finished_at
+                active_attempt.error_code = "cancelled"
+                active_attempt.error_message = "Run cancelled."
+                self.control_plane.upsert_attempt(active_attempt)
+            self.control_plane.drop_lease(task.id)
             task.status = "cancelled"
             task.finished_at = utc_now_iso()
             task.updated_at = task.finished_at
@@ -521,22 +737,22 @@ class OrchestrationService:
             level="warning",
             message="Cancelled orchestration run.",
         )
-        return run
+        return self._sync_run_status(run.id)
 
-    def retry_task(self, legacy_instance_id: str) -> OrchestrationTask:
-        run = self.control_plane.get_run_by_legacy_instance(legacy_instance_id)
-        task = self.control_plane.get_task_by_legacy_instance(legacy_instance_id)
-        if run is None or task is None:
-            raise FileNotFoundError(f"Unknown orchestration task for {legacy_instance_id}")
+    def retry_task(self, task_or_legacy_id: str) -> OrchestrationTask:
+        task = self._resolve_task(task_or_legacy_id)
+        if task is None:
+            raise FileNotFoundError(f"Unknown orchestration task for {task_or_legacy_id}")
+        if task.status == "running":
+            raise ValueError(f"Cannot retry running task: {task.id}")
         task.status = "ready"
         task.available_at = utc_now_iso()
+        task.finished_at = None
         task.updated_at = utc_now_iso()
         task.last_error_code = None
         task.last_error_message = None
-        run.status = "queued"
-        run.updated_at = utc_now_iso()
         self.control_plane.upsert_task(task)
-        self.control_plane.upsert_run(run)
+        run = self._sync_run_status(task.run_id)
         self.append_event(
             run.id,
             task.id,
@@ -556,6 +772,8 @@ class OrchestrationService:
             attempt = self.control_plane.get_attempt(str(lease["attempt_id"]))
             if task is None or attempt is None:
                 continue
+            if task.status != "running" or attempt.status != "running":
+                continue
             attempt.status = "failed"
             attempt.finished_at = utc_now_iso()
             attempt.error_code = "lease_expired"
@@ -574,21 +792,18 @@ class OrchestrationService:
             task.updated_at = utc_now_iso()
             self.control_plane.upsert_task(task)
             recovered.append(task)
-            run = self.control_plane.get_run(task.run_id)
-            if run is not None:
-                run.status = "running" if retry_allowed else "failed"
-                run.updated_at = utc_now_iso()
-                self.control_plane.upsert_run(run)
-                self.append_event(
-                    run.id,
-                    task.id,
-                    attempt.id,
-                    event_type="task.recovered",
-                    level="warning",
-                    message="Recovered stalled task after heartbeat expiry.",
-                    agent_type=task.agent_type,
-                    payload={"retry_allowed": retry_allowed},
-                )
+            self.record_agent_failure(task.agent_type, task.last_error_message)
+            run = self._sync_run_status(task.run_id)
+            self.append_event(
+                run.id,
+                task.id,
+                attempt.id,
+                event_type="task.recovered",
+                level="warning",
+                message="Recovered stalled task after heartbeat expiry.",
+                agent_type=task.agent_type,
+                payload={"retry_allowed": retry_allowed},
+            )
         return recovered
 
     def compute_retry_delay(self, policy: RetryPolicy, current_attempt: int) -> int:
@@ -598,7 +813,7 @@ class OrchestrationService:
         if policy.jitter_s > 0:
             jitter_ms = max(int(policy.jitter_s * 1000), 0)
             jitter = (secrets.randbelow(jitter_ms + 1) / 1000.0) if jitter_ms > 0 else 0.0
-        return max(int(round(bounded + jitter)), 0)
+        return max(min(int(round(bounded + jitter)), policy.max_delay_s), 0)
 
     def record_agent_failure(self, agent_type: AgentType, message: str) -> CircuitState:
         circuit = self.control_plane.get_circuit(agent_type) or CircuitState(agent_type=agent_type)
@@ -672,6 +887,41 @@ class OrchestrationService:
             return []
         return self.control_plane.list_events(run_id=run.id, limit=limit)
 
+    def summarize_run(self, legacy_or_run_id: str) -> dict[str, Any]:
+        run = self.control_plane.get_run(legacy_or_run_id) or self.control_plane.get_run_by_legacy_instance(
+            legacy_or_run_id
+        )
+        if run is None:
+            raise FileNotFoundError(f"Unknown orchestration run: {legacy_or_run_id}")
+        tasks = self.control_plane.list_tasks(run_id=run.id)
+        task_status_counts = dict(Counter(task.status for task in tasks))
+        task_type_counts = dict(Counter(task.task_type for task in tasks))
+        ready_tasks = self.ready_tasks(run.id)
+        dispatchable_tasks = self._dispatchable_ready_tasks(run_id=run.id)
+        run_leases = [
+            lease
+            for lease in self.control_plane.list_leases()
+            if (task := self.control_plane.get_task(lease.task_id)) is not None and task.run_id == run.id
+        ]
+        attempts = [attempt for task in tasks for attempt in self.control_plane.list_attempts(task.id)]
+        events = self.control_plane.list_events(run_id=run.id)
+        return {
+            "run_id": run.id,
+            "status": run.status,
+            "tasks": len(tasks),
+            "task_status_counts": task_status_counts,
+            "task_type_counts": task_type_counts,
+            "ready_tasks": len(ready_tasks),
+            "dispatchable_tasks": len(dispatchable_tasks),
+            "blocked_tasks": task_status_counts.get("blocked", 0),
+            "retry_waiting_tasks": task_status_counts.get("retry_waiting", 0),
+            "dead_lettered_tasks": task_status_counts.get("dead_lettered", 0),
+            "active_leases": len(run_leases),
+            "last_event_at": events[-1].created_at if events else None,
+            "last_heartbeat_at": attempts[-1].heartbeat_at if attempts else None,
+            "open_circuits": sorted({task.agent_type for task in tasks if self.is_circuit_open(task.agent_type)}),
+        }
+
     def monitoring_summary(self) -> dict[str, Any]:
         runs = self.control_plane.list_runs()
         tasks = self.control_plane.list_tasks()
@@ -686,9 +936,13 @@ class OrchestrationService:
         for run in runs:
             run_status_counts[run.status] = run_status_counts.get(run.status, 0) + 1
         ready_tasks = self.ready_tasks()
+        dispatchable_tasks = self._dispatchable_ready_tasks()
         ready_by_resource: dict[str, int] = {}
+        running_by_agent = dict(Counter(task.agent_type for task in tasks if task.status == "running"))
+        dispatchable_by_agent = dict(Counter(task.agent_type for task in dispatchable_tasks))
         for task in ready_tasks:
             ready_by_resource[task.resource_class] = ready_by_resource.get(task.resource_class, 0) + 1
+        circuits = {circuit.agent_type: circuit.model_dump(mode="json") for circuit in self.control_plane.list_circuits()}
         return {
             "runs": len(runs),
             "tasks": len(tasks),
@@ -698,7 +952,14 @@ class OrchestrationService:
             "task_type_counts": task_type_counts,
             "resource_class_counts": resource_class_counts,
             "ready_tasks": len(ready_tasks),
+            "dispatchable_tasks": len(dispatchable_tasks),
             "ready_by_resource": ready_by_resource,
+            "running_by_agent": running_by_agent,
+            "dispatchable_by_agent": dispatchable_by_agent,
+            "blocked_tasks": status_counts.get("blocked", 0),
+            "retry_waiting_tasks": status_counts.get("retry_waiting", 0),
+            "stale_leases": len(self.control_plane.list_stale_leases(stale_before=utc_now_iso())),
+            "circuits": circuits,
             "open_circuits": [
                 circuit.agent_type
                 for circuit in (
@@ -774,10 +1035,10 @@ class OrchestrationService:
         return self.control_plane.append_event(event)
 
     async def dispatch_ready_tasks(self, *, limit: int | None = None) -> list[OrchestrationTask]:
-        ready = self.ready_tasks()
-        if limit is not None:
-            ready = ready[:limit]
-        return ready
+        return self._dispatchable_ready_tasks(limit=limit)
+
+    async def dispatch_ready_legacy_tasks(self, *, limit: int | None = None) -> list[OrchestrationTask]:
+        return self._dispatchable_ready_tasks(limit=limit, legacy_only=True)
 
     async def watch_run(
         self,

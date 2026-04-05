@@ -12,7 +12,12 @@ from ai_factory.core.instances.models import EnvironmentSpec
 
 
 def _load_yaml(path: Path) -> dict[str, Any]:
-    return yaml.safe_load(path.read_text()) or {}
+    if not path.exists():
+        raise FileNotFoundError(f"Config file not found: {path}")
+    payload = yaml.safe_load(path.read_text()) or {}
+    if not isinstance(payload, dict):
+        raise ValueError(f"Config file must contain a mapping: {path}")
+    return payload
 
 
 def _resolve_ref(config_path: Path, ref: str | None) -> str | None:
@@ -104,8 +109,11 @@ def load_orchestration_config(path: str) -> OrchestrationConfig:
         # Normal orchestration config - resolve the subsystem reference
         resolved_ref = _resolve_ref(config_path, config.subsystem.config_ref)
         config.resolved_subsystem_config_path = resolved_ref
-        if resolved_ref and Path(resolved_ref).exists():
-            config.resolved_subsystem_config = _load_yaml(Path(resolved_ref))
+        if resolved_ref:
+            resolved_path = Path(resolved_ref)
+            if not resolved_path.exists():
+                raise FileNotFoundError(f"Referenced subsystem config not found: {resolved_path}")
+            config.resolved_subsystem_config = _load_yaml(resolved_path)
 
     return config
 

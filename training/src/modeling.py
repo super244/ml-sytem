@@ -1,11 +1,12 @@
 from __future__ import annotations
 
 import logging
+from pathlib import Path
 from typing import Any
 
 import torch
 from peft import LoraConfig, get_peft_model, prepare_model_for_kbit_training
-from transformers import AutoModelForCausalLM, AutoTokenizer, BitsAndBytesConfig
+from transformers import AutoConfig, AutoModelForCausalLM, AutoTokenizer, BitsAndBytesConfig
 from transformers.utils import is_flash_attn_2_available
 
 from training.src.config import ExperimentConfig
@@ -40,15 +41,25 @@ def build_quantization_config(config: ExperimentConfig) -> BitsAndBytesConfig | 
     return None
 
 
+def resolve_tokenizer_reference(config: ExperimentConfig) -> str:
+    if config.model.tokenizer_path:
+        tokenizer_path = Path(config.model.tokenizer_path).expanduser()
+        if tokenizer_path.exists():
+            return str(tokenizer_path)
+    if config.model.tokenizer_name:
+        return config.model.tokenizer_name
+    return config.model.base_model_name
+
+
 def load_tokenizer(config: ExperimentConfig) -> Any:
-    tokenizer_name = config.model.tokenizer_name or config.model.base_model_name
+    tokenizer_name = resolve_tokenizer_reference(config)
     tokenizer = AutoTokenizer.from_pretrained(
         tokenizer_name,
         trust_remote_code=config.model.trust_remote_code,
-        use_fast=False,
+        use_fast=True,
     )
     if tokenizer.pad_token is None:
-        tokenizer.pad_token = tokenizer.eos_token
+        tokenizer.pad_token = tokenizer.eos_token or tokenizer.unk_token
     tokenizer.padding_side = "right"
     return tokenizer
 
@@ -66,7 +77,46 @@ def resolve_attention_implementation(config: ExperimentConfig) -> str | None:
     return None
 
 
-def load_model_for_training(config: ExperimentConfig) -> Any:
+def build_model_from_scratch(config: ExperimentConfig, tokenizer: Any | None = None) -> Any:
+    architecture = dict(config.model.architecture)
+    if tokenizer is not None:
+        architecture.setdefault("vocab_size", len(tokenizer))
+        if tokenizer.pad_token_id is not None:
+            architecture.setdefault("pad_token_id", tokenizer.pad_token_id)
+        if tokenizer.bos_token_id is not None:
+            architecture.setdefault("bos_token_id", tokenizer.bos_token_id)
+        if tokenizer.eos_token_id is not None:
+            architecture.setdefault("eos_token_id", tokenizer.eos_token_id)
+
+    model_type = config.model.model_type or architecture.get("model_type")
+    if not model_type:
+        raise ValueError("Scratch model initialization requires model.model_type.")
+
+    hf_config = AutoConfig.for_model(model_type, **architecture)
+    attention_implementation = resolve_attention_implementation(config)
+    if attention_implementation:
+        setattr(hf_config, "_attn_implementation", attention_implementation)
+        setattr(hf_config, "attn_implementation", attention_implementation)
+
+    model = AutoModelForCausalLM.from_config(
+        hf_config,
+        trust_remote_code=config.model.trust_remote_code,
+    )
+    model.config.use_cache = False
+    if config.model.gradient_checkpointing:
+        model.gradient_checkpointing_enable()
+    return model
+
+
+def load_model_for_training(config: ExperimentConfig, tokenizer: Any | None = None) -> Any:
+    if config.model.initialization.lower() == "scratch":
+        if build_quantization_config(config) is not None:
+            raise ValueError("Scratch training requires use_4bit=false and use_8bit=false.")
+        method = (config.lora.method or "full").lower()
+        if method not in {"full", "sft"}:
+            raise ValueError("Scratch initialization currently supports method=full or method=sft.")
+        return build_model_from_scratch(config, tokenizer=tokenizer)
+
     quantization_config = build_quantization_config(config)
     dtype = resolve_dtype(config.model.bnb_compute_dtype)
     method = (config.lora.method or "qlora").lower()

@@ -1,0 +1,12 @@
+train_file: data/processed/train.jsonl
+eval_file: data/processed/eval.jsonl
+test_file: data/processed/test.jsonl
+pack_manifest: data/processed/manifest.json
+max_length: 4096
+format: pretraining_text
+curriculum_learning: false
+sequential_curriculum: false
+oversample_hard_examples: false
+include_failure_tag: false
+include_verification_tag: false
+system_prompt: ""

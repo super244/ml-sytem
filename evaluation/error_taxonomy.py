@@ -7,7 +7,9 @@ from typing import Any
 def cluster_failures(results: list[dict[str, Any]], key: str) -> dict[str, int]:
     counter: Counter[str] = Counter()
     for result in results:
-        entry = result.get(key) or {}
+        entry = result.get(key)
+        if not isinstance(entry, dict):
+            continue
         if entry.get("correct"):
             continue
         counter[entry.get("error_type", "unknown")] += 1
