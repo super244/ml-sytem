@@ -51,6 +51,13 @@ class InstanceService:
             raise HTTPException(status_code=400, detail="config_path is required")
         path = Path(config_path)
         resolved = path.resolve() if path.is_absolute() else (self.repo_root / path).resolve()
+        try:
+            resolved.relative_to(self.repo_root)
+        except ValueError as exc:
+            raise HTTPException(
+                status_code=403,
+                detail=f"Config path must stay within repo root: {self.repo_root}",
+            ) from exc
         if resolved.exists():
             return str(resolved)
         raise HTTPException(status_code=404, detail=f"Config not found: {config_path}")

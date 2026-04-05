@@ -2,7 +2,7 @@
 
 import clsx from 'clsx';
 import Link from 'next/link';
-import { useEffect, useState, useTransition } from 'react';
+import { useEffect, useRef, useState, useTransition } from 'react';
 
 import {
   generateAnswer,
@@ -101,31 +101,15 @@ export function ChatShell() {
   const [workspaceMode, setWorkspaceMode] = useState<WorkspaceMode>('research');
   const [density, setDensity] = useState<WorkspaceDensity>('balanced');
   const [isPending, startTransition] = useTransition();
+  const messageSequenceRef = useRef(0);
+  const activeModelVariant = pickPrimaryModel(availableModels, modelVariant);
+  const activeCompareToModel = pickSecondaryModel(availableModels, activeModelVariant, compareToModel);
+  const activePromptPreset = pickPromptPreset(promptPresets, ['atlas_rigorous'], promptPreset);
   const canSubmit =
     question.trim().length > 0 &&
-    Boolean(modelVariant) &&
-    Boolean(promptPreset) &&
+    Boolean(activeModelVariant) &&
+    Boolean(activePromptPreset) &&
     !metadataDegraded;
-
-  const availableModelsStr = JSON.stringify(availableModels);
-  const [prevModelsStr, setPrevModelsStr] = useState(availableModelsStr);
-  if (availableModelsStr !== prevModelsStr) {
-    setPrevModelsStr(availableModelsStr);
-    setModelVariant(pickPrimaryModel(availableModels, modelVariant));
-  }
-
-  const [prevCompareVariant, setPrevCompareVariant] = useState(modelVariant);
-  if (availableModelsStr !== prevModelsStr || modelVariant !== prevCompareVariant) {
-    setPrevCompareVariant(modelVariant);
-    setCompareToModel(pickSecondaryModel(availableModels, modelVariant, compareToModel));
-  }
-
-  const promptPresetsStr = JSON.stringify(promptPresets);
-  const [prevPresetsStr, setPrevPresetsStr] = useState(promptPresetsStr);
-  if (promptPresetsStr !== prevPresetsStr) {
-    setPrevPresetsStr(promptPresetsStr);
-    setPromptPreset(pickPromptPreset(promptPresets, ['atlas_rigorous'], promptPreset));
-  }
 
   useEffect(() => {
     try {
@@ -165,6 +149,11 @@ export function ChatShell() {
     setSelectedCandidateIndex(0);
   }
 
+  function nextMessageId(prefix: 'user' | 'assistant') {
+    messageSequenceRef.current += 1;
+    return `${prefix}-${messageSequenceRef.current}`;
+  }
+
   function applyWorkspacePreset(mode: WorkspaceMode) {
     setWorkspaceMode(mode);
     if (mode === 'focus') {
@@ -201,11 +190,11 @@ export function ChatShell() {
 
   async function submitQuestion(submittedQuestion: string) {
     const trimmed = submittedQuestion.trim();
-    if (!trimmed || !modelVariant || !promptPreset || metadataDegraded) {
+    if (!trimmed || !activeModelVariant || !activePromptPreset || metadataDegraded) {
       return;
     }
     const userMessage: ChatMessage = {
-      id: `user-${Date.now()}`,
+      id: nextMessageId('user'),
       role: 'user',
       content: trimmed,
     };
@@ -214,10 +203,10 @@ export function ChatShell() {
     try {
       const response = await generateAnswer({
         question: trimmed,
-        model_variant: modelVariant,
+        model_variant: activeModelVariant,
         compare_to_base: false,
-        compare_to_model: compareToModel || null,
-        prompt_preset: promptPreset,
+        compare_to_model: activeCompareToModel || null,
+        prompt_preset: activePromptPreset,
         temperature,
         top_p: 0.95,
         max_new_tokens: 768,
@@ -233,7 +222,7 @@ export function ChatShell() {
       setMessages((current) => [
         ...current,
         {
-          id: `assistant-${Date.now()}`,
+          id: nextMessageId('assistant'),
           role: 'assistant',
           content: response.answer,
           result: response,
@@ -244,7 +233,7 @@ export function ChatShell() {
       setMessages((current) => [
         ...current,
         {
-          id: `assistant-error-${Date.now()}`,
+          id: nextMessageId('assistant'),
           role: 'assistant',
           content: `The request failed.\n\n\`\`\`\n${message}\n\`\`\``,
         },
@@ -372,7 +361,7 @@ export function ChatShell() {
                 thread ready for direct model-vs-model inspection.
               </p>
               <div className="badge-row">
-                <MetricBadge label="Primary" value={modelVariant} />
+                <MetricBadge label="Primary" value={activeModelVariant} />
                 <MetricBadge label="Samples" value={`${numSamples}`} tone="secondary" />
                 <MetricBadge
                   label="Reasoning"
@@ -399,11 +388,11 @@ export function ChatShell() {
                 </label>
                 <select
                   id="modelVariant"
-                  value={modelVariant}
+                  value={activeModelVariant}
                   onChange={(event) => {
                     const nextModel = event.target.value as ModelVariant;
                     setModelVariant(nextModel);
-                    if (compareToModel === nextModel) {
+                    if (activeCompareToModel === nextModel) {
                       setCompareToModel('');
                     }
                   }}
@@ -422,12 +411,12 @@ export function ChatShell() {
                 </label>
                 <select
                   id="compareModel"
-                  value={compareToModel}
+                  value={activeCompareToModel}
                   onChange={(event) => setCompareToModel(event.target.value)}
                 >
                   <option value="">No comparison</option>
                   {availableModels
-                    .filter((model) => model.name !== modelVariant)
+                    .filter((model) => model.name !== activeModelVariant)
                     .map((model) => (
                       <option key={model.name} value={model.name}>
                         {model.label ?? model.name}
@@ -443,7 +432,7 @@ export function ChatShell() {
                   </label>
                   <select
                     id="preset"
-                    value={promptPreset}
+                    value={activePromptPreset}
                     onChange={(event) => setPromptPreset(event.target.value)}
                   >
                     {promptPresets.map((preset) => (
@@ -600,7 +589,7 @@ export function ChatShell() {
             </div>
 
             <div className="badge-row workspace-badges">
-              <MetricBadge label="Preset" value={promptPreset} />
+              <MetricBadge label="Preset" value={activePromptPreset} />
               <MetricBadge label="Mode" value={solverMode} tone="secondary" />
               <MetricBadge label="Target" value={difficultyTarget} tone="accent" />
               <MetricBadge

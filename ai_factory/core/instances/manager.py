@@ -5,7 +5,7 @@ import uuid
 from copy import deepcopy
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, Literal, cast
+from typing import Any, Literal
 
 import yaml
 

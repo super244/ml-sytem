@@ -357,7 +357,7 @@ docker compose up --build
 
 Base model:
 
-- `Qwen/Qwen2.5-Math-0.5B-Instruct`
+- `Qwen/Qwen2.5-0.5B-Instruct`
 
 Use when:
 

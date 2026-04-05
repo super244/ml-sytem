@@ -1,4 +1,4 @@
-with open("frontend/app/dashboard/page.tsx", "r") as f:
+with open("frontend/app/dashboard/page.tsx") as f:
     c = f.read()
 
 c = c.replace("const instances = mission?.control_plane.instances ?? [];", "const instances = useMemo(() => mission?.control_plane.instances ?? [], [mission?.control_plane.instances]);")

@@ -5,6 +5,8 @@ import subprocess
 import sys
 from pathlib import Path
 
+from ai_factory.core.datasets import inspect_json_asset
+
 
 def run_command(cmd: str, description: str) -> bool:
     """Run a command and return success status."""
@@ -16,6 +18,16 @@ def run_command(cmd: str, description: str) -> bool:
     except subprocess.CalledProcessError as e:
         print(f"✗ {description}: {e.stderr.strip()}")
         return False
+
+
+def check_json_asset(path: Path, description: str) -> bool:
+    print(f"Checking {description}...")
+    status = inspect_json_asset(path)
+    if status["ok"]:
+        print(f"✓ {description}")
+        return True
+    print(f"✗ {description}: {status['detail']}")
+    return False
 
 
 def main() -> int:
@@ -67,6 +79,19 @@ def main() -> int:
 
     for cmd, desc in checks:
         if run_command(cmd, desc):
+            passed += 1
+        print()
+
+    json_asset_checks = [
+        (Path("data/catalog.json"), "Dataset catalog JSON"),
+        (Path("data/processed/manifest.json"), "Processed manifest JSON"),
+        (Path("data/processed/pack_summary.json"), "Pack summary JSON"),
+    ]
+
+    total += len(json_asset_checks)
+
+    for path, desc in json_asset_checks:
+        if check_json_asset(path, desc):
             passed += 1
         print()
 

@@ -19,6 +19,44 @@ def _resolve_path(path: str | Path, *, repo_root: str | Path | None = None) -> P
     return Path(repo_root) / resolved
 
 
+def inspect_json_asset(path: str | Path, *, repo_root: str | Path | None = None) -> dict[str, Any]:
+    resolved = _resolve_path(path, repo_root=repo_root)
+    if not resolved.exists():
+        return {"ok": False, "kind": "missing", "path": str(resolved), "detail": "file is missing"}
+
+    raw = resolved.read_text()
+    stripped = raw.strip()
+    if not stripped:
+        return {"ok": False, "kind": "empty", "path": str(resolved), "detail": "file is empty"}
+    if stripped.startswith("version https://git-lfs.github.com/spec/v1"):
+        return {
+            "ok": False,
+            "kind": "git_lfs_pointer",
+            "path": str(resolved),
+            "detail": "file is a Git LFS pointer; run `git lfs pull` or regenerate the asset locally",
+        }
+
+    try:
+        payload = json.loads(raw)
+    except json.JSONDecodeError as exc:
+        return {
+            "ok": False,
+            "kind": "invalid_json",
+            "path": str(resolved),
+            "detail": f"invalid JSON ({exc.msg} at line {exc.lineno}, column {exc.colno})",
+        }
+
+    if not isinstance(payload, dict):
+        return {
+            "ok": False,
+            "kind": "unexpected_type",
+            "path": str(resolved),
+            "detail": f"expected a JSON object, found {type(payload).__name__}",
+        }
+
+    return {"ok": True, "kind": "json_object", "path": str(resolved), "detail": "valid JSON object"}
+
+
 def _load_json(path: str | Path, *, repo_root: str | Path | None = None) -> dict[str, Any]:
     resolved = _resolve_path(path, repo_root=repo_root)
     if not resolved.exists():
@@ -164,6 +202,7 @@ __all__ = [
     "DEFAULT_PACK_SUMMARY_PATH",
     "DEFAULT_PROCESSED_MANIFEST_PATH",
     "compute_record_stats",
+    "inspect_json_asset",
     "list_catalog_entries",
     "list_sample_prompts",
     "load_catalog",

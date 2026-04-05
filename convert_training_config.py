@@ -1,6 +1,6 @@
 import re
 
-with open("training/src/config.py", "r") as f:
+with open("training/src/config.py") as f:
     content = f.read()
 
 content = content.replace("from dataclasses import asdict, dataclass, field", "from pydantic import BaseModel, ConfigDict, Field")

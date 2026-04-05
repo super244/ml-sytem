@@ -1,7 +1,9 @@
-import re
 
-def fix_file(filepath):
-    with open(filepath, 'r') as f:
+from __future__ import annotations
+
+
+def fix_file(filepath: str) -> None:
+    with open(filepath) as f:
         content = f.read()
 
     # Replace local storage effects
@@ -57,7 +59,7 @@ def fix_file(filepath):
     setSecondaryModel(pickSecondaryModel(models, primaryModel, secondaryModel));
   }""")
 
-    with open(filepath, 'w') as f:
+    with open(filepath, "w") as f:
         f.write(content)
 
 fix_file("frontend/components/chat-shell.tsx")

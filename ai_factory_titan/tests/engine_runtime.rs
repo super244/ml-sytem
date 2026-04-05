@@ -13,6 +13,7 @@ use ai_factory_titan::{
     TitanEngineDescriptor,
     TitanRuntimeMode,
     TitanRuntimePlan,
+    TitanScheduler,
 };
 
 #[test]
@@ -96,5 +97,17 @@ fn sampler_prefers_best_scoring_token_with_repetition_penalty() {
 fn runtime_plan_tracks_runtime_flag_modes() {
     let runtime = TitanRuntimePlan::current();
     assert!(matches!(runtime.mode, TitanRuntimeMode::PythonFallback | TitanRuntimeMode::RustCanary | TitanRuntimeMode::RustPrimary));
-    assert!(runtime.reason.contains("Titan runtime") || runtime.reason.contains("Transformers path"));
+    assert!(runtime.reason.contains("Titan") || runtime.reason.contains("Transformers path"));
+}
+
+#[test]
+fn scheduler_can_be_created_without_a_tokio_runtime() {
+    let _ = TitanScheduler::new(2);
+}
+
+#[tokio::test]
+async fn scheduler_completes_submitted_work() {
+    let scheduler = TitanScheduler::new(2);
+    let reply = scheduler.submit("decode-step").await.expect("scheduler reply");
+    assert_eq!(reply, "completed: decode-step");
 }

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import argparse
+import inspect
 import json
 import logging
 import os
@@ -35,6 +36,7 @@ logging.basicConfig(
     handlers=[logging.StreamHandler(sys.stdout)],
 )
 logger = logging.getLogger(__name__)
+_TRAINING_ARGUMENT_PARAMETERS = set(inspect.signature(TrainingArguments.__init__).parameters)
 
 
 def parse_args() -> argparse.Namespace:
@@ -68,39 +70,48 @@ def parse_args() -> argparse.Namespace:
 def build_training_arguments(config: ExperimentConfig, layout) -> TrainingArguments:
     training = config.training
     optim = "paged_adamw_8bit" if (config.model.use_4bit or config.model.use_8bit) else "adamw_torch"
+    training_arguments = {
+        "output_dir": str(layout.checkpoints_dir),
+        "run_name": config.run_name,
+        "num_train_epochs": training.num_train_epochs,
+        "max_steps": training.max_steps,
+        "learning_rate": training.learning_rate,
+        "weight_decay": training.weight_decay,
+        "warmup_ratio": training.warmup_ratio,
+        "lr_scheduler_type": training.lr_scheduler_type,
+        "per_device_train_batch_size": training.per_device_train_batch_size,
+        "per_device_eval_batch_size": training.per_device_eval_batch_size,
+        "gradient_accumulation_steps": training.gradient_accumulation_steps,
+        "max_grad_norm": training.max_grad_norm,
+        "logging_steps": training.logging_steps,
+        "eval_steps": training.eval_steps,
+        "save_steps": training.save_steps,
+        "save_total_limit": training.save_total_limit,
+        "bf16": training.bf16,
+        "fp16": training.fp16,
+        "save_strategy": training.save_strategy,
+        "load_best_model_at_end": training.load_best_model_at_end,
+        "report_to": config.logging.report_to,
+        "dataloader_num_workers": training.dataloader_num_workers,
+        "remove_unused_columns": False,
+        "optim": optim,
+        "logging_dir": str(layout.logs_dir),
+        "logging_first_step": config.logging.logging_first_step,
+        "group_by_length": training.group_by_length,
+        "save_safetensors": training.save_safetensors,
+        "seed": config.seed,
+        "deepspeed": config.runtime.deepspeed_config,
+        "torch_compile": config.runtime.torch_compile,
+    }
+    if "eval_strategy" in _TRAINING_ARGUMENT_PARAMETERS:
+        training_arguments["eval_strategy"] = training.evaluation_strategy
+    else:
+        training_arguments["evaluation_strategy"] = training.evaluation_strategy
+    training_arguments = {
+        key: value for key, value in training_arguments.items() if key in _TRAINING_ARGUMENT_PARAMETERS
+    }
     return TrainingArguments(
-        output_dir=str(layout.checkpoints_dir),
-        run_name=config.run_name,
-        num_train_epochs=training.num_train_epochs,
-        max_steps=training.max_steps,
-        learning_rate=training.learning_rate,
-        weight_decay=training.weight_decay,
-        warmup_ratio=training.warmup_ratio,
-        lr_scheduler_type=training.lr_scheduler_type,
-        per_device_train_batch_size=training.per_device_train_batch_size,
-        per_device_eval_batch_size=training.per_device_eval_batch_size,
-        gradient_accumulation_steps=training.gradient_accumulation_steps,
-        max_grad_norm=training.max_grad_norm,
-        logging_steps=training.logging_steps,
-        eval_steps=training.eval_steps,
-        save_steps=training.save_steps,
-        save_total_limit=training.save_total_limit,
-        bf16=training.bf16,
-        fp16=training.fp16,
-        evaluation_strategy=training.evaluation_strategy,
-        save_strategy=training.save_strategy,
-        load_best_model_at_end=training.load_best_model_at_end,
-        report_to=config.logging.report_to,
-        dataloader_num_workers=training.dataloader_num_workers,
-        remove_unused_columns=False,
-        optim=optim,
-        logging_dir=str(layout.logs_dir),
-        logging_first_step=config.logging.logging_first_step,
-        group_by_length=training.group_by_length,
-        save_safetensors=training.save_safetensors,
-        seed=config.seed,
-        deepspeed=config.runtime.deepspeed_config,
-        torch_compile=config.runtime.torch_compile,
+        **training_arguments,
     )
 
 

@@ -9,6 +9,8 @@ python -m venv .venv
 source .venv/bin/activate
 pip install -U pip
 pip install -e .[dev]
+git lfs install
+git lfs pull
 ```
 
 Frontend dependencies:
@@ -92,7 +94,7 @@ Examples:
 
 ```bash
 python3 -m training.train --config training/configs/profiles/baseline_qlora.yaml
-python3 -m training.train --config training/configs/profiles/calculus_specialist.yaml
+python3 -m training.train --config training/configs/profiles/math_specialist.yaml
 python3 -m training.train --config training/configs/profiles/failure_aware.yaml
 ```
 

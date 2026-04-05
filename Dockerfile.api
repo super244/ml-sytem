@@ -5,6 +5,12 @@ WORKDIR /build
 RUN pip install --upgrade pip
 
 COPY pyproject.toml ./
+COPY ai_factory/ ./ai_factory/
+COPY inference/ ./inference/
+COPY training/ ./training/
+COPY evaluation/ ./evaluation/
+COPY data/ ./data/
+COPY configs/ ./configs/
 RUN pip install --no-cache-dir -e . --target /build/deps
 
 FROM python:3.11-slim AS runtime
