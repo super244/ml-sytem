@@ -8,6 +8,7 @@ import os
 import sys
 from pathlib import Path
 
+import torch
 from transformers import TrainingArguments, set_seed
 
 from ai_factory.core.artifacts import prepare_run_layout, write_json
@@ -37,6 +38,19 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 _TRAINING_ARGUMENT_PARAMETERS = set(inspect.signature(TrainingArguments.__init__).parameters)
+
+
+def _resolve_precision_flags(config: ExperimentConfig) -> dict[str, bool]:
+    training = config.training
+    bf16_enabled = training.bf16
+    fp16_enabled = training.fp16
+
+    if torch.cuda.is_available():
+        return {"bf16": bf16_enabled, "fp16": fp16_enabled, "use_cpu": False}
+
+    # TrainingArguments validates mixed precision against the current runtime
+    # during initialization, so CPU-only environments must disable GPU dtypes.
+    return {"bf16": False, "fp16": False, "use_cpu": True}
 
 
 def parse_args() -> argparse.Namespace:
@@ -72,6 +86,7 @@ def parse_args() -> argparse.Namespace:
 def build_training_arguments(config: ExperimentConfig, layout) -> TrainingArguments:
     training = config.training
     optim = "paged_adamw_8bit" if (config.model.use_4bit or config.model.use_8bit) else "adamw_torch"
+    precision_flags = _resolve_precision_flags(config)
     training_arguments = {
         "output_dir": str(layout.checkpoints_dir),
         "run_name": config.run_name,
@@ -89,8 +104,9 @@ def build_training_arguments(config: ExperimentConfig, layout) -> TrainingArgume
         "eval_steps": training.eval_steps,
         "save_steps": training.save_steps,
         "save_total_limit": training.save_total_limit,
-        "bf16": training.bf16,
-        "fp16": training.fp16,
+        "bf16": precision_flags["bf16"],
+        "fp16": precision_flags["fp16"],
+        "use_cpu": precision_flags["use_cpu"],
         "save_strategy": training.save_strategy,
         "load_best_model_at_end": training.load_best_model_at_end,
         "report_to": config.logging.report_to,
