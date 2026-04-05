@@ -1,12 +1,16 @@
 from __future__ import annotations
 
+import logging
 from typing import Any
 
 import torch
 from peft import LoraConfig, get_peft_model, prepare_model_for_kbit_training
 from transformers import AutoModelForCausalLM, AutoTokenizer, BitsAndBytesConfig
+from transformers.utils import is_flash_attn_2_available
 
 from training.src.config import ExperimentConfig
+
+logger = logging.getLogger(__name__)
 
 
 def resolve_dtype(name: str) -> torch.dtype:
@@ -49,6 +53,19 @@ def load_tokenizer(config: ExperimentConfig) -> Any:
     return tokenizer
 
 
+def resolve_attention_implementation(config: ExperimentConfig) -> str | None:
+    if not config.model.use_flash_attention:
+        return None
+    if is_flash_attn_2_available():
+        return "flash_attention_2"
+    logger.warning(
+        "FlashAttention2 was requested for %s, but it is unavailable in the current environment. "
+        "Falling back to the default attention implementation.",
+        config.model.base_model_name,
+    )
+    return None
+
+
 def load_model_for_training(config: ExperimentConfig) -> Any:
     quantization_config = build_quantization_config(config)
     dtype = resolve_dtype(config.model.bnb_compute_dtype)
@@ -63,7 +80,7 @@ def load_model_for_training(config: ExperimentConfig) -> Any:
         device_map=config.model.device_map,
         torch_dtype=dtype,
         low_cpu_mem_usage=config.runtime.low_cpu_mem_usage,
-        attn_implementation="flash_attention_2" if config.model.use_flash_attention else None,
+        attn_implementation=resolve_attention_implementation(config),
     )
     model.config.use_cache = False
     if config.model.gradient_checkpointing:

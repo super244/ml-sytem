@@ -214,6 +214,32 @@ def test_load_catalog_returns_empty_structure_when_missing(tmp_path: Path) -> No
     assert result["generated_at"] is None
 
 
+def test_inspect_json_asset_flags_git_lfs_pointer(tmp_path: Path) -> None:
+    from ai_factory.core.datasets import inspect_json_asset
+
+    pointer = tmp_path / "catalog.json"
+    pointer.write_text(
+        "version https://git-lfs.github.com/spec/v1\n"
+        "oid sha256:1234567890abcdef\n"
+        "size 42\n"
+    )
+
+    status = inspect_json_asset(pointer)
+    assert status["ok"] is False
+    assert status["kind"] == "git_lfs_pointer"
+
+
+def test_inspect_json_asset_flags_invalid_json(tmp_path: Path) -> None:
+    from ai_factory.core.datasets import inspect_json_asset
+
+    broken = tmp_path / "catalog.json"
+    broken.write_text("{not json")
+
+    status = inspect_json_asset(broken)
+    assert status["ok"] is False
+    assert status["kind"] == "invalid_json"
+
+
 def test_load_pack_summary_returns_empty_when_missing(tmp_path: Path) -> None:
     from ai_factory.core.datasets import load_pack_summary
 

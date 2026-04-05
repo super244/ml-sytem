@@ -44,18 +44,6 @@ async fn main() -> anyhow::Result<()> {
             "sampler": sampler,
             "sampler_stack": ["argmax", "temperature", "top_k", "top_p", "repetition_penalty"]
         },
-        "metrics": {
-            "tokens_per_second": 45.2,
-            "time_to_first_token_ms": 120.5,
-            "active_requests": 2,
-            "total_requests_served": 1050,
-            "uptime_seconds": 3600
-        },
-        "neural_accelerator": {
-            "target": "apple-amx",
-            "mode": "prompt-preprocess",
-            "speedup_goal_vs_m4": 4
-        },
         "quantization": {
             "formats": ["q4_0", "q4_k", "q8_0", "f16"],
             "layout": default_q4_layout()

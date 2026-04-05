@@ -2,8 +2,13 @@ from __future__ import annotations
 
 from pathlib import Path
 
+import pytest
+from fastapi import HTTPException
+
 from ai_factory.core.instances.creation import InstanceCreationService
 from ai_factory.core.instances.store import FileInstanceStore
+from inference.app.config import AppSettings
+from inference.app.services.instance_service import InstanceService
 
 
 def _write(path: Path, body: str) -> None:
@@ -86,3 +91,28 @@ def test_instance_creation_service_writes_config_snapshots(tmp_path: Path) -> No
     inference_instance = service.create_inference_instance(created.id, str(inference_template), start=False)
     assert inference_instance.parent_instance_id == created.id
     assert store.config_snapshot_path(inference_instance.id).exists()
+
+
+def test_instance_service_rejects_config_paths_outside_repo(tmp_path: Path) -> None:
+    settings = AppSettings(
+        title="test",
+        version="0.0.0",
+        repo_root=str(tmp_path),
+        cors_origins=["*"],
+        model_registry_path=str(tmp_path / "inference" / "configs" / "model_registry.yaml"),
+        prompt_library_path=str(tmp_path / "inference" / "configs" / "prompt_presets.yaml"),
+        benchmark_registry_path=str(tmp_path / "evaluation" / "benchmarks" / "registry.yaml"),
+        artifacts_dir=str(tmp_path / "artifacts"),
+        cache_dir=str(tmp_path / "artifacts" / "cache"),
+        telemetry_path=str(tmp_path / "artifacts" / "telemetry.jsonl"),
+        cache_enabled=False,
+        telemetry_enabled=False,
+    )
+    service = InstanceService(settings)
+    outside = tmp_path.parent / "outside.yaml"
+    outside.write_text("instance:\n  type: finetune\n")
+
+    with pytest.raises(HTTPException) as exc:
+        service._ensure_config_path(str(outside))
+
+    assert exc.value.status_code == 403

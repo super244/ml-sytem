@@ -9,6 +9,8 @@ python -m venv .venv
 source .venv/bin/activate
 pip install -U pip
 pip install -e .[dev]
+git lfs install
+git lfs pull
 ```
 
 Frontend dependencies:

@@ -46,7 +46,7 @@ models:
     tags: [specialist, verification, local]
   - name: fast_iteration
     label: Atlas Fast Iteration
-    base_model: Qwen/Qwen2.5-Math-0.5B-Instruct
+    base_model: Qwen/Qwen2.5-0.5B-Instruct
     adapter_path: artifacts/models/atlas-math-fast-iteration/latest
     load_in_4bit: true
     load_in_8bit: false

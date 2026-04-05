@@ -56,6 +56,8 @@ python -m venv .venv
 source .venv/bin/activate
 pip install -U pip
 pip install -e ".[dev]"
+git lfs install
+git lfs pull
 cp .env.example .env
 ```
 
@@ -75,6 +77,8 @@ export ARTIFACTS_DIR="/mnt/ai-factory-artifacts"
 ```
 
 Use a writable persistent path for `ARTIFACTS_DIR` on cloud VMs.
+
+If you intentionally skip Git LFS, regenerate `data/catalog.json` locally before relying on `ai-factory ready` or `ai-factory doctor`.
 
 ## 3. Verify The Workspace
 

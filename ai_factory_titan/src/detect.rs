@@ -121,12 +121,6 @@ fn detect_cuda(cpu_cores: usize, memory_gb: u64) -> Option<HardwareProfile> {
     use cudarc::driver::sys::CUdevice_attribute;
 
     let device = cudarc::driver::CudaDevice::new(0).ok()?;
-    let major = device
-        .attribute(CUdevice_attribute::CU_DEVICE_ATTRIBUTE_COMPUTE_CAPABILITY_MAJOR)
-        .ok()?;
-    let minor = device
-        .attribute(CUdevice_attribute::CU_DEVICE_ATTRIBUTE_COMPUTE_CAPABILITY_MINOR)
-        .ok()?;
     let bus_width_bits = device
         .attribute(CUdevice_attribute::CU_DEVICE_ATTRIBUTE_GLOBAL_MEMORY_BUS_WIDTH)
         .ok()
@@ -138,7 +132,7 @@ fn detect_cuda(cpu_cores: usize, memory_gb: u64) -> Option<HardwareProfile> {
         gpu_name: Some(device.name().ok()?),
         gpu_vendor: Some("NVIDIA".to_string()),
         unified_memory: false,
-        bandwidth_gbps: bus_width_bits.or(Some(((major * 100) + minor) as u64)),
+        bandwidth_gbps: bus_width_bits,
         simd_features: Vec::new(), // will be overwritten in detect_hardware
         vram_usage_mb: None, // could be obtained via nvml or cudarc
         backend: TitanBackend::new(BackendKind::Cuda, 100),
@@ -152,6 +146,7 @@ fn detect_cuda(_cpu_cores: usize, _memory_gb: u64) -> Option<HardwareProfile> {
 }
 
 #[cfg(target_os = "macos")]
+#[allow(dead_code)]
 fn probe_apple_silicon_name() -> Option<String> {
     let output = Command::new("sysctl")
         .args(["-n", "machdep.cpu.brand_string"])
@@ -169,6 +164,7 @@ fn probe_apple_silicon_name() -> Option<String> {
 }
 
 #[cfg(target_os = "macos")]
+#[allow(dead_code)]
 fn apple_bandwidth_gbps(name: &str) -> Option<u64> {
     let normalized = name.to_lowercase();
     if normalized.contains("m5 max") {

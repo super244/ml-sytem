@@ -233,6 +233,7 @@ function resolveApiBases(): string[] {
 
   const bases = ['http://127.0.0.1:8000', 'http://localhost:8000'];
   if (typeof window !== 'undefined') {
+    bases.unshift(window.location.origin);
     const protocol = window.location.protocol === 'https:' ? 'https:' : 'http:';
     bases.unshift(`${protocol}//${window.location.hostname}:8000`);
   }
