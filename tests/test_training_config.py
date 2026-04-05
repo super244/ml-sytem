@@ -5,8 +5,10 @@ from pathlib import Path
 import pytest
 
 from training.src.config import ConfigValidationError, load_experiment_config, validate_experiment_config
+from training.src.data import build_messages, load_jsonl
 from training.src.modeling import resolve_attention_implementation
 from training.src.validation import build_validation_data_config
+from training.src.workflows import build_source_specs
 
 
 def test_profile_config_merges_components() -> None:
@@ -35,6 +37,30 @@ def test_build_validation_data_config_preserves_model_type() -> None:
     assert validation_config.max_train_samples == 8
     assert validation_config.max_eval_samples == 4
     assert validation_config.model_dump() != {}
+
+
+def test_load_jsonl_reports_invalid_records(tmp_path: Path) -> None:
+    dataset_path = tmp_path / "broken.jsonl"
+    dataset_path.write_text('{"question": "ok", "solution": "yes"}\nnot-json\n')
+
+    with pytest.raises(ValueError, match="Invalid JSONL record"):
+        load_jsonl(dataset_path)
+
+
+def test_build_messages_requires_question_and_solution() -> None:
+    config = load_experiment_config("training/configs/profiles/baseline_qlora.yaml").data
+
+    with pytest.raises(ValueError, match="question"):
+        build_messages({"solution": "answer"}, config)
+    with pytest.raises(ValueError, match="solution"):
+        build_messages({"question": "prompt"}, config)
+
+
+def test_build_source_specs_rejects_missing_local_dataset(tmp_path: Path) -> None:
+    missing_path = tmp_path / "missing.jsonl"
+
+    with pytest.raises(FileNotFoundError, match="Local dataset not found"):
+        build_source_specs(local_datasets=[str(missing_path)])
 
 
 def test_resolve_attention_implementation_falls_back_when_flash_attention_is_unavailable(

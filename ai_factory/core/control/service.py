@@ -12,6 +12,8 @@ from ai_factory.core.control.models import (
     InstanceStreamFrame,
     LiveInstanceSnapshot,
     ManagedInstanceDetail,
+    OrchestrationCircuitSnapshot,
+    OrchestrationRuntime,
 )
 from ai_factory.core.instances.models import (
     DeploymentTarget,
@@ -49,6 +51,12 @@ def _tail_list(values: list[T], limit: int | None) -> tuple[list[T], bool]:
     return list(values[-limit:]), True
 
 
+def _value(item: Any, key: str, default: Any = None) -> Any:
+    if isinstance(item, dict):
+        return item.get(key, default)
+    return getattr(item, key, default)
+
+
 class FactoryControlService:
     def __init__(
         self,
@@ -64,6 +72,149 @@ class FactoryControlService:
         self.settings = settings
         self.plugin_registry = plugin_registry
         self.lineage_registry = lineage_registry
+
+    def _control_plane(self) -> Any | None:
+        orchestration = getattr(self.manager, "orchestration", None)
+        return getattr(orchestration, "control_plane", None)
+
+    def _list_task_attempts(self, task_id: str) -> list[Any]:
+        control_plane = self._control_plane()
+        if control_plane is None or not hasattr(control_plane, "list_attempts"):
+            return []
+        return list(control_plane.list_attempts(task_id))
+
+    def _list_task_dependencies(self, task_id: str) -> list[Any]:
+        control_plane = self._control_plane()
+        if control_plane is None or not hasattr(control_plane, "list_dependencies"):
+            return []
+        return list(control_plane.list_dependencies(task_id))
+
+    def _list_circuits(self) -> list[OrchestrationCircuitSnapshot]:
+        control_plane = self._control_plane()
+        if control_plane is None or not hasattr(control_plane, "get_circuit"):
+            return []
+        circuit_types = (
+            "data_processing",
+            "training_orchestration",
+            "evaluation_benchmarking",
+            "monitoring_telemetry",
+            "optimization_feedback",
+            "deployment",
+        )
+        snapshots: list[OrchestrationCircuitSnapshot] = []
+        for agent_type in circuit_types:
+            circuit = control_plane.get_circuit(agent_type)
+            if circuit is None:
+                continue
+            snapshots.append(
+                OrchestrationCircuitSnapshot(
+                    agent_type=circuit.agent_type,
+                    status=circuit.status,
+                    failure_count=circuit.failure_count,
+                    opened_at=circuit.opened_at,
+                    reopen_after=circuit.reopen_after,
+                    last_error=circuit.last_error,
+                    updated_at=circuit.updated_at,
+                    is_open=circuit.status == "open",
+                    is_half_open=circuit.status == "half_open",
+                )
+            )
+        return snapshots
+
+    def _runtime_summary(
+        self,
+        manifest: InstanceManifest,
+        *,
+        tasks: list[Any] | None = None,
+        events: list[Any] | None = None,
+    ) -> OrchestrationRuntime:
+        run_target = manifest.orchestration_run_id or manifest.id
+        control_plane = self._control_plane()
+        run = None
+        if control_plane is not None:
+            if hasattr(control_plane, "get_run"):
+                run = control_plane.get_run(run_target)
+            if run is None and hasattr(control_plane, "get_run_by_legacy_instance"):
+                run = control_plane.get_run_by_legacy_instance(run_target)
+
+        task_objects = tasks
+        if task_objects is None:
+            task_objects = []
+            orchestration = getattr(self.manager, "orchestration", None)
+            if orchestration is not None and hasattr(orchestration, "list_tasks"):
+                task_objects = list(orchestration.list_tasks(run_target))
+
+        task = next(
+            (item for item in task_objects if _value(item, "legacy_instance_id") == manifest.id),
+            None,
+        )
+        if task is None and task_objects:
+            task = task_objects[0]
+
+        task_id = _value(task, "id") if task is not None else None
+        attempts = self._list_task_attempts(task_id) if task_id is not None else []
+        latest_attempt = attempts[-1] if attempts else None
+        dependencies = self._list_task_dependencies(task_id) if task_id is not None else []
+
+        task_events = events
+        if task_events is None:
+            task_events = []
+            if run is not None:
+                task_events = list(self.list_orchestration_events(run.id, limit=25))
+        latest_event = task_events[-1] if task_events else None
+
+        completed_task_ids = {
+            _value(item, "id")
+            for item in task_objects
+            if _value(item, "status") == "completed"
+        }
+        dependency_ids = [_value(dependency, "depends_on_task_id") for dependency in dependencies]
+        ready_dependency_count = sum(1 for dependency_id in dependency_ids if dependency_id in completed_task_ids)
+
+        task_status = _value(task, "status")
+        retry_policy = _value(task, "retry_policy") if task is not None else None
+        current_attempt = int(_value(task, "current_attempt", 0) or 0) if task is not None else 0
+        max_attempts = int(_value(retry_policy, "max_attempts", 0) or 0) if retry_policy is not None else 0
+        retryable = bool(task is not None and current_attempt < max_attempts)
+        next_retry_at = _value(task, "available_at") if task_status == "retry_waiting" else None
+
+        checkpoint_hint = _value(task, "checkpoint_hint") if task is not None else None
+        last_error_code = _value(task, "last_error_code") if task is not None else None
+        last_error_message = _value(task, "last_error_message") if task is not None else None
+        lease_owner = None
+        last_heartbeat_at = None
+        if latest_attempt is not None:
+            lease_owner = _value(latest_attempt, "lease_owner")
+            last_heartbeat_at = _value(latest_attempt, "heartbeat_at")
+            checkpoint_hint = checkpoint_hint or _value(latest_attempt, "checkpoint_hint")
+            last_error_code = last_error_code or _value(latest_attempt, "error_code")
+            last_error_message = last_error_message or _value(latest_attempt, "error_message")
+
+        return OrchestrationRuntime(
+            run_id=_value(run, "id"),
+            run_status=_value(run, "status"),
+            run_updated_at=_value(run, "updated_at"),
+            task_id=_value(task, "id"),
+            task_type=_value(task, "task_type"),
+            agent_type=_value(task, "agent_type"),
+            task_status=task_status,
+            resource_class=_value(task, "resource_class"),
+            current_attempt=current_attempt,
+            max_attempts=max_attempts,
+            attempt_count=len(attempts),
+            dependency_count=len(dependency_ids),
+            dependency_ready_count=ready_dependency_count,
+            dependency_blocked_count=len(dependency_ids) - ready_dependency_count,
+            retryable=retryable,
+            next_retry_at=next_retry_at,
+            checkpoint_hint=checkpoint_hint,
+            last_error_code=last_error_code,
+            last_error_message=last_error_message,
+            lease_owner=lease_owner,
+            last_heartbeat_at=last_heartbeat_at,
+            last_event_type=_value(latest_event, "event_type"),
+            last_event_at=_value(latest_event, "created_at"),
+        )
 
     def record_lineage(self, record: LineageRecord) -> None:
         """Register a new lineage record."""
@@ -209,7 +360,34 @@ class FactoryControlService:
         return self.manager.list_orchestration_events(target, limit=limit)
 
     def monitoring_summary(self) -> dict[str, Any]:
-        return self.manager.monitoring_summary()
+        base = dict(self.manager.monitoring_summary())
+        control_plane = self._control_plane()
+        if control_plane is not None and hasattr(control_plane, "list_stale_leases"):
+            stale_task_ids: list[str] = []
+            for lease in control_plane.list_stale_leases(stale_before=utc_now_iso()):
+                task_id = _value(lease, "task_id")
+                if task_id is None:
+                    continue
+                stale_task_ids.append(str(task_id))
+        else:
+            stale_task_ids = []
+        circuits = self._list_circuits()
+        status_counts = dict(base.get("task_status_counts", {}))
+        base.update(
+            {
+                "completed_tasks": status_counts.get("completed", 0),
+                "failed_tasks": status_counts.get("failed", 0),
+                "retry_waiting_tasks": status_counts.get("retry_waiting", 0),
+                "blocked_tasks": status_counts.get("blocked", 0),
+                "dead_lettered_tasks": status_counts.get("dead_lettered", 0),
+                "stale_task_ids": stale_task_ids,
+                "stale_task_count": len(stale_task_ids),
+                "circuits": [circuit.model_dump(mode="json") for circuit in circuits],
+                "open_circuits": [circuit.agent_type for circuit in circuits if circuit.is_open],
+                "half_open_circuits": [circuit.agent_type for circuit in circuits if circuit.is_half_open],
+            }
+        )
+        return base
 
     def get_logs(self, instance_id: str, *, tail_chars: int | None = None) -> InstanceLogsView:
         logs = self.store.read_logs(instance_id)
@@ -236,17 +414,22 @@ class FactoryControlService:
     def get_instance_detail(self, instance_id: str) -> ManagedInstanceDetail:
         manifest = self.get_instance(instance_id)
         run_target = manifest.orchestration_run_id or manifest.id
+        tasks = self.list_tasks(run_target)
+        events = self.list_orchestration_events(run_target, limit=200)
         return ManagedInstanceDetail.model_validate(
             {
                 **manifest.model_dump(mode="json"),
                 "config_snapshot": self.store.load_config_snapshot(instance_id),
                 "logs": self.get_logs(instance_id).model_dump(mode="json"),
                 "metrics": self.get_metrics(instance_id).model_dump(mode="json"),
+                "orchestration_runtime": self._runtime_summary(manifest, tasks=tasks, events=events).model_dump(
+                    mode="json"
+                ),
                 "children": [item.model_dump(mode="json") for item in self.get_children(instance_id)],
                 "events": self.store.read_events(instance_id),
                 "available_actions": self.manager.get_available_actions(instance_id),
-                "tasks": self.list_tasks(run_target),
-                "orchestration_events": self.list_orchestration_events(run_target, limit=200),
+                "tasks": tasks,
+                "orchestration_events": events,
                 "orchestration_summary": self.monitoring_summary(),
             }
         )
@@ -268,6 +451,7 @@ class FactoryControlService:
             instance=manifest,
             logs=self.get_logs(instance_id, tail_chars=log_tail_chars),
             metrics=self.get_metrics(instance_id, tail_points=metric_tail_points),
+            orchestration_runtime=self._runtime_summary(manifest, tasks=tasks, events=events),
             events=events,
             tasks=tasks,
             available_actions=self.manager.get_available_actions(instance_id),
@@ -311,36 +495,47 @@ class FactoryControlService:
         return self.plugin_registry.list_plugins()
 
     def describe_foundation(self) -> FoundationOverview:
+        interfaces = [
+            FoundationInterface(
+                id="cli",
+                label="CLI control surface",
+                transport="direct-python",
+                entrypoint="ai_factory.cli:main",
+            ),
+            FoundationInterface(
+                id="tui",
+                label="Terminal dashboard",
+                transport="direct-python",
+                entrypoint="ai_factory.tui:run_tui",
+            ),
+            FoundationInterface(
+                id="web_api",
+                label="FastAPI control API",
+                transport="http+sse",
+                entrypoint="inference.app.main:app",
+            ),
+            FoundationInterface(
+                id="desktop",
+                label="Desktop shell",
+                transport="http+sse",
+                entrypoint="desktop/",
+                status="planned",
+            ),
+        ]
+        plugins = self.list_plugins()
         return FoundationOverview(
             repo_root=str(self.settings.repo_root),
             artifacts_dir=str(self.settings.artifacts_dir),
             control_db_path=str(self.settings.control_db_path),
-            interfaces=[
-                FoundationInterface(
-                    id="cli",
-                    label="CLI control surface",
-                    transport="direct-python",
-                    entrypoint="ai_factory.cli:main",
-                ),
-                FoundationInterface(
-                    id="tui",
-                    label="Terminal dashboard",
-                    transport="direct-python",
-                    entrypoint="ai_factory.tui:run_tui",
-                ),
-                FoundationInterface(
-                    id="web_api",
-                    label="FastAPI control API",
-                    transport="http+sse",
-                    entrypoint="inference.app.main:app",
-                ),
-                FoundationInterface(
-                    id="desktop",
-                    label="Desktop shell",
-                    transport="http+sse",
-                    entrypoint="desktop/",
-                    status="planned",
-                ),
-            ],
-            plugins=self.list_plugins(),
+            summary={
+                "interface_count": len(interfaces),
+                "available_interface_count": len([item for item in interfaces if item.status == "available"]),
+                "planned_interface_count": len([item for item in interfaces if item.status == "planned"]),
+                "plugin_count": len(plugins),
+                "repo_root_exists": self.settings.repo_root.exists(),
+                "artifacts_dir_exists": self.settings.artifacts_dir.exists(),
+                "control_db_exists": self.settings.control_db_path.exists(),
+            },
+            interfaces=interfaces,
+            plugins=plugins,
         )

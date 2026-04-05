@@ -17,11 +17,23 @@ def difficulty_score(level: str | None) -> int:
 
 
 def load_jsonl(path: str) -> list[dict[str, Any]]:
+    path_obj = Path(path).expanduser()
+    if not path_obj.exists():
+        raise FileNotFoundError(f"JSONL dataset not found: {path_obj}")
     records: list[dict[str, Any]] = []
-    for line in Path(path).read_text().splitlines():
+    for line_number, line in enumerate(path_obj.read_text().splitlines(), start=1):
         line = line.strip()
-        if line:
-            records.append(json.loads(line))
+        if not line:
+            continue
+        try:
+            record = json.loads(line)
+        except json.JSONDecodeError as exc:
+            raise ValueError(f"Invalid JSONL record in {path_obj} at line {line_number}: {exc.msg}") from exc
+        if not isinstance(record, dict):
+            raise ValueError(
+                f"Expected object record in {path_obj} at line {line_number}, got {type(record).__name__}."
+            )
+        records.append(record)
     return records
 
 
@@ -71,7 +83,16 @@ def compute_sample_weight(record: dict[str, Any], data_config: DataConfig) -> fl
 
 def build_messages(record: dict[str, Any], data_config: DataConfig) -> list[dict[str, str]]:
     if "messages" in record:
-        return record["messages"]
+        messages = record["messages"]
+        if not isinstance(messages, list):
+            raise ValueError(f"Dataset record messages field must be a list: {record.get('id', '<unknown>')}")
+        return messages
+    question = record.get("question")
+    solution = record.get("solution")
+    if not isinstance(question, str) or not question.strip():
+        raise ValueError(f"Dataset record is missing a non-empty question field: {record.get('id', '<unknown>')}")
+    if not isinstance(solution, str) or not solution.strip():
+        raise ValueError(f"Dataset record is missing a non-empty solution field: {record.get('id', '<unknown>')}")
     topic_line = f"Topic: {record.get('topic', 'general')}.\n" if data_config.include_topic_prefix else ""
     difficulty_line = f"Difficulty: {record.get('difficulty', 'hard')}.\n"
     source_line = f"Source style: {record.get('source', 'unknown')}.\n" if data_config.include_source_tag else ""
@@ -89,12 +110,12 @@ def build_messages(record: dict[str, Any], data_config: DataConfig) -> list[dict
         "Solve the following math problem. Show the reasoning step by step and end with "
         "`Final Answer: ...`.\n"
         f"{topic_line}{source_line}{difficulty_line}{failure_line}{verification_line}\n"
-        f"Problem:\n{record['question']}"
+        f"Problem:\n{question}"
     )
     return [
         {"role": "system", "content": data_config.system_prompt},
         {"role": "user", "content": user_prompt},
-        {"role": "assistant", "content": record["solution"]},
+        {"role": "assistant", "content": solution},
     ]
 
 

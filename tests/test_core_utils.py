@@ -333,6 +333,9 @@ def test_load_benchmark_registry_returns_list(tmp_path: Path) -> None:
 def test_resolve_benchmark_file_by_id(tmp_path: Path) -> None:
     from evaluation.benchmark_registry import resolve_benchmark_file
 
+    benchmark_path = tmp_path / "data" / "math500.jsonl"
+    benchmark_path.parent.mkdir(parents=True, exist_ok=True)
+    benchmark_path.write_text("[]\n")
     registry_path = tmp_path / "registry.yaml"
     registry_path.write_text("benchmarks:\n  - id: math500\n    path: data/math500.jsonl\n")
     path, entry = resolve_benchmark_file(registry_path, benchmark_id="math500")
@@ -343,10 +346,23 @@ def test_resolve_benchmark_file_by_id(tmp_path: Path) -> None:
 def test_resolve_benchmark_file_by_path(tmp_path: Path) -> None:
     from evaluation.benchmark_registry import resolve_benchmark_file
 
+    benchmark_path = tmp_path / "custom" / "bench.jsonl"
+    benchmark_path.parent.mkdir(parents=True, exist_ok=True)
+    benchmark_path.write_text("[]\n")
     registry_path = tmp_path / "registry.yaml"
     registry_path.write_text("benchmarks: []\n")
     path, entry = resolve_benchmark_file(registry_path, benchmark_file="custom/bench.jsonl")
     assert path == "custom/bench.jsonl"
+
+
+def test_resolve_benchmark_file_rejects_missing_path(tmp_path: Path) -> None:
+    from evaluation.benchmark_registry import resolve_benchmark_file
+
+    registry_path = tmp_path / "registry.yaml"
+    registry_path.write_text("benchmarks: []\n")
+
+    with pytest.raises(FileNotFoundError, match="Benchmark file not found"):
+        resolve_benchmark_file(registry_path, benchmark_file=str(tmp_path / "missing.jsonl"))
 
 
 def test_resolve_benchmark_file_raises_for_unknown_id(tmp_path: Path) -> None:

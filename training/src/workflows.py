@@ -104,6 +104,9 @@ def normalize_huggingface_dataset_reference(value: str) -> dict[str, str]:
         dataset_id, revision = dataset_id.split("@", 1)
         dataset_id = dataset_id.strip()
         revision = revision.strip() or None
+    dataset_id = dataset_id.strip()
+    if not dataset_id:
+        raise ValueError("Empty Hugging Face dataset reference.")
     payload = {"path": dataset_id, "split": split}
     if revision:
         payload["revision"] = revision
@@ -168,12 +171,14 @@ def build_source_specs(
         )
 
     for local_dataset in local_datasets or []:
-        path = Path(local_dataset)
+        path = Path(local_dataset).expanduser()
+        if not path.exists():
+            raise FileNotFoundError(f"Local dataset not found: {path}")
         specs.append(
             {
                 "id": slugify(path.stem or path.name),
                 "kind": "local",
-                "path": str(path),
+                "path": str(path.resolve()),
             }
         )
 

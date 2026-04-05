@@ -15,15 +15,32 @@ from ai_factory.core.instances.models import (
     DeploymentTarget,
     EnvironmentSpec,
     InstanceManifest,
+    InstanceStatus,
+    InstanceType,
     LifecycleProfile,
     UserLevel,
 )
-from ai_factory.core.orchestration.models import OrchestrationEvent, OrchestrationRun, OrchestrationTask
+from ai_factory.core.orchestration.models import (
+    AgentType,
+    OrchestrationEvent,
+    OrchestrationRun,
+    OrchestrationTask,
+    RunStatus,
+    TaskStatus,
+    TaskType,
+)
 
 ModelVariant = str
 Difficulty = Literal["easy", "medium", "hard", "olympiad"]
 SolverMode = Literal["rigorous", "exam", "concise", "verification"]
 OutputFormat = Literal["text", "json"]
+InstanceTypeFilter = InstanceType
+InstanceStatusFilter = InstanceStatus
+RunStatusFilter = RunStatus
+TaskStatusFilter = TaskStatus
+TaskTypeFilter = TaskType
+AgentTypeFilter = AgentType
+EventLevelFilter = Literal["debug", "info", "warning", "error"]
 
 
 class CandidateVerification(BaseModel):
@@ -262,6 +279,13 @@ class OrchestrationTaskListResponse(BaseModel):
 class OrchestrationEventListResponse(BaseModel):
     model_config = ConfigDict(strict=True)
     events: list[OrchestrationEvent | dict[str, Any]]
+
+
+class OrchestrationRecoveryResponse(BaseModel):
+    model_config = ConfigDict(strict=True)
+    recovered_task_ids: list[str] = Field(default_factory=list)
+    recovered_count: int = 0
+    summary: dict[str, Any] = Field(default_factory=dict)
 
 
 class OrchestrationRunDetail(BaseModel):

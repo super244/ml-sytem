@@ -398,9 +398,36 @@ class InstanceManager:
 
     def start_instance(self, instance_id: str) -> InstanceManifest:
         manifest = self.store.load(instance_id)
+        if manifest.status == "completed":
+            raise ValueError(f"Instance {instance_id} is already completed and cannot be started again.")
+        if manifest.status == "running":
+            return self._project_manifest(manifest)
         snapshot = self.store.load_config_snapshot(instance_id)
         config = build_orchestration_config(snapshot, config_path=manifest.config_path)
         self.orchestration.ensure_run_for_instance(manifest, snapshot)
+        task = self.orchestration.control_plane.get_task_by_legacy_instance(instance_id)
+        task_readiness = getattr(self.orchestration, "task_readiness", None)
+        if callable(task_readiness) and task is not None:
+            readiness = task_readiness(task.id)
+            if not readiness.get("ready", True):
+                blockers = [str(item) for item in readiness.get("blockers", []) if item]
+                blocker_text = ", ".join(blockers) if blockers else "orchestration blockers"
+                manifest.progress = self._progress(
+                    stage="blocked",
+                    message=f"Waiting for {blocker_text} before starting.",
+                    percent=0.0,
+                    metrics={"blockers": blockers},
+                )
+                self.store.save(self._project_manifest(manifest))
+                self.store.append_event(
+                    instance_id,
+                    InstanceEvent(
+                        type="instance.start_deferred",
+                        message=f"Waiting for {blocker_text} before starting.",
+                        payload={"blockers": blockers},
+                    ),
+                )
+                return self._project_manifest(manifest)
         self.orchestration.recover_stalled_tasks()
         try:
             command = build_command(config, manifest, plugin_registry=self.plugin_registry)
@@ -1387,7 +1414,7 @@ class InstanceManager:
             "run": run.model_dump(mode="json"),
             "tasks": tasks,
             "events": events,
-            "summary": self.orchestration.monitoring_summary(),
+            "summary": self.orchestration.summarize_run(run.id),
         }
 
     def list_orchestration_events(self, legacy_or_run_id: str, *, limit: int | None = None) -> list[dict[str, Any]]:
@@ -1395,15 +1422,40 @@ class InstanceManager:
 
     def cancel_instance(self, instance_id: str) -> InstanceManifest:
         legacy_instance_id = self._legacy_instance_id(instance_id)
+        run = self.orchestration.control_plane.get_run(legacy_instance_id) or self.orchestration.control_plane.get_run_by_legacy_instance(
+            legacy_instance_id
+        )
+        if run is not None and run.status in {"completed", "failed", "cancelled"}:
+            return self._project_manifest(self.store.load(legacy_instance_id))
         self.orchestration.cancel_run(legacy_instance_id)
         manifest = self.store.load(legacy_instance_id)
         manifest.status = "failed"
+        if manifest.execution is None:
+            manifest.execution = ExecutionHandle(
+                backend="ssh" if manifest.environment.kind == "cloud" else "local",
+                stdout_path=str(self.store.stdout_path(legacy_instance_id)),
+                stderr_path=str(self.store.stderr_path(legacy_instance_id)),
+            )
+        manifest.execution.ended_at = utc_now_iso()
+        if manifest.execution.exit_code is None:
+            manifest.execution.exit_code = 130
+        if manifest.error is None:
+            manifest.error = InstanceError(
+                code="cancelled",
+                message="Instance was cancelled.",
+                details={"instance_id": legacy_instance_id},
+            )
         manifest.progress = self._progress(stage="cancelled", message="Instance was cancelled.")
         self.store.save(self._project_manifest(manifest))
         return self._project_manifest(manifest)
 
     def retry_instance(self, instance_id: str) -> InstanceManifest:
         legacy_instance_id = self._legacy_instance_id(instance_id)
+        task = self.orchestration.control_plane.get_task_by_legacy_instance(legacy_instance_id)
+        if task is None:
+            raise FileNotFoundError(f"Unknown orchestration task for {legacy_instance_id}")
+        if task.status not in {"retry_waiting", "dead_lettered", "failed"}:
+            raise ValueError(f"Instance {legacy_instance_id} is not retryable while task status is '{task.status}'.")
         self.orchestration.retry_task(legacy_instance_id)
         return self.start_instance(legacy_instance_id)
 
@@ -1413,7 +1465,7 @@ class InstanceManager:
 
     def dispatch_ready_tasks(self) -> list[str]:
         started: list[str] = []
-        for task in self.orchestration.ready_tasks():
+        for task in asyncio.run(self.orchestration.dispatch_ready_legacy_tasks()):
             legacy_instance_id = task.legacy_instance_id
             if not legacy_instance_id:
                 continue

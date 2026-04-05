@@ -141,6 +141,79 @@ def test_manager_creates_runs_and_finalizes_instances(tmp_path: Path, monkeypatc
     assert manager.list_instances(parent_instance_id=created.id)[0].type == "evaluate"
 
 
+def test_manager_defers_primary_start_until_preprocess_dependency_clears(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _prime_manager_packages(monkeypatch)
+    models = importlib.import_module("ai_factory.core.instances.models")
+    store_mod = importlib.import_module("ai_factory.core.instances.store")
+    manager_mod = importlib.import_module("ai_factory.core.instances.manager")
+
+    profile_dir = tmp_path / "training" / "configs" / "profiles"
+    profile_dir.mkdir(parents=True)
+    (profile_dir / "baseline_qlora.yaml").write_text("run_name: demo-run\ntraining:\n  artifacts_dir: artifacts\n")
+    prepare_config = tmp_path / "configs" / "prepare.yaml"
+    prepare_config.parent.mkdir(parents=True, exist_ok=True)
+    prepare_config.write_text(
+        "\n".join(
+            [
+                "instance:",
+                "  type: prepare",
+                "  environment: local",
+                "subsystem:",
+                "  config_ref: ../training/configs/profiles/baseline_qlora.yaml",
+            ]
+        )
+    )
+    train_config = tmp_path / "configs" / "train.yaml"
+    train_config.write_text(
+        "\n".join(
+            [
+                "instance:",
+                "  type: train",
+                "  environment: local",
+                "sub_agents:",
+                "  enabled: true",
+                "  workloads:",
+                "    - preprocess",
+                "pipeline:",
+                f"  default_prepare_config: {prepare_config}",
+                "subsystem:",
+                "  config_ref: ../training/configs/profiles/baseline_qlora.yaml",
+            ]
+        )
+    )
+
+    store = store_mod.FileInstanceStore(tmp_path)
+    manager = manager_mod.InstanceManager(store)
+    started: list[tuple[str, str]] = []
+    fake_handle = models.ExecutionHandle(backend="local", pid=101, stdout_path="stdout", stderr_path="stderr")
+    monkeypatch.setattr(
+        manager_mod,
+        "build_command",
+        lambda config, manifest, plugin_registry=None: types.SimpleNamespace(argv=["python", manifest.type]),
+    )
+    monkeypatch.setattr(
+        manager_mod.LocalExecutor,
+        "start",
+        lambda self, manifest, command, *, artifacts_dir, stdout_path, stderr_path: started.append(
+            (manifest.id, manifest.type)
+        )
+        or fake_handle,
+    )
+
+    created = manager.create_instance(str(train_config), start=True)
+    children = manager.list_instances(parent_instance_id=created.id)
+
+    assert created.execution is None
+    assert created.progress is not None
+    assert created.progress.stage in {"blocked", "queued"}
+    assert len(children) == 1
+    assert children[0].type == "prepare"
+    assert started == [(children[0].id, "prepare")]
+
+
 def test_manager_can_create_evaluation_children(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     _prime_manager_packages(monkeypatch)
     models = importlib.import_module("ai_factory.core.instances.models")
@@ -355,6 +428,10 @@ def test_manager_projects_live_training_state_from_artifacts(tmp_path: Path, mon
                 "instance:",
                 "  type: train",
                 "  environment: local",
+                "sub_agents:",
+                "  enabled: false",
+                "feedback_loop:",
+                "  queue_follow_up_evaluation: false",
                 "subsystem:",
                 "  config_ref: ../training/configs/profiles/baseline_qlora.yaml",
             ]
@@ -543,3 +620,69 @@ def test_manager_finalize_evaluation_can_recommend_inference(
     assert finalized.decision.action == "open_inference"
     assert any(item.action == "open_inference" for item in finalized.recommendations)
     assert any(item["action"] == "open_inference" for item in actions)
+
+
+def test_manager_cancel_is_noop_for_completed_instances_and_retry_is_rejected(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _prime_manager_packages(monkeypatch)
+    models = importlib.import_module("ai_factory.core.instances.models")
+    store_mod = importlib.import_module("ai_factory.core.instances.store")
+    manager_mod = importlib.import_module("ai_factory.core.instances.manager")
+
+    profile_dir = tmp_path / "training" / "configs" / "profiles"
+    profile_dir.mkdir(parents=True)
+    (profile_dir / "baseline_qlora.yaml").write_text("run_name: demo-run\ntraining:\n  artifacts_dir: artifacts\n")
+    config_path = tmp_path / "configs" / "train.yaml"
+    config_path.parent.mkdir(parents=True, exist_ok=True)
+    config_path.write_text(
+        "\n".join(
+            [
+                "instance:",
+                "  type: train",
+                "  environment: local",
+                "sub_agents:",
+                "  enabled: false",
+                "feedback_loop:",
+                "  queue_follow_up_evaluation: false",
+                "subsystem:",
+                "  config_ref: ../training/configs/profiles/baseline_qlora.yaml",
+            ]
+        )
+    )
+
+    store = store_mod.FileInstanceStore(tmp_path)
+    manager = manager_mod.InstanceManager(store)
+    fake_handle = models.ExecutionHandle(backend="local", pid=102, stdout_path="stdout", stderr_path="stderr")
+    monkeypatch.setattr(
+        manager_mod,
+        "build_command",
+        lambda config, manifest, plugin_registry=None: types.SimpleNamespace(argv=["python", manifest.type]),
+    )
+    monkeypatch.setattr(
+        manager_mod.LocalExecutor,
+        "start",
+        lambda self, manifest, command, *, artifacts_dir, stdout_path, stderr_path: fake_handle,
+    )
+    monkeypatch.setattr(
+        manager_mod,
+        "collect_metrics_for_instance",
+        lambda manifest, snapshot, collect_gpu=True: (
+            {"accuracy": 0.93},
+            [models.MetricPoint(name="accuracy", value=0.93)],
+            {"run_dir": "artifacts/runs/demo"},
+        ),
+    )
+
+    created = manager.create_instance(str(config_path), start=True)
+    completed = manager.finalize_instance(created.id, 0)
+    cancelled = manager.cancel_instance(created.id)
+
+    assert completed.status == "completed"
+    assert cancelled.status == "completed"
+    assert cancelled.progress is not None
+    assert cancelled.progress.stage == "completed"
+
+    with pytest.raises(ValueError, match="not retryable"):
+        manager.retry_instance(created.id)
