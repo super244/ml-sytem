@@ -9,7 +9,7 @@ from peft import LoraConfig, get_peft_model, prepare_model_for_kbit_training
 from transformers import AutoConfig, AutoModelForCausalLM, AutoTokenizer, BitsAndBytesConfig
 from transformers.utils import is_flash_attn_2_available
 
-from training.src.config import ExperimentConfig
+from training.src.config import ExperimentConfig, resolve_path_reference
 from training.src.scaling import resolve_scratch_architecture
 
 logger = logging.getLogger(__name__)
@@ -42,18 +42,32 @@ def build_quantization_config(config: ExperimentConfig) -> BitsAndBytesConfig | 
     return None
 
 
-def resolve_tokenizer_reference(config: ExperimentConfig) -> str:
+def resolve_tokenizer_reference(config: ExperimentConfig, *, require_local_path: bool = False) -> str:
     if config.model.tokenizer_path:
-        tokenizer_path = Path(config.model.tokenizer_path).expanduser()
+        tokenizer_path = (
+            resolve_path_reference(config.model.tokenizer_path, config.config_path)
+            or Path(config.model.tokenizer_path).expanduser()
+        )
         if tokenizer_path.exists():
             return str(tokenizer_path)
+        if require_local_path:
+            raise FileNotFoundError(
+                "Scratch training requires a local tokenizer artifact at "
+                f"{tokenizer_path}. Run `python training/scripts/train_tokenizer.py --config "
+                f"{config.config_path} --output-dir {config.model.tokenizer_path}` first."
+            )
+        logger.warning(
+            "Tokenizer path %s does not exist; falling back to tokenizer_name=%s.",
+            tokenizer_path,
+            config.model.tokenizer_name or config.model.base_model_name,
+        )
     if config.model.tokenizer_name:
         return config.model.tokenizer_name
     return config.model.base_model_name
 
 
-def load_tokenizer(config: ExperimentConfig) -> Any:
-    tokenizer_name = resolve_tokenizer_reference(config)
+def load_tokenizer(config: ExperimentConfig, *, require_local_path: bool = False) -> Any:
+    tokenizer_name = resolve_tokenizer_reference(config, require_local_path=require_local_path)
     tokenizer = AutoTokenizer.from_pretrained(
         tokenizer_name,
         trust_remote_code=config.model.trust_remote_code,

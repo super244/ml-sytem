@@ -8,7 +8,7 @@ COVERAGE_ARGS = --cov=ai_factory --cov=data --cov=training --cov=evaluation --co
 .PHONY: data-generate data-prepare data-validate data-audit data-preview
 
 # Training Operations
-.PHONY: train train-dry validate-model
+.PHONY: train train-dry train-preflight validate-model
 
 # Evaluation Operations
 .PHONY: evaluate analyze-failures
@@ -37,6 +37,7 @@ help:
 	@echo "Data:       make data-generate    Generate synthetic datasets"
 	@echo "            make data-prepare     Normalize + pack datasets"
 	@echo "Training:   make train-dry        Dry-run training validation"
+	@echo "            make train-preflight  Hard fail preflight before a real run"
 	@echo "            make train            Run full training"
 	@echo "Eval:       make evaluate         Run evaluation pipeline"
 
@@ -102,6 +103,9 @@ train:
 
 train-dry:
 	$(PYTHON) -m training.train --config training/configs/profiles/failure_aware.yaml --dry-run
+
+train-preflight:
+	$(PYTHON) -m ai_factory.cli train-preflight --config training/configs/profiles/failure_aware.yaml
 
 validate-model:
 	$(PYTHON) -m training.train --config training/configs/profiles/failure_aware.yaml --dry-run --validate-model-load

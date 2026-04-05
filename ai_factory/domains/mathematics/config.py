@@ -37,7 +37,7 @@ class MathDomainConfig(BaseModel):
 
     # Default models for this domain
     default_models: list[str] = Field(
-        default_factory=lambda: [default_foundation_model_ref("2b"), default_foundation_model_ref("12b")]
+        default_factory=lambda: ["Qwen/Qwen2.5-Math-1.5B-Instruct", default_foundation_model_ref("12b")]
     )
 
     # Specialized evaluation benchmarks

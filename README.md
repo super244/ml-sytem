@@ -107,6 +107,9 @@ python data/prepare_dataset.py --config data/configs/processing.yaml
 # Validate the training path
 python -m training.train --config training/configs/profiles/baseline_qlora.yaml --dry-run
 
+# Hard fail preflight before a real run
+ai-factory train-preflight --config training/configs/profiles/failure_aware.yaml
+
 # Serve the API
 ai-factory serve --host 127.0.0.1 --port 8000
 

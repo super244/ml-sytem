@@ -209,6 +209,8 @@ def main() -> None:
     logger.info("Loading experiment config.")
     config = load_experiment_config(args.config)
     validation_warnings = validate_experiment_config(config)
+    for warning in validation_warnings:
+        logger.warning("Config validation: %s", warning)
     set_seed(config.seed)
 
     layout = prepare_run_layout(config.training.artifacts_dir, config.run_name)
@@ -216,6 +218,9 @@ def main() -> None:
         layout.checkpoints_dir,
         explicit_checkpoint=args.resume_from_checkpoint,
         resume_from_latest=args.resume_from_latest_checkpoint,
+        artifacts_dir=config.training.artifacts_dir,
+        run_name=config.run_name,
+        exclude_run_id=layout.run_id,
     )
     config_snapshot_path = save_config_snapshot(config, layout)
     config_report_path, config_report = write_config_report(
@@ -278,7 +283,12 @@ def main() -> None:
     validate_model_load = args.validate_model_load or config.runtime.validate_model_load
 
     logger.info("Loading tokenizer.")
-    tokenizer = load_tokenizer(config) if (not args.dry_run or validate_model_load) else None
+    require_local_tokenizer = config.model.initialization.lower() == "scratch" and not args.dry_run
+    tokenizer = (
+        load_tokenizer(config, require_local_path=require_local_tokenizer)
+        if (not args.dry_run or validate_model_load)
+        else None
+    )
 
     dry_validation = run_dry_validation(config, tokenizer)
     write_json(layout.metrics_dir / "dry_run_validation.json", dry_validation)
@@ -412,7 +422,7 @@ def main() -> None:
         )
 
         logger.info("Starting training loop.")
-        trainer.train(resume_from_checkpoint=args.resume_from_checkpoint)
+        trainer.train(resume_from_checkpoint=resume_from_checkpoint)
 
         logger.info("Training complete. Evaluating.")
         metrics = trainer.evaluate() if eval_dataset is not None else {}

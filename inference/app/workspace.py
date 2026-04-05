@@ -194,6 +194,13 @@ def _build_command_recipes() -> list[dict[str, str]]:
             "serve",
         ),
         _command_recipe(
+            "train-preflight",
+            "Training preflight",
+            "Validate training inputs, artifacts, hardware, and tokenizer readiness before a real launch.",
+            "ai-factory train-preflight --config training/configs/profiles/failure_aware.yaml",
+            "training",
+        ),
+        _command_recipe(
             "baseline-dry-run",
             "Baseline dry-run",
             ("Validate the default local specialist profile without entering a full training loop."),

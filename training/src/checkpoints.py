@@ -70,6 +70,37 @@ def find_latest_checkpoint(checkpoints_dir: str | Path) -> Path | None:
     return max(checkpoints, key=lambda c: (c.step, c.modified_at)).path
 
 
+def find_latest_checkpoint_in_artifacts(
+    artifacts_dir: str | Path,
+    run_name: str,
+    *,
+    exclude_run_id: str | None = None,
+) -> Path | None:
+    runs_dir = Path(artifacts_dir) / "runs"
+    if not runs_dir.exists():
+        return None
+
+    candidates: list[CheckpointInfo] = []
+    run_prefix = f"{run_name}-"
+    for run_dir in sorted(runs_dir.iterdir()):
+        if not run_dir.is_dir():
+            continue
+        if exclude_run_id and run_dir.name == exclude_run_id:
+            continue
+        if run_dir.name != run_name and not run_dir.name.startswith(run_prefix):
+            continue
+        latest = find_latest_checkpoint(run_dir / "checkpoints")
+        if latest is None:
+            continue
+        info = inspect_checkpoint(latest)
+        if info is not None:
+            candidates.append(info)
+
+    if not candidates:
+        return None
+    return max(candidates, key=lambda c: (c.step, c.modified_at)).path
+
+
 def validate_checkpoint(ckpt_path: str | Path) -> list[str]:
     path = Path(ckpt_path)
     errors: list[str] = []
@@ -95,12 +126,19 @@ def resolve_resume_checkpoint(
     checkpoint_dir: str | Path,
     explicit_checkpoint: str | None = None,
     resume_from_latest: bool = False,
+    *,
+    artifacts_dir: str | Path | None = None,
+    run_name: str | None = None,
+    exclude_run_id: str | None = None,
 ) -> tuple[str | None, dict[str, Any]]:
     report: dict[str, Any] = {
         "checkpoint_dir": str(checkpoint_dir),
         "explicit_checkpoint": explicit_checkpoint,
         "resume_from_latest": resume_from_latest,
+        "artifacts_dir": str(artifacts_dir) if artifacts_dir is not None else None,
+        "run_name": run_name,
         "resolved": None,
+        "source": None,
         "validation_errors": [],
         "available_checkpoints": [],
     }
@@ -122,5 +160,19 @@ def resolve_resume_checkpoint(
         report["validation_errors"] = errors
         if not errors:
             report["resolved"] = str(latest)
+            report["source"] = "run_directory"
             return str(latest), report
+    if artifacts_dir and run_name:
+        latest = find_latest_checkpoint_in_artifacts(
+            artifacts_dir,
+            run_name,
+            exclude_run_id=exclude_run_id,
+        )
+        if latest is not None:
+            errors = validate_checkpoint(latest)
+            report["validation_errors"] = errors
+            if not errors:
+                report["resolved"] = str(latest)
+                report["source"] = "artifacts_runs"
+                return str(latest), report
     return None, report

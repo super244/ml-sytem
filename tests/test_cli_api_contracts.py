@@ -62,6 +62,14 @@ def test_cli_parse_args_supports_tui_command(monkeypatch) -> None:
     assert args.command == "workspace"
     assert args.root == "/tmp/project"
 
+    monkeypatch.setattr(
+        "sys.argv",
+        ["ai-factory", "train-preflight", "--config", "training/configs/profiles/failure_aware.yaml"],
+    )
+    args = ai_factory_cli.parse_args()
+    assert args.command == "train-preflight"
+    assert args.config == "training/configs/profiles/failure_aware.yaml"
+
 
 def test_cli_parse_args_supports_control_center_new_and_inference(monkeypatch) -> None:
     monkeypatch.setattr(
