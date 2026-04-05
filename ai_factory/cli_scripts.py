@@ -273,6 +273,7 @@ def cmd_doctor(args: argparse.Namespace) -> None:
 
     recommended_next_steps = [
         "ai-factory refresh-lab",
+        "ai-factory train-preflight --config training/configs/profiles/failure_aware.yaml",
         "ai-factory serve --host 127.0.0.1 --port 8000",
         "ai-factory api-smoke",
     ]

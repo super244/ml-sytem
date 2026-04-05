@@ -7,7 +7,7 @@ from typing import Any
 
 from ai_factory.core.datasets import compute_record_stats
 from ai_factory.core.io import write_json, write_markdown
-from training.src.data import load_jsonl
+from training.src.data import load_records
 
 
 def count_parameters(model: Any) -> dict[str, int]:
@@ -25,12 +25,13 @@ def count_parameters(model: Any) -> dict[str, int]:
     }
 
 
-def dataset_summary(path: str, max_preview: int = 3) -> dict[str, Any]:
-    rows = load_jsonl(path)
+def dataset_summary(path: str, max_preview: int = 3, *, split: str | None = None) -> dict[str, Any]:
+    rows = load_records(path, split=split)
     lengths = [len(row.get("question", "")) + len(row.get("solution", "")) for row in rows]
     preview = rows[:max_preview]
     return {
         "path": path,
+        "split": split,
         "num_rows": len(rows),
         "avg_question_solution_chars": mean(lengths) if lengths else 0.0,
         "preview_ids": [row.get("id") for row in preview],

@@ -148,13 +148,14 @@ class AgentRegistry:
             DeploymentAgent.descriptor,
         )
         self._agents: dict[AgentType, AgentDescriptor] = {
-            descriptor.agent_type: descriptor
-            for descriptor in descriptors
+            descriptor.agent_type: descriptor for descriptor in descriptors
         }
         self._ordered_agents: tuple[AgentDescriptor, ...] = descriptors
         self._task_type_index: dict[TaskType, tuple[AgentDescriptor, ...]] = {}
         for task_type in SUPPORTED_TASK_TYPES:
-            matching = tuple(descriptor for descriptor in self._ordered_agents if descriptor.supports_task_type(task_type))
+            matching = tuple(
+                descriptor for descriptor in self._ordered_agents if descriptor.supports_task_type(task_type)
+            )
             if matching:
                 self._task_type_index[task_type] = matching
 

@@ -12,6 +12,7 @@ import {
 } from '@/lib/api';
 import { FALLBACK_EXAMPLES, FALLBACK_MODELS, FALLBACK_PROMPTS } from '@/lib/demo-content';
 import { formatCount, formatLatency, formatPercent } from '@/lib/formatting';
+import { formatModelTitle } from '@/lib/model-metadata';
 import { DIFFICULTY_OPTIONS, OUTPUT_FORMAT_OPTIONS, SOLVER_MODE_OPTIONS } from '@/lib/options';
 import {
   isDemoMode,
@@ -164,7 +165,7 @@ export function CompareLab() {
               >
                 {models.map((model) => (
                   <option key={model.name} value={model.name}>
-                    {model.label ?? model.name}
+                    {formatModelTitle(model)}
                   </option>
                 ))}
               </select>
@@ -177,7 +178,7 @@ export function CompareLab() {
               >
                 {models.map((model) => (
                   <option key={model.name} value={model.name}>
-                    {model.label ?? model.name}
+                    {formatModelTitle(model)}
                   </option>
                 ))}
               </select>

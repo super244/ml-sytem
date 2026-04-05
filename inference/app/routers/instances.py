@@ -83,7 +83,8 @@ async def stream_instance(
     metric_tail_points: int = Query(default=200, ge=10, le=2000),
     event_limit: int = Query(default=50, ge=1, le=500),
     task_limit: int = Query(default=20, ge=1, le=200),
-    service: Any = Depends(get_instance_service)) -> StreamingResponse:
+    service: Any = Depends(get_instance_service),
+) -> StreamingResponse:
 
     service.get_live_snapshot(instance_id)
 

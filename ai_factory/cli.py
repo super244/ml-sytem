@@ -261,6 +261,22 @@ def _render_ready_summary(payload: dict[str, Any]) -> None:
         print(f"\n{total - ready} check(s) need attention before full operation.")
 
 
+def _render_training_preflight(payload: dict[str, Any]) -> None:
+    summary = payload.get("summary") or {}
+    print(f"Training preflight: {payload.get('status', 'unknown')}")
+    print(f"profile: {payload.get('profile_name', 'n/a')} | run: {payload.get('run_name', 'n/a')}")
+    print(f"config: {payload.get('config_path', 'n/a')}")
+    print(f"checks: ok={summary.get('ok', 0)} warn={summary.get('warn', 0)} error={summary.get('error', 0)}")
+    for check in payload.get("checks", []):
+        print(f"  [{check.get('status', 'unknown').upper():>5}] {check.get('label', check.get('id', 'check'))}")
+        print(f"         {check.get('detail', '')}")
+    commands = payload.get("recommended_commands") or []
+    if commands:
+        _print_section("Recommended commands")
+        for command in commands:
+            print(f"  - {command}")
+
+
 def _render_titan_status(payload: dict[str, Any]) -> None:
     print(f"Hardware: {payload['silicon']}")
     print(f"Mode: {payload['mode']}")
@@ -603,6 +619,9 @@ def parse_args() -> argparse.Namespace:
     ready_parser = subparsers.add_parser("ready", parents=[common_json])
     ready_parser.add_argument("--root")
 
+    preflight_parser = subparsers.add_parser("train-preflight", parents=[common_json])
+    preflight_parser.add_argument("--config", required=True)
+
     compare_parser = subparsers.add_parser("compare", parents=[common_json])
     compare_parser.add_argument("left_instance_id")
     compare_parser.add_argument("right_instance_id", nargs="?")
@@ -685,6 +704,18 @@ def main() -> None:
             _render_ready_summary(payload)
         else:
             _render_workspace_overview(payload)
+        return
+
+    if args.command == "train-preflight":
+        from training.src.preflight import build_training_preflight_report
+
+        payload = build_training_preflight_report(args.config)
+        if args.json:
+            _render_payload(payload, as_json=True)
+        else:
+            _render_training_preflight(payload)
+        if (payload.get("summary") or {}).get("error", 0):
+            raise SystemExit(1)
         return
 
     if args.command in {"doctor", "api-smoke", "latest-run", "refresh-lab"}:

@@ -177,6 +177,21 @@ def compute_record_stats(records: list[dict[str, Any]]) -> dict[str, Any]:
     pack_counts = Counter(record.get("pack_id", "unknown") for record in records)
     reasoning_counts = Counter(record.get("reasoning_style", "mixed") for record in records)
     quality_scores = [float(record.get("quality_score", 0.0) or 0.0) for record in records]
+
+    def _quantile(values: list[float], fraction: float) -> float:
+        if not values:
+            return 0.0
+        if len(values) == 1:
+            return round(values[0], 4)
+        ordered = sorted(values)
+        position = (len(ordered) - 1) * fraction
+        lower = int(position)
+        upper = min(len(ordered) - 1, lower + 1)
+        if lower == upper:
+            return round(ordered[lower], 4)
+        weight = position - lower
+        return round(ordered[lower] * (1.0 - weight) + ordered[upper] * weight, 4)
+
     return {
         "num_records": len(records),
         "difficulty_counts": dict(difficulty_counts),
@@ -187,6 +202,12 @@ def compute_record_stats(records: list[dict[str, Any]]) -> dict[str, Any]:
         "failure_case_count": sum(1 for record in records if record.get("failure_case")),
         "verification_ready_count": sum(1 for record in records if record.get("step_checks")),
         "avg_quality_score": round(mean(quality_scores), 4) if quality_scores else 0.0,
+        "quality_score_summary": {
+            "min": round(min(quality_scores), 4) if quality_scores else 0.0,
+            "max": round(max(quality_scores), 4) if quality_scores else 0.0,
+            "p50": _quantile(quality_scores, 0.5),
+            "p90": _quantile(quality_scores, 0.9),
+        },
         "contaminated_count": sum(
             1
             for record in records

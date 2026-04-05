@@ -148,10 +148,7 @@ def _build_readiness_checks(repo_root: Path) -> list[dict[str, Any]]:
             "detail": (
                 "Training and dataset browsing expect valid processed manifest and pack summary outputs."
                 if manifest_status["ok"] and pack_summary_status["ok"]
-                else (
-                    f"manifest: {manifest_status['detail']}; "
-                    f"pack summary: {pack_summary_status['detail']}"
-                )
+                else (f"manifest: {manifest_status['detail']}; pack summary: {pack_summary_status['detail']}")
             ),
         },
         {
@@ -195,6 +192,13 @@ def _build_command_recipes() -> list[dict[str, str]]:
             "Launch the Next.js workspace against the local API.",
             "cd frontend && NEXT_PUBLIC_API_BASE_URL=http://localhost:8000 npm run dev",
             "serve",
+        ),
+        _command_recipe(
+            "train-preflight",
+            "Training preflight",
+            "Validate training inputs, artifacts, hardware, and tokenizer readiness before a real launch.",
+            "ai-factory train-preflight --config training/configs/profiles/failure_aware.yaml",
+            "training",
         ),
         _command_recipe(
             "baseline-dry-run",

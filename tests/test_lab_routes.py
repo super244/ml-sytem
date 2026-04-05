@@ -40,7 +40,7 @@ async def test_dataset_telemetry_routes_support_promote_and_discard(
 
     # Insert test records
     from inference.app.routers.datasets import _telemetry_record_id
-    
+
     rec1 = {
         "timestamp": 101.0,
         "prompt": "bad prompt",
@@ -77,13 +77,13 @@ async def test_dataset_telemetry_routes_support_promote_and_discard(
     assert promote_response.status_code == 200
     assert promote_response.json()["status"] == "promoted"
     assert "db:promoted" in promote_response.json()["destination"]
-    
+
     promoted = db.list_telemetry("promoted")
     assert len(promoted) == 1
 
     assert discard_response.status_code == 200
     assert discard_response.json()["status"] == "discarded"
-    
+
     discarded = db.list_telemetry("discarded")
     assert len(discarded) == 1
 

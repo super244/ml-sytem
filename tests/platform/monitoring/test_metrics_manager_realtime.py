@@ -45,7 +45,14 @@ async def test_monitoring_manager_health_score(monitoring_config: MonitoringConf
             timestamp=datetime.now(timezone.utc),
         )
     ]
-    metrics = {"system": {"cpu_usage": 95, "memory_usage": 40}}
+    metrics = {
+        "system": {"cpu_usage": 95, "memory_usage": 40},
+        "utilization_rollup": {"peak_pct": 95.0, "average_pct": 85.0},
+        "observability": {
+            "anomalies": [{"metric": "cpu_usage", "value": 95.0}],
+            "utilization_rollup": {"peak_pct": 95.0},
+        },
+    }
     score = manager._calculate_health_score(metrics, alerts)
     assert score < 0.6
 
@@ -70,11 +77,19 @@ def test_realtime_monitoring_pipeline_and_alerts() -> None:
     system = RealTimeMonitoringSystem()
     captured: dict[str, object] = {}
     system.streamer.broadcast_update = lambda data: captured.update({"payload": data})
+    system.collector.get_latest_metrics = lambda: {
+        "cpu_usage_pct": 96.0,
+        "memory_usage_mb": 2048.0,
+        "gpu_utilization_pct": 97.0,
+    }
 
     system.start()
     system.process_tick()
     system.stop()
 
     assert "payload" in captured
+    assert "alert_payloads" in captured["payload"]
+    assert captured["payload"]["analysis"]["anomalies"]
+    assert captured["payload"]["alert_payloads"][0]["utilization_rollup"]["metric_count"] >= 1
     status = system.get_status()
     assert status["is_running"] is False

@@ -285,9 +285,15 @@ class InstanceService:
         if status is not None:
             tasks = [task for task in tasks if (task["status"] if isinstance(task, dict) else task.status) == status]
         if task_type is not None:
-            tasks = [task for task in tasks if (task["task_type"] if isinstance(task, dict) else task.task_type) == task_type]
+            tasks = [
+                task for task in tasks if (task["task_type"] if isinstance(task, dict) else task.task_type) == task_type
+            ]
         if agent_type is not None:
-            tasks = [task for task in tasks if (task["agent_type"] if isinstance(task, dict) else task.agent_type) == agent_type]
+            tasks = [
+                task
+                for task in tasks
+                if (task["agent_type"] if isinstance(task, dict) else task.agent_type) == agent_type
+            ]
         if limit is not None:
             tasks = tasks[:limit]
         return OrchestrationTaskListResponse(tasks=tasks)
@@ -312,7 +318,9 @@ class InstanceService:
                 if (event["event_type"] if isinstance(event, dict) else event.event_type) == event_type
             ]
         if level is not None:
-            events = [event for event in events if (event["level"] if isinstance(event, dict) else event.level) == level]
+            events = [
+                event for event in events if (event["level"] if isinstance(event, dict) else event.level) == level
+            ]
         return OrchestrationEventListResponse(events=events)
 
     def cancel_orchestration_run(self, run_id: str) -> OrchestrationRunDetail:

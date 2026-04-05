@@ -37,6 +37,11 @@ def write_run_manifest(
         metadata=metadata,
     )
     write_json(layout.manifests_dir / config.logging.manifest_filename, manifest.model_dump())
+    ensure_latest_pointer(
+        layout.latest_pointer,
+        layout.root,
+        metadata={"run_id": layout.run_id, "run_name": config.run_name, "profile_name": config.profile_name},
+    )
     return manifest
 
 

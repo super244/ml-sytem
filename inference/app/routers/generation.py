@@ -146,6 +146,8 @@ def compare_models(request: CompareRequest, service: Any = Depends(get_generatio
 
 
 @router.post("/generate/batch", response_model=GenerateBatchResponse)
-def generate_batch(request: GenerateBatchRequest, service: Any = Depends(get_generation_service)) -> GenerateBatchResponse:
+def generate_batch(
+    request: GenerateBatchRequest, service: Any = Depends(get_generation_service)
+) -> GenerateBatchResponse:
     results = [generate_answer(item, service=service) for item in request.requests]
     return GenerateBatchResponse(results=results)

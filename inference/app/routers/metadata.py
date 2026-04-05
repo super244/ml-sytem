@@ -41,7 +41,7 @@ def get_model(model_id: str, service: Any = Depends(get_metadata_service)) -> di
         models = service.models()
     except Exception as exc:
         raise HTTPException(status_code=503, detail=f"Metadata service unavailable: {str(exc)}") from exc
-        
+
     for model in models:
         if model["name"] == model_id:
             return _openai_model_record(model)

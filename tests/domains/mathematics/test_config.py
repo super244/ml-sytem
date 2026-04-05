@@ -39,7 +39,8 @@ def test_math_domain_config_default_models():
     """Test default models are properly configured."""
     config = MathDomainConfig()
     assert len(config.default_models) >= 1
-    assert any("Qwen" in model or "Math" in model for model in config.default_models)
+    assert any(model == "Qwen/Qwen2.5-Math-1.5B-Instruct" for model in config.default_models)
+    assert any(model.endswith("artifacts/foundation/qwen2-12b") for model in config.default_models)
 
 
 def test_math_domain_config_benchmarks():

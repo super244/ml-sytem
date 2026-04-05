@@ -6,6 +6,7 @@ from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 
+from data.quality.profiles import build_dataset_profile
 from data.reports.cards import dataset_card_text
 from data.synthesis.base import DatasetSpec, choose_weighted
 from data.synthesis.families import (
@@ -55,6 +56,7 @@ def generate_records(spec: DatasetSpec, target_size_bytes: int, seed: int) -> li
 
 
 def build_catalog_entry(spec: DatasetSpec, output_path: Path, records: list[dict[str, Any]]) -> dict[str, Any]:
+    profile_summary = build_dataset_profile(records, title=spec.title)
     preview_examples = [
         {
             "id": record["id"],
@@ -77,6 +79,8 @@ def build_catalog_entry(spec: DatasetSpec, output_path: Path, records: list[dict
         "description": " / ".join(spec.pedagogical_focus),
         "reasoning_style": spec.reasoning_style,
         "preview_examples": preview_examples,
+        "profile_summary": profile_summary,
+        "quality_summary": profile_summary.get("quality_summary", {}),
     }
     return entry
 

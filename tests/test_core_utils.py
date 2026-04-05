@@ -218,11 +218,7 @@ def test_inspect_json_asset_flags_git_lfs_pointer(tmp_path: Path) -> None:
     from ai_factory.core.datasets import inspect_json_asset
 
     pointer = tmp_path / "catalog.json"
-    pointer.write_text(
-        "version https://git-lfs.github.com/spec/v1\n"
-        "oid sha256:1234567890abcdef\n"
-        "size 42\n"
-    )
+    pointer.write_text("version https://git-lfs.github.com/spec/v1\noid sha256:1234567890abcdef\nsize 42\n")
 
     status = inspect_json_asset(pointer)
     assert status["ok"] is False

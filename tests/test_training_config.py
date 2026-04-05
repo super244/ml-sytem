@@ -7,6 +7,8 @@ import pytest
 from training.src.config import ConfigValidationError, load_experiment_config, validate_experiment_config
 from training.src.data import build_messages, build_training_text, load_jsonl
 from training.src.modeling import resolve_attention_implementation
+from training.src.preflight import build_training_preflight_report
+from training.src.scaling import resolve_scratch_architecture
 from training.src.validation import build_validation_data_config
 from training.src.workflows import build_source_specs
 
@@ -14,7 +16,8 @@ from training.src.workflows import build_source_specs
 def test_profile_config_merges_components() -> None:
     config = load_experiment_config("training/configs/profiles/failure_aware.yaml")
     assert config.profile_name == "failure_aware"
-    assert config.model.base_model_name.endswith("1.5B-Instruct")
+    assert config.model.scale == "2b"
+    assert config.model.base_model_name == "Qwen/Qwen2.5-Math-1.5B-Instruct"
     assert config.data.failure_replay_boost > 1.0
     assert config.packaging.publish_model_name == "atlas-math-failure-aware"
 
@@ -24,9 +27,39 @@ def test_pretraining_profile_uses_scratch_model_and_text_mode() -> None:
 
     assert config.model.initialization == "scratch"
     assert config.model.model_type == "qwen2"
+    assert config.model.target_parameters == "2b"
     assert config.model.architecture["vocab_size"] == 50257
     assert config.data.format == "pretraining_text"
     assert config.adapter.method == "full"
+
+
+def test_resolve_scratch_architecture_from_target_parameters() -> None:
+    architecture, estimate = resolve_scratch_architecture(
+        model_type="qwen2",
+        target_parameters="2b",
+        architecture_overrides={"vocab_size": 50257, "max_position_embeddings": 4096},
+    )
+
+    assert architecture["hidden_size"] == 2560
+    assert architecture["num_hidden_layers"] == 24
+    assert architecture["num_attention_heads"] == 20
+    assert architecture["num_key_value_heads"] == 10
+    assert architecture["intermediate_size"] == 6912
+    assert estimate is not None
+    assert abs(estimate - 2_000_000_000) < 10_000_000
+
+
+def test_resolve_large_scratch_architecture_from_target_parameters() -> None:
+    architecture, estimate = resolve_scratch_architecture(
+        model_type="qwen2",
+        target_parameters="20b",
+        architecture_overrides={"vocab_size": 50257, "max_position_embeddings": 4096},
+    )
+
+    assert architecture["hidden_size"] >= 4096
+    assert architecture["num_hidden_layers"] >= 56
+    assert estimate is not None
+    assert abs(estimate - 20_000_000_000) < 250_000_000
 
 
 def test_validation_rejects_conflicting_training_flags() -> None:
@@ -145,3 +178,53 @@ print(callable(build_ultimate_trainer))
     completed = subprocess.run([sys.executable, "-c", script], capture_output=True, text=True, check=True)
 
     assert "True" in completed.stdout
+
+
+def test_training_preflight_flags_missing_scratch_tokenizer(tmp_path: Path) -> None:
+    train_path = tmp_path / "data" / "processed" / "train.jsonl"
+    eval_path = tmp_path / "data" / "processed" / "eval.jsonl"
+    test_path = tmp_path / "data" / "processed" / "test.jsonl"
+    manifest_path = tmp_path / "data" / "processed" / "manifest.json"
+    train_path.parent.mkdir(parents=True, exist_ok=True)
+    train_path.write_text('{"question":"q","solution":"a"}\n')
+    eval_path.write_text('{"question":"q","solution":"a"}\n')
+    test_path.write_text('{"question":"q","solution":"a"}\n')
+    manifest_path.write_text('{"schema_version":"v2"}')
+
+    config_path = tmp_path / "pretraining.yaml"
+    config_path.write_text(
+        "\n".join(
+            [
+                "profile_name: pretraining",
+                "run_name: scratch-test",
+                "seed: 1",
+                "model:",
+                "  initialization: scratch",
+                "  model_type: qwen2",
+                "  target_parameters: 1b",
+                "  base_model_name: scratch/qwen2-1b",
+                "  tokenizer_name: gpt2",
+                "  tokenizer_path: artifacts/tokenizers/missing",
+                "  trust_remote_code: false",
+                "  use_4bit: false",
+                "  use_8bit: false",
+                "  use_full_precision: true",
+                "data:",
+                f"  train_file: {train_path}",
+                f"  eval_file: {eval_path}",
+                f"  test_file: {test_path}",
+                f"  pack_manifest: {manifest_path}",
+                "  format: pretraining_text",
+                "training:",
+                f"  artifacts_dir: {tmp_path / 'artifacts'}",
+                "adapter:",
+                "  method: full",
+            ]
+        )
+    )
+
+    report = build_training_preflight_report(str(config_path))
+    tokenizer_check = next(check for check in report["checks"] if check["id"] == "tokenizer")
+
+    assert report["status"] == "error"
+    assert tokenizer_check["status"] == "error"

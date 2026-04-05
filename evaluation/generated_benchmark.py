@@ -12,6 +12,7 @@ from tqdm import tqdm
 
 from ai_factory.core.io import write_json, write_jsonl
 from evaluation.metrics import score_prediction
+from evaluation.reporting import build_trend_series, summarize_scorecards, write_single_model_markdown_report
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_GENERATION_CONFIG = REPO_ROOT / "data" / "configs" / "generation.yaml"
@@ -74,22 +75,29 @@ def create_temp_model_registry(
     dtype: str = "bfloat16",
     label: str | None = None,
     description: str | None = None,
+    parameter_size_b: float | None = None,
+    quantization: str | None = None,
+    tags: list[str] | None = None,
+    metadata: dict[str, Any] | None = None,
 ) -> Path:
-    payload = {
-        "models": [
-            {
-                "name": model_name,
-                "label": label or model_name,
-                "base_model": base_model,
-                "adapter_path": adapter_path,
-                "load_in_4bit": load_in_4bit,
-                "load_in_8bit": load_in_8bit,
-                "dtype": dtype,
-                "description": description or "Generated evaluation model registry entry.",
-                "tags": ["generated", "evaluation"],
-            }
-        ]
+    entry: dict[str, Any] = {
+        "name": model_name,
+        "label": label or model_name,
+        "base_model": base_model,
+        "adapter_path": adapter_path,
+        "load_in_4bit": load_in_4bit,
+        "load_in_8bit": load_in_8bit,
+        "dtype": dtype,
+        "description": description or "Generated evaluation model registry entry.",
+        "tags": list(dict.fromkeys(["generated", "evaluation", *(tags or [])])),
     }
+    if parameter_size_b is not None:
+        entry["parameter_size_b"] = parameter_size_b
+    if quantization is not None:
+        entry["quantization"] = quantization
+    if metadata:
+        entry["metadata"] = dict(metadata)
+    payload = {"models": [entry]}
     path = Path(registry_path)
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(yaml.safe_dump(payload, sort_keys=False))
@@ -189,12 +197,20 @@ def evaluate_records(
             }
         )
 
+    scorecard = summarize_scorecards(results)
     summary = {
         "question_count": len(records),
         "total_marks": total_marks,
         "accuracy": (total_marks / len(records)) if records else 0.0,
         "correct": total_marks,
         "incorrect_or_blank": len(records) - total_marks,
+        "model_variant": model_variant,
+        "prompt_preset": prompt_preset,
+        "num_samples": num_samples,
+        "use_calculator": use_calculator,
+        "use_cache": use_cache,
+        "metrics": scorecard,
+        "trend": build_trend_series(results),
         "by_topic": {
             topic: {
                 "questions": count,
@@ -227,3 +243,4 @@ def write_evaluation_bundle(
     write_jsonl(directory / "questions.jsonl", questions)
     write_jsonl(directory / "results.jsonl", results)
     write_json(directory / "summary.json", summary)
+    write_single_model_markdown_report(directory / "summary.md", summary)

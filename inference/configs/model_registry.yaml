@@ -1,73 +1,113 @@
 models:
   - name: base
-    label: Base 1.5B
+    label: Base 2B
     base_model: Qwen/Qwen2.5-Math-1.5B-Instruct
     adapter_path:
     load_in_4bit: true
     load_in_8bit: false
     dtype: bfloat16
+    target_parameters: 2b
+    parameter_size_b: 2.0
+    quantization: 4bit
+    tier: baseline
     description: Untuned base math model for side-by-side comparison.
-    tags: [baseline, local]
+    tags: [baseline, local, 2b]
+    scale_tags: [2b, baseline, local]
   - name: finetuned
-    label: Atlas Failure-Aware
+    label: Atlas Failure-Aware 2B
     base_model: Qwen/Qwen2.5-Math-1.5B-Instruct
     adapter_path: artifacts/models/atlas-math-failure-aware/latest
     load_in_4bit: true
     load_in_8bit: false
     dtype: bfloat16
+    target_parameters: 2b
+    parameter_size_b: 2.0
+    quantization: 4bit
+    tier: specialist
     description: Failure-aware calculus and verification specialist adapter.
-    tags: [specialist, failure_aware, local]
+    tags: [specialist, failure_aware, local, 2b]
+    scale_tags: [2b, specialist, failure_aware, local]
   - name: calculus_specialist
-    label: Atlas Calculus Specialist
+    label: Atlas Calculus Specialist 2B
     base_model: Qwen/Qwen2.5-Math-1.5B-Instruct
     adapter_path: artifacts/models/atlas-math-calculus-specialist/latest
     load_in_4bit: true
     load_in_8bit: false
     dtype: bfloat16
+    target_parameters: 2b
+    parameter_size_b: 2.0
+    quantization: 4bit
+    tier: specialist
     description: Calculus-weighted specialist adapter.
-    tags: [specialist, calculus, local]
+    tags: [specialist, calculus, local, 2b]
+    scale_tags: [2b, specialist, calculus, local]
   - name: curriculum_specialist
-    label: Atlas Curriculum Specialist
+    label: Atlas Curriculum Specialist 2B
     base_model: Qwen/Qwen2.5-Math-1.5B-Instruct
     adapter_path: artifacts/models/atlas-math-curriculum-specialist/latest
     load_in_4bit: true
     load_in_8bit: false
     dtype: bfloat16
+    target_parameters: 2b
+    parameter_size_b: 2.0
+    quantization: 4bit
+    tier: specialist
     description: Curriculum-ordered specialist adapter.
-    tags: [specialist, curriculum, local]
+    tags: [specialist, curriculum, local, 2b]
+    scale_tags: [2b, specialist, curriculum, local]
   - name: verifier_augmented
-    label: Atlas Verifier Augmented
+    label: Atlas Verifier Augmented 2B
     base_model: Qwen/Qwen2.5-Math-1.5B-Instruct
     adapter_path: artifacts/models/atlas-math-verifier-augmented/latest
     load_in_4bit: true
     load_in_8bit: false
     dtype: bfloat16
+    target_parameters: 2b
+    parameter_size_b: 2.0
+    quantization: 4bit
+    tier: specialist
     description: Verifier-aware specialist adapter.
-    tags: [specialist, verification, local]
+    tags: [specialist, verification, local, 2b]
+    scale_tags: [2b, specialist, verification, local]
   - name: fast_iteration
-    label: Atlas Fast Iteration
-    base_model: Qwen/Qwen2.5-0.5B-Instruct
+    label: Atlas Fast Iteration 1B
+    base_model: Qwen/Qwen2.5-Math-1.5B-Instruct
     adapter_path: artifacts/models/atlas-math-fast-iteration/latest
     load_in_4bit: true
     load_in_8bit: false
     dtype: bfloat16
+    target_parameters: 1b
+    parameter_size_b: 1.0
+    quantization: 4bit
+    tier: fast_iteration
     description: Small fast-iteration adapter for rapid local experimentation.
-    tags: [specialist, fast_iteration, local]
+    tags: [specialist, fast_iteration, local, 1b]
+    scale_tags: [1b, fast_iteration, specialist, local]
   - name: long_context_base
-    label: Base 7B
-    base_model: Qwen/Qwen2.5-Math-7B-Instruct
+    label: Scale-Up Base 12B
+    base_model: artifacts/foundation/qwen2-12b
     adapter_path:
     load_in_4bit: true
     load_in_8bit: false
     dtype: bfloat16
-    description: Larger 7B base profile for scale-up experiments.
-    tags: [baseline, scaleup]
+    target_parameters: 12b
+    parameter_size_b: 12.0
+    quantization: 4bit
+    tier: baseline
+    description: Larger scale-up base profile for experimentation.
+    tags: [baseline, scaleup, 12b]
+    scale_tags: [12b, baseline, scaleup]
   - name: long_context_specialist
-    label: Atlas Long Context
-    base_model: Qwen/Qwen2.5-Math-7B-Instruct
+    label: Atlas Long Context 12B
+    base_model: artifacts/foundation/qwen2-12b
     adapter_path: artifacts/models/atlas-math-long-context/latest
     load_in_4bit: true
     load_in_8bit: false
     dtype: bfloat16
+    target_parameters: 12b
+    parameter_size_b: 12.0
+    quantization: 4bit
+    tier: specialist
     description: Long-context specialist template for scale-up experiments.
-    tags: [specialist, scaleup, long_context]
+    tags: [specialist, scaleup, long_context, 12b]
+    scale_tags: [12b, specialist, scaleup, long_context]

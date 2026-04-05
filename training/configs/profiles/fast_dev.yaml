@@ -3,13 +3,22 @@ run_name: atlas_fast_dev
 seed: 202
 description: "Fast iteration profile for development and experimentation"
 refs:
-  model: ../components/models/qwen25_math_0p5b.yaml
+  model: ../components/models/qwen2_scratch_1b.yaml
   adapter: ../components/adapters/qlora_math.yaml
   data: ../components/data/fast_iteration.yaml
   runtime: ../components/runtime/hybrid_local.yaml
   logging: ../components/logging/default.yaml
   tracking: ../components/tracking/default.yaml
   packaging: ../components/packaging/default.yaml
+model:
+  initialization: pretrained
+  base_model_name: Qwen/Qwen2.5-Math-1.5B-Instruct
+  trust_remote_code: false
+  use_4bit: true
+  use_8bit: false
+  use_full_precision: false
+  recommended_runtime_profile: hybrid_local
+  recommended_quantization: 4bit
 training:
   num_train_epochs: 1.0
   learning_rate: 0.0002

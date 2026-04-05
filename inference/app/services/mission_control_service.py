@@ -268,8 +268,10 @@ class MissionControlService:
         ]
         orchestration_summary = self.instance_service.get_orchestration_summary()
         orchestration_summary_payload = getattr(orchestration_summary, "summary", orchestration_summary)
-        autonomous = AutonomousLabService(self.settings, instance_service=self.instance_service).snapshot().model_dump(
-            mode="json"
+        autonomous = (
+            AutonomousLabService(self.settings, instance_service=self.instance_service)
+            .snapshot()
+            .model_dump(mode="json")
         )
         ready_actions = list(autonomous.get("ready_actions", []))
         autonomous.setdefault(
@@ -322,7 +324,9 @@ class MissionControlService:
             "workspace_summary": workspace_summary,
             "instances": instances,
             "runs": runs,
-            "orchestration_summary": orchestration_summary_payload if isinstance(orchestration_summary_payload, dict) else {},
+            "orchestration_summary": orchestration_summary_payload
+            if isinstance(orchestration_summary_payload, dict)
+            else {},
             "autonomous": autonomous,
             "cluster_nodes": cluster_nodes,
             "agents": agents,
@@ -565,7 +569,11 @@ class MissionControlService:
             child_types = {str(child.get("type", "")) for child in children}
             lifecycle = instance.get("lifecycle") or {}
 
-            if instance.get("status") == "completed" and instance.get("type") in {"train", "finetune"} and "evaluate" not in child_types:
+            if (
+                instance.get("status") == "completed"
+                and instance.get("type") in {"train", "finetune"}
+                and "evaluate" not in child_types
+            ):
                 alerts.append(
                     AutonomyLineageAlert(
                         id=f"lineage-eval-{instance_id}",
@@ -659,7 +667,9 @@ class MissionControlService:
         telemetry_backlog = int(telemetry["flagged"]["count"])
         running_instances = [item for item in instances if item.get("status") == "running"]
         failed_instances = [item for item in instances if item.get("status") == "failed"]
-        stalled_runs = len(failed_instances) + int(orchestration_summary.get("task_status_counts", {}).get("retry_waiting", 0))
+        stalled_runs = len(failed_instances) + int(
+            orchestration_summary.get("task_status_counts", {}).get("retry_waiting", 0)
+        )
         running_sweeps = int(automl["status_counts"].get("running", 0))
         active_runs = int(orchestration_summary.get("active_runs", 0))
 
@@ -688,14 +698,20 @@ class MissionControlService:
                 children_by_parent.setdefault(parent_id, []).append(instance)
 
         completed_models = [
-            item for item in instances if item.get("status") == "completed" and item.get("type") in {"train", "finetune"}
+            item
+            for item in instances
+            if item.get("status") == "completed" and item.get("type") in {"train", "finetune"}
         ]
         completed_without_eval = 0
         deploy_ready = 0
         for instance in instances:
             children = children_by_parent.get(str(instance.get("id", "")), [])
             child_types = {str(child.get("type", "")) for child in children}
-            if instance.get("status") == "completed" and instance.get("type") in {"train", "finetune"} and "evaluate" not in child_types:
+            if (
+                instance.get("status") == "completed"
+                and instance.get("type") in {"train", "finetune"}
+                and "evaluate" not in child_types
+            ):
                 completed_without_eval += 1
             if (
                 instance.get("status") == "completed"
@@ -705,7 +721,9 @@ class MissionControlService:
             ):
                 deploy_ready += 1
 
-        prepare_running = sum(1 for item in instances if item.get("type") == "prepare" and item.get("status") == "running")
+        prepare_running = sum(
+            1 for item in instances if item.get("type") == "prepare" and item.get("status") == "running"
+        )
         train_running = sum(
             1 for item in instances if item.get("type") in {"train", "finetune"} and item.get("status") == "running"
         )
@@ -848,8 +866,12 @@ class MissionControlService:
         ]
 
         queued_statuses = {"queued", "ready", "retry_waiting", "blocked"}
-        resource_counts = Counter(str(task.get("resource_class", "control")) for task in tasks if task.get("status") == "running")
-        execution_modes = Counter(str((instance.get("environment") or {}).get("kind", "local")) for instance in running_instances)
+        resource_counts = Counter(
+            str(task.get("resource_class", "control")) for task in tasks if task.get("status") == "running"
+        )
+        execution_modes = Counter(
+            str((instance.get("environment") or {}).get("kind", "local")) for instance in running_instances
+        )
         idle_nodes = sum(1 for node in cluster_nodes if node.get("status") == "idle")
         busy_nodes = sum(1 for node in cluster_nodes if node.get("status") in {"online", "busy"})
         offline_nodes = sum(1 for node in cluster_nodes if node.get("status") == "offline")
@@ -868,7 +890,9 @@ class MissionControlService:
             busy_nodes=busy_nodes,
             offline_nodes=offline_nodes,
             active_gpu_tasks=int(resource_counts.get("gpu", 0)),
-            active_cpu_tasks=int(resource_counts.get("cpu", 0) + resource_counts.get("io", 0) + resource_counts.get("control", 0)),
+            active_cpu_tasks=int(
+                resource_counts.get("cpu", 0) + resource_counts.get("io", 0) + resource_counts.get("control", 0)
+            ),
             schedulable_trials=max(idle_nodes, 0),
             suggested_parallelism=suggested_parallelism,
             bottleneck=(

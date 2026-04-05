@@ -14,7 +14,9 @@ _MISSION_CONTROL_CACHE_TTL_S = 1.0
 _mission_control_cache: dict[str, tuple[float, MissionControlSnapshot]] = {}
 
 
-def _mission_control_snapshot(settings: Any = Depends(get_settings), instance_service: Any = Depends(get_instance_service)) -> MissionControlSnapshot:
+def _mission_control_snapshot(
+    settings: Any = Depends(get_settings), instance_service: Any = Depends(get_instance_service)
+) -> MissionControlSnapshot:
     repo_root = settings.repo_root
     now = time.monotonic()
     cached = _mission_control_cache.get(repo_root)
@@ -29,4 +31,3 @@ def _mission_control_snapshot(settings: Any = Depends(get_settings), instance_se
 @router.get("/lab/mission-control", response_model=MissionControlSnapshot)
 def mission_control(snapshot: MissionControlSnapshot = Depends(_mission_control_snapshot)) -> MissionControlSnapshot:
     return snapshot
-

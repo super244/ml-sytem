@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import sqlite3
 import sys
 from pathlib import Path
 from typing import Any
@@ -14,8 +15,9 @@ from ai_factory.core.tokens import approximate_token_count
 
 
 def parse_args() -> argparse.Namespace:
-    parser = argparse.ArgumentParser(description="Preview a few records from a dataset JSONL.")
+    parser = argparse.ArgumentParser(description="Preview a few records from a dataset JSONL or SQLite corpus.")
     parser.add_argument("--input", required=True)
+    parser.add_argument("--split", choices=["train", "eval", "test"], default=None)
     parser.add_argument("--limit", type=int, default=5)
     parser.add_argument(
         "--fields",
@@ -28,6 +30,24 @@ def parse_args() -> argparse.Namespace:
         "--token-preview-length", type=int, default=12, help="Number of preview tokens to show per field."
     )
     return parser.parse_args()
+
+
+def load_rows(path: str, *, split: str | None = None) -> list[dict[str, Any]]:
+    dataset_path = Path(path)
+    if dataset_path.suffix.lower() in {".sqlite", ".db"}:
+        connection = sqlite3.connect(dataset_path)
+        try:
+            query = "SELECT payload_json FROM records"
+            params: list[Any] = []
+            if split:
+                query += " WHERE dataset_split = ?"
+                params.append(split)
+            query += " ORDER BY sequence_id ASC"
+            rows = [json.loads(row[0]) for row in connection.execute(query, params).fetchall()]
+        finally:
+            connection.close()
+        return rows
+    return read_jsonl(dataset_path)
 
 
 def load_tokenizer(tokenizer_name: str | None) -> tuple[Any | None, str]:
@@ -114,7 +134,7 @@ def preview_rows(
 
 def main() -> None:
     args = parse_args()
-    rows = read_jsonl(Path(args.input))[: args.limit]
+    rows = load_rows(args.input, split=args.split)[: args.limit]
     tokenizer, tokenizer_mode = load_tokenizer(args.tokenizer)
     preview = preview_rows(rows, fields=args.fields, tokenizer=tokenizer, preview_length=args.token_preview_length)
     if tokenizer_mode != "transformers":
