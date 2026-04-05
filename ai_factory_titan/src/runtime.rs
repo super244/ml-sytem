@@ -45,15 +45,17 @@ pub struct TitanRuntimePlan {
 impl TitanRuntimePlan {
     pub fn current() -> Self {
         let mode = TitanRuntimeMode::from_env();
-        let rust_enabled = !matches!(mode, TitanRuntimeMode::PythonFallback);
+        let metadata_enabled = !matches!(mode, TitanRuntimeMode::PythonFallback);
         Self {
             mode,
-            can_generate: rust_enabled,
-            gguf_enabled: rust_enabled,
-            kv_cache_enabled: rust_enabled,
-            sampler_enabled: rust_enabled,
-            reason: if rust_enabled {
-                "Rust Titan runtime canary path enabled via AI_FACTORY_TITAN_RUNTIME."
+            // Titan can surface runtime metadata today, but the decode loop still lives on the
+            // Python side. Keep the status contract honest until Rust generation is implemented.
+            can_generate: false,
+            gguf_enabled: metadata_enabled,
+            kv_cache_enabled: metadata_enabled,
+            sampler_enabled: metadata_enabled,
+            reason: if metadata_enabled {
+                "Rust Titan metadata path enabled, but generation remains Python-backed."
             } else {
                 "Python Transformers path remains primary until Titan runtime is promoted."
             },

@@ -194,8 +194,9 @@ def _load_cargo_features(crate_root: Path) -> list[str]:
 def _find_titan_status_binary(repo_root: Path) -> Path | None:
     crate_root = repo_root / "ai_factory_titan"
     candidates = [
-        crate_root / "target" / "debug" / "titan-status",
-        crate_root / "target" / "release" / "titan-status",
+        crate_root / "target" / profile / binary_name
+        for profile in ("debug", "release")
+        for binary_name in ("titan-status", "titan-status.exe")
     ]
     for candidate in candidates:
         if candidate.exists() and candidate.is_file():
@@ -237,6 +238,7 @@ def _detect_pyo3_bridge_support() -> bool:
 
 def _source_engine_manifest(repo_root: Path) -> dict[str, Any]:
     crate_root = repo_root / "ai_factory_titan" / "src"
+    features = set(_load_cargo_features(repo_root / "ai_factory_titan"))
     runtime_selected = (os.getenv("AI_FACTORY_TITAN_RUNTIME") or "python").strip().lower() or "python"
     runtime_mode = (
         "rust-primary"
@@ -249,12 +251,8 @@ def _source_engine_manifest(repo_root: Path) -> dict[str, Any]:
         "architecture": "llm-runtime",
         "decode_model": "llama.cpp-inspired",
         "runtime_mode": runtime_mode,
-        "runtime_ready": runtime_mode != "python-fallback",
-        "runtime_reason": (
-            "Rust Titan runtime enabled via AI_FACTORY_TITAN_RUNTIME."
-            if runtime_mode != "python-fallback"
-            else "Python Transformers path remains primary until Titan runtime is promoted."
-        ),
+        "runtime_ready": False,
+        "runtime_reason": "Titan exposes runtime metadata today, but live generation remains Python-backed.",
         "max_context_tokens": 8192,
         "max_batch_tokens": 2048,
         "cache_strategy": "paged_kv",
@@ -270,9 +268,9 @@ def _source_engine_manifest(repo_root: Path) -> dict[str, Any]:
         "default_layout": _default_layout(),
         "acceleration": {
             "rust_fallback": True,
-            "cpp_kernels": (crate_root / "cpp.rs").exists(),
-            "metal_backend": (repo_root / "ai_factory_titan" / "Cargo.toml").exists(),
-            "cuda_backend": (repo_root / "ai_factory_titan" / "Cargo.toml").exists(),
+            "cpp_kernels": "cpp" in features,
+            "metal_backend": "metal" in features,
+            "cuda_backend": "cuda" in features,
         },
     }
 
@@ -431,7 +429,7 @@ def detect_titan_status(repo_root: str | Path | None = None) -> dict[str, Any]:
         "selected": runtime_selected,
         "env_var": "AI_FACTORY_TITAN_RUNTIME",
         "runtime_flag": "AI_FACTORY_TITAN_RUNTIME",
-        "runtime_enabled": runtime_selected in {"rust", "rust-primary", "rust-canary"},
+        "runtime_enabled": False,
         "status_source": "rust-binary" if rust_status else "python-probe",
         "status_binary_available": rust_core["status_binary_available"],
         "gguf_support": bool(engine.get("supports_gguf", engine.get("gguf_support"))),
@@ -456,7 +454,8 @@ def detect_titan_status(repo_root: str | Path | None = None) -> dict[str, Any]:
                 if runtime.get("selected") == "rust-canary"
                 else "python-fallback"
             ),
-            "runtime_ready": bool(runtime.get("selected") in {"rust", "rust-primary", "rust-canary"}),
+            "runtime_ready": bool(runtime.get("runtime_enabled")),
+            "runtime_reason": str(runtime.get("reason") or engine.get("runtime_reason") or ""),
             "supports_gguf": bool(runtime.get("gguf_support")),
             "supports_kv_cache": bool(runtime.get("kv_cache")),
             "supports_sampler_stack": bool(runtime.get("sampler_stack")),
@@ -607,7 +606,7 @@ def titan_diagnostics(repo_root: str | Path | None = None) -> dict[str, Any]:
             "gguf_support": runtime.get("gguf_support"),
             "kv_cache": runtime.get("kv_cache"),
             "sampler_stack": runtime.get("sampler_stack"),
-            "canary_generation_requested": runtime.get("runtime_enabled"),
+            "canary_generation_requested": runtime.get("selected") in {"rust", "rust-primary", "rust-canary"},
             "canary_generation_enabled": _env_flag("AI_FACTORY_TITAN_ENABLE_CANARY_GENERATION"),
         },
         "engine": {

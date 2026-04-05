@@ -6,7 +6,7 @@ from typing import Any
 
 import yaml
 
-from ai_factory.core.datasets import load_catalog, load_pack_summary
+from ai_factory.core.datasets import inspect_json_asset, load_catalog, load_pack_summary
 from ai_factory.core.discovery import list_training_runs, load_benchmark_registry
 from ai_factory.core.foundation import build_foundation_catalog
 
@@ -108,6 +108,10 @@ def _load_evaluation_configs(repo_root: Path) -> list[dict[str, str]]:
 
 
 def _build_readiness_checks(repo_root: Path) -> list[dict[str, Any]]:
+    catalog_status = inspect_json_asset(repo_root / "data" / "catalog.json")
+    manifest_status = inspect_json_asset(repo_root / "data" / "processed" / "manifest.json")
+    pack_summary_status = inspect_json_asset(repo_root / "data" / "processed" / "pack_summary.json")
+
     return [
         {
             "id": "python-deps",
@@ -128,10 +132,27 @@ def _build_readiness_checks(repo_root: Path) -> list[dict[str, Any]]:
             "detail": "The workspace UI is ready when frontend/node_modules is present.",
         },
         {
+            "id": "dataset-catalog",
+            "label": "Dataset catalog",
+            "ok": catalog_status["ok"],
+            "detail": (
+                "Dataset metadata is available for the workspace and API summaries."
+                if catalog_status["ok"]
+                else catalog_status["detail"]
+            ),
+        },
+        {
             "id": "processed-corpus",
             "label": "Processed corpus",
-            "ok": (repo_root / "data" / "processed" / "manifest.json").exists(),
-            "detail": ("Training and dataset browsing expect the processed manifest and pack summary outputs."),
+            "ok": manifest_status["ok"] and pack_summary_status["ok"],
+            "detail": (
+                "Training and dataset browsing expect valid processed manifest and pack summary outputs."
+                if manifest_status["ok"] and pack_summary_status["ok"]
+                else (
+                    f"manifest: {manifest_status['detail']}; "
+                    f"pack summary: {pack_summary_status['detail']}"
+                )
+            ),
         },
         {
             "id": "benchmark-registry",
@@ -148,7 +169,7 @@ def _build_command_recipes() -> list[dict[str, str]]:
             "doctor",
             "Workspace doctor",
             ("Inspect dependency readiness, dataset state, run discovery, and frontend installation in one pass."),
-            "python scripts/doctor.py --json",
+            "ai-factory doctor --json",
             "setup",
         ),
         _command_recipe(
@@ -158,14 +179,14 @@ def _build_command_recipes() -> list[dict[str, str]]:
                 "Regenerate data artifacts, validate the corpus, refresh notebooks, "
                 "and optionally run dry validation/tests."
             ),
-            "python scripts/refresh_lab.py",
+            "ai-factory refresh-lab",
             "orchestration",
         ),
         _command_recipe(
             "serve-api",
             "Serve API",
             ("Start the FastAPI layer that powers the solve workspace, compare lab, and metadata routes."),
-            "uvicorn inference.app.main:app --reload",
+            "ai-factory serve --host 127.0.0.1 --port 8000",
             "serve",
         ),
         _command_recipe(
@@ -272,17 +293,27 @@ def build_workspace_overview(root: Path | None = None) -> dict[str, Any]:
     """Build workspace overview with optimized loading and caching."""
     repo_root = (root or REPO_ROOT).resolve()
     errors: list[str] = []
+    catalog_status = inspect_json_asset(repo_root / "data" / "catalog.json")
+    pack_summary_status = inspect_json_asset(repo_root / "data" / "processed" / "pack_summary.json")
 
-    try:
-        catalog = load_catalog(repo_root / "data" / "catalog.json")
-    except Exception as exc:
-        errors.append(f"catalog: {exc}")
+    if catalog_status["ok"]:
+        try:
+            catalog = load_catalog(repo_root / "data" / "catalog.json")
+        except Exception as exc:
+            errors.append(f"catalog: {exc}")
+            catalog = {"summary": {"num_datasets": 0}}
+    else:
+        errors.append(f"catalog: {catalog_status['detail']}")
         catalog = {"summary": {"num_datasets": 0}}
 
-    try:
-        packs = load_pack_summary(repo_root / "data" / "processed" / "pack_summary.json").get("packs", [])
-    except Exception as exc:
-        errors.append(f"pack summary: {exc}")
+    if pack_summary_status["ok"]:
+        try:
+            packs = load_pack_summary(repo_root / "data" / "processed" / "pack_summary.json").get("packs", [])
+        except Exception as exc:
+            errors.append(f"pack summary: {exc}")
+            packs = []
+    else:
+        errors.append(f"pack summary: {pack_summary_status['detail']}")
         packs = []
 
     try:

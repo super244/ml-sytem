@@ -129,10 +129,10 @@ frontend-check:
 
 # Docker Operations
 docker-up:
-	docker-compose up -d
+	docker compose up -d
 
 docker-down:
-	docker-compose down
+	docker compose down
 
 # Legacy Aliases (for backward compatibility)
 refresh-lab:

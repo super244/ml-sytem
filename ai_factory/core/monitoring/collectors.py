@@ -409,14 +409,40 @@ def _titan_snapshot() -> dict[str, Any] | None:
 
     if _TITAN_SMI_AVAILABLE is None:
         # Check if the binary is built and available.
-        # We look for it in the target directory.
-        titan_bin = Path("ai_factory_titan/target/debug/titan-status")
-        _TITAN_SMI_AVAILABLE = titan_bin.exists()
+        # We look for it in the standard Cargo output directories.
+        titan_bin = next(
+            (
+                candidate
+                for candidate in (
+                    Path("ai_factory_titan/target/debug/titan-status"),
+                    Path("ai_factory_titan/target/release/titan-status"),
+                    Path("ai_factory_titan/target/debug/titan-status.exe"),
+                    Path("ai_factory_titan/target/release/titan-status.exe"),
+                )
+                if candidate.exists()
+            ),
+            None,
+        )
+        _TITAN_SMI_AVAILABLE = titan_bin is not None
 
     if not _TITAN_SMI_AVAILABLE:
         return None
 
-    titan_command = ["ai_factory_titan/target/debug/titan-status"]
+    titan_command = next(
+        (
+            [str(candidate)]
+            for candidate in (
+                Path("ai_factory_titan/target/debug/titan-status"),
+                Path("ai_factory_titan/target/release/titan-status"),
+                Path("ai_factory_titan/target/debug/titan-status.exe"),
+                Path("ai_factory_titan/target/release/titan-status.exe"),
+            )
+            if candidate.exists()
+        ),
+        None,
+    )
+    if titan_command is None:
+        return None
     try:
         result = subprocess.run(  # nosec B603
             titan_command,
