@@ -45,7 +45,17 @@ def test_build_workspace_overview_discovers_profiles_and_commands(tmp_path: Path
     )
     _write(
         tmp_path / "inference" / "configs" / "model_registry.yaml",
-        "models:\n  - name: base\n    base_model: Qwen/Qwen2.5-Math-1.5B-Instruct\n",
+        (
+            "models:\n"
+            "  - name: base\n"
+            "    label: Base 1.5B\n"
+            "    base_model: Qwen/Qwen2.5-Math-1.5B-Instruct\n"
+            "    parameter_size_b: 1.5\n"
+            "    quantization: 4bit\n"
+            "    tier: baseline\n"
+            "    tags: [baseline, local]\n"
+            "    scale_tags: [baseline, local]\n"
+        ),
     )
 
     overview = build_workspace_overview(tmp_path)
@@ -56,6 +66,9 @@ def test_build_workspace_overview_discovers_profiles_and_commands(tmp_path: Path
     assert overview["summary"]["training_profiles"] == 1
     assert overview["summary"]["evaluation_configs"] == 1
     assert overview["summary"]["orchestration_templates"] == 1
+    assert overview["models"][0]["parameter_size_label"] == "1.5B"
+    assert overview["models"][0]["quantization"] == "4bit"
+    assert overview["models"][0]["availability_context"]["state"] == "available"
     assert any(recipe["id"] == "refresh-lab" for recipe in overview["command_recipes"])
     assert any(recipe["command"] == "ai-factory refresh-lab" for recipe in overview["command_recipes"])
     assert any(recipe["command"] == "ai-factory doctor --json" for recipe in overview["command_recipes"])

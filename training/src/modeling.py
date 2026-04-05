@@ -109,8 +109,8 @@ def build_model_from_scratch(config: ExperimentConfig, tokenizer: Any | None = N
     hf_config = AutoConfig.for_model(model_type, **architecture)
     attention_implementation = resolve_attention_implementation(config)
     if attention_implementation:
-        setattr(hf_config, "_attn_implementation", attention_implementation)
-        setattr(hf_config, "attn_implementation", attention_implementation)
+        hf_config._attn_implementation = attention_implementation
+        hf_config.attn_implementation = attention_implementation
 
     model = AutoModelForCausalLM.from_config(
         hf_config,

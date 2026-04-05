@@ -34,7 +34,20 @@ It now also performs stricter config validation, emits richer run reports/manife
 
 Legacy top-level config names are retained as wrappers for compatibility, but the primary entry points are the profile configs.
 
-The parameter budget for a scratch run now lives in the model component YAML. For the default pretraining path, see `training/configs/components/models/qwen2_scratch_2b.yaml`, which now uses `target_parameters: 2b` and resolves to the 24-layer / 2560-hidden / ~2.00B-parameter architecture automatically.
+The parameter budget for a scratch run now lives in the model component YAML. The canonical ladder is:
+
+- `training/configs/components/models/qwen2_scratch_1b.yaml`
+- `training/configs/components/models/qwen2_scratch_2b.yaml`
+- `training/configs/components/models/qwen2_scratch_4b.yaml`
+- `training/configs/components/models/qwen2_scratch_9b.yaml`
+- `training/configs/components/models/qwen2_scratch_12b.yaml`
+- `training/configs/components/models/qwen2_scratch_20b.yaml`
+- `training/configs/components/models/qwen2_scratch_27b.yaml`
+- `training/configs/components/models/qwen2_scratch_30b.yaml`
+- `training/configs/components/models/qwen2_scratch_70b.yaml`
+- `training/configs/components/models/qwen2_scratch_120b.yaml`
+
+For the default pretraining path, `training/configs/components/models/qwen2_scratch_2b.yaml` uses `target_parameters: 2b` and resolves to the 24-layer / 2560-hidden / ~2.00B-parameter architecture automatically.
 
 ## Named Profiles
 
@@ -67,7 +80,7 @@ For the scratch-pretraining path:
 
 - `training/configs/profiles/pretraining.yaml` is now a real scratch run, not a mislabeled fine-tune.
 - `training/configs/components/data/pretraining_text_4k.yaml` switches the data objective to causal next-token modeling over plain math documents instead of masked instruction tuning.
-- `training/configs/components/models/qwen2_scratch_2b.yaml` is where you set `target_parameters`, and therefore the model scale.
+- `training/configs/components/models/qwen2_scratch_2b.yaml` is the default scratch template; the matching sibling files cover the rest of the ladder.
 - `training/scripts/train_tokenizer.py` can build a local tokenizer that matches the configured vocab budget before the first full run.
 - `training/scripts/plan_model_scale.py` lets you preview the resolved qwen2 architecture before you commit to a run.
 

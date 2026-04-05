@@ -10,6 +10,7 @@ from urllib.parse import parse_qs, urlparse
 import yaml
 
 from ai_factory.core.io import write_json
+from ai_factory.core.model_scales import DEFAULT_FOUNDATION_MODEL
 from ai_factory.core.workflows import (
     WorkflowLayout,
     slugify,
@@ -21,7 +22,7 @@ from ai_factory.core.workflows import (
     parse_csv_values as parse_csv_values_core,
 )
 
-DEFAULT_BASE_MODEL = "Qwen/Qwen2.5-Math-1.5B-Instruct"
+DEFAULT_BASE_MODEL = DEFAULT_FOUNDATION_MODEL
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 DEFAULT_CUSTOM_ROOT_CANDIDATES = (

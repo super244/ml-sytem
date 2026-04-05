@@ -15,7 +15,8 @@ from training.src.workflows import build_source_specs
 def test_profile_config_merges_components() -> None:
     config = load_experiment_config("training/configs/profiles/failure_aware.yaml")
     assert config.profile_name == "failure_aware"
-    assert config.model.base_model_name.endswith("1.5B-Instruct")
+    assert config.model.scale == "2b"
+    assert config.model.base_model_name.endswith("artifacts/foundation/qwen2-2b")
     assert config.data.failure_replay_boost > 1.0
     assert config.packaging.publish_model_name == "atlas-math-failure-aware"
 
@@ -45,6 +46,19 @@ def test_resolve_scratch_architecture_from_target_parameters() -> None:
     assert architecture["intermediate_size"] == 6912
     assert estimate is not None
     assert abs(estimate - 2_000_000_000) < 10_000_000
+
+
+def test_resolve_large_scratch_architecture_from_target_parameters() -> None:
+    architecture, estimate = resolve_scratch_architecture(
+        model_type="qwen2",
+        target_parameters="20b",
+        architecture_overrides={"vocab_size": 50257, "max_position_embeddings": 4096},
+    )
+
+    assert architecture["hidden_size"] >= 4096
+    assert architecture["num_hidden_layers"] >= 56
+    assert estimate is not None
+    assert abs(estimate - 20_000_000_000) < 250_000_000
 
 
 def test_validation_rejects_conflicting_training_flags() -> None:

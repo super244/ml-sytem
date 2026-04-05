@@ -76,7 +76,9 @@ def _load_public_entries(registry_path: str) -> list[dict[str, Any]]:
     return entries
 
 
-def _resolve_dataset_targets(specs: list[DatasetSpec], config: dict[str, Any], args: argparse.Namespace) -> dict[str, int]:
+def _resolve_dataset_targets(
+    specs: list[DatasetSpec], config: dict[str, Any], args: argparse.Namespace
+) -> dict[str, int]:
     explicit_targets = {}
     for spec in specs:
         if spec.target_size_bytes is not None:
@@ -115,12 +117,30 @@ def _resolve_dataset_targets(specs: list[DatasetSpec], config: dict[str, Any], a
 
 
 def write_catalog(path: Path, datasets: list[dict[str, Any]]) -> None:
+    kind_counts = {}
+    family_counts = {}
+    topic_counts = {}
+    for item in datasets:
+        kind = str(item.get("kind", "unknown"))
+        family = str(item.get("family", "unknown"))
+        topic = str(item.get("topic", "unknown"))
+        kind_counts[kind] = kind_counts.get(kind, 0) + 1
+        family_counts[family] = family_counts.get(family, 0) + 1
+        topic_counts[topic] = topic_counts.get(topic, 0) + 1
     summary = {
         "num_datasets": len(datasets),
-        "custom_datasets": sum(1 for item in datasets if item["kind"] == "custom"),
-        "public_datasets": sum(1 for item in datasets if item["kind"] == "public"),
+        "custom_datasets": kind_counts.get("custom", 0),
+        "public_datasets": kind_counts.get("public", 0),
         "total_bytes": sum(item.get("size_bytes", 0) for item in datasets),
         "total_rows": sum(item.get("num_rows", 0) for item in datasets),
+        "profile_summary": {
+            "kind_counts": kind_counts,
+            "family_counts": family_counts,
+            "topic_counts": topic_counts,
+            "top_kinds": sorted(kind_counts.items(), key=lambda item: item[1], reverse=True)[:5],
+            "top_families": sorted(family_counts.items(), key=lambda item: item[1], reverse=True)[:5],
+            "top_topics": sorted(topic_counts.items(), key=lambda item: item[1], reverse=True)[:5],
+        },
     }
     payload = {"generated_at": "local-build", "summary": summary, "datasets": datasets}
     write_json(path, payload)
@@ -161,8 +181,16 @@ def main() -> None:
             pack_id=spec.id,
             description=" / ".join(spec.pedagogical_focus),
             outputs=[_build_file_info(output_path)],
-            stats={"num_rows": len(records), "topic": spec.topic, "family": spec.family},
-            metadata={"card_path": str(output_path.with_suffix(".md"))},
+            stats={
+                "num_rows": len(records),
+                "topic": spec.topic,
+                "family": spec.family,
+                "profile_summary": entry["profile_summary"],
+            },
+            metadata={
+                "card_path": str(output_path.with_suffix(".md")),
+                "profile_summary": entry["profile_summary"],
+            },
         )
         write_json(output_path.with_suffix(".manifest.json"), manifest.model_dump())
         print(

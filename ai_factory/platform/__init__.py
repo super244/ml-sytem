@@ -9,7 +9,13 @@ Key components:
 - deployment: Multi-target model deployment pipeline
 """
 
-from .deployment import DeploymentManager
+from .deployment import (
+    DeploymentManager,
+    DeploymentManifest,
+    DeploymentRollbackReadiness,
+    DeploymentRolloutStage,
+    DeploymentVersionSummary,
+)
 from .monitoring import MonitoringManager
 from .scaling import ScalingManager
 from .utils import create_multi_domain_training, get_platform_status, scale_platform
@@ -18,6 +24,10 @@ __all__ = [
     "ScalingManager",
     "MonitoringManager",
     "DeploymentManager",
+    "DeploymentManifest",
+    "DeploymentVersionSummary",
+    "DeploymentRolloutStage",
+    "DeploymentRollbackReadiness",
     "get_platform_status",
     "scale_platform",
     "create_multi_domain_training",

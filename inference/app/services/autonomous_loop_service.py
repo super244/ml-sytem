@@ -118,7 +118,9 @@ class AutonomousLoopService:
         completed_by_type = Counter(str(item.get("type", "unknown")) for item in completed_instances)
 
         orchestration_summary = self._orchestration_summary()
-        open_circuits = orchestration_summary.get("open_circuits", []) if isinstance(orchestration_summary, dict) else []
+        open_circuits = (
+            orchestration_summary.get("open_circuits", []) if isinstance(orchestration_summary, dict) else []
+        )
         telemetry_dir = self.repo_root / "data" / "telemetry" / "flagged.jsonl"
         telemetry_backlog = 0
         if telemetry_dir.exists():
@@ -174,7 +176,15 @@ class AutonomousLoopService:
             base_priority = 80 if instance_type == "evaluate" else 70
             for available_action in available_actions:
                 target_action = available_action.action
-                if target_action not in {"evaluate", "re_evaluate", "finetune", "retrain", "deploy", "report", "open_inference"}:
+                if target_action not in {
+                    "evaluate",
+                    "re_evaluate",
+                    "finetune",
+                    "retrain",
+                    "deploy",
+                    "report",
+                    "open_inference",
+                }:
                     continue
                 priority_boost = {
                     "deploy": 18,

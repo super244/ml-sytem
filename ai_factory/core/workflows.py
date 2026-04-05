@@ -4,7 +4,9 @@ import re
 from dataclasses import dataclass
 from pathlib import Path
 
-DEFAULT_BASE_MODEL = "Qwen/Qwen2.5-Math-1.5B-Instruct"
+from ai_factory.core.model_scales import DEFAULT_FOUNDATION_MODEL
+
+DEFAULT_BASE_MODEL = DEFAULT_FOUNDATION_MODEL
 
 
 @dataclass(frozen=True)

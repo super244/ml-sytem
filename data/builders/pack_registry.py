@@ -7,6 +7,7 @@ from typing import Any
 from ai_factory.core.hashing import normalize_text, sha256_file
 from ai_factory.core.io import write_json, write_jsonl, write_markdown
 from ai_factory.core.schemas import DatasetBuildInfo, DatasetFileInfo, DatasetManifest
+from data.quality.profiles import build_dataset_profile
 from data.reports.cards import pack_card_text
 
 Predicate = Callable[[dict[str, Any]], bool]
@@ -63,6 +64,7 @@ def build_derived_packs(
         definition = DEFAULT_PACK_DEFINITIONS[pack_id]
         predicate: Predicate = definition["predicate"]
         pack_records = [dict(record, pack_id=pack_id) for record in records if predicate(record)]
+        profile_summary = build_dataset_profile(pack_records, title=pack_id)
         pack_dir = base_dir / pack_id
         pack_dir.mkdir(parents=True, exist_ok=True)
         records_path = pack_dir / "records.jsonl"
@@ -82,10 +84,11 @@ def build_derived_packs(
                     num_rows=len(pack_records),
                 )
             ],
-            stats={
-                "num_records": len(pack_records),
+            stats=profile_summary,
+            metadata={
+                "card_path": str(card_path),
+                "profile_summary": profile_summary,
             },
-            metadata={"card_path": str(card_path)},
         )
         manifest_path = pack_dir / "manifest.json"
         write_json(manifest_path, manifest.model_dump())
@@ -100,9 +103,8 @@ def build_derived_packs(
                 "card_path": str(card_path),
                 "build_id": build.build_id,
                 "build": build.model_dump(mode="json"),
-                "stats": {
-                    "num_records": len(pack_records),
-                },
+                "stats": profile_summary,
+                "profile_summary": profile_summary,
             }
         )
     return results

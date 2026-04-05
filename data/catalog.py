@@ -32,6 +32,27 @@ from ai_factory.core.datasets import (
 )
 
 
+def _build_catalog_profile_summary(datasets: list[dict[str, Any]]) -> dict[str, Any]:
+    from collections import Counter
+
+    kind_counts = Counter(str(entry.get("kind", "unknown")) for entry in datasets)
+    family_counts = Counter(str(entry.get("family", "unknown")) for entry in datasets)
+    topic_counts = Counter(str(entry.get("topic", "unknown")) for entry in datasets)
+    size_bytes = sum(int(entry.get("size_bytes", 0) or 0) for entry in datasets)
+    rows = sum(int(entry.get("num_rows", 0) or 0) for entry in datasets)
+    return {
+        "num_datasets": len(datasets),
+        "kind_counts": dict(kind_counts),
+        "family_counts": dict(family_counts),
+        "topic_counts": dict(topic_counts),
+        "total_rows": rows,
+        "total_bytes": size_bytes,
+        "top_kinds": kind_counts.most_common(5),
+        "top_families": family_counts.most_common(5),
+        "top_topics": topic_counts.most_common(5),
+    }
+
+
 class CatalogPreview(BaseModel):
     model_config = ConfigDict(strict=True)
     id: str
@@ -56,6 +77,8 @@ class CatalogEntry(BaseModel):
     sha256: str | None = None  # cryptographic hash
     lineage_data: dict[str, Any] | None = None  # explicit lineage data
     preview_examples: list[CatalogPreview] = Field(default_factory=list)
+    profile_summary: dict[str, Any] = Field(default_factory=dict)
+    quality_summary: dict[str, Any] = Field(default_factory=dict)
 
 
 class CatalogSummary(BaseModel):
@@ -65,6 +88,7 @@ class CatalogSummary(BaseModel):
     public_datasets: int = 0
     total_bytes: int = 0
     total_rows: int = 0
+    profile_summary: dict[str, Any] = Field(default_factory=dict)
 
 
 class CatalogModel(BaseModel):
@@ -74,13 +98,23 @@ class CatalogModel(BaseModel):
     datasets: list[CatalogEntry] = Field(default_factory=list)
 
 
-def load_catalog(
-    path: str | Path = DEFAULT_CATALOG_PATH, *, repo_root: str | Path | None = None
-) -> CatalogModel:
+def load_catalog(path: str | Path = DEFAULT_CATALOG_PATH, *, repo_root: str | Path | None = None) -> CatalogModel:
     data = _load_catalog(path, repo_root=repo_root)
-    # Ensure nested summary is populated if empty
+    datasets = data.get("datasets") or []
     if "summary" not in data or not data["summary"]:
-        data["summary"] = {}
+        data["summary"] = {
+            "num_datasets": len(datasets),
+            "custom_datasets": sum(1 for entry in datasets if entry.get("kind") == "custom"),
+            "public_datasets": sum(1 for entry in datasets if entry.get("kind") == "public"),
+            "total_bytes": sum(int(entry.get("size_bytes", 0) or 0) for entry in datasets),
+            "total_rows": sum(int(entry.get("num_rows", 0) or 0) for entry in datasets),
+        }
+    summary = data["summary"]
+    if "profile_summary" not in summary or not summary["profile_summary"]:
+        summary["profile_summary"] = _build_catalog_profile_summary(datasets)
+    for entry in datasets:
+        entry.setdefault("profile_summary", {})
+        entry.setdefault("quality_summary", {})
     return CatalogModel.model_validate(data)
 
 

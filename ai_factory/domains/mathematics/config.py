@@ -4,6 +4,7 @@ from typing import Literal
 
 from pydantic import BaseModel, Field
 
+from ai_factory.core.model_scales import default_foundation_model_ref
 from ai_factory.core.schemas import MetricSpec
 
 
@@ -36,7 +37,7 @@ class MathDomainConfig(BaseModel):
 
     # Default models for this domain
     default_models: list[str] = Field(
-        default_factory=lambda: ["Qwen2.5-Math-1.5B-Instruct", "Qwen2.5-Math-7B-Instruct"]
+        default_factory=lambda: [default_foundation_model_ref("2b"), default_foundation_model_ref("12b")]
     )
 
     # Specialized evaluation benchmarks

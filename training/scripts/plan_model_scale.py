@@ -5,6 +5,7 @@ import json
 
 import yaml
 
+from ai_factory.core.model_scales import get_model_scale_spec
 from training.src.scaling import format_parameter_count, resolve_scratch_architecture
 
 
@@ -33,8 +34,14 @@ def main() -> None:
         },
     )
     if args.yaml_only:
-        print(yaml.safe_dump({"target_parameters": args.target_parameters, "architecture": architecture}, sort_keys=False))
+        print(
+            yaml.safe_dump({"target_parameters": args.target_parameters, "architecture": architecture}, sort_keys=False)
+        )
         return
+    try:
+        scale_spec = get_model_scale_spec(args.target_parameters)
+    except ValueError:
+        scale_spec = None
     payload = {
         "target_parameters": args.target_parameters,
         "estimated_parameters": estimated_parameters,
@@ -42,6 +49,14 @@ def main() -> None:
         "model_type": args.model_type,
         "architecture": architecture,
     }
+    if scale_spec is not None:
+        payload["supported_scale"] = {
+            "scale": scale_spec.scale,
+            "tier": scale_spec.tier,
+            "runtime_profile": scale_spec.runtime_profile,
+            "recommended_quantization": scale_spec.recommended_quantization,
+            "preferred_gpu_count": scale_spec.preferred_gpu_count,
+        }
     print(json.dumps(payload, indent=2))
 
 

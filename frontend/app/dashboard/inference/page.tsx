@@ -19,6 +19,12 @@ import {
   type StatusInfo,
 } from '@/lib/api';
 import { FALLBACK_MODELS, FALLBACK_PROMPTS } from '@/lib/demo-content';
+import { formatCount } from '@/lib/formatting';
+import {
+  formatModelAvailabilityDetail,
+  formatModelSummary,
+  formatModelTitle,
+} from '@/lib/model-metadata';
 import {
   isDemoMode,
   pickPrimaryModel,
@@ -223,7 +229,7 @@ export default function InferencePage() {
   }, [availableModels, secondaryModel, selectedModel]);
 
   const modelLabelLookup = useMemo(
-    () => new Map(availableModels.map((model) => [model.name, model.label ?? model.name])),
+    () => new Map(availableModels.map((model) => [model.name, formatModelTitle(model)])),
     [availableModels],
   );
   const flaggedCount = useMemo(
@@ -455,10 +461,10 @@ export default function InferencePage() {
                 onChange={(event) => setSelectedModel(event.target.value)}
                 disabled={!availableModels.length || metadataDegraded}
               >
-                {availableModels.length > 0 ? (
+                  {availableModels.length > 0 ? (
                   availableModels.map((model) => (
                     <option key={model.name} value={model.name}>
-                      {model.label ?? model.name}
+                      {formatModelTitle(model)}
                     </option>
                   ))
                 ) : (
@@ -481,7 +487,7 @@ export default function InferencePage() {
                     .filter((model) => model.name !== selectedModel)
                     .map((model) => (
                       <option key={model.name} value={model.name}>
-                        {model.label ?? model.name}
+                        {formatModelTitle(model)}
                       </option>
                     ))}
                 </select>
@@ -492,6 +498,14 @@ export default function InferencePage() {
               <div className="inference-stat-card">
                 <span className="inference-stat-label">Turns</span>
                 <strong>{messages.filter((message) => message.role === 'assistant').length}</strong>
+              </div>
+              <div className="inference-stat-card">
+                <span className="inference-stat-label">Ready models</span>
+                <strong>
+                  {status?.model_inventory
+                    ? `${status.model_inventory.ready}/${status.model_inventory.total}`
+                    : formatCount(availableModels.filter((model) => model.available).length)}
+                </strong>
               </div>
               <div className="inference-stat-card">
                 <span className="inference-stat-label">Avg latency</span>
@@ -618,18 +632,24 @@ export default function InferencePage() {
           <div className="panel inference-settings-panel">
             <h2 className="section-title">Model Catalog</h2>
             <div className="model-catalog">
-              {availableModels.slice(0, 6).map((model) => (
-                <button
-                  key={model.name}
-                  type="button"
-                  className={`model-catalog-item ${selectedModel === model.name ? 'active' : ''}`}
-                  disabled={metadataDegraded}
-                  onClick={() => setSelectedModel(model.name)}
-                >
-                  <strong>{model.label ?? model.name}</strong>
-                  <span>{model.description ?? 'Local registry model'}</span>
-                </button>
-              ))}
+              {availableModels.slice(0, 6).map((model) => {
+                const summary = formatModelSummary(model);
+                return (
+                  <button
+                    key={model.name}
+                    type="button"
+                    className={`model-catalog-item ${selectedModel === model.name ? 'active' : ''}`}
+                    disabled={metadataDegraded}
+                    onClick={() => setSelectedModel(model.name)}
+                  >
+                    <strong>{formatModelTitle(model)}</strong>
+                    <span>{model.base_model}</span>
+                    {summary.length ? <span>{summary.join(' · ')}</span> : null}
+                    <span>{model.description ?? 'Local registry model'}</span>
+                    <span>{formatModelAvailabilityDetail(model)}</span>
+                  </button>
+                );
+              })}
             </div>
             {!loading && availableModels.length === 0 && (
               <Link href="/dashboard/deploy" className="secondary-button small">

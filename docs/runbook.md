@@ -1,6 +1,6 @@
 # Runbook
 
-This runbook describes the default local workflow for AI-Factory. It assumes local development with optional public-dataset access and a runnable math model such as `Qwen2.5-Math-1.5B-Instruct`.
+This runbook describes the default local workflow for AI-Factory. It assumes local development with optional public-dataset access and a configured math model entry from `inference/configs/model_registry.yaml` or a local scratch template.
 
 ## 1. Install Dependencies
 
@@ -69,7 +69,7 @@ Outputs in `data/processed/`:
 If you want a tokenization-aware quick look at the corpus, run:
 
 ```bash
-python3 data/tools/preview_dataset.py --input data/processed/train.jsonl --tokenizer Qwen/Qwen2.5-Math-1.5B-Instruct
+python3 data/tools/preview_dataset.py --input data/processed/train.jsonl --tokenizer artifacts/tokenizers/qwen2_math_2b
 ```
 
 ## 5. Validate Training Configuration

@@ -2,13 +2,22 @@ profile_name: olympiad_reasoning
 run_name: atlas_olympiad_reasoning
 seed: 21
 refs:
-  model: ../components/models/qwen25_math_7b.yaml
+  model: ../components/models/qwen2_scratch_20b.yaml
   adapter: ../components/adapters/long_context_lora.yaml
   data: ../components/data/curriculum_specialist.yaml
   runtime: ../components/runtime/hybrid_scaleup.yaml
   logging: ../components/logging/default.yaml
   tracking: ../components/tracking/default.yaml
   packaging: ../components/packaging/default.yaml
+model:
+  initialization: pretrained
+  base_model_name: artifacts/foundation/qwen2-20b
+  trust_remote_code: false
+  use_4bit: true
+  use_8bit: false
+  use_full_precision: false
+  recommended_runtime_profile: hybrid_scaleup
+  recommended_quantization: 4bit
 training:
   num_train_epochs: 1.5
   per_device_train_batch_size: 1

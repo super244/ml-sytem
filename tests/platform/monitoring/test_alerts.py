@@ -1,6 +1,8 @@
 """Test platform monitoring alerts."""
 
+import json
 from datetime import UTC, datetime
+from pathlib import Path
 
 import pytest
 
@@ -49,6 +51,10 @@ async def test_check_alerts_high_cpu(alert_manager):
     assert len(alerts) == 1
     assert alerts[0].severity == "warning"
     assert "CPU" in alerts[0].message
+    assert alerts[0].metadata["metric"] == "cpu_usage"
+    assert alerts[0].metadata["observed_value"] == 95.0
+    assert alerts[0].metadata["threshold"] == 90.0
+    assert "utilization_rollup" in alerts[0].metadata
 
 
 @pytest.mark.asyncio
@@ -64,6 +70,7 @@ async def test_check_alerts_high_memory(alert_manager):
     assert len(alerts) == 1
     assert alerts[0].severity == "warning"
     assert "memory" in alerts[0].message.lower()
+    assert alerts[0].metadata["metric"] == "memory_usage"
 
 
 @pytest.mark.asyncio
@@ -79,6 +86,8 @@ async def test_check_alerts_training_failures(alert_manager):
     assert len(alerts) == 1
     assert alerts[0].severity == "critical"
     assert "failures" in alerts[0].message.lower()
+    assert alerts[0].metadata["metric"] == "failed_jobs"
+    assert alerts[0].metadata["observed_value"] == 3.0
 
 
 @pytest.mark.asyncio
@@ -145,3 +154,24 @@ async def test_get_alert_history(alert_manager):
 
     assert len(history) == 1
     assert history[0].id == "test_alert_1"
+
+
+@pytest.mark.asyncio
+async def test_send_alert_writes_structured_payload(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    config = MonitoringConfig(alert_channels=["file"])
+    manager = AlertManager(config)
+    monkeypatch.chdir(tmp_path)
+    alert = Alert(
+        id="structured-alert",
+        severity="warning",
+        message="High CPU usage: 95.0%",
+        source="system_monitor",
+        timestamp=datetime.now(UTC),
+        metadata={"metric": "cpu_usage", "observed_value": 95.0, "threshold": 90.0},
+    )
+
+    await manager.send_alert(alert)
+
+    payload = json.loads((tmp_path / "alerts.log").read_text().strip())
+    assert payload["id"] == "structured-alert"
+    assert payload["metadata"]["metric"] == "cpu_usage"

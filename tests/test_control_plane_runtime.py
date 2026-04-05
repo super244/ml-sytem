@@ -298,7 +298,9 @@ def test_sqlite_control_plane_filters_runs_tasks_attempts_and_events(tmp_path: P
     control.upsert_task(queued_task)
     control.upsert_task(completed_task)
 
-    queued_attempt = TaskAttempt(id="attempt-queued", task_id=queued_task.id, sequence=1, status="running", lease_owner="runner")
+    queued_attempt = TaskAttempt(
+        id="attempt-queued", task_id=queued_task.id, sequence=1, status="running", lease_owner="runner"
+    )
     completed_attempt = TaskAttempt(
         id="attempt-completed",
         task_id=completed_task.id,
@@ -333,11 +335,15 @@ def test_sqlite_control_plane_filters_runs_tasks_attempts_and_events(tmp_path: P
 
     assert [run.id for run in control.list_runs(status="completed")] == [completed_run.id]
     assert [run.id for run in control.list_runs(legacy_instance_id=queued_run.legacy_instance_id)] == [queued_run.id]
-    assert [task.id for task in control.list_tasks(run_id=queued_run.id, status="ready", agent_type="training_orchestration")] == [
-        queued_task.id
-    ]
+    assert [
+        task.id
+        for task in control.list_tasks(run_id=queued_run.id, status="ready", agent_type="training_orchestration")
+    ] == [queued_task.id]
     assert [attempt.id for attempt in control.list_attempts(queued_task.id, status="running")] == [queued_attempt.id]
-    assert [event.id for event in control.list_events(run_id=queued_run.id, task_id=queued_task.id, attempt_id=queued_attempt.id, event_type="task.running")] == [
-        "evt-queued"
-    ]
+    assert [
+        event.id
+        for event in control.list_events(
+            run_id=queued_run.id, task_id=queued_task.id, attempt_id=queued_attempt.id, event_type="task.running"
+        )
+    ] == ["evt-queued"]
     assert [event.id for event in control.list_events(run_id=completed_run.id, limit=1)] == ["evt-completed"]

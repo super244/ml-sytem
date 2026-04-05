@@ -8,6 +8,11 @@ from typing import Any
 import yaml
 from pydantic import BaseModel, ConfigDict, Field
 
+from ai_factory.core.model_scales import (
+    DEFAULT_MODEL_SCALE,
+    default_foundation_model_ref,
+    get_model_scale_spec,
+)
 from training.src.scaling import resolve_scratch_architecture
 
 
@@ -17,11 +22,13 @@ class ConfigValidationError(ValueError):
 
 class ModelConfig(BaseModel):
     model_config = ConfigDict(strict=True)
-    name: str = "qwen25_math_1p5b"
+    name: str = "qwen2_foundation_2b"
+    scale: str | None = None
+    parameter_size_b: float | None = None
     initialization: str = "pretrained"
     model_type: str | None = None
     target_parameters: str | int | None = None
-    base_model_name: str = "Qwen/Qwen2.5-Math-1.5B-Instruct"
+    base_model_name: str = default_foundation_model_ref(DEFAULT_MODEL_SCALE)
     tokenizer_name: str | None = None
     tokenizer_path: str | None = None
     trust_remote_code: bool = True
@@ -34,6 +41,10 @@ class ModelConfig(BaseModel):
     gradient_checkpointing: bool = True
     use_flash_attention: bool = True
     device_map: str = "auto"
+    recommended_runtime_profile: str | None = None
+    recommended_quantization: str | None = None
+    deployment_tier: str | None = None
+    context_length: int | None = None
     architecture: dict[str, Any] = Field(default_factory=dict)
     input_cost_per_million: float | None = None
     output_cost_per_million: float | None = None
@@ -329,6 +340,16 @@ def _path_exists(path_like: str | None, base_path: str | None = None) -> bool:
     return path.exists()
 
 
+def _resolve_model_scale_spec(config: ExperimentConfig) -> Any | None:
+    scale_value = config.model.scale or config.model.target_parameters
+    if scale_value is None:
+        return None
+    try:
+        return get_model_scale_spec(scale_value)
+    except ValueError:
+        return None
+
+
 def validate_experiment_config(config: ExperimentConfig) -> list[str]:
     errors: list[str] = []
     warnings: list[str] = []
@@ -400,7 +421,11 @@ def validate_experiment_config(config: ExperimentConfig) -> list[str]:
         "model.bnb_compute_dtype must be one of bf16, fp16, or fp32.",
         errors,
     )
-    _require(config.data.format in SUPPORTED_DATA_FORMATS, f"data.format must be one of {sorted(SUPPORTED_DATA_FORMATS)}.", errors)
+    _require(
+        config.data.format in SUPPORTED_DATA_FORMATS,
+        f"data.format must be one of {sorted(SUPPORTED_DATA_FORMATS)}.",
+        errors,
+    )
     _require(
         config.adapter.method.lower() in SUPPORTED_ADAPTER_METHODS,
         f"adapter.method must be one of {sorted(SUPPORTED_ADAPTER_METHODS)}.",
@@ -447,6 +472,23 @@ def validate_experiment_config(config: ExperimentConfig) -> list[str]:
     )
     if config.model.initialization.lower() == "pretrained":
         _require(bool(config.model.base_model_name.strip()), "model.base_model_name must be non-empty.", errors)
+    if config.model.scale:
+        try:
+            scale_spec = get_model_scale_spec(config.model.scale)
+        except ValueError as exc:
+            errors.append(str(exc))
+            scale_spec = None
+        if scale_spec is not None and config.model.parameter_size_b is not None:
+            _require(
+                abs(config.model.parameter_size_b - scale_spec.parameter_size_b) < 0.01,
+                (
+                    "model.parameter_size_b must match the declared model.scale "
+                    f"({scale_spec.parameter_size_b:.1f} for {scale_spec.scale})."
+                ),
+                errors,
+            )
+    else:
+        scale_spec = _resolve_model_scale_spec(config)
     if config.model.initialization.lower() == "scratch":
         _require(bool(config.model.model_type), "scratch initialization requires model.model_type.", errors)
         _require(
@@ -525,6 +567,26 @@ def validate_experiment_config(config: ExperimentConfig) -> list[str]:
         warnings.append("torch_compile with 4-bit quantization can be brittle; validate on a small run first.")
     if config.runtime.torch_compile and config.runtime.deepspeed_config:
         warnings.append("torch_compile with DeepSpeed should be validated carefully for your exact backend.")
+    if scale_spec is not None:
+        runtime_profile = config.model.recommended_runtime_profile or scale_spec.runtime_profile
+        if config.runtime.profile_name != runtime_profile:
+            warnings.append(
+                f"model scale {scale_spec.scale} is typically paired with runtime.profile_name={runtime_profile}."
+            )
+        if scale_spec.parameter_size_b >= 20.0 and not config.runtime.deepspeed_config:
+            warnings.append(
+                f"model scale {scale_spec.scale} is large enough that a DeepSpeed config is strongly recommended."
+            )
+        if (
+            scale_spec.parameter_size_b >= 20.0
+            and config.model.initialization.lower() == "pretrained"
+            and not config.model.use_4bit
+            and not config.model.use_8bit
+            and not config.model.use_full_precision
+        ):
+            warnings.append(
+                f"model scale {scale_spec.scale} should usually specify a quantized loading mode for reliable bring-up."
+            )
 
     if errors:
         raise ConfigValidationError("\n".join(f"- {item}" for item in errors))
@@ -539,6 +601,7 @@ def describe_experiment_config(config: ExperimentConfig, *, warnings: list[str] 
         model_mode = "8bit"
     elif config.model.use_full_precision:
         model_mode = "full_precision"
+    scale_spec = _resolve_model_scale_spec(config)
     resolved_architecture = dict(config.model.architecture)
     if config.model.initialization.lower() == "scratch" and config.model.model_type:
         resolved_architecture, _ = resolve_scratch_architecture(
@@ -555,6 +618,8 @@ def describe_experiment_config(config: ExperimentConfig, *, warnings: list[str] 
         },
         "model": {
             "name": config.model.name,
+            "scale": config.model.scale or (scale_spec.scale if scale_spec is not None else None),
+            "parameter_size_b": config.model.parameter_size_b or (scale_spec.parameter_size_b if scale_spec else None),
             "initialization": config.model.initialization,
             "model_type": config.model.model_type,
             "target_parameters": config.model.target_parameters,
@@ -562,6 +627,13 @@ def describe_experiment_config(config: ExperimentConfig, *, warnings: list[str] 
             "tokenizer_name": config.model.tokenizer_name,
             "tokenizer_path": config.model.tokenizer_path,
             "mode": model_mode,
+            "recommended_runtime_profile": config.model.recommended_runtime_profile
+            or (scale_spec.runtime_profile if scale_spec else None),
+            "recommended_quantization": config.model.recommended_quantization
+            or (scale_spec.recommended_quantization if scale_spec else None),
+            "deployment_tier": config.model.deployment_tier or (scale_spec.tier if scale_spec else None),
+            "context_length": config.model.context_length
+            or (scale_spec.recommended_context_length if scale_spec else None),
             "adapter_method": config.adapter.method,
             "architecture": resolved_architecture,
         },

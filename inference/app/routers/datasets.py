@@ -50,7 +50,6 @@ def list_datasets(service: Any = Depends(get_metadata_service)) -> dict[str, Any
 @router.get("/telemetry")
 def get_telemetry_backlog(db: SqliteControlPlane = Depends(_get_db)) -> dict[str, Any]:
     try:
-        
         records = db.list_telemetry(status="flagged")
         return {"telemetry": records}
     except Exception as exc:
@@ -60,7 +59,6 @@ def get_telemetry_backlog(db: SqliteControlPlane = Depends(_get_db)) -> dict[str
 @router.post("/telemetry/{record_id}/promote")
 def promote_telemetry_record(record_id: str, db: SqliteControlPlane = Depends(_get_db)) -> dict[str, Any]:
     try:
-        
         updated = db.update_telemetry_status(record_id, status="promoted", actioned_at=time.time())
         if not updated:
             raise HTTPException(status_code=404, detail=f"Telemetry record '{record_id}' not found")
@@ -79,7 +77,6 @@ def promote_telemetry_record(record_id: str, db: SqliteControlPlane = Depends(_g
 @router.post("/telemetry/{record_id}/discard")
 def discard_telemetry_record(record_id: str, db: SqliteControlPlane = Depends(_get_db)) -> dict[str, Any]:
     try:
-        
         updated = db.update_telemetry_status(record_id, status="discarded", actioned_at=time.time())
         if not updated:
             raise HTTPException(status_code=404, detail=f"Telemetry record '{record_id}' not found")
@@ -98,7 +95,6 @@ def discard_telemetry_record(record_id: str, db: SqliteControlPlane = Depends(_g
 @router.post("/synthesize")
 def synthesize_dataset(req: SynthesizeRequest, db: SqliteControlPlane = Depends(_get_db)) -> dict[str, Any]:
     try:
-        
         job_id = f"synth-{uuid.uuid4().hex[:8]}"
         estimated_time = req.num_variants * 1.5
         settings = get_settings()
@@ -128,11 +124,10 @@ def synthesize_dataset(req: SynthesizeRequest, db: SqliteControlPlane = Depends(
 @router.get("/synthesize/{job_id}")
 def get_synthesis_job(job_id: str, db: SqliteControlPlane = Depends(_get_db)) -> dict[str, Any]:
     try:
-        
         job = db.get_synth_job(job_id)
         if not job:
             raise HTTPException(status_code=404, detail=f"Job '{job_id}' not found")
-        
+
         # Check if output file exists and count rows as proxy for progress
         output_path = Path(job.get("output_path", ""))
         if output_path.exists():
@@ -147,4 +142,3 @@ def get_synthesis_job(job_id: str, db: SqliteControlPlane = Depends(_get_db)) ->
         raise
     except Exception as exc:
         raise HTTPException(status_code=503, detail=f"Synthesis job retrieval unavailable: {str(exc)}") from exc
-

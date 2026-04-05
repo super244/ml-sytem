@@ -11,7 +11,9 @@ router = APIRouter(tags=["openai"])
 
 
 @router.post("/chat/completions")
-def create_chat_completions(request: OpenAIChatCompletionRequest, raw_request: Request, service: Any = Depends(get_openai_service)):
+def create_chat_completions(
+    request: OpenAIChatCompletionRequest, raw_request: Request, service: Any = Depends(get_openai_service)
+):
 
     service.authorize_request(raw_request)
     if request.stream:
