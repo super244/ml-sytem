@@ -50,7 +50,7 @@ def main() -> int:
     checks.append(("ruff check --quiet", "Code linting"))
 
     # Type checking (optional)
-    checks.append(("mypy ai_factory/ --no-error-summary", "Type checking"))
+    checks.append(("mypy . --no-error-summary", "Type checking"))
 
     # Frontend dependencies
     frontend_path = Path("frontend")

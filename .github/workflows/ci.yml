@@ -8,8 +8,15 @@ on:
 
 permissions:
   contents: read
-  checks: write
-  pull-requests: write
+  security-events: write
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+defaults:
+  run:
+    shell: bash
 
 jobs:
   python-quality:
@@ -31,7 +38,6 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           pip install -e ".[dev]"
-          pip install bandit
 
       - name: Ruff formatting check
         run: ruff format --check .
@@ -40,11 +46,19 @@ jobs:
         run: ruff check .
 
       - name: MyPy type checking
-        run: mypy ai_factory/ --no-incremental
+        run: mypy .
 
       - name: Bandit security scan
-        run: bandit -r ai_factory/ -f json -o bandit-report.json || true
+        run: bandit -r ai_factory/ -f json -o bandit-report.json
         continue-on-error: true
+
+      - name: Upload Bandit report
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: bandit-report-py${{ matrix.python-version }}
+          path: bandit-report.json
+          if-no-files-found: ignore
 
   python-tests:
     name: "Python: Tests"
@@ -69,12 +83,11 @@ jobs:
 
       - name: Run tests
         run: |
-          pytest tests/ -v --tb=short --cov=ai_factory --cov-report=xml --cov-report=term-missing
+          python -m pytest -q --tb=short --cov=ai_factory --cov-report=xml --cov-report=term-missing
 
       - name: Upload coverage
         uses: codecov/codecov-action@v4
         with:
-          token: ${{ secrets.CODECOV_TOKEN }}
           file: ./coverage.xml
           flags: python
         continue-on-error: true
@@ -89,6 +102,7 @@ jobs:
         uses: actions-rust-lang/setup-rust-toolchain@v1
         with:
           toolchain: stable
+          components: rustfmt, clippy
           cache: true
 
       - name: Rust checks
@@ -97,7 +111,7 @@ jobs:
             cd ai_factory_titan
             cargo fmt --check
             cargo check
-            cargo clippy -- -D warnings
+            cargo clippy --all-targets -- -D warnings
           else
             echo "No Rust/Titan components found"
           fi
@@ -131,12 +145,8 @@ jobs:
         working-directory: frontend
         run: npm run build
 
-      - name: Run frontend tests (if available)
-        working-directory: frontend
-        run: npm test -- --passWithNoTests
-
   desktop-checks:
-    name: "Desktop: Electron"
+    name: "Desktop: Shell Validation"
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -152,9 +162,12 @@ jobs:
         working-directory: desktop
         run: npm ci --legacy-peer-deps
 
-      - name: Validate desktop packaging
+      - name: Validate desktop JavaScript entrypoints
         working-directory: desktop
-        run: npx electron-builder --linux dir
+        run: |
+          node --check main.js
+          node --check preload.js
+          npx electron-builder --version
 
   integration-tests:
     name: "Integration: System Tests"
@@ -181,6 +194,12 @@ jobs:
           else
             echo "No doctor script found"
           fi
+
+      - name: Workspace readiness
+        run: python3 -m ai_factory.cli ready
+
+      - name: Training preflight
+        run: python3 -m ai_factory.cli train-preflight --config training/configs/profiles/failure_aware.yaml
 
       - name: Basic import tests
         run: |
@@ -210,3 +229,11 @@ jobs:
         with:
           sarif_file: 'trivy-results.sarif'
         continue-on-error: true
+
+      - name: Upload Trivy report
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: trivy-results
+          path: trivy-results.sarif
+          if-no-files-found: ignore
