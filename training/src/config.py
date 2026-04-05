@@ -8,6 +8,8 @@ from typing import Any
 import yaml
 from pydantic import BaseModel, ConfigDict, Field
 
+from training.src.scaling import resolve_scratch_architecture
+
 
 class ConfigValidationError(ValueError):
     pass
@@ -18,6 +20,7 @@ class ModelConfig(BaseModel):
     name: str = "qwen25_math_1p5b"
     initialization: str = "pretrained"
     model_type: str | None = None
+    target_parameters: str | int | None = None
     base_model_name: str = "Qwen/Qwen2.5-Math-1.5B-Instruct"
     tokenizer_name: str | None = None
     tokenizer_path: str | None = None
@@ -446,7 +449,11 @@ def validate_experiment_config(config: ExperimentConfig) -> list[str]:
         _require(bool(config.model.base_model_name.strip()), "model.base_model_name must be non-empty.", errors)
     if config.model.initialization.lower() == "scratch":
         _require(bool(config.model.model_type), "scratch initialization requires model.model_type.", errors)
-        _require(bool(config.model.architecture), "scratch initialization requires model.architecture.", errors)
+        _require(
+            bool(config.model.architecture) or config.model.target_parameters is not None,
+            "scratch initialization requires model.architecture or model.target_parameters.",
+            errors,
+        )
         _require(
             config.adapter.method.lower() in {"full", "sft"},
             "scratch initialization currently supports adapter.method=full or sft only.",
@@ -532,6 +539,13 @@ def describe_experiment_config(config: ExperimentConfig, *, warnings: list[str] 
         model_mode = "8bit"
     elif config.model.use_full_precision:
         model_mode = "full_precision"
+    resolved_architecture = dict(config.model.architecture)
+    if config.model.initialization.lower() == "scratch" and config.model.model_type:
+        resolved_architecture, _ = resolve_scratch_architecture(
+            model_type=config.model.model_type,
+            architecture_overrides=config.model.architecture,
+            target_parameters=config.model.target_parameters,
+        )
     return {
         "run": {
             "run_name": config.run_name,
@@ -543,12 +557,13 @@ def describe_experiment_config(config: ExperimentConfig, *, warnings: list[str] 
             "name": config.model.name,
             "initialization": config.model.initialization,
             "model_type": config.model.model_type,
+            "target_parameters": config.model.target_parameters,
             "base_model_name": config.model.base_model_name,
             "tokenizer_name": config.model.tokenizer_name,
             "tokenizer_path": config.model.tokenizer_path,
             "mode": model_mode,
             "adapter_method": config.adapter.method,
-            "architecture": dict(config.model.architecture),
+            "architecture": resolved_architecture,
         },
         "data": {
             "train_file": config.data.train_file,

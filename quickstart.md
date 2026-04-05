@@ -2,14 +2,14 @@
 
 This file is the exact operator path for this repository in its current state.
 
-Status as validated on April 4, 2026:
+Status as validated on April 5, 2026:
 
 - `pytest` passes.
 - `ruff check .` passes.
 - `mypy .` passes.
 - `python scripts/doctor.py` passes.
 - `ai-factory serve` and `ai-factory api-smoke` pass.
-- Dataset generation, corpus preparation, and training dry-run pass.
+- Dataset generation, corpus preparation, SQLite corpus export, tokenizer training smoke test, and scratch-training dry-run pass.
 - `finetuned` evaluation, finetuned inference, and real deployment require a first real training run because the repo does not ship packaged adapters in `artifacts/models/`.
 
 ## 1. Choose Your Track
@@ -19,6 +19,7 @@ Status as validated on April 4, 2026:
 Use this if you want to:
 
 - generate and pack datasets
+- pretrain a scratch model from your own corpus
 - validate training with `--dry-run`
 - run a real small-model or adapter-based fine-tune on your own GPU
 - run the API and frontend locally
@@ -33,7 +34,7 @@ Recommended:
 
 Use this if you want to:
 
-- run the same training commands on a rented GPU VM
+- run a real 2B scratch pretraining job on a rented GPU VM
 - keep artifacts on persistent attached storage
 - avoid local GPU limits
 
@@ -102,6 +103,12 @@ docker compose config
 python data/generator/generate_calculus_datasets.py --config data/configs/generation.yaml
 ```
 
+Default behavior now:
+
+- the six custom math datasets target `2.0` GiB total
+- the generator splits that total budget across the six custom families
+- the generated files are still JSONL under `data/custom/`
+
 ### 4.2 Optional: normalize public datasets
 
 Run this only if you want public data folded into the corpus.
@@ -115,6 +122,8 @@ python data/public/normalize_public_datasets.py --registry data/public/registry.
 ```bash
 python data/prepare_dataset.py --config data/configs/processing.yaml
 ```
+
+This now writes both JSONL splits and a SQLite corpus database.
 
 ### 4.4 Validate the processed training split
 
@@ -133,16 +142,74 @@ Expected outputs:
 - `data/processed/train.jsonl`
 - `data/processed/eval.jsonl`
 - `data/processed/test.jsonl`
+- `data/processed/corpus.sqlite`
 - `data/processed/manifest.json`
 - `data/processed/pack_summary.json`
 - `data/processed/packs/*`
 
-## 5. Validate The Training Path First
+### 4.6 Optional: inspect the SQLite corpus
+
+```bash
+python data/tools/preview_dataset.py --input data/processed/corpus.sqlite --split train --limit 3
+python data/tools/validate_dataset.py --input data/processed/corpus.sqlite --split train --manifest data/processed/manifest.json
+```
+
+Important note on SQLite:
+
+- `data/processed/corpus.sqlite` is now the durable structured corpus store for processed train/eval/test rows
+- the training stack can read either JSONL or SQLite
+- the existing JSONL outputs remain in place because they are simple to diff, inspect, and reuse with external tooling
+- this SQLite corpus is separate from the orchestration control-plane SQLite database under `artifacts/control_plane/`
+
+## 5. Choose The Scratch Model Size
+
+The scratch-model path now supports target parameter counts directly.
+
+To plan a model around a parameter budget:
+
+```bash
+python training/scripts/plan_model_scale.py --target-parameters 2b
+python training/scripts/plan_model_scale.py --target-parameters 1.3b
+python training/scripts/plan_model_scale.py --target-parameters 3b
+```
+
+The default scratch model component is:
+
+- `training/configs/components/models/qwen2_scratch_2b.yaml`
+
+It uses:
+
+- `model_type: qwen2`
+- `target_parameters: 2b`
+- `vocab_size: 50257`
+
+If you want a different model size, edit that file and change `target_parameters` to the budget you want, for example:
+
+```yaml
+target_parameters: 1.3b
+```
+
+Then keep the tokenizer vocab size aligned with the same component.
+
+## 6. Train The Tokenizer For Scratch Pretraining
+
+Before the first real scratch run, train a local tokenizer that matches the configured vocab budget.
+
+```bash
+python training/scripts/train_tokenizer.py \
+  --config training/configs/profiles/pretraining.yaml \
+  --output-dir artifacts/tokenizers/qwen2_math_2b
+```
+
+If you want a different vocab size, update `training/configs/components/models/qwen2_scratch_2b.yaml` first, then pass the same setting through the profile.
+
+## 7. Validate The Scratch Training Path First
 
 Always start with a dry-run.
 
 ```bash
-python -m training.train --config training/configs/profiles/baseline_qlora.yaml --dry-run
+python -m training.train --config training/configs/profiles/pretraining.yaml --dry-run
+python -m training.train --config training/configs/profiles/pretraining.yaml --dry-run --validate-model-load
 ```
 
 This validates:
@@ -150,8 +217,12 @@ This validates:
 - config composition
 - dataset paths
 - tokenizer loading
-- prompt rendering
+- scratch architecture resolution from `target_parameters`
+- full model instantiation
 - artifact layout
+- plain-text pretraining tokenization
+
+For SQLite-backed training data, point the data component at `data/processed/corpus.sqlite` for train/eval/test if you prefer DB-backed reads over JSONL.
 
 You can also run the repo refresh flow:
 
@@ -159,7 +230,42 @@ You can also run the repo refresh flow:
 ai-factory refresh-lab --skip-tests --skip-notebooks --skip-generate
 ```
 
-## 6. Run The First Real Fine-Tune
+## 8. Run The First Real 2B Scratch Pretraining Job
+
+The default scratch-pretraining profile is:
+
+- `training/configs/profiles/pretraining.yaml`
+
+Run it like this:
+
+```bash
+python -m training.train --config training/configs/profiles/pretraining.yaml
+```
+
+What this profile does now:
+
+- builds a Qwen2-style decoder from scratch instead of loading `from_pretrained`
+- uses `target_parameters: 2b` to resolve the model scale
+- reads plain-text math documents for next-token prediction
+- reads the processed corpus from `data/processed/corpus.sqlite` by default
+- trains all parameters
+- publishes the result under `artifacts/models/atlas-math-2b-pretrained/`
+
+What you need operationally:
+
+- a serious GPU machine for a real 2B run
+- persistent storage for `artifacts/`
+- enough disk for the 2 GiB custom corpus, processed splits, tokenizer, checkpoints, and final model
+
+Recommended operator order:
+
+1. `python data/generator/generate_calculus_datasets.py --config data/configs/generation.yaml`
+2. `python data/prepare_dataset.py --config data/configs/processing.yaml`
+3. `python training/scripts/train_tokenizer.py --config training/configs/profiles/pretraining.yaml --output-dir artifacts/tokenizers/qwen2_math_2b`
+4. `python -m training.train --config training/configs/profiles/pretraining.yaml --dry-run --validate-model-load`
+5. `python -m training.train --config training/configs/profiles/pretraining.yaml`
+
+## 9. Run The First Real Fine-Tune
 
 ### Recommended first real production run
 
@@ -211,7 +317,7 @@ Useful command:
 ai-factory latest-run
 ```
 
-## 7. Evaluate
+## 10. Evaluate
 
 ### 7.1 Bootstrap evaluation before any adapter exists
 
@@ -236,7 +342,7 @@ Expected outputs:
 - `evaluation/results/base_vs_finetuned/summary.md`
 - `evaluation/results/base_vs_finetuned/leaderboard.json`
 
-## 8. Optimization Loop
+## 11. Optimization Loop
 
 ### 8.1 Mine failures into new training examples
 
@@ -272,7 +378,7 @@ A common loop is:
 4. rerun with `math_specialist.yaml` or `verifier_augmented.yaml`
 5. compare runs
 
-## 9. Serve And Run Inference
+## 12. Serve And Run Inference
 
 ### 9.1 Start the API
 
@@ -308,7 +414,7 @@ curl -s http://127.0.0.1:8000/v1/generate \
 
 If that returns an adapter-path error, your first real fine-tune has not published yet.
 
-## 10. Local Deployment Options
+## 13. Local Deployment Options
 
 ### 10.1 Demo stack with Docker Compose
 

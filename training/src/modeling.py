@@ -10,6 +10,7 @@ from transformers import AutoConfig, AutoModelForCausalLM, AutoTokenizer, BitsAn
 from transformers.utils import is_flash_attn_2_available
 
 from training.src.config import ExperimentConfig
+from training.src.scaling import resolve_scratch_architecture
 
 logger = logging.getLogger(__name__)
 
@@ -78,7 +79,11 @@ def resolve_attention_implementation(config: ExperimentConfig) -> str | None:
 
 
 def build_model_from_scratch(config: ExperimentConfig, tokenizer: Any | None = None) -> Any:
-    architecture = dict(config.model.architecture)
+    architecture, estimated_parameters = resolve_scratch_architecture(
+        model_type=config.model.model_type or "",
+        architecture_overrides=config.model.architecture,
+        target_parameters=config.model.target_parameters,
+    )
     if tokenizer is not None:
         architecture.setdefault("vocab_size", len(tokenizer))
         if tokenizer.pad_token_id is not None:
@@ -91,6 +96,15 @@ def build_model_from_scratch(config: ExperimentConfig, tokenizer: Any | None = N
     model_type = config.model.model_type or architecture.get("model_type")
     if not model_type:
         raise ValueError("Scratch model initialization requires model.model_type.")
+    if estimated_parameters is not None:
+        logger.info(
+            "Resolved scratch architecture for %s target %s -> hidden=%s layers=%s estimated_parameters=%s",
+            model_type,
+            config.model.target_parameters,
+            architecture.get("hidden_size"),
+            architecture.get("num_hidden_layers"),
+            estimated_parameters,
+        )
 
     hf_config = AutoConfig.for_model(model_type, **architecture)
     attention_implementation = resolve_attention_implementation(config)

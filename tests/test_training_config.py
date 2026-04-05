@@ -7,6 +7,7 @@ import pytest
 from training.src.config import ConfigValidationError, load_experiment_config, validate_experiment_config
 from training.src.data import build_messages, build_training_text, load_jsonl
 from training.src.modeling import resolve_attention_implementation
+from training.src.scaling import resolve_scratch_architecture
 from training.src.validation import build_validation_data_config
 from training.src.workflows import build_source_specs
 
@@ -24,9 +25,26 @@ def test_pretraining_profile_uses_scratch_model_and_text_mode() -> None:
 
     assert config.model.initialization == "scratch"
     assert config.model.model_type == "qwen2"
+    assert config.model.target_parameters == "2b"
     assert config.model.architecture["vocab_size"] == 50257
     assert config.data.format == "pretraining_text"
     assert config.adapter.method == "full"
+
+
+def test_resolve_scratch_architecture_from_target_parameters() -> None:
+    architecture, estimate = resolve_scratch_architecture(
+        model_type="qwen2",
+        target_parameters="2b",
+        architecture_overrides={"vocab_size": 50257, "max_position_embeddings": 4096},
+    )
+
+    assert architecture["hidden_size"] == 2560
+    assert architecture["num_hidden_layers"] == 24
+    assert architecture["num_attention_heads"] == 20
+    assert architecture["num_key_value_heads"] == 10
+    assert architecture["intermediate_size"] == 6912
+    assert estimate is not None
+    assert abs(estimate - 2_000_000_000) < 10_000_000
 
 
 def test_validation_rejects_conflicting_training_flags() -> None:
