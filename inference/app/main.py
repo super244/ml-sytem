@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from collections.abc import Iterable
 
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
@@ -86,7 +86,6 @@ try:
 except ImportError:
     pass
 
-from fastapi import HTTPException, Request
 
 @app.exception_handler(HTTPException)
 async def custom_http_exception_handler(request: Request, exc: HTTPException) -> JSONResponse:
@@ -100,10 +99,10 @@ async def custom_http_exception_handler(request: Request, exc: HTTPException) ->
                 "detail": exc.detail,
                 "instance": str(request.url),
             },
-            headers={"Content-Type": "application/problem+json"}
+            headers={"Content-Type": "application/problem+json"},
         )
     return JSONResponse(
         status_code=exc.status_code,
         content={"detail": exc.detail},
-        headers=exc.headers
+        headers=exc.headers,
     )

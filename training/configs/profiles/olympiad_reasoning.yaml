@@ -1,0 +1,19 @@
+profile_name: olympiad_reasoning
+run_name: atlas_olympiad_reasoning
+seed: 21
+refs:
+  model: ../components/models/qwen25_math_7b.yaml
+  adapter: ../components/adapters/long_context_lora.yaml
+  data: ../components/data/curriculum_specialist.yaml
+  runtime: ../components/runtime/hybrid_scaleup.yaml
+  logging: ../components/logging/default.yaml
+  tracking: ../components/tracking/default.yaml
+  packaging: ../components/packaging/default.yaml
+training:
+  num_train_epochs: 1.5
+  per_device_train_batch_size: 1
+  gradient_accumulation_steps: 16
+  learning_rate: 0.0001
+  artifacts_dir: artifacts
+packaging:
+  publish_model_name: atlas-math-olympiad-reasoning

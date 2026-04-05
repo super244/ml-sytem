@@ -266,12 +266,12 @@ def cmd_doctor(args: argparse.Namespace) -> None:
     frontend_ready = (root / "frontend" / "node_modules").exists()
 
     recommended_next_steps = [
-        "python scripts/refresh_lab.py",
-        "uvicorn inference.app.main:app --reload",
-        "python scripts/api_smoke.py",
+        "ai-factory refresh-lab",
+        "ai-factory serve --host 127.0.0.1 --port 8000",
+        "ai-factory api-smoke",
     ]
     if runs:
-        recommended_next_steps.append("python scripts/latest_run.py")
+        recommended_next_steps.append("ai-factory latest-run")
     else:
         recommended_next_steps.append(
             "python -m training.train --config training/configs/profiles/baseline_qlora.yaml --dry-run"

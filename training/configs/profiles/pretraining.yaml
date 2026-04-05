@@ -3,9 +3,9 @@ run_name: atlas_pretraining
 seed: 42
 refs:
   model: ../components/models/qwen25_math_1p5b.yaml
-  adapter: ../components/adapters/pretraining.yaml
-  data: ../components/data/large_corpus.yaml
-  runtime: ../components/runtime/distributed.yaml
+  adapter: ../components/adapters/full_finetune.yaml
+  data: ../components/data/baseline.yaml
+  runtime: ../components/runtime/hybrid_scaleup.yaml
   logging: ../components/logging/default.yaml
   tracking: ../components/tracking/default.yaml
   packaging: ../components/packaging/default.yaml

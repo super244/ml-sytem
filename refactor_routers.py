@@ -3,21 +3,28 @@ import re
 
 ROUTERS_DIR = "/Users/luca/Projects/ai-factory/inference/app/routers"
 
-def process_file(fpath):
-    with open(fpath, "r") as f:
+
+def process_file(fpath: str) -> None:
+    with open(fpath) as f:
         content = f.read()
 
-    original_content = content
-
-    if "service = get_" not in content and "get_instance_service()." not in content and "get_metadata_service()." not in content:
+    if (
+        "service = get_" not in content
+        and "get_instance_service()." not in content
+        and "get_metadata_service()." not in content
+    ):
         return
 
     # Add imports
     if "from typing import Any" not in content:
         content = re.sub(r'(from __future__ import annotations\n+)', r'\1from typing import Any\n', content)
-        
+
     if "Depends" not in content and "from fastapi import" in content:
-        content = re.sub(r'(from fastapi import .*?)(?=\n)', lambda m: m.group(1) + ", Depends" if "Depends" not in m.group(1) else m.group(1), content)
+        content = re.sub(
+            r"(from fastapi import .*?)(?=\n)",
+            lambda m: m.group(1) + ", Depends" if "Depends" not in m.group(1) else m.group(1),
+            content,
+        )
 
     # Refactor direct calls
     # For def func(..., arg: type = ...): \n    service = get_service()
@@ -30,19 +37,35 @@ def process_file(fpath):
     
     # orchestrations.py uses get_instance_service() directly on return
     # e.g., return get_instance_service().list_orchestration_runs()
-    content = re.sub(r'def ([a-zA-Z0-9_]+)\((.*?)\)( -> [^:]+)?:\n(\s+)try:\n(\s+)return get_([a-zA-Z0-9_]+)_service\(\)', 
-                     r'def \1(\2, service: Any = Depends(get_\6_service))\3:\n\4try:\n\5return service', content, flags=re.DOTALL)
-                     
-    # For metadata.py
-    content = re.sub(r'def ([a-zA-Z0-9_]+)\((.*?)\)( -> [^:]+)?:\n(\s+)try:\n(\s+)([a-zA-Z0-9_]+) = get_([a-zA-Z0-9_]+)_service\(\)', 
-                     r'def \1(\2, service: Any = Depends(get_\7_service))\3:\n\4try:\n\5\6 = service', content, flags=re.DOTALL)
-                     
-    # For instances.py
-    content = re.sub(r'def ([a-zA-Z0-9_]+)\((.*?)\)( -> [^:]+)?:\n(\s+)service = get_([a-zA-Z0-9_]+)_service\(\)', 
-                     r'def \1(\2, service: Any = Depends(get_\5_service))\3:\n', content, flags=re.DOTALL)
+    content = re.sub(
+        r"def ([a-zA-Z0-9_]+)\((.*?)\)( -> [^:]+)?:\n(\s+)try:\n(\s+)return get_([a-zA-Z0-9_]+)_service\(\)",
+        r"def \1(\2, service: Any = Depends(get_\6_service))\3:\n\4try:\n\5return service",
+        content,
+        flags=re.DOTALL,
+    )
 
-    content = re.sub(r'def ([a-zA-Z0-9_]+)\((.*?)\)( -> [^:]+)?:\n(\s+)return get_([a-zA-Z0-9_]+)_service\(\)', 
-                     r'def \1(\2, service: Any = Depends(get_\5_service))\3:\n\4return service', content, flags=re.DOTALL)
+    # For metadata.py
+    content = re.sub(
+        r"def ([a-zA-Z0-9_]+)\((.*?)\)( -> [^:]+)?:\n(\s+)try:\n(\s+)([a-zA-Z0-9_]+) = get_([a-zA-Z0-9_]+)_service\(\)",
+        r"def \1(\2, service: Any = Depends(get_\7_service))\3:\n\4try:\n\5\6 = service",
+        content,
+        flags=re.DOTALL,
+    )
+
+    # For instances.py
+    content = re.sub(
+        r"def ([a-zA-Z0-9_]+)\((.*?)\)( -> [^:]+)?:\n(\s+)service = get_([a-zA-Z0-9_]+)_service\(\)",
+        r"def \1(\2, service: Any = Depends(get_\5_service))\3:\n",
+        content,
+        flags=re.DOTALL,
+    )
+
+    content = re.sub(
+        r"def ([a-zA-Z0-9_]+)\((.*?)\)( -> [^:]+)?:\n(\s+)return get_([a-zA-Z0-9_]+)_service\(\)",
+        r"def \1(\2, service: Any = Depends(get_\5_service))\3:\n\4return service",
+        content,
+        flags=re.DOTALL,
+    )
 
     # autonomous.py / lab.py: they use get_instance_service in non-route helpers
     # _loop_service() -> AutonomousLoopService:
@@ -56,10 +79,11 @@ def process_file(fpath):
 
     with open(fpath, "w") as f:
         f.write(content)
-    
+
     print(f"Refactored {os.path.basename(fpath)}")
 
-for fname in os.listdir(ROUTERS_DIR):
-    if not fname.endswith(".py"): continue
-    process_file(os.path.join(ROUTERS_DIR, fname))
 
+for fname in os.listdir(ROUTERS_DIR):
+    if not fname.endswith(".py"):
+        continue
+    process_file(os.path.join(ROUTERS_DIR, fname))

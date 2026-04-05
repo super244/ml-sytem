@@ -1,5 +1,7 @@
 import pytest
+
 from inference.app.main import app
+
 
 @pytest.fixture(autouse=True)
 def clear_dependency_overrides():

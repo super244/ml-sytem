@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-from dataclasses import replace
 from typing import Any
 
 from ai_factory.core.tokens import approximate_token_count
@@ -10,16 +9,17 @@ from training.src.data import build_dataset, build_messages, curriculum_sort, lo
 
 
 def build_validation_data_config(config: ExperimentConfig) -> DataConfig:
-    return replace(
-        config.data,
-        max_train_samples=min(
-            config.training.max_validation_train_rows,
-            config.data.max_train_samples or config.training.max_validation_train_rows,
-        ),
-        max_eval_samples=min(
-            config.training.max_validation_eval_rows,
-            config.data.max_eval_samples or config.training.max_validation_eval_rows,
-        ),
+    return config.data.model_copy(
+        update={
+            "max_train_samples": min(
+                config.training.max_validation_train_rows,
+                config.data.max_train_samples or config.training.max_validation_train_rows,
+            ),
+            "max_eval_samples": min(
+                config.training.max_validation_eval_rows,
+                config.data.max_eval_samples or config.training.max_validation_eval_rows,
+            ),
+        }
     )
 
 

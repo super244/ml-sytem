@@ -1,4 +1,4 @@
-with open("frontend/app/dashboard/inference/page.tsx", "r") as f:
+with open("frontend/app/dashboard/inference/page.tsx") as f:
     c = f.read()
 
 c = c.replace("const availableModels = models.length ? models : demoMode ? FALLBACK_MODELS : [];", "const availableModels = useMemo(() => models.length ? models : demoMode ? FALLBACK_MODELS : [], [models, demoMode]);")

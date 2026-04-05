@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-from dataclasses import asdict
 import importlib.metadata
 import os
 import platform

@@ -23,9 +23,12 @@ AI-Factory ships with lightweight deployment scaffolding for a demo or pre-produ
 docker compose up --build
 ```
 
+The compose stack now supplies sane defaults without requiring a checked-in `.env`, but you can still override values such as `ARTIFACTS_DIR`, `OPENAI_API_KEYS`, and `NEXT_PUBLIC_API_BASE_URL` from your shell.
+
 ## Production Notes
 
 - Model weights are not bundled in the repo.
+- `configs/deploy.yaml` ships in `dry_run: true` mode; switch that off and provide provider-specific options before a real publish.
 - The API is single-operator by default, but OpenAI-compatible routes can be protected with `OPENAI_API_KEYS`.
 - The control plane is SQLite local-first and broker-ready: durable enough for single-node production-style operation, with interfaces shaped for later Redis/Postgres adapters.
 - Multiple worker processes are future-ready, but this pass only ships local and SSH/cloud executors.

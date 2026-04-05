@@ -1,7 +1,8 @@
 from __future__ import annotations
 
 from typing import Any
-from fastapi import APIRouter, BackgroundTasks, Query, Depends
+
+from fastapi import APIRouter, BackgroundTasks, Depends, Query
 from fastapi.responses import StreamingResponse
 
 from inference.app.dependencies import get_instance_service

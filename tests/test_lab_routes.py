@@ -31,15 +31,14 @@ async def test_dataset_telemetry_routes_support_promote_and_discard(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ):
-    from inference.app.routers import datasets as datasets_router
     from ai_factory.core.orchestration.sqlite import SqliteControlPlane
+    from inference.app.routers import datasets as datasets_router
 
     # Use a real DB in the tmp_path
     control_db_path = tmp_path / "control_plane.db"
     db = SqliteControlPlane(control_db_path)
 
     # Insert test records
-    import time
     from inference.app.routers.datasets import _telemetry_record_id
     
     rec1 = {

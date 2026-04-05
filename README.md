@@ -82,66 +82,69 @@ AI-Factory/
 
 ### **Installation**
 ```bash
-# Clone the repository
 git clone https://github.com/super244/ai-factory.git
 cd ai-factory
 
-# Install in development mode
-pip install -e .[dev]
+python -m venv .venv
+source .venv/bin/activate
+pip install -U pip
+pip install -e ".[dev]"
+cp .env.example .env
 
-# Verify installation
-ai-factory --help
+# Verify the workspace
+ai-factory ready
+python scripts/doctor.py
 ```
 
 ### **Basic Usage**
 ```bash
-# List available domains
-ai-factory domain list
+# Prepare data
+python data/prepare_dataset.py --config data/configs/processing.yaml
 
-# Check platform status
-ai-factory platform status
+# Validate the training path
+python -m training.train --config training/configs/profiles/baseline_qlora.yaml --dry-run
 
-# Start training with default config
-ai-factory new --config configs/finetune.yaml
+# Serve the API
+ai-factory serve --host 127.0.0.1 --port 8000
 
-# Monitor progress
-ai-factory tui
-
-# Launch web interface
-ai-factory serve
+# Smoke-test a live server
+ai-factory api-smoke
 ```
 
 ### **Development Setup**
 ```bash
-# Install frontend dependencies
 cd frontend && npm install
+cd ..
 
-# Run development servers
-ai-factory serve           # Backend server
-npm run dev               # Frontend development
+# Run checks
+ruff check .
+mypy .
+pytest
 
-# Run tests
-pytest                    # Python tests
-npm test                   # Frontend tests
+# Build the frontend
+cd frontend && npm run build
 ```
+
+Full operator setup, including local vs cloud guidance, dataset generation, training, evaluation, optimization, deployment, and inference, is documented in [quickstart.md](quickstart.md).
 
 ## 📚 **Documentation**
 
 ### **Core Guides**
 - **[Architecture Guide](docs/architecture.md)** - System design and principles
 - **[Data System Guide](docs/data-system.md)** - Data layer and processing
-- **[Training Guide](tune-guide.md)** - Model training and fine-tuning
+- **[Quickstart](quickstart.md)** - Exact local and cloud setup plus the full lifecycle
+- **[Training Guide](training/README.md)** - Training profiles, artifacts, and workflow details
 - **[Deployment Guide](docs/deployment-guide.md)** - Deployment and production
 
 ### **API Documentation**
 - **[API Reference](docs/api/README.md)** - REST API and endpoints
-- **[CLI Reference](docs/cli-guide.md)** - Command-line interface
-- **[Configuration Guide](docs/config-guide.md)** - Configuration options
+- **[API Guide](docs/api-guide.md)** - API usage patterns and examples
+- **[Runbook](docs/runbook.md)** - Operational commands and recovery steps
 
 ### **Tutorials & Examples**
 - **[Notebooks](notebooks/)** - Interactive tutorials and explorations
-- **[Examples](examples/)** - Code examples and templates
-- **[Best Practices](docs/best-practices.md)** - Development guidelines
+- **[Docs Examples](docs/examples/)** - Reference examples and templates
+- **[Contributor Guide](docs/contributor-guide.md)** - Development guidelines
 
 ## 🛠️ **Development**
 
@@ -189,8 +192,8 @@ See [Contributor Guide](docs/contributor-guide.md) for detailed guidelines.
 ### **Environment Variables**
 ```bash
 export AI_FACTORY_REPO_ROOT="/path/to/ai-factory"
-export AI_FACTORY_ARTIFACTS_DIR="/path/to/artifacts"
-export AI_FACTORY_LOG_LEVEL="INFO"
+export ARTIFACTS_DIR="/path/to/artifacts"
+export CORS_ORIGINS="http://localhost:3000"
 ```
 
 ### **Key Configuration Files**
