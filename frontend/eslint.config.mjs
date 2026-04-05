@@ -21,8 +21,8 @@ export default tseslint.config(
       ...nextPlugin.configs.recommended.rules,
       ...nextPlugin.configs['core-web-vitals'].rules,
       ...hooksPlugin.configs.recommended.rules,
-      "react-hooks/exhaustive-deps": "off",
-      "react-hooks/set-state-in-effect": "off",
+      
+      
     },
     settings: {
       react: {

@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { useEffect, useRef, useState, useCallback } from 'react';
+import { useEffect, useRef, useState, useCallback, useMemo } from 'react';
 
 import {
   getInstances,
@@ -93,12 +93,12 @@ function Sparkline({
 
 function LiveTerminal({ logText }: { logText: string }) {
   const bottomRef = useRef<HTMLDivElement>(null);
-  const lines = logText
+  const lines = useMemo(() => logText
     ? logText
         .split('\n')
         .filter((line) => line.trim())
         .slice(-200)
-    : ['No log output yet — instance is initializing…'];
+    : ['No log output yet — instance is initializing…'], [logText]);
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
