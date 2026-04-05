@@ -1,4 +1,4 @@
-with open("frontend/app/dashboard/automl/page.tsx", "r") as f:
+with open("frontend/app/dashboard/automl/page.tsx") as f:
     c = f.read()
 
 c = c.replace("  const modelOptions =\n    availableModels.length > 0\n      ? availableModels.map((model) => model.name)\n      : demoMode\n        ? MODELS\n        : [];", "  const modelOptions = useMemo(() => \n    availableModels.length > 0\n      ? availableModels.map((model) => model.name)\n      : demoMode\n        ? MODELS\n        : [], [availableModels, demoMode]);")

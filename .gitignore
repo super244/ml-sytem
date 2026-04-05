@@ -36,6 +36,7 @@ node_modules/
 dist/
 build/
 coverage/
+ai_factory_titan/target/
 
 # Logs
 logs

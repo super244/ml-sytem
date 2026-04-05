@@ -13,6 +13,7 @@ The evaluation layer turns the model into a benchmarkable system rather than a p
 
 ## Included Benchmark Configs
 
+- `configs/base_smoke.yaml`
 - `configs/base_vs_finetuned.yaml`
 - `configs/source_ablation_calculus_only.yaml`
 - `configs/curriculum_ablation.yaml`
@@ -35,7 +36,10 @@ The evaluation layer turns the model into a benchmarkable system rather than a p
 ## Example Commands
 
 ```bash
+python3 -m evaluation.evaluate --config evaluation/configs/base_smoke.yaml
 python3 -m evaluation.evaluate --config evaluation/configs/base_vs_finetuned.yaml
 python3 -m evaluation.evaluate --config evaluation/configs/verifier_on_off.yaml
 python3 evaluation/analysis/analyze_failures.py --input evaluation/results/latest/per_example.jsonl --output evaluation/results/latest/failure_analysis.json
 ```
+
+`base_smoke.yaml` works before any adapters are trained. `base_vs_finetuned.yaml` requires a packaged adapter at `artifacts/models/atlas-math-failure-aware/latest`.

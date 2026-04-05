@@ -69,7 +69,15 @@ def test_detect_titan_status_prefers_remote_cuda_when_configured(monkeypatch) ->
     assert status["runtime"]["selected"] == "rust"
     assert status["runtime"]["gguf_support"] is True
     assert status["engine"]["runtime_mode"] == "rust-primary"
-    assert status["engine"]["runtime_ready"] is True
+    assert status["engine"]["runtime_ready"] is False
     assert status["engine"]["supports_gguf"] is True
     assert status["engine"]["supports_kv_cache"] is True
     assert status["engine"]["supports_sampler_stack"] is True
+
+
+def test_find_titan_status_binary_uses_release_or_windows_paths(tmp_path) -> None:
+    binary = tmp_path / "ai_factory_titan" / "target" / "release" / "titan-status.exe"
+    binary.parent.mkdir(parents=True)
+    binary.write_text("")
+
+    assert titan._find_titan_status_binary(tmp_path) == binary

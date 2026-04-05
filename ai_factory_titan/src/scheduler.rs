@@ -24,8 +24,8 @@ pub struct SchedulerStatus {
 impl TitanScheduler {
     pub fn new(capacity: usize) -> Self {
         let (sender, mut receiver) = mpsc::channel::<GpuTask>(capacity);
-        tokio::spawn(async move {
-            while let Some(task) = receiver.recv().await {
+        std::thread::spawn(move || {
+            while let Some(task) = receiver.blocking_recv() {
                 let _ = task.reply.send(format!("completed: {}", task.label));
             }
         });

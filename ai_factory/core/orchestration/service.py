@@ -5,7 +5,7 @@ import hashlib
 import secrets
 import uuid
 from datetime import datetime, timedelta, timezone
-from typing import Any, Literal, cast, TYPE_CHECKING
+from typing import TYPE_CHECKING, Any, Literal, cast
 
 if TYPE_CHECKING:
     from ai_factory.core.orchestration.sqlite import SqliteControlPlane

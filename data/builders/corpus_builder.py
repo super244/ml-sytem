@@ -258,6 +258,8 @@ def _load_local_source_rows(spec: SourceSpec) -> list[dict[str, Any]]:
     if not spec.path:
         return []
     paths = resolve_source_paths([spec.path])
+    if not paths:
+        return []
     rows: list[dict[str, Any]] = []
     for path in paths:
         rows.extend(dict(row) for row in read_records(path))
@@ -366,6 +368,11 @@ def load_source_records(
                 )
                 continue
             raise
+        if not raw_rows:
+            warning = f"Source '{spec.id}' loaded 0 rows from {spec.path or '<unknown>'}."
+            if spec.optional:
+                warning = f"Optional source '{spec.id}' loaded 0 rows from {spec.path or '<unknown>'}."
+            warnings.append(warning)
         summaries.append(
             {
                 "id": spec.id,

@@ -1,11 +1,14 @@
 from __future__ import annotations
 
+import inspect
+from importlib import import_module
 from typing import Any
 
 from torch.nn import CrossEntropyLoss
 from torch.utils.data import DataLoader, SequentialSampler
 from transformers import Trainer
-from trl import DPOConfig, DPOTrainer, ORPOConfig, ORPOTrainer
+
+_TRAINER_PARAMETERS = set(inspect.signature(Trainer.__init__).parameters)
 
 
 class MathTrainer(Trainer):
@@ -55,6 +58,21 @@ class MathTrainer(Trainer):
         )
 
 
+def _load_preference_optimization_runtime() -> tuple[Any, Any, Any, Any]:
+    try:
+        trl = import_module("trl")
+    except ImportError as exc:
+        raise RuntimeError("Preference optimization requires the optional `trl` package to be installed.") from exc
+    return trl.DPOConfig, trl.DPOTrainer, trl.ORPOConfig, trl.ORPOTrainer
+
+
+def _attach_processing_class(trainer_kwargs: dict[str, Any], processor: Any, *, parameter_names: set[str]) -> None:
+    if "processing_class" in parameter_names:
+        trainer_kwargs["processing_class"] = processor
+    elif "tokenizer" in parameter_names:
+        trainer_kwargs["tokenizer"] = processor
+
+
 def build_ultimate_trainer(
     config: Any,
     model: Any,
@@ -67,18 +85,22 @@ def build_ultimate_trainer(
 ) -> Any:
     """Builds the appropriate trainer (SFT, DPO, ORPO) based on experiment config."""
     if not config.preference.enabled:
+        trainer_kwargs = {
+            "model": model,
+            "args": args,
+            "train_dataset": train_dataset,
+            "eval_dataset": eval_dataset,
+            "data_collator": data_collator,
+            "sequential_training": (config.data.curriculum_learning and config.data.sequential_curriculum),
+            "callbacks": callbacks,
+        }
+        _attach_processing_class(trainer_kwargs, tokenizer, parameter_names=_TRAINER_PARAMETERS)
         return MathTrainer(
-            model=model,
-            args=args,
-            train_dataset=train_dataset,
-            eval_dataset=eval_dataset,
-            data_collator=data_collator,
-            tokenizer=tokenizer,
-            sequential_training=(config.data.curriculum_learning and config.data.sequential_curriculum),
-            callbacks=callbacks,
+            **trainer_kwargs,
         )
 
     # Preference Optimization (DPO/ORPO)
+    DPOConfig, DPOTrainer, ORPOConfig, ORPOTrainer = _load_preference_optimization_runtime()
     if config.preference.loss_type == "orpo":
         orpo_args = ORPOConfig(
             **args.to_dict(),
@@ -86,13 +108,20 @@ def build_ultimate_trainer(
             max_prompt_length=config.preference.max_prompt_length,
             max_length=config.preference.max_prompt_length + config.preference.max_target_length,
         )
+        trainer_kwargs = {
+            "model": model,
+            "args": orpo_args,
+            "train_dataset": train_dataset,
+            "eval_dataset": eval_dataset,
+            "callbacks": callbacks,
+        }
+        _attach_processing_class(
+            trainer_kwargs,
+            tokenizer,
+            parameter_names=set(inspect.signature(ORPOTrainer.__init__).parameters),
+        )
         return ORPOTrainer(
-            model=model,
-            args=orpo_args,
-            train_dataset=train_dataset,
-            eval_dataset=eval_dataset,
-            tokenizer=tokenizer,
-            callbacks=callbacks,
+            **trainer_kwargs,
         )
 
     # Default to DPO
@@ -104,11 +133,18 @@ def build_ultimate_trainer(
         max_length=config.preference.max_prompt_length + config.preference.max_target_length,
         label_smoothing=config.preference.label_smoothing,
     )
+    trainer_kwargs = {
+        "model": model,
+        "args": dpo_args,
+        "train_dataset": train_dataset,
+        "eval_dataset": eval_dataset,
+        "callbacks": callbacks,
+    }
+    _attach_processing_class(
+        trainer_kwargs,
+        tokenizer,
+        parameter_names=set(inspect.signature(DPOTrainer.__init__).parameters),
+    )
     return DPOTrainer(
-        model=model,
-        args=dpo_args,
-        train_dataset=train_dataset,
-        eval_dataset=eval_dataset,
-        tokenizer=tokenizer,
-        callbacks=callbacks,
+        **trainer_kwargs,
     )

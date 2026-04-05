@@ -10,7 +10,7 @@ from pathlib import Path
 from typing import Any
 from urllib.parse import urlparse
 
-from ai_factory.core.datasets import load_catalog, load_pack_summary
+from ai_factory.core.datasets import inspect_json_asset, load_catalog, load_pack_summary
 from ai_factory.core.discovery import (
     latest_training_run,
     list_training_runs,
@@ -259,19 +259,25 @@ def cmd_refresh_lab(args: argparse.Namespace) -> None:
 
 def cmd_doctor(args: argparse.Namespace) -> None:
     root = Path(getattr(args, "root", None) or Path.cwd())
-    catalog = load_catalog(root / "data" / "catalog.json")
-    packs = load_pack_summary(root / "data" / "processed" / "pack_summary.json").get("packs", [])
+    catalog_status = inspect_json_asset(root / "data" / "catalog.json")
+    pack_summary_status = inspect_json_asset(root / "data" / "processed" / "pack_summary.json")
+    catalog = load_catalog(root / "data" / "catalog.json") if catalog_status["ok"] else {"summary": {}}
+    packs = (
+        load_pack_summary(root / "data" / "processed" / "pack_summary.json").get("packs", [])
+        if pack_summary_status["ok"]
+        else []
+    )
     runs = list_training_runs(str(root / "artifacts"))
     benchmarks = load_benchmark_registry(root / "evaluation" / "benchmarks" / "registry.yaml")
     frontend_ready = (root / "frontend" / "node_modules").exists()
 
     recommended_next_steps = [
-        "python scripts/refresh_lab.py",
-        "uvicorn inference.app.main:app --reload",
-        "python scripts/api_smoke.py",
+        "ai-factory refresh-lab",
+        "ai-factory serve --host 127.0.0.1 --port 8000",
+        "ai-factory api-smoke",
     ]
     if runs:
-        recommended_next_steps.append("python scripts/latest_run.py")
+        recommended_next_steps.append("ai-factory latest-run")
     else:
         recommended_next_steps.append(
             "python -m training.train --config training/configs/profiles/baseline_qlora.yaml --dry-run"
@@ -293,7 +299,9 @@ def cmd_doctor(args: argparse.Namespace) -> None:
         "python_packages": packages,
         "data": {
             "catalog_present": (root / "data" / "catalog.json").exists(),
+            "catalog_status": catalog_status,
             "processed_manifest_present": (root / "data" / "processed" / "manifest.json").exists(),
+            "pack_summary_status": pack_summary_status,
             "num_catalog_datasets": catalog.get("summary", {}).get("num_datasets", 0),
             "num_derived_packs": len(packs),
         },
@@ -357,7 +365,9 @@ def cmd_doctor(args: argparse.Namespace) -> None:
 
         data_rows = [
             ["Catalog Present", str(payload["data"]["catalog_present"])],
+            ["Catalog Status", payload["data"]["catalog_status"]["detail"]],
             ["Manifest Present", str(payload["data"]["processed_manifest_present"])],
+            ["Pack Summary Status", payload["data"]["pack_summary_status"]["detail"]],
             ["Catalog Datasets", str(payload["data"]["num_catalog_datasets"])],
             ["Derived Packs", str(payload["data"]["num_derived_packs"])],
         ]

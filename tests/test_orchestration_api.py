@@ -87,6 +87,59 @@ async def test_orchestration_routes_expose_runs_tasks_and_summary(tmp_path: Path
 
 
 @pytest.mark.anyio
+async def test_orchestration_create_route_uses_injected_service_and_preserves_not_found(tmp_path: Path) -> None:
+    from inference.app.routers import orchestration as orchestration_router
+
+    _write(
+        tmp_path / "training" / "configs" / "profiles" / "baseline_qlora.yaml",
+        "run_name: baseline\ntraining:\n  artifacts_dir: artifacts\n",
+    )
+    _write(
+        tmp_path / "configs" / "finetune.yaml",
+        (
+            "instance:\n"
+            "  type: finetune\n"
+            "  environment: local\n"
+            "subsystem:\n"
+            "  config_ref: ../training/configs/profiles/baseline_qlora.yaml\n"
+        ),
+    )
+    settings = AppSettings(
+        title="test",
+        version="0.0.0",
+        repo_root=str(tmp_path),
+        cors_origins=["*"],
+        model_registry_path=str(tmp_path / "inference" / "configs" / "model_registry.yaml"),
+        prompt_library_path=str(tmp_path / "inference" / "configs" / "prompt_presets.yaml"),
+        benchmark_registry_path=str(tmp_path / "evaluation" / "benchmarks" / "registry.yaml"),
+        artifacts_dir=str(tmp_path / "artifacts"),
+        cache_dir=str(tmp_path / "artifacts" / "cache"),
+        telemetry_path=str(tmp_path / "artifacts" / "telemetry.jsonl"),
+        cache_enabled=False,
+        telemetry_enabled=False,
+    )
+    service = InstanceService(settings)
+    app.dependency_overrides[orchestration_router.get_instance_service] = lambda: service
+
+    transport = httpx.ASGITransport(app=app)
+    async with httpx.AsyncClient(transport=transport, base_url="http://testserver") as client:
+        create_response = await client.post(
+            "/v1/orchestration/runs",
+            json={
+                "config_path": str(tmp_path / "configs" / "finetune.yaml"),
+                "start": False,
+            },
+        )
+        missing_response = await client.get("/v1/orchestration/runs/does-not-exist")
+
+    assert create_response.status_code == 200
+    payload = create_response.json()
+    assert payload["run"]["id"] == payload["tasks"][0]["run_id"]
+    assert missing_response.status_code == 404
+    assert "Unknown orchestration run" in missing_response.json()["detail"]
+
+
+@pytest.mark.anyio
 async def test_instance_routes_support_control_center_creation_and_inference(tmp_path: Path, monkeypatch) -> None:
     from inference.app.routers import instances as instances_router
 

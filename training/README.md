@@ -34,19 +34,22 @@ Legacy top-level config names are retained as wrappers for compatibility, but th
 ## Named Profiles
 
 - `baseline_qlora`
-- `calculus_specialist`
-- `curriculum_specialist`
+- `math_specialist`
 - `failure_aware`
 - `verifier_augmented`
 - `long_context`
-- `fast_iteration_small_model`
+- `fast_dev`
+- `full_finetune`
+- `continual_learning`
+- `multitask_learning`
+- `pretraining`
 
 ## Example Commands
 
 ```bash
 python3 -m training.train --config training/configs/profiles/baseline_qlora.yaml --dry-run
 python3 -m training.train --config training/configs/profiles/baseline_qlora.yaml --resume-from-latest-checkpoint
-python3 -m training.train --config training/configs/profiles/calculus_specialist.yaml
+python3 -m training.train --config training/configs/profiles/math_specialist.yaml
 python3 training/scripts/export_merged_model.py --run-dir artifacts/runs/<run_id>
 python3 training/scripts/compare_runs.py --left artifacts/runs/<run_a> --right artifacts/runs/<run_b> --markdown-output artifacts/runs/comparison.md
 ```
