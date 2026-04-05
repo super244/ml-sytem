@@ -164,7 +164,7 @@ class WandbTracker(NullTracker):
             name=config.tracking.run_name or config.run_name,
             group=config.tracking.experiment_name,
             tags=config.tracking.tags,
-            config=asdict(config),
+            config=config.model_dump(),
             mode=config.tracking.wandb_mode,
         )
         if self.run is not None:

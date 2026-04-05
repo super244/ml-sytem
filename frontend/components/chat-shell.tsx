@@ -107,31 +107,39 @@ export function ChatShell() {
     Boolean(promptPreset) &&
     !metadataDegraded;
 
-  useEffect(() => {
-    setModelVariant((current) => pickPrimaryModel(availableModels, current));
-  }, [availableModels]);
+  const availableModelsStr = JSON.stringify(availableModels);
+  const [prevModelsStr, setPrevModelsStr] = useState(availableModelsStr);
+  if (availableModelsStr !== prevModelsStr) {
+    setPrevModelsStr(availableModelsStr);
+    setModelVariant(pickPrimaryModel(availableModels, modelVariant));
+  }
 
-  useEffect(() => {
-    setCompareToModel((current) => pickSecondaryModel(availableModels, modelVariant, current));
-  }, [availableModels, modelVariant]);
+  const [prevCompareVariant, setPrevCompareVariant] = useState(modelVariant);
+  if (availableModelsStr !== prevModelsStr || modelVariant !== prevCompareVariant) {
+    setPrevCompareVariant(modelVariant);
+    setCompareToModel(pickSecondaryModel(availableModels, modelVariant, compareToModel));
+  }
 
-  useEffect(() => {
-    setPromptPreset((current) => pickPromptPreset(promptPresets, ['atlas_rigorous'], current));
-  }, [promptPresets]);
+  const promptPresetsStr = JSON.stringify(promptPresets);
+  const [prevPresetsStr, setPrevPresetsStr] = useState(promptPresetsStr);
+  if (promptPresetsStr !== prevPresetsStr) {
+    setPrevPresetsStr(promptPresetsStr);
+    setPromptPreset(pickPromptPreset(promptPresets, ['atlas_rigorous'], promptPreset));
+  }
 
   useEffect(() => {
     try {
       const storedMode = window.localStorage.getItem('ai-factory-workspace-mode');
       const storedDensity = window.localStorage.getItem('ai-factory-workspace-density');
       if (storedMode === 'focus' || storedMode === 'research' || storedMode === 'verification') {
-        setWorkspaceMode(storedMode);
+        setTimeout(() => setWorkspaceMode(storedMode), 0);
       }
       if (
         storedDensity === 'compact' ||
         storedDensity === 'balanced' ||
         storedDensity === 'expanded'
       ) {
-        setDensity(storedDensity);
+        setTimeout(() => setDensity(storedDensity), 0);
       }
     } catch {
       // LocalStorage can be disabled in privacy-focused environments.

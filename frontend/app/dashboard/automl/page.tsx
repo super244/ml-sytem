@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import {
   getModels,
   getMissionControl,
@@ -99,14 +99,14 @@ export default function AutoMLPage() {
       cancelled = true;
       clearInterval(interval);
     };
-  }, []);
+  }, [demoMode]);
 
-  const modelOptions =
+  const modelOptions = useMemo(() => 
     availableModels.length > 0
       ? availableModels.map((model) => model.name)
       : demoMode
         ? MODELS
-        : [];
+        : [], [availableModels, demoMode]);
 
   useEffect(() => {
     if (!baseModel || !modelOptions.includes(baseModel)) {
