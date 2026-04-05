@@ -165,8 +165,8 @@ def build_dataset_artifacts(config: ExperimentConfig, tokenizer, layout):
             split="eval",
         )
     dataset_report = {
-        "train": dataset_summary(config.data.train_file),
-        "eval": dataset_summary(config.data.eval_file) if config.data.eval_file else None,
+        "train": dataset_summary(config.data.train_file, split="train"),
+        "eval": dataset_summary(config.data.eval_file, split="eval") if config.data.eval_file else None,
         "tokenized_train_rows": len(train_dataset),
         "tokenized_eval_rows": len(eval_dataset) if eval_dataset is not None else 0,
     }

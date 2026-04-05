@@ -7,6 +7,7 @@ import json
 import math
 import random
 import re
+import sqlite3
 from collections import Counter
 from collections.abc import Iterable
 from dataclasses import dataclass, field
@@ -67,6 +68,8 @@ class ProcessingConfig:
     require_final_answer: bool = True
     output_subdir: str | None = None
     derived_packs: list[str] | None = None
+    emit_sqlite: bool = True
+    sqlite_output_path: str | None = "corpus.sqlite"
 
 
 @dataclass
@@ -712,10 +715,82 @@ def package_record(record: dict[str, Any], system_prompt: str) -> dict[str, Any]
     return PackagedMathRecord.model_validate(packaged).model_dump()
 
 
+def _write_sqlite_corpus(
+    path: Path,
+    *,
+    train_records: list[dict[str, Any]],
+    eval_records: list[dict[str, Any]],
+    test_records: list[dict[str, Any]],
+    metadata: dict[str, Any],
+) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    if path.exists():
+        path.unlink()
+    connection = sqlite3.connect(path)
+    try:
+        connection.execute(
+            """
+            CREATE TABLE records (
+                dataset_split TEXT NOT NULL,
+                sequence_id INTEGER NOT NULL,
+                id TEXT NOT NULL,
+                topic TEXT,
+                difficulty TEXT,
+                source TEXT,
+                payload_json TEXT NOT NULL,
+                PRIMARY KEY (dataset_split, sequence_id)
+            )
+            """
+        )
+        connection.execute("CREATE INDEX idx_records_split ON records(dataset_split)")
+        connection.execute("CREATE INDEX idx_records_topic ON records(topic)")
+        connection.execute("CREATE INDEX idx_records_source ON records(source)")
+        connection.execute(
+            """
+            CREATE TABLE metadata (
+                key TEXT PRIMARY KEY,
+                value_json TEXT NOT NULL
+            )
+            """
+        )
+        for split_name, rows in (("train", train_records), ("eval", eval_records), ("test", test_records)):
+            connection.executemany(
+                """
+                INSERT INTO records(dataset_split, sequence_id, id, topic, difficulty, source, payload_json)
+                VALUES (?, ?, ?, ?, ?, ?, ?)
+                """,
+                [
+                    (
+                        split_name,
+                        index,
+                        str(row.get("id", f"{split_name}-{index}")),
+                        row.get("topic"),
+                        row.get("difficulty"),
+                        row.get("source"),
+                        json.dumps(row, ensure_ascii=False),
+                    )
+                    for index, row in enumerate(rows)
+                ],
+            )
+        connection.executemany(
+            "INSERT INTO metadata(key, value_json) VALUES (?, ?)",
+            [(key, json.dumps(value, ensure_ascii=False)) for key, value in metadata.items()],
+        )
+        connection.commit()
+    finally:
+        connection.close()
+
+
 def _build_file_info(path: Path) -> DatasetFileInfo:
     num_rows = 0
     if path.exists() and path.suffix.lower() == ".jsonl":
         num_rows = sum(1 for line in path.read_text().splitlines() if line.strip())
+    elif path.exists() and path.suffix.lower() in {".sqlite", ".db"}:
+        connection = sqlite3.connect(path)
+        try:
+            num_rows = int(connection.execute("SELECT COUNT(*) FROM records").fetchone()[0])
+        finally:
+            connection.close()
     return DatasetFileInfo(
         path=str(path),
         sha256=sha256_file(path) if path.exists() else "",
@@ -790,10 +865,29 @@ def build_corpus(config: ProcessingConfig, config_path: str | Path) -> dict[str,
     train_path = output_dir / "train.jsonl"
     eval_path = output_dir / "eval.jsonl"
     test_path = output_dir / "test.jsonl"
+    sqlite_path = None
     write_jsonl(normalized_path, normalized_all)
     write_jsonl(train_path, train_packaged)
     write_jsonl(eval_path, eval_packaged)
     write_jsonl(test_path, test_packaged)
+    if config.emit_sqlite and config.sqlite_output_path:
+        sqlite_path = output_dir / config.sqlite_output_path
+        _write_sqlite_corpus(
+            sqlite_path,
+            train_records=train_packaged,
+            eval_records=eval_packaged,
+            test_records=test_packaged,
+            metadata={
+                "build_id": config.build_id or "",
+                "dataset_version": config.dataset_version,
+                "processing_version": config.processing_version,
+                "source_spec_version": config.source_spec_version,
+                "system_prompt": config.system_prompt,
+                "train_rows": len(train_packaged),
+                "eval_rows": len(eval_packaged),
+                "test_rows": len(test_packaged),
+            },
+        )
 
     stats = {
         "all": compute_record_stats(normalized_all),
@@ -834,6 +928,7 @@ def build_corpus(config: ProcessingConfig, config_path: str | Path) -> dict[str,
         outputs=[
             _build_file_info(path)
             for path in [normalized_path, train_path, eval_path, test_path, stats_path, lineage_summary_path]
+            + ([sqlite_path] if sqlite_path is not None else [])
         ],
         source_lineage=[SourceLineage.model_validate(record["lineage"]) for record in normalized_all[:1000]],
         stats=stats,
@@ -843,6 +938,7 @@ def build_corpus(config: ProcessingConfig, config_path: str | Path) -> dict[str,
             "processing_version": config.processing_version,
             "source_spec_version": config.source_spec_version,
             "lineage_summary_path": str(lineage_summary_path),
+            "sqlite_path": str(sqlite_path) if sqlite_path is not None else None,
             "source_summaries": source_summaries,
             "source_warnings": source_warnings,
         },
@@ -879,6 +975,7 @@ def build_corpus(config: ProcessingConfig, config_path: str | Path) -> dict[str,
         "stats": stats,
         "manifest_path": str(manifest_path),
         "lineage_summary_path": str(lineage_summary_path),
+        "sqlite_path": str(sqlite_path) if sqlite_path is not None else None,
         "derived_packs": derived_pack_summaries,
         "source_summaries": source_summaries,
         "source_warnings": source_warnings,

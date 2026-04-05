@@ -10,7 +10,7 @@ from transformers import PreTrainedTokenizerFast
 
 from ai_factory.core.artifacts import write_json
 from training.src.config import load_experiment_config
-from training.src.data import build_training_text, load_jsonl
+from training.src.data import build_training_text, load_records
 
 
 def parse_args() -> argparse.Namespace:
@@ -29,8 +29,11 @@ def _iter_texts(config_path: str, max_records: int | None = None) -> tuple[Itera
 
     def generator() -> Iterator[str]:
         emitted = 0
-        for file_path in data_files:
-            for record in load_jsonl(file_path):
+        split_map = {"train": config.data.train_file, "eval": config.data.eval_file, "test": config.data.test_file}
+        for split_name, file_path in split_map.items():
+            if not file_path:
+                continue
+            for record in load_records(file_path, split=split_name):
                 yield build_training_text(record, config.data)
                 emitted += 1
                 if max_records is not None and emitted >= max_records:

@@ -40,6 +40,18 @@ For actual from-scratch training, the repo now includes a dedicated 2B-profile p
 
 The architecture YAML is the place where you specify model scale. The current default is a 24-layer Qwen2-style decoder with `hidden_size=2560`, `intermediate_size=6912`, `num_attention_heads=20`, `num_key_value_heads=10`, and `vocab_size=50257`, which instantiates to about 2.00B parameters.
 
+You can now specify the model size directly through `target_parameters`, for example:
+
+```yaml
+target_parameters: 2b
+```
+
+Use this helper to preview the resolved architecture:
+
+```bash
+python3 training/scripts/plan_model_scale.py --target-parameters 2b
+```
+
 ## Runtime Readiness
 
 The repo includes:
