@@ -124,7 +124,7 @@ cd ..
 
 # Run checks
 ruff check .
-mypy ai_factory/ --no-incremental
+mypy .
 pytest
 cd frontend && npm run lint && npm run typecheck
 cd ..
@@ -161,12 +161,14 @@ Full operator setup, including local vs cloud guidance, dataset generation, trai
 # Linting and formatting
 ruff check .              # Lint code
 ruff format .             # Format code
-mypy ai_factory/         # Type checking
+mypy .                    # Type checking
 
 # Testing
 pytest                    # Run tests
 pytest --cov=ai_factory  # With coverage
 ```
+
+Training note: `python -m training.train --config ... --dry-run` is safe to use on CPU-only machines for config and dataset validation. Real training still needs the hardware profile described by the selected training config.
 
 ### **Contributing**
 1. Fork the repository

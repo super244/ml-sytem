@@ -6,9 +6,11 @@ Status as validated on April 5, 2026:
 
 - `pytest` passes.
 - `ruff check .` passes.
-- `mypy ai_factory/ --no-incremental` passes.
+- `mypy .` passes.
 - `python scripts/doctor.py` passes.
-- `ai-factory serve` and `ai-factory api-smoke` pass.
+- `ai-factory ready` passes.
+- `ai-factory train-preflight --config training/configs/profiles/failure_aware.yaml` passes with environment warnings on CPU-only hosts.
+- Frontend `npm run typecheck` and `npm run build` pass.
 - Dataset generation, corpus preparation, SQLite corpus export, tokenizer training smoke test, and scratch-training dry-run pass.
 - `finetuned` evaluation, finetuned inference, and real deployment require a first real training run because the repo does not ship packaged adapters in `artifacts/models/`.
 
@@ -23,6 +25,7 @@ Use this if you want to:
 - validate training with `--dry-run`
 - run a real small-model or adapter-based fine-tune on your own GPU
 - run the API and frontend locally
+- validate the full training configuration on a CPU-only workstation before moving to a GPU box
 
 Recommended:
 
@@ -88,6 +91,8 @@ ai-factory ready
 python scripts/doctor.py
 ai-factory doctor
 ```
+
+If you are validating on a CPU-only machine, expect `ai-factory train-preflight` to warn about CUDA visibility and FlashAttention availability for GPU-oriented profiles. Those warnings are informational until you start a real training run.
 
 Optional container sanity check:
 
