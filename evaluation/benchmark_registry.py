@@ -6,11 +6,31 @@ from typing import Any
 import yaml
 
 
+def _find_project_root(start: Path) -> Path | None:
+    for candidate in [start, *start.parents]:
+        if (candidate / "pyproject.toml").exists():
+            return candidate
+    return None
+
+
 def _resolve_relative_path(base_path: Path, path: str) -> Path:
     candidate = Path(path).expanduser()
     if candidate.is_absolute():
         return candidate
-    return (base_path.parent / candidate).resolve()
+    direct = (base_path.parent / candidate).resolve()
+    if direct.exists():
+        return direct
+
+    project_root = _find_project_root(base_path.parent.resolve())
+    if project_root is not None:
+        rooted = (project_root / candidate).resolve()
+        if rooted.exists():
+            return rooted
+
+    cwd_relative = (Path.cwd() / candidate).resolve()
+    if cwd_relative.exists():
+        return cwd_relative
+    return direct
 
 
 def load_benchmark_registry(path: str | Path) -> list[dict[str, Any]]:
