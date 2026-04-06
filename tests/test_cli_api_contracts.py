@@ -70,6 +70,43 @@ def test_cli_parse_args_supports_tui_command(monkeypatch) -> None:
     assert args.command == "train-preflight"
     assert args.config == "training/configs/profiles/failure_aware.yaml"
 
+    monkeypatch.setattr(
+        "sys.argv",
+        [
+            "ai-factory",
+            "bootstrap-train",
+            "--config",
+            "training/configs/profiles/pretraining.yaml",
+            "--dataset-config",
+            "data/configs/processing.yaml",
+            "--dry-run",
+            "--validate-model-load",
+        ],
+    )
+    args = ai_factory_cli.parse_args()
+    assert args.command == "bootstrap-train"
+    assert args.config == "training/configs/profiles/pretraining.yaml"
+    assert args.dataset_config == "data/configs/processing.yaml"
+    assert args.dry_run is True
+    assert args.validate_model_load is True
+
+    monkeypatch.setattr(
+        "sys.argv",
+        [
+            "ai-factory",
+            "bootstrap-train",
+            "--config",
+            "training/configs/profiles/local_metal.yaml",
+            "--dry-run",
+            "--skip-doctor",
+        ],
+    )
+    args = ai_factory_cli.parse_args()
+    assert args.command == "bootstrap-train"
+    assert args.config == "training/configs/profiles/local_metal.yaml"
+    assert args.dry_run is True
+    assert args.skip_doctor is True
+
 
 def test_cli_parse_args_supports_control_center_new_and_inference(monkeypatch) -> None:
     monkeypatch.setattr(

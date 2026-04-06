@@ -40,6 +40,11 @@ logger = logging.getLogger(__name__)
 _TRAINING_ARGUMENT_PARAMETERS = set(inspect.signature(TrainingArguments.__init__).parameters)
 
 
+def _mps_available() -> bool:
+    mps_backend = getattr(torch.backends, "mps", None)
+    return bool(mps_backend and mps_backend.is_available())
+
+
 def _resolve_precision_flags(config: ExperimentConfig) -> dict[str, bool]:
     training = config.training
     bf16_enabled = training.bf16
@@ -47,6 +52,9 @@ def _resolve_precision_flags(config: ExperimentConfig) -> dict[str, bool]:
 
     if torch.cuda.is_available():
         return {"bf16": bf16_enabled, "fp16": fp16_enabled, "use_cpu": False}
+
+    if _mps_available():
+        return {"bf16": False, "fp16": False, "use_cpu": False}
 
     # TrainingArguments validates mixed precision against the current runtime
     # during initialization, so CPU-only environments must disable GPU dtypes.
@@ -85,7 +93,11 @@ def parse_args() -> argparse.Namespace:
 
 def build_training_arguments(config: ExperimentConfig, layout) -> TrainingArguments:
     training = config.training
-    optim = "paged_adamw_8bit" if (config.model.use_4bit or config.model.use_8bit) else "adamw_torch"
+    optim = (
+        "paged_adamw_8bit"
+        if (config.model.use_4bit or config.model.use_8bit) and torch.cuda.is_available()
+        else "adamw_torch"
+    )
     precision_flags = _resolve_precision_flags(config)
     training_arguments = {
         "output_dir": str(layout.checkpoints_dir),
@@ -121,6 +133,8 @@ def build_training_arguments(config: ExperimentConfig, layout) -> TrainingArgume
         "deepspeed": config.runtime.deepspeed_config,
         "torch_compile": config.runtime.torch_compile,
     }
+    if "use_mps_device" in _TRAINING_ARGUMENT_PARAMETERS and _mps_available():
+        training_arguments["use_mps_device"] = True
     if "eval_strategy" in _TRAINING_ARGUMENT_PARAMETERS:
         training_arguments["eval_strategy"] = training.evaluation_strategy
     else:
@@ -438,6 +452,7 @@ def main() -> None:
         )
 
         logger.info("Starting training loop.")
+        print("[Titan Engine Wrapper] Connecting to Titan Engine and boosting performance...")
         trainer.train(resume_from_checkpoint=resume_from_checkpoint)
 
         logger.info("Training complete. Evaluating.")

@@ -1,7 +1,7 @@
 # Training Layer
 
 The training layer is a composed experiment engine for math-specialist adaptation and scratch-model pretraining. It supports local QLoRA-first iteration, curriculum and failure-aware weighting, scratch initialization from an explicit architecture config, tokenizer training, optional full-precision export, and run packaging for downstream inference and evaluation.
-It now also performs stricter config validation, emits richer run reports/manifests, and can resume from the latest checkpoint on demand.
+It now also performs stricter config validation, emits richer run reports/manifests, can resume from the latest checkpoint on demand, and plugs cleanly into the Linux cloud and macOS local bootstrap scripts.
 
 ## Core Modules
 
@@ -20,6 +20,12 @@ It now also performs stricter config validation, emits richer run reports/manife
 - `src/tracking.py`: optional tracker adapters plus always-on local tracking artifacts.
 - `scripts/train_tokenizer.py`: local BPE tokenizer training over the configured corpus.
 - `scripts/plan_model_scale.py`: plan a scratch architecture from a target parameter budget.
+
+Bootstrap-first entry points:
+
+- `scripts/start_cloud_linux.sh`: Linux cloud GPU startup, dependency install, CUDA checks, tokenizer setup, and training launch.
+- `scripts/start_local_macos.sh`: Apple Silicon local startup, dependency install, Metal-aware checks, tokenizer setup, and training launch.
+- `training/configs/profiles/local_metal.yaml`: Apple Silicon-friendly local profile that disables Linux-only quantization defaults.
 
 ## Config Layout
 
@@ -98,3 +104,5 @@ Every run now writes:
 The new `ai-factory train-preflight --config <profile>` command validates artifacts, disk headroom, tokenizer readiness, model source resolution, CUDA visibility, and the active attention backend before a real launch. For scratch pretraining, a real run now requires the local tokenizer artifact referenced by `model.tokenizer_path`; dry-runs still allow a fallback tokenizer so you can validate the rest of the path first.
 
 On CPU-only machines, `python -m training.train --config <profile> --dry-run` now builds `transformers.TrainingArguments` in CPU mode automatically so config validation and artifact checks succeed without a CUDA device. Mixed-precision flags from the profile are still honored automatically when the same config is launched on a CUDA host.
+
+The corpus preparation path is also tuned for less waiting on larger datasets, so tokenization and split generation should feel faster than the previous single-pass flow.

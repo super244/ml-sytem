@@ -23,6 +23,16 @@ async fn main() -> anyhow::Result<()> {
     let runtime = TitanRuntimePlan::current();
     let sampler = SamplerConfig::default();
     let payload = serde_json::json!({
+        "build": {
+            "features": {
+                "cuda": cfg!(feature = "cuda"),
+                "metal": cfg!(feature = "metal"),
+                "cpp": cfg!(feature = "cpp"),
+                "python": cfg!(feature = "python"),
+            },
+            "runtime_env": "AI_FACTORY_TITAN_RUNTIME",
+            "kernel_source": "src/cpp/kernels.cpp",
+        },
         "hardware": hardware,
         "scheduler": scheduler,
         "engine": engine,

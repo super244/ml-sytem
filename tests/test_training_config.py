@@ -4,9 +4,11 @@ from pathlib import Path
 
 import pytest
 
+import training.train as training_train
 from training.src.config import ConfigValidationError, load_experiment_config, validate_experiment_config
 from training.src.data import build_messages, build_training_text, load_jsonl
-from training.src.modeling import resolve_attention_implementation
+from training.src.hardware import TrainingHardware
+from training.src.modeling import build_quantization_config, resolve_attention_implementation, resolve_device_map
 from training.src.preflight import build_training_preflight_report
 from training.src.scaling import resolve_scratch_architecture
 from training.src.validation import build_validation_data_config
@@ -31,6 +33,15 @@ def test_pretraining_profile_uses_scratch_model_and_text_mode() -> None:
     assert config.model.architecture["vocab_size"] == 50257
     assert config.data.format == "pretraining_text"
     assert config.adapter.method == "full"
+
+
+def test_local_metal_profile_uses_non_quantized_lora() -> None:
+    config = load_experiment_config("training/configs/profiles/local_metal.yaml")
+
+    assert config.adapter.method == "lora"
+    assert config.model.use_4bit is False
+    assert config.model.use_8bit is False
+    assert config.model.use_full_precision is True
 
 
 def test_resolve_scratch_architecture_from_target_parameters() -> None:
@@ -139,9 +150,60 @@ def test_resolve_attention_implementation_preserves_flash_attention_when_availab
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     config = load_experiment_config("training/configs/profiles/baseline_qlora.yaml")
+    monkeypatch.setattr(
+        "training.src.modeling.detect_training_hardware",
+        lambda: TrainingHardware(
+            backend="cuda",
+            system="Linux",
+            machine="x86_64",
+            cuda_available=True,
+            cuda_device_count=1,
+            mps_available=False,
+            cpu_threads=8,
+            bitsandbytes_supported=True,
+        ),
+    )
     monkeypatch.setattr("training.src.modeling.is_flash_attn_2_available", lambda: True)
 
     assert resolve_attention_implementation(config) == "flash_attention_2"
+
+
+def test_build_quantization_config_falls_back_without_cuda(monkeypatch: pytest.MonkeyPatch) -> None:
+    config = load_experiment_config("training/configs/profiles/baseline_qlora.yaml")
+    monkeypatch.setattr(
+        "training.src.modeling.detect_training_hardware",
+        lambda: TrainingHardware(
+            backend="mps",
+            system="Darwin",
+            machine="arm64",
+            cuda_available=False,
+            cuda_device_count=0,
+            mps_available=True,
+            cpu_threads=8,
+            bitsandbytes_supported=False,
+        ),
+    )
+
+    assert build_quantization_config(config) is None
+
+
+def test_resolve_device_map_disables_auto_on_non_cuda(monkeypatch: pytest.MonkeyPatch) -> None:
+    config = load_experiment_config("training/configs/profiles/baseline_qlora.yaml")
+    monkeypatch.setattr(
+        "training.src.modeling.detect_training_hardware",
+        lambda: TrainingHardware(
+            backend="mps",
+            system="Darwin",
+            machine="arm64",
+            cuda_available=False,
+            cuda_device_count=0,
+            mps_available=True,
+            cpu_threads=8,
+            bitsandbytes_supported=False,
+        ),
+    )
+
+    assert resolve_device_map(config) is None
 
 
 def test_build_training_arguments_uses_installed_transformers_api(tmp_path: Path) -> None:
@@ -158,6 +220,18 @@ print(arguments.eval_strategy)
     completed = subprocess.run([sys.executable, "-c", script], capture_output=True, text=True, check=True)
 
     assert "steps" in completed.stdout.lower()
+
+
+def test_resolve_precision_flags_prefers_mps_when_available(monkeypatch: pytest.MonkeyPatch) -> None:
+    config = load_experiment_config("training/configs/profiles/local_metal.yaml")
+    monkeypatch.setattr(training_train.torch.cuda, "is_available", lambda: False)
+    monkeypatch.setattr(training_train, "_mps_available", lambda: True)
+
+    flags = training_train._resolve_precision_flags(config)
+
+    assert flags["use_cpu"] is False
+    assert flags["bf16"] is False
+    assert flags["fp16"] is False
 
 
 def test_all_training_profiles_load_and_validate() -> None:
@@ -228,3 +302,62 @@ def test_training_preflight_flags_missing_scratch_tokenizer(tmp_path: Path) -> N
 
     assert report["status"] == "error"
     assert tokenizer_check["status"] == "error"
+
+
+def test_training_preflight_flags_quantization_without_cuda(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    train_path = tmp_path / "data" / "processed" / "train.jsonl"
+    eval_path = tmp_path / "data" / "processed" / "eval.jsonl"
+    test_path = tmp_path / "data" / "processed" / "test.jsonl"
+    manifest_path = tmp_path / "data" / "processed" / "manifest.json"
+    train_path.parent.mkdir(parents=True, exist_ok=True)
+    train_path.write_text('{"question":"q","solution":"a"}\n')
+    eval_path.write_text('{"question":"q","solution":"a"}\n')
+    test_path.write_text('{"question":"q","solution":"a"}\n')
+    manifest_path.write_text('{"schema_version":"v2"}')
+
+    config_path = tmp_path / "quantized.yaml"
+    config_path.write_text(
+        "\n".join(
+            [
+                "profile_name: quantized_local",
+                "run_name: quantized-local-test",
+                "seed: 1",
+                "model:",
+                "  initialization: pretrained",
+                "  base_model_name: Qwen/Qwen2.5-Math-1.5B-Instruct",
+                "  trust_remote_code: false",
+                "  use_4bit: true",
+                "  use_8bit: false",
+                "  use_full_precision: false",
+                "data:",
+                f"  train_file: {train_path}",
+                f"  eval_file: {eval_path}",
+                f"  test_file: {test_path}",
+                f"  pack_manifest: {manifest_path}",
+                "training:",
+                f"  artifacts_dir: {tmp_path / 'artifacts'}",
+                "adapter:",
+                "  method: qlora",
+            ]
+        )
+    )
+    monkeypatch.setattr(
+        "training.src.preflight.detect_training_hardware",
+        lambda: TrainingHardware(
+            backend="mps",
+            system="Darwin",
+            machine="arm64",
+            cuda_available=False,
+            cuda_device_count=0,
+            mps_available=True,
+            cpu_threads=8,
+            bitsandbytes_supported=False,
+        ),
+    )
+    monkeypatch.setattr("training.src.preflight.torch.cuda.device_count", lambda: 0)
+
+    report = build_training_preflight_report(str(config_path))
+    quantization_check = next(check for check in report["checks"] if check["id"] == "quantization-runtime")
+
+    assert report["status"] == "warn"
+    assert quantization_check["status"] == "warn"

@@ -5,21 +5,10 @@ This runbook describes the default local workflow for AI-Factory. It assumes loc
 ## 1. Install Dependencies
 
 ```bash
-python -m venv .venv
-source .venv/bin/activate
-pip install -U pip
-pip install -e .[dev]
-git lfs install
-git lfs pull
+bash scripts/start_cloud_linux.sh
 ```
 
-Frontend dependencies:
-
-```bash
-cd frontend
-npm install
-cd ..
-```
+Use `bash scripts/start_local_macos.sh` on Apple Silicon local machines. Both bootstrap scripts install the runtime, fetch dependencies, and prepare the training entry points without a manual virtual environment step.
 
 ## 2. Generate Local Synthetic Packs
 
@@ -50,6 +39,8 @@ under `data/public/normalized/`.
 ```bash
 python3 data/prepare_dataset.py --config data/configs/processing.yaml
 ```
+
+The processing pipeline now spends less time in the tokenizer and dataset assembly stages, so large corpora should move through this step faster than before.
 
 Outputs in `data/processed/`:
 
@@ -87,6 +78,7 @@ Dry-run validates:
 - prompt rendering
 - tokenizer wiring
 - artifact directory creation
+- the hardware-aware bootstrap assumptions used by the cloud Linux and macOS local start scripts
 
 ## 6. Train A Specialist Profile
 
@@ -99,6 +91,8 @@ python3 -m training.train --config training/configs/profiles/failure_aware.yaml
 ```
 
 Training runs write standardized artifacts under `artifacts/runs/<run_id>/` and publish packaged model assets under `artifacts/models/<name>/`.
+
+For fresh runs on cloud GPU hosts, start from the Linux bootstrap script so the CUDA dependencies, tokenizer artifacts, and launch environment are all aligned before training begins. For Apple Silicon local runs, use the macOS bootstrap script so the same workflow lands on the Metal-aware local path.
 
 Managed control-plane alternative:
 

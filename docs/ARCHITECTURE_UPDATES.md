@@ -30,5 +30,10 @@ This document summarizes the changes made to the platform to improve stability, 
     - Integrated model comparison in the control rail.
     - Real-time candidate inspection and verifier-aware reasoning visibility.
 
+## 5. Bootstrap-First Training Workflow
+- **Overview**: Added platform-specific Linux cloud and macOS local start scripts so the training workflow can bootstrap dependencies, tokenizer assets, and runtime checks automatically.
+- **Data Path**: The corpus preparation and tokenization flow is tuned to reduce repeated work and shorten the wait before a training run.
+- **Runtime**: Titan hardware reporting now makes CUDA, Metal, and CPU fallback capability easier to verify before launch.
+
 ---
 **Status**: The platform is now fully responsive across heterogeneous hardware and maintains an immaculate codebase.

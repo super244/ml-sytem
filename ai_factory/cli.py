@@ -619,6 +619,23 @@ def parse_args() -> argparse.Namespace:
     ready_parser = subparsers.add_parser("ready", parents=[common_json])
     ready_parser.add_argument("--root")
 
+    bootstrap_parser = subparsers.add_parser("bootstrap-train")
+    bootstrap_parser.add_argument("--config", required=True)
+    bootstrap_parser.add_argument("--dataset-config", default="data/configs/processing.yaml")
+    bootstrap_parser.add_argument("--tokenizer-output-dir")
+    bootstrap_parser.add_argument("--skip-ready", action="store_true")
+    bootstrap_parser.add_argument("--skip-doctor", action="store_true")
+    bootstrap_parser.add_argument("--skip-dataset", action="store_true")
+    bootstrap_parser.add_argument("--skip-tokenizer", action="store_true")
+    bootstrap_parser.add_argument("--skip-preflight", action="store_true")
+    bootstrap_parser.add_argument("--skip-training", action="store_true")
+    bootstrap_parser.add_argument("--force-tokenizer", action="store_true")
+    bootstrap_parser.add_argument("--ensure-tokenizer", action="store_true")
+    bootstrap_parser.add_argument("--dry-run", action="store_true")
+    bootstrap_parser.add_argument("--validate-model-load", action="store_true")
+    bootstrap_parser.add_argument("--resume-from-latest-checkpoint", action="store_true")
+    bootstrap_parser.add_argument("--train-arg", dest="train_args", action="append", default=[])
+
     preflight_parser = subparsers.add_parser("train-preflight", parents=[common_json])
     preflight_parser.add_argument("--config", required=True)
 
@@ -718,7 +735,7 @@ def main() -> None:
             raise SystemExit(1)
         return
 
-    if args.command in {"doctor", "api-smoke", "latest-run", "refresh-lab"}:
+    if args.command in {"doctor", "api-smoke", "latest-run", "refresh-lab", "bootstrap-train"}:
         from ai_factory import cli_scripts
 
         if args.command == "doctor":
@@ -729,6 +746,8 @@ def main() -> None:
             cli_scripts.cmd_latest_run(args)
         elif args.command == "refresh-lab":
             cli_scripts.cmd_refresh_lab(args)
+        elif args.command == "bootstrap-train":
+            cli_scripts.cmd_bootstrap_train(args)
         return
 
     if args.command == "titan":

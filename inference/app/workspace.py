@@ -163,6 +163,16 @@ def _build_readiness_checks(repo_root: Path) -> list[dict[str, Any]]:
 def _build_command_recipes() -> list[dict[str, str]]:
     return [
         _command_recipe(
+            "bootstrap-train",
+            "Bootstrap training",
+            (
+                "Run dataset prep, tokenizer readiness, preflight, "
+                "and the selected training command from one operator entrypoint."
+            ),
+            "ai-factory bootstrap-train --config training/configs/profiles/failure_aware.yaml --dry-run",
+            "training",
+        ),
+        _command_recipe(
             "doctor",
             "Workspace doctor",
             ("Inspect dependency readiness, dataset state, run discovery, and frontend installation in one pass."),
@@ -205,6 +215,13 @@ def _build_command_recipes() -> list[dict[str, str]]:
             "Baseline dry-run",
             ("Validate the default local specialist profile without entering a full training loop."),
             ("python -m training.train --config training/configs/profiles/baseline_qlora.yaml --dry-run"),
+            "training",
+        ),
+        _command_recipe(
+            "local-metal-dry-run",
+            "Local Metal dry-run",
+            "Validate the Apple Silicon-safe profile without Linux-only quantization requirements.",
+            "python -m training.train --config training/configs/profiles/local_metal.yaml --dry-run",
             "training",
         ),
         _command_recipe(
