@@ -1,3 +1,10 @@
+"""
+Command-line interface for the AI-Factory operating system.
+
+Provides a comprehensive suite of commands to orchestrate, monitor, evaluate,
+and deploy machine learning models across various environments.
+"""
+
 from __future__ import annotations
 
 import argparse
@@ -482,6 +489,12 @@ def _tail_file(path: Path, *, initial: str = "") -> None:
 
 
 def parse_args() -> argparse.Namespace:
+    """
+    Parse the command-line arguments.
+
+    Returns:
+        argparse.Namespace: The parsed arguments.
+    """
     parser = argparse.ArgumentParser(prog="ai-factory", description="Unified instance control plane for AI-Factory.")
     parser.add_argument("--repo-root")
     parser.add_argument("--artifacts-dir")
@@ -698,6 +711,12 @@ def parse_args() -> argparse.Namespace:
 
 
 def main() -> None:
+    """
+    Main entry point for the CLI.
+
+    Routes the command to the appropriate handler or service method based on
+    parsed arguments.
+    """
     args = parse_args()
     if args.command == "tui":
         from ai_factory.tui import run_tui

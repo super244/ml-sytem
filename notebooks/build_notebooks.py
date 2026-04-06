@@ -234,6 +234,11 @@ len(win_cases), win_cases[:1]
                 ],
             ),
             code_cell(COMMON_SETUP),
+            markdown_cell(
+                "### Inspecting LoRA Profiles\n\n"
+                "This section scans the `profiles` directory for experiment configurations. "
+                "We extract key hyperparameter choices like `run_name`, `seed`, and potentially LoRA rank or learning rates to build a comprehensive view of all planned or completed experiments."
+            ),
             code_cell(
                 """
 import pandas as pd
@@ -241,10 +246,36 @@ import yaml
 
 profile_dir = REPO_ROOT / "training" / "configs" / "profiles"
 rows = []
-for path in sorted(profile_dir.glob("*.yaml")):
-    payload = yaml.safe_load(path.read_text())
-    rows.append({"profile": path.stem, "run_name": payload["run_name"], "seed": payload["seed"]})
-pd.DataFrame(rows)
+if profile_dir.exists():
+    for path in sorted(profile_dir.glob("*.yaml")):
+        try:
+            payload = yaml.safe_load(path.read_text())
+            rows.append({
+                "profile": path.stem,
+                "run_name": payload.get("run_name", "N/A"),
+                "seed": payload.get("seed", "N/A"),
+                "lora_r": payload.get("lora_config", {}).get("r", "N/A"),
+                "learning_rate": payload.get("training_arguments", {}).get("learning_rate", "N/A")
+            })
+        except Exception as e:
+            print(f"Error loading {path.name}: {e}")
+            
+df_profiles = pd.DataFrame(rows)
+if not df_profiles.empty:
+    display(df_profiles)
+else:
+    print("No profiles found.")
+"""
+            ),
+            markdown_cell(
+                "### Comparing Configurations\n\n"
+                "By analyzing the extracted dataframe, we can visually compare different experiment settings, helping us understand which hyperparameter combinations have been explored."
+            ),
+            code_cell(
+                """
+if not df_profiles.empty and 'lora_r' in df_profiles.columns:
+    print("Distribution of LoRA ranks:")
+    print(df_profiles['lora_r'].value_counts())
 """
             ),
         ],
@@ -433,6 +464,89 @@ load_run_summary(run_dirs[0]) if run_dirs else {"runs": []}
             ),
         ],
     ),
+    "14_colab_training_pipeline.ipynb": (
+        "Colab Training Pipeline",
+        [
+            tutorial_intro(
+                "Colab Training Pipeline",
+                [
+                    "Set up environment and install dependencies in Google Colab.",
+                    "Mount Google Drive to persist models and logs.",
+                    "Run the end-to-end data preparation and training pipeline in the cloud.",
+                ],
+            ),
+            markdown_cell(
+                "### Environment Setup\n\n"
+                "Run the following cell to install the necessary packages for AI-Factory training. This includes deep learning libraries and utility tools."
+            ),
+            code_cell(
+                """
+!pip install -qU transformers peft accelerate bitsandbytes datasets trl
+!pip install -q pydantic pyyaml pandas
+"""
+            ),
+            markdown_cell(
+                "### Mount Google Drive\n\n"
+                "Mount Google Drive to save your checkpoints and load any pre-existing configurations or datasets. "
+                "You can skip this if you do not want to persist data."
+            ),
+            code_cell(
+                """
+from google.colab import drive
+import os
+
+try:
+    drive.mount('/content/drive')
+    print("Drive mounted successfully.")
+    # Set up a working directory in Drive
+    WORK_DIR = '/content/drive/MyDrive/ai-factory-workspace'
+    os.makedirs(WORK_DIR, exist_ok=True)
+    os.chdir(WORK_DIR)
+    print(f"Working directory set to: {os.getcwd()}")
+except Exception as e:
+    print(f"Drive mounting skipped or failed: {e}")
+"""
+            ),
+            markdown_cell(
+                "### Configure Environment Variables\n\n"
+                "Set up essential environment variables used by the AI-Factory system."
+            ),
+            code_cell(
+                """
+import os
+
+os.environ["AI_FACTORY_ROOT"] = os.getcwd()
+os.environ["WANDB_PROJECT"] = "ai-factory-colab"
+# Uncomment and set your WANDB_API_KEY if you want to track experiments
+# os.environ["WANDB_API_KEY"] = "your_key_here"
+
+print("Environment configured.")
+"""
+            ),
+            markdown_cell(
+                "### Run Data Preparation\n\nExecute the dataset preparation script before starting the training."
+            ),
+            code_cell(
+                """
+# Assuming ai-factory source code is cloned or available in the current directory
+# !git clone https://github.com/super244/ai-factory.git . 
+# !python data/prepare_dataset.py --config configs/prepare.yaml
+print("Run your data preparation script here, e.g., !python data/prepare_dataset.py")
+"""
+            ),
+            markdown_cell(
+                "### Run Training Pipeline\n\n"
+                "Finally, kick off the fine-tuning script. Make sure your configurations are correctly set in the `configs/` directory."
+            ),
+            code_cell(
+                """
+# Example training command
+# !python training/src/train.py --config configs/train.yaml
+print("Run your training script here, e.g., !python training/src/train.py")
+"""
+            ),
+        ],
+    ),
 }
 
 
@@ -450,6 +564,9 @@ def main() -> None:
         capture_output=True,
     )
 
+
+if __name__ == "__main__":
+    main()
 
 if __name__ == "__main__":
     main()

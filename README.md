@@ -59,7 +59,8 @@ AI-Factory is a comprehensive platform designed to manage the entire lifecycle o
 - **FastAPI Backend**: High-performance inference server
 - **Prompt Management**: Configurable prompt presets and templates
 - **Model Registry**: Centralized model versioning and management
-- **Accelerator Awareness**: Titan runtime reporting surfaces CUDA, Metal, and CPU fallback capability for hardware-aware launches. The Titan C++ Engine now accelerates operations and talks directly to the GPU for boosted performance.
+- **Accelerator Awareness**: Titan runtime reporting surfaces CUDA, Metal, and CPU fallback capability for hardware-aware launches. The Titan Rust core natively accelerates operations and provides robust telemetry for both NVIDIA and Apple Silicon.
+- **Durable Control Plane**: Local-first SQLite control plane for orchestration runs, tasks, and telemetry, paired with a SQLite-backed corpus.
 
 ## 🏗️ **Architecture Overview**
 
