@@ -274,7 +274,9 @@ def get_cluster_nodes() -> list[dict[str, Any]]:
             "id": local.id,
             "name": local.name,
             "hostname": local.hostname,
-            "type": local.gpus[0].name if local.gpus else (local.accelerator_type.value.upper() if local.accelerator_type else "CPU"),
+            "type": local.gpus[0].name
+            if local.gpus
+            else (local.accelerator_type.value.upper() if local.accelerator_type else "CPU"),
             "gpus": [
                 {
                     "id": gpu.id,
@@ -288,7 +290,9 @@ def get_cluster_nodes() -> list[dict[str, Any]]:
             "memory": f"{local.memory_gb:.0f}GB",
             "cpu_count": local.cpu_count,
             "status": local.status,
-            "usage": int(sum(gpu.utilization_percent or 0 for gpu in local.gpus) / len(local.gpus)) if local.gpus else 0,
+            "usage": int(sum(gpu.utilization_percent or 0 for gpu in local.gpus) / len(local.gpus))
+            if local.gpus
+            else 0,
             "active_jobs": local.active_jobs,
         }
     )
@@ -301,8 +305,20 @@ def get_cluster_nodes() -> list[dict[str, Any]]:
             "hostname": "gpu-01.internal",
             "type": "NVIDIA A100",
             "gpus": [
-                {"id": 0, "name": "NVIDIA A100 80GB", "memory_gb": 80.0, "memory_used_gb": 12.5, "utilization_percent": 15},
-                {"id": 1, "name": "NVIDIA A100 80GB", "memory_gb": 80.0, "memory_used_gb": 4.2, "utilization_percent": 5},
+                {
+                    "id": 0,
+                    "name": "NVIDIA A100 80GB",
+                    "memory_gb": 80.0,
+                    "memory_used_gb": 12.5,
+                    "utilization_percent": 15,
+                },
+                {
+                    "id": 1,
+                    "name": "NVIDIA A100 80GB",
+                    "memory_gb": 80.0,
+                    "memory_used_gb": 4.2,
+                    "utilization_percent": 5,
+                },
             ],
             "memory": "512GB",
             "cpu_count": 64,

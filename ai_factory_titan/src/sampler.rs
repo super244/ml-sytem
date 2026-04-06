@@ -19,7 +19,11 @@ impl Default for SamplerConfig {
     }
 }
 
-pub fn sample_token(logits: &[f32], recent_tokens: &[u32], config: &SamplerConfig) -> Option<usize> {
+pub fn sample_token(
+    logits: &[f32],
+    recent_tokens: &[u32],
+    config: &SamplerConfig,
+) -> Option<usize> {
     if logits.is_empty() {
         return None;
     }
@@ -34,7 +38,12 @@ pub fn sample_token(logits: &[f32], recent_tokens: &[u32], config: &SamplerConfi
         }
     }
 
-    scored.sort_by(|left, right| right.1.partial_cmp(&left.1).unwrap_or(std::cmp::Ordering::Equal));
+    scored.sort_by(|left, right| {
+        right
+            .1
+            .partial_cmp(&left.1)
+            .unwrap_or(std::cmp::Ordering::Equal)
+    });
     let top_k = config.top_k.max(1).min(scored.len());
     scored.truncate(top_k);
 
@@ -60,6 +69,10 @@ pub fn sample_token(logits: &[f32], recent_tokens: &[u32], config: &SamplerConfi
 
     nucleus
         .into_iter()
-        .max_by(|left, right| left.1.partial_cmp(&right.1).unwrap_or(std::cmp::Ordering::Equal))
+        .max_by(|left, right| {
+            left.1
+                .partial_cmp(&right.1)
+                .unwrap_or(std::cmp::Ordering::Equal)
+        })
         .map(|(index, _)| index)
 }

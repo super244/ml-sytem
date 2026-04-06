@@ -95,4 +95,3 @@ mod tests {
         assert_eq!(std::mem::size_of::<BlockQ8_0>(), 34);
     }
 }
-

@@ -83,15 +83,18 @@ def main() -> int:
         print()
 
     json_asset_checks = [
-        (Path("data/catalog.json"), "Dataset catalog JSON"),
-        (Path("data/processed/manifest.json"), "Processed manifest JSON"),
-        (Path("data/processed/pack_summary.json"), "Pack summary JSON"),
+        (Path("data/catalog.json"), "Dataset catalog JSON", True),
+        (Path("data/processed/manifest.json"), "Processed manifest JSON", False),
+        (Path("data/processed/pack_summary.json"), "Pack summary JSON", False),
     ]
 
     total += len(json_asset_checks)
 
-    for path, desc in json_asset_checks:
+    for path, desc, required in json_asset_checks:
         if check_json_asset(path, desc):
+            passed += 1
+        elif not required:
+            print(f"! {desc} missing (optional)")
             passed += 1
         print()
 

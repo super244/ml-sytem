@@ -10,7 +10,9 @@
 //! Target hardware: A100, H100, H200, RTX 4090/5090
 
 use anyhow::{anyhow, Result};
-use cudarc::driver::{CudaDevice, CudaFunction, CudaModule, CudaSlice, LaunchAsync, LaunchConfig, CudaStream};
+use cudarc::driver::{
+    CudaDevice, CudaFunction, CudaSlice, CudaStream, LaunchAsync, LaunchConfig,
+};
 use std::sync::Arc;
 
 /// CUDA kernel cache for efficient kernel launching
@@ -25,35 +27,38 @@ impl CudaKernelCache {
     pub fn new(device_id: usize) -> Result<Self> {
         let device = CudaDevice::new(device_id)
             .map_err(|e| anyhow!("Failed to initialize CUDA device {}: {:?}", device_id, e))?;
-        
+
         // Load compiled PTX modules
         let kernel_ptx = include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/src/cuda/kernels.ptx"));
         device
-            .load_ptx(kernel_ptx.into(), "titan_kernels", &[
-                "matmul_tf32",
-                "matmul_fp16_tc",
-                "flash_attention_cuda",
-                "rms_norm_fused",
-                "softmax_warp",
-                "adamw_fused",
-                "quantize_q4_0",
-                "dequantize_q4_0",
-            ])
+            .load_ptx(
+                kernel_ptx.into(),
+                "titan_kernels",
+                &[
+                    "matmul_tf32",
+                    "matmul_fp16_tc",
+                    "flash_attention_cuda",
+                    "rms_norm_fused",
+                    "softmax_warp",
+                    "adamw_fused",
+                    "quantize_q4_0",
+                    "dequantize_q4_0",
+                ],
+            )
             .map_err(|e| anyhow!("Failed to load CUDA module: {:?}", e))?;
-        
-        Ok(Self {
-            device,
-        })
+
+        Ok(Self { device })
     }
-    
+
     /// Get reference to CUDA device
     pub fn device(&self) -> &Arc<CudaDevice> {
         &self.device
     }
-    
+
     /// Get kernel function
     pub fn get_kernel(&self, name: &str) -> Result<CudaFunction> {
-        self.device.get_func("titan_kernels", name)
+        self.device
+            .get_func("titan_kernels", name)
             .ok_or_else(|| anyhow!("Failed to get kernel {}: not found in module", name))
     }
 }
@@ -69,29 +74,29 @@ impl ComputeCapability {
     pub fn new(major: i32, minor: i32) -> Self {
         Self { major, minor }
     }
-    
+
     /// Check if Tensor Cores are available
     pub fn has_tensor_cores(&self) -> bool {
         (self.major == 7 && self.minor >= 5) || // Turing (RTX 20 series)
         self.major >= 8 // Ampere (A100, RTX 30) and newer
     }
-    
+
     /// Check if supports TF32
     pub fn supports_tf32(&self) -> bool {
         self.major >= 8 // Ampere and newer
     }
-    
+
     /// Check if supports FP16 Tensor Cores
     pub fn supports_fp16_tc(&self) -> bool {
         (self.major == 7 && self.minor >= 0) || // Volta and newer
         self.major >= 8
     }
-    
+
     /// Check if supports BF16
     pub fn supports_bf16(&self) -> bool {
         self.major >= 8 // Ampere and newer
     }
-    
+
     /// Check if supports FP8 (Hopper+)
     pub fn supports_fp8(&self) -> bool {
         self.major >= 9 // Hopper and newer
@@ -161,37 +166,41 @@ pub struct TileSizes {
 #[cfg(feature = "cuda")]
 pub fn detect_cuda_gpus() -> Result<Vec<GpuArchitecture>> {
     use cudarc::driver::sys::CUdevice_attribute;
-    
-    let count = CudaDevice::count()
-        .map_err(|e| anyhow!("Failed to get device count: {:?}", e))?;
-    
+
+    let count = CudaDevice::count().map_err(|e| anyhow!("Failed to get device count: {:?}", e))?;
+
     let mut gpus = Vec::with_capacity(count as usize);
-    
+
     for i in 0..count {
         let device = CudaDevice::new(i as usize)
             .map_err(|e| anyhow!("Failed to get device {}: {:?}", i, e))?;
-        
+
         // Get compute capability
-        let major = device.attribute(CUdevice_attribute::CU_DEVICE_ATTRIBUTE_COMPUTE_CAPABILITY_MAJOR)
+        let major = device
+            .attribute(CUdevice_attribute::CU_DEVICE_ATTRIBUTE_COMPUTE_CAPABILITY_MAJOR)
             .map_err(|e| anyhow!("Failed to get major CC: {:?}", e))?;
-        let minor = device.attribute(CUdevice_attribute::CU_DEVICE_ATTRIBUTE_COMPUTE_CAPABILITY_MINOR)
+        let minor = device
+            .attribute(CUdevice_attribute::CU_DEVICE_ATTRIBUTE_COMPUTE_CAPABILITY_MINOR)
             .map_err(|e| anyhow!("Failed to get minor CC: {:?}", e))?;
-        
+
         let cc = ComputeCapability::new(major, minor);
-        
+
         // Get memory info
-        let mem_info = device.as_ref().memory_info()
+        let (free, total) = device
+            .mem_get_info()
             .map_err(|e| anyhow!("Failed to get memory info: {:?}", e))?;
-        let memory_gb = mem_info.total as f64 / (1024.0 * 1024.0 * 1024.0);
-        
+        let memory_gb = total as f64 / (1024.0 * 1024.0 * 1024.0);
+
         // Get SM count
-        let sm_count = device.attribute(CUdevice_attribute::CU_DEVICE_ATTRIBUTE_MULTIPROCESSOR_COUNT)
+        let sm_count = device
+            .attribute(CUdevice_attribute::CU_DEVICE_ATTRIBUTE_MULTIPROCESSOR_COUNT)
             .map_err(|e| anyhow!("Failed to get SM count: {:?}", e))?;
-        
+
         // Get max threads per SM
-        let max_threads = device.attribute(CUdevice_attribute::CU_DEVICE_ATTRIBUTE_MAX_THREADS_PER_MULTIPROCESSOR)
+        let max_threads = device
+            .attribute(CUdevice_attribute::CU_DEVICE_ATTRIBUTE_MAX_THREADS_PER_MULTIPROCESSOR)
             .map_err(|e| anyhow!("Failed to get max threads: {:?}", e))?;
-        
+
         // Tensor core version
         let tc_version = if cc.major >= 9 {
             4 // Hopper
@@ -204,9 +213,9 @@ pub fn detect_cuda_gpus() -> Result<Vec<GpuArchitecture>> {
         } else {
             0
         };
-        
-        let name = device.name().unwrap_or_else(|| format!("GPU {}", i));
-        
+
+        let name = device.name().unwrap_or_else(|_| format!("GPU {}", i));
+
         gpus.push(GpuArchitecture {
             name,
             compute_capability: cc,
@@ -216,7 +225,7 @@ pub fn detect_cuda_gpus() -> Result<Vec<GpuArchitecture>> {
             tensor_core_version: tc_version,
         });
     }
-    
+
     Ok(gpus)
 }
 
@@ -231,42 +240,47 @@ pub fn matmul_tf32_cuda(
     n: usize,
 ) -> Result<Vec<f32>> {
     let device = cache.device();
-    
+
     // Allocate device memory
-    let a_dev = device.htod_sync_copy(a)
+    let a_dev = device
+        .htod_sync_copy(a)
         .map_err(|e| anyhow!("Failed to copy A to device: {:?}", e))?;
-    let b_dev = device.htod_sync_copy(b)
+    let b_dev = device
+        .htod_sync_copy(b)
         .map_err(|e| anyhow!("Failed to copy B to device: {:?}", e))?;
-    let mut c_dev = device.alloc_zeros::<f32>(m * n)
+    let mut c_dev = device
+        .alloc_zeros::<f32>(m * n)
         .map_err(|e| anyhow!("Failed to allocate C: {:?}", e))?;
-    
+
     // Get kernel
     let kernel = cache.get_kernel("matmul_tf32")?;
-    
+
     // Configure launch - optimized for A100/H100
     let block_size = 32u32;
     let grid_x = ((n as u32 + block_size - 1) / block_size) as u32;
     let grid_y = ((m as u32 + block_size - 1) / block_size) as u32;
-    
+
     // Pack dimensions as u32 array
-    let dims = [m as u32, k as u32, n as u32];
-    
+    // (dims removed to avoid unused variable warning)
+
     let cfg = LaunchConfig {
         grid_dim: (grid_x, grid_y, 1),
         block_dim: (block_size, block_size, 1),
         shared_mem_bytes: 0,
     };
-    
+
     unsafe {
-        kernel.launch(cfg, (&a_dev, &b_dev, &mut c_dev, &dims[..]))
+        kernel
+            .launch(cfg, (&a_dev, &b_dev, &mut c_dev, m as u32, k as u32, n as u32))
             .map_err(|e| anyhow!("Kernel launch failed: {:?}", e))?;
     }
-    
+
     // Copy result back
     let mut c_host = vec![0.0f32; m * n];
-    device.dtoh_sync_copy_into(&c_dev, &mut c_host)
+    device
+        .dtoh_sync_copy_into(&c_dev, &mut c_host)
         .map_err(|e| anyhow!("Failed to copy result: {:?}", e))?;
-    
+
     Ok(c_host)
 }
 
@@ -281,33 +295,38 @@ pub fn matmul_fp16_tc_cuda(
     n: usize,
 ) -> Result<Vec<half::f16>> {
     let device = cache.device();
-    
-    let a_dev = device.htod_sync_copy(a)
+
+    let a_dev = device
+        .htod_sync_copy(a)
         .map_err(|e| anyhow!("Failed to copy A to device: {:?}", e))?;
-    let b_dev = device.htod_sync_copy(b)
+    let b_dev = device
+        .htod_sync_copy(b)
         .map_err(|e| anyhow!("Failed to copy B to device: {:?}", e))?;
-    let mut c_dev = device.alloc_zeros::<half::f16>(m * n)
+    let mut c_dev = device
+        .alloc_zeros::<half::f16>(m * n)
         .map_err(|e| anyhow!("Failed to allocate C: {:?}", e))?;
-    
+
     let kernel = cache.get_kernel("matmul_fp16_tc")?;
-    
-    let dims = [m as u32, k as u32, n as u32];
-    
+
+    // Dimensions used directly in launch call
+
     let cfg = LaunchConfig {
         grid_dim: (((n / 16) as u32 + 3) / 4, ((m / 16) as u32 + 3) / 4, 1),
-        block_dim: (128, 1, 1), // 4 warps, each handling 16x16 tile
+        block_dim: (128, 1, 1),      // 4 warps, each handling 16x16 tile
         shared_mem_bytes: 32 * 1024, // Shared memory for tiles
     };
-    
+
     unsafe {
-        kernel.launch(cfg, (&a_dev, &b_dev, &mut c_dev, &dims[..]))
+        kernel
+            .launch(cfg, (&a_dev, &b_dev, &mut c_dev, m as u32, k as u32, n as u32))
             .map_err(|e| anyhow!("FP16 TC kernel launch failed: {:?}", e))?;
     }
-    
+
     let mut c_host = vec![half::f16::ZERO; m * n];
-    device.dtoh_sync_copy_into(&c_dev, &mut c_host)
+    device
+        .dtoh_sync_copy_into(&c_dev, &mut c_host)
         .map_err(|e| anyhow!("Failed to copy result: {:?}", e))?;
-    
+
     Ok(c_host)
 }
 
@@ -328,40 +347,61 @@ pub fn adamw_fused_cuda(
     step: i32,
 ) -> Result<()> {
     let device = cache.device();
-    
-    let mut p_dev = device.htod_sync_copy(params)
+
+    let mut p_dev = device
+        .htod_sync_copy(params)
         .map_err(|e| anyhow!("Failed to copy params: {:?}", e))?;
-    let g_dev = device.htod_sync_copy(grads)
+    let g_dev = device
+        .htod_sync_copy(grads)
         .map_err(|e| anyhow!("Failed to copy grads: {:?}", e))?;
-    let mut m_dev = device.htod_sync_copy(m)
+    let mut m_dev = device
+        .htod_sync_copy(m)
         .map_err(|e| anyhow!("Failed to copy m: {:?}", e))?;
-    let mut v_dev = device.htod_sync_copy(v)
+    let mut v_dev = device
+        .htod_sync_copy(v)
         .map_err(|e| anyhow!("Failed to copy v: {:?}", e))?;
-    
+
     let kernel = cache.get_kernel("adamw_fused")?;
-    
+
     let numel = params.len() as u32;
     let cfg = LaunchConfig {
         grid_dim: ((numel + 255) / 256, 1, 1),
         block_dim: (256, 1, 1),
         shared_mem_bytes: 0,
     };
-    
+
     unsafe {
-        kernel.launch(
-            cfg,
-            (&mut p_dev, &g_dev, &mut m_dev, &mut v_dev, lr, beta1, beta2, eps, weight_decay, step, numel)
-        ).map_err(|e| anyhow!("AdamW kernel launch failed: {:?}", e))?;
+        kernel
+            .launch(
+                cfg,
+                (
+                    &mut p_dev,
+                    &g_dev,
+                    &mut m_dev,
+                    &mut v_dev,
+                    lr,
+                    beta1,
+                    beta2,
+                    eps,
+                    weight_decay,
+                    step,
+                    numel,
+                ),
+            )
+            .map_err(|e| anyhow!("AdamW kernel launch failed: {:?}", e))?;
     }
-    
+
     // Copy results back
-    device.dtoh_sync_copy_into(&p_dev, params)
+    device
+        .dtoh_sync_copy_into(&p_dev, params)
         .map_err(|e| anyhow!("Failed to copy params back: {:?}", e))?;
-    device.dtoh_sync_copy_into(&m_dev, m)
+    device
+        .dtoh_sync_copy_into(&m_dev, m)
         .map_err(|e| anyhow!("Failed to copy m back: {:?}", e))?;
-    device.dtoh_sync_copy_into(&v_dev, v)
+    device
+        .dtoh_sync_copy_into(&v_dev, v)
         .map_err(|e| anyhow!("Failed to copy v back: {:?}", e))?;
-    
+
     Ok(())
 }
 
@@ -376,38 +416,44 @@ pub fn flash_attention_cuda(
     head_dim: usize,
 ) -> Result<Vec<f32>> {
     let device = cache.device();
-    
+
     let numel = seq_len * head_dim;
-    
-    let q_dev = device.htod_sync_copy(q)
+
+    let q_dev = device
+        .htod_sync_copy(q)
         .map_err(|e| anyhow!("Failed to copy Q: {:?}", e))?;
-    let k_dev = device.htod_sync_copy(k)
+    let k_dev = device
+        .htod_sync_copy(k)
         .map_err(|e| anyhow!("Failed to copy K: {:?}", e))?;
-    let v_dev = device.htod_sync_copy(v)
+    let v_dev = device
+        .htod_sync_copy(v)
         .map_err(|e| anyhow!("Failed to copy V: {:?}", e))?;
-    let mut out_dev = device.alloc_zeros::<f32>(numel)
+    let mut out_dev = device
+        .alloc_zeros::<f32>(numel)
         .map_err(|e| anyhow!("Failed to allocate output: {:?}", e))?;
-    
+
     let kernel = cache.get_kernel("flash_attention_cuda")?;
-    
-    let dims = [seq_len as u32, head_dim as u32];
-    
+
+    // Dimensions used directly in launch call
+
     // Each block handles one sequence position
     let cfg = LaunchConfig {
         grid_dim: ((seq_len as u32 + 127) / 128, 1, 1),
         block_dim: (128, 1, 1),
         shared_mem_bytes: 3 * 32 * 1024, // Q, K, V tiles
     };
-    
+
     unsafe {
-        kernel.launch(cfg, (&q_dev, &k_dev, &v_dev, &mut out_dev, &dims[..]))
+        kernel
+            .launch(cfg, (&q_dev, &k_dev, &v_dev, &mut out_dev, seq_len as u32, head_dim as u32))
             .map_err(|e| anyhow!("FlashAttention kernel failed: {:?}", e))?;
     }
-    
+
     let mut out = vec![0.0f32; numel];
-    device.dtoh_sync_copy_into(&out_dev, &mut out)
+    device
+        .dtoh_sync_copy_into(&out_dev, &mut out)
         .map_err(|e| anyhow!("Failed to copy output: {:?}", e))?;
-    
+
     Ok(out)
 }
 
@@ -415,35 +461,27 @@ pub fn flash_attention_cuda(
 #[cfg(feature = "cuda")]
 pub mod distributed {
     use super::*;
-    
+
     /// All-reduce operation across multiple GPUs
-    pub fn allreduce_sum(
-        data: &[f32],
-        _local_rank: usize,
-        _world_size: usize,
-    ) -> Result<Vec<f32>> {
+    pub fn allreduce_sum(data: &[f32], _local_rank: usize, _world_size: usize) -> Result<Vec<f32>> {
         // Simplified implementation - in production use NCCL
         // This is a placeholder for the actual NCCL integration
-        
+
         // For single GPU, just return data
         if _world_size == 1 {
             return Ok(data.to_vec());
         }
-        
+
         // Multi-GPU: would use NCCL here
         // For now, return placeholder
         Ok(data.to_vec())
     }
-    
+
     /// Ring all-reduce algorithm for bandwidth efficiency
-    pub fn ring_allreduce(
-        _data: &mut [f32],
-        _local_rank: usize,
-        _world_size: usize,
-    ) -> Result<()> {
+    pub fn ring_allreduce(_data: &mut [f32], _local_rank: usize, _world_size: usize) -> Result<()> {
         // Ring algorithm reduces bandwidth requirement from O(n) to O(2*(n-1)/n)
         // Implementation would use NCCL or custom CUDA kernels
-        
+
         Ok(())
     }
 }
@@ -459,27 +497,28 @@ pub struct GradientAccumulator {
 #[cfg(feature = "cuda")]
 impl GradientAccumulator {
     pub fn new(device: Arc<CudaDevice>, num_params: usize) -> Result<Self> {
-        let accumulated = device.alloc_zeros::<f32>(num_params)
+        let accumulated = device
+            .alloc_zeros::<f32>(num_params)
             .map_err(|e| anyhow!("Failed to allocate accumulator: {:?}", e))?;
-        
+
         Ok(Self {
             _device: device,
             accumulated,
             _count: 0,
         })
     }
-    
+
     pub fn accumulate(&mut self, _grads: &CudaSlice<f32>) -> Result<()> {
         // Launch kernel to add grads to accumulator
         self._count += 1;
         Ok(())
     }
-    
+
     pub fn average_and_reset(&mut self) -> Result<CudaSlice<f32>> {
         // Divide by count and return, reset to zero
         let _count = self._count;
         self._count = 0;
-        
+
         // Would launch division kernel here
         Ok(self.accumulated.clone())
     }
@@ -494,17 +533,22 @@ pub struct CudaStreamPool {
 
 #[cfg(feature = "cuda")]
 impl CudaStreamPool {
-    pub fn new(device: &CudaDevice, num_streams: usize) -> Result<Self> {
+    pub fn new(device: &Arc<CudaDevice>, num_streams: usize) -> Result<Self> {
         let mut streams = Vec::with_capacity(num_streams);
         for _ in 0..num_streams {
-            let stream = device.fork_default_stream()
+            let stream = device
+                .clone()
+                .fork_default_stream()
                 .map_err(|e| anyhow!("Failed to create stream: {:?}", e))?;
             streams.push(stream);
         }
-        
-        Ok(Self { streams, current: 0 })
+
+        Ok(Self {
+            streams,
+            current: 0,
+        })
     }
-    
+
     /// Get next stream in round-robin fashion
     pub fn next_stream(&mut self) -> &CudaStream {
         let stream = &self.streams[self.current];
@@ -539,12 +583,12 @@ impl BenchmarkedCudaKernel {
             benchmark_iters: 100,
         }
     }
-    
+
     pub fn with_warmup(mut self, iters: usize) -> Self {
         self.warmup_iters = iters;
         self
     }
-    
+
     pub fn with_benchmark_iters(mut self, iters: usize) -> Self {
         self.benchmark_iters = iters;
         self

@@ -15,7 +15,7 @@ path = "src/bin/titan-status.rs"
 [features]
 default = []
 metal = ["dep:metal", "dep:objc", "dep:objc_id"]
-cuda = ["dep:cudarc", "dep:half", "cudarc/cuda-12080"]
+cuda = ["dep:cudarc", "dep:half", "cudarc/cuda-12080", "cudarc/f16"]
 python = ["dep:pyo3"]
 cpp = []
 ultimate = ["metal", "cuda", "cpp"]
@@ -33,6 +33,7 @@ tokio = { version = "1", features = ["macros", "rt-multi-thread", "sync", "time"
 
 [dependencies.cudarc]
 version = "0.13"
+features = ["f16"]
 optional = true
 
 [dependencies.metal]

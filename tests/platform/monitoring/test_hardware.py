@@ -24,7 +24,7 @@ def test_get_cluster_nodes_without_torch(monkeypatch: pytest.MonkeyPatch) -> Non
 def test_get_cluster_nodes_with_cuda(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(hardware, "detect_gpus_titan", lambda: [])
     monkeypatch.setattr(hardware, "detect_gpus_nvidia_smi", lambda: [])
-    
+
     class _Cuda:
         @staticmethod
         def is_available() -> bool:
@@ -38,7 +38,7 @@ def test_get_cluster_nodes_with_cuda(monkeypatch: pytest.MonkeyPatch) -> None:
         def get_device_name(index: int) -> str:
             assert index == 0
             return "NVIDIA RTX"
-        
+
         @staticmethod
         def get_device_properties(index: int):
             return SimpleNamespace(total_memory=16 * 1024**3)
@@ -66,7 +66,7 @@ def test_get_cluster_nodes_with_mps(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(hardware, "detect_gpus_titan", lambda: [])
     monkeypatch.setattr(hardware, "detect_gpus_nvidia_smi", lambda: [])
     monkeypatch.setattr(hardware, "detect_titan_status", lambda: {"gpu_name": "MPS (Apple Silicon)"})
-    
+
     class _Cuda:
         @staticmethod
         def is_available() -> bool:

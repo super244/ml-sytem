@@ -46,7 +46,13 @@ impl TitanEngineDescriptor {
             runtime_env: "AI_FACTORY_TITAN_RUNTIME",
             gguf_support: true,
             kv_cache: true,
-            sampler_stack: vec!["argmax", "temperature", "top_k", "top_p", "repetition_penalty"],
+            sampler_stack: vec![
+                "argmax",
+                "temperature",
+                "top_k",
+                "top_p",
+                "repetition_penalty",
+            ],
             supported_quantizations: vec![
                 QuantizationFormat::Q4_0,
                 QuantizationFormat::Q4K,

@@ -14,9 +14,21 @@ pub fn dot_f32(lhs: &[f32], rhs: &[f32]) -> anyhow::Result<f32> {
     Ok(lhs.iter().zip(rhs).map(|(left, right)| left * right).sum())
 }
 
-pub fn matmul_f32(lhs: &[f32], m: usize, k: usize, rhs: &[f32], n: usize) -> anyhow::Result<Vec<f32>> {
-    ensure!(lhs.len() == m.saturating_mul(k), "lhs shape does not match m x k");
-    ensure!(rhs.len() == k.saturating_mul(n), "rhs shape does not match k x n");
+pub fn matmul_f32(
+    lhs: &[f32],
+    m: usize,
+    k: usize,
+    rhs: &[f32],
+    n: usize,
+) -> anyhow::Result<Vec<f32>> {
+    ensure!(
+        lhs.len() == m.saturating_mul(k),
+        "lhs shape does not match m x k"
+    );
+    ensure!(
+        rhs.len() == k.saturating_mul(n),
+        "rhs shape does not match k x n"
+    );
 
     #[cfg(feature = "cpp")]
     if let Some(values) = cpp::matmul_f32(lhs, m, k, rhs, n) {
@@ -53,7 +65,10 @@ pub fn vec_add_f32(a: &[f32], b: &[f32]) -> anyhow::Result<Vec<f32>> {
 }
 
 pub fn vec_mul_f32(a: &[f32], b: &[f32]) -> anyhow::Result<Vec<f32>> {
-    ensure!(a.len() == b.len(), "vector multiplication dimension mismatch");
+    ensure!(
+        a.len() == b.len(),
+        "vector multiplication dimension mismatch"
+    );
 
     #[cfg(feature = "cpp")]
     if let Some(result) = cpp::vec_mul_f32(a, b) {

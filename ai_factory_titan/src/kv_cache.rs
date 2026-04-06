@@ -30,7 +30,10 @@ impl KvCache {
     }
 
     pub fn append(&mut self, token_id: u32) -> anyhow::Result<()> {
-        anyhow::ensure!(self.tokens.len() < self.config.max_tokens, "KV cache is full");
+        anyhow::ensure!(
+            self.tokens.len() < self.config.max_tokens,
+            "KV cache is full"
+        );
         self.tokens.push(token_id);
         Ok(())
     }

@@ -1,12 +1,6 @@
 use ai_factory_titan::{
-    detect_hardware,
-    quantization::default_q4_layout,
-    KvCache,
-    KvCacheConfig,
-    SamplerConfig,
-    TitanEngineDescriptor,
-    TitanRuntimePlan,
-    TitanScheduler,
+    detect_hardware, quantization::default_q4_layout, KvCache, KvCacheConfig, SamplerConfig,
+    TitanEngineDescriptor, TitanRuntimePlan, TitanScheduler,
 };
 
 #[tokio::main]

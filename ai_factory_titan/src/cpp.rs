@@ -105,11 +105,7 @@ pub fn dequantize_q4_0(blocks: &[BlockQ4_0]) -> Vec<f32> {
     // SAFETY: BlockQ4_0 has same layout as C struct
     unsafe {
         extern "C" {
-            fn titan_dequantize_q4_0(
-                blocks: *const BlockQ4_0,
-                num_blocks: usize,
-                output: *mut f32,
-            );
+            fn titan_dequantize_q4_0(blocks: *const BlockQ4_0, num_blocks: usize, output: *mut f32);
         }
         titan_dequantize_q4_0(blocks.as_ptr(), num_blocks, out.as_mut_ptr());
     }

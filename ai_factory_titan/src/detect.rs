@@ -20,13 +20,21 @@ fn detect_simd() -> Vec<String> {
     let mut features = Vec::new();
     #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
     {
-        if std::is_x86_feature_detected!("avx") { features.push("avx".to_string()); }
-        if std::is_x86_feature_detected!("avx2") { features.push("avx2".to_string()); }
-        if std::is_x86_feature_detected!("avx512f") { features.push("avx512f".to_string()); }
+        if std::is_x86_feature_detected!("avx") {
+            features.push("avx".to_string());
+        }
+        if std::is_x86_feature_detected!("avx2") {
+            features.push("avx2".to_string());
+        }
+        if std::is_x86_feature_detected!("avx512f") {
+            features.push("avx512f".to_string());
+        }
     }
     #[cfg(target_arch = "aarch64")]
     {
-        if std::arch::is_aarch64_feature_detected!("neon") { features.push("neon".to_string()); }
+        if std::arch::is_aarch64_feature_detected!("neon") {
+            features.push("neon".to_string());
+        }
     }
     features
 }
@@ -134,7 +142,7 @@ fn detect_cuda(cpu_cores: usize, memory_gb: u64) -> Option<HardwareProfile> {
         unified_memory: false,
         bandwidth_gbps: bus_width_bits,
         simd_features: Vec::new(), // will be overwritten in detect_hardware
-        vram_usage_mb: None, // could be obtained via nvml or cudarc
+        vram_usage_mb: None,       // could be obtained via nvml or cudarc
         backend: TitanBackend::new(BackendKind::Cuda, 100),
     })
 }
@@ -171,7 +179,10 @@ fn apple_bandwidth_gbps(name: &str) -> Option<u64> {
         Some(614)
     } else if normalized.contains("m4 max") {
         Some(546)
-    } else if normalized.contains("m3 max") || normalized.contains("m2 max") || normalized.contains("m1 max") {
+    } else if normalized.contains("m3 max")
+        || normalized.contains("m2 max")
+        || normalized.contains("m1 max")
+    {
         Some(400)
     } else {
         None
