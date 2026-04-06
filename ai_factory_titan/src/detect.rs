@@ -79,7 +79,7 @@ fn detect_apple(cpu_cores: usize, memory_gb: u64) -> Option<HardwareProfile> {
         };
         // Very basic mock of VRAM usage for Apple Silicon (unified memory)
         let vram_usage_mb = Some(0); // We'd need IOKit to get real memory usage
-        return Some(HardwareProfile {
+        Some(HardwareProfile {
             silicon: name.clone(),
             cpu_cores,
             memory_gb,
@@ -90,13 +90,13 @@ fn detect_apple(cpu_cores: usize, memory_gb: u64) -> Option<HardwareProfile> {
             simd_features: Vec::new(),
             vram_usage_mb,
             backend: TitanBackend::new(BackendKind::Metal, 90),
-        });
+        })
     }
 
     #[cfg(not(feature = "metal"))]
     {
         let name = probe_apple_silicon_name()?;
-        return Some(HardwareProfile {
+        Some(HardwareProfile {
             silicon: name.clone(),
             cpu_cores,
             memory_gb,
@@ -107,7 +107,7 @@ fn detect_apple(cpu_cores: usize, memory_gb: u64) -> Option<HardwareProfile> {
             simd_features: Vec::new(),
             vram_usage_mb: None,
             backend: TitanBackend::new(BackendKind::CpuFallback, 90),
-        });
+        })
     }
 }
 

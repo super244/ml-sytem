@@ -18,13 +18,15 @@ logger = logging.getLogger(__name__)
 
 class DistributedBackend(str, Enum):
     """Supported distributed training backends."""
+
     NCCL = "nccl"  # NVIDIA Collective Communication Library
     GLOO = "gloo"  # Facebook's collective library
-    MPI = "mpi"    # Message Passing Interface
+    MPI = "mpi"  # Message Passing Interface
 
 
 class NodeStatus(str, Enum):
     """Status of a distributed training node."""
+
     PENDING = "pending"
     CONNECTING = "connecting"
     READY = "ready"
@@ -36,6 +38,7 @@ class NodeStatus(str, Enum):
 @dataclass
 class NodeInfo:
     """Information about a distributed training node."""
+
     node_rank: int
     status: NodeStatus = NodeStatus.PENDING
     gpu_ids: list[int] = field(default_factory=list)
@@ -56,7 +59,7 @@ class DistributedConfig:
     backend: DistributedBackend = DistributedBackend.NCCL
     timeout_seconds: float = 300.0  # Default timeout for operations
     max_restarts: int = 3  # Maximum number of restart attempts
-    
+
     def __post_init__(self) -> None:
         """Validate configuration."""
         if self.num_nodes < 1:
@@ -77,7 +80,7 @@ class DistributedConfig:
 class DistributedTrainingOrchestrator:
     """
     Production-grade distributed training orchestrator with fault tolerance.
-    
+
     Features:
     - Multi-node/multi-GPU training via torchrun
     - Automatic restart on failure (configurable)
@@ -88,9 +91,7 @@ class DistributedTrainingOrchestrator:
 
     def __init__(self, config: DistributedConfig) -> None:
         self.config = config
-        self._nodes: dict[int, NodeInfo] = {
-            i: NodeInfo(node_rank=i) for i in range(config.num_nodes)
-        }
+        self._nodes: dict[int, NodeInfo] = {i: NodeInfo(node_rank=i) for i in range(config.num_nodes)}
         self._restart_count = 0
         self._start_time: float | None = None
 
@@ -106,88 +107,91 @@ class DistributedTrainingOrchestrator:
         env["PYTHONUNBUFFERED"] = "1"
         return env
 
-    def _build_torchrun_cmd(self, training_script: str, training_args: list[str]) -> list[str]:
+    def get_torchrun_cmd(self, training_script: str, training_args: list[str]) -> list[str]:
         """Build the torchrun command for distributed execution."""
         cmd = [
             sys.executable,
-            "-m", "torch.distributed.run",
+            "-m",
+            "torch.distributed.run",
             f"--nnodes={self.config.num_nodes}",
             f"--nproc_per_node={self.config.num_gpus_per_node}",
-            "--rdzv_id", f"ai_factory_job_{int(time.time())}",
-            "--rdzv_backend", "c10d",
+            "--rdzv_id",
+            f"ai_factory_job_{int(time.time())}",
+            "--rdzv_backend",
+            "c10d",
             f"--rdzv_endpoint={self.config.master_addr}:{self.config.master_port}",
-            "--max_restarts", str(self.config.max_restarts),
+            "--max_restarts",
+            str(self.config.max_restarts),
         ]
-        
+
         # Add timeout if specified
         if self.config.timeout_seconds > 0:
             cmd.extend(["--rdzv_timeout", str(int(self.config.timeout_seconds))])
-        
+
         cmd.append(training_script)
         cmd.extend(training_args)
         return cmd
 
-    def launch(self, training_script: str, training_args: list[str]) -> int:
+    def launch(self, training_script: str, training_args: list[str], check: bool = False) -> int:
         """
         Launch distributed training job with fault tolerance.
-        
+
         Args:
             training_script: Path to the training script.
             training_args: Arguments to pass to the script.
-            
+            check: Whether to check the exit code and raise an error if it's non-zero.
+
         Returns:
             Exit code of the training process.
-            
+
         Raises:
             ClusterError: If distributed training fails after all retries.
             TimeoutError: If training exceeds timeout.
         """
         self._start_time = time.time()
-        
+
         while self._restart_count <= self.config.max_restarts:
             try:
-                return self._launch_once(training_script, training_args)
+                return self._launch_once(training_script, training_args, check=check)
             except subprocess.CalledProcessError as e:
                 self._restart_count += 1
                 elapsed = time.time() - self._start_time
-                
+
                 if self._restart_count > self.config.max_restarts:
-                    logger.error(
-                        f"Distributed training failed after {self.config.max_restarts} restarts"
-                    )
+                    logger.error(f"Distributed training failed after {self.config.max_restarts} restarts")
                     raise ClusterError(
                         f"Training failed after {self.config.max_restarts} restart attempts",
                         cluster_id=f"{self.config.master_addr}:{self.config.master_port}",
                         operation="distributed_training",
                     ) from e
-                
+
                 logger.warning(
                     f"Training failed with exit code {e.returncode}, "
                     f"attempting restart {self._restart_count}/{self.config.max_restarts}"
                 )
-                
+
                 # Check timeout
                 if elapsed > self.config.timeout_seconds:
                     raise TimeoutError(
                         "distributed_training",
                         timeout_seconds=self.config.timeout_seconds,
                     ) from e
-                
+
                 # Exponential backoff before retry
-                backoff = min(2 ** self._restart_count, 30)
+                backoff = min(2**self._restart_count, 30)
                 logger.info(f"Waiting {backoff}s before restart...")
                 time.sleep(backoff)
-        
+
         return 1  # Should never reach here
 
-    def _launch_once(self, training_script: str, training_args: list[str]) -> int:
+    def _launch_once(self, training_script: str, training_args: list[str], check: bool = False) -> int:
         """Execute a single training launch attempt."""
-        cmd = self._build_torchrun_cmd(training_script, training_args)
+        cmd = self.get_torchrun_cmd(training_script, training_args)
         env = self._build_env()
-        
+
         logger.info(f"Launching distributed training: {' '.join(cmd)}")
         logger.info(f"Configuration: {self.config}")
-        
+
         try:
             result = subprocess.run(
                 cmd,
@@ -195,6 +199,7 @@ class DistributedTrainingOrchestrator:
                 stdout=sys.stdout,
                 stderr=sys.stderr,
                 timeout=self.config.timeout_seconds if self.config.timeout_seconds > 0 else None,
+                check=check,
             )
             return result.returncode
         except subprocess.TimeoutExpired as e:
