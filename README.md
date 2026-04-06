@@ -138,15 +138,14 @@ ai-factory api-smoke
 cd frontend && npm install
 cd ..
 
+### **Code Quality & Stabilization**
+Code is fully typed (Mypy) and linted (Ruff). The Rust-based Titan engine is stabilized across CUDA and Metal backends.
+```bash
 # Run checks
-ruff check .
-mypy .
+make lint
+make rust-check
 pytest
-cd frontend && npm run lint && npm run typecheck
-cd ..
-
-# Build the frontend
-cd frontend && npm run build
+```
 ```
 
 Full operator setup, including local vs cloud guidance, dataset generation, training, evaluation, optimization, deployment, and inference, is documented in [quickstart.md](quickstart.md).

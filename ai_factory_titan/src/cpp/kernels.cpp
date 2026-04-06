@@ -1,23 +1,60 @@
+// Titan C++ Kernels v2.0 - High-performance CPU kernels with SIMD optimization
+// ============================================================================
+// Supports:
+// - AVX-512 (Intel Ice Lake+, AMD Zen 4+)
+// - AVX2 (Intel Haswell+, AMD Zen+)
+// - ARM NEON (Apple Silicon, ARM64)
+// - OpenMP parallelization
+// ============================================================================
+
 #include <cstddef>
 #include <cstring>
 #include <cstdint>
 #include <cmath>
+#include <algorithm>
 
-#if defined(__AVX2__)
-#include <immintrin.h>
-#elif defined(__ARM_NEON)
-#include <arm_neon.h>
+// SIMD Headers
+#if defined(__AVX512F__) && defined(__AVX512BW__)
+    #include <immintrin.h>
+    #define TITAN_HAS_AVX512 1
+#elif defined(__AVX2__)
+    #include <immintrin.h>
+    #define TITAN_HAS_AVX2 1
+#elif defined(__ARM_NEON) || defined(__ARM_NEON__)
+    #include <arm_neon.h>
+    #define TITAN_HAS_NEON 1
+#endif
+
+// OpenMP for parallelization
+#if defined(_OPENMP)
+    #include <omp.h>
+    #define TITAN_HAS_OPENMP 1
 #endif
 
 // ============================================================================
-// Vector Operations - Dot Product
+// Utility Functions
+// ============================================================================
+
+// ============================================================================
+// Dot Product - Vectorized with AVX-512, AVX2, or NEON
 // ============================================================================
 
 extern "C" float titan_dot_f32(const float* lhs, const float* rhs, std::size_t len) {
     float acc = 0.0f;
     std::size_t i = 0;
 
-#if defined(__AVX2__)
+#if defined(TITAN_HAS_AVX512)
+    // AVX-512: Process 16 floats at a time
+    __m512 sum512 = _mm512_setzero_ps();
+    std::size_t vec_len = len & ~15;
+    for (; i < vec_len; i += 16) {
+        __m512 v_lhs = _mm512_loadu_ps(lhs + i);
+        __m512 v_rhs = _mm512_loadu_ps(rhs + i);
+        sum512 = _mm512_fmadd_ps(v_lhs, v_rhs, sum512);
+    }
+    acc = _mm512_reduce_add_ps(sum512);
+
+#elif defined(TITAN_HAS_AVX2)
     __m256 sum256 = _mm256_setzero_ps();
     std::size_t vec_len = len & ~7;
     for (; i < vec_len; i += 8) {

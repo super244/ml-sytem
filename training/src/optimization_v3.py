@@ -21,26 +21,156 @@ Key features v3.0:
 
 from __future__ import annotations
 
+import json
 import logging
 import os
 import platform
 import subprocess
+from dataclasses import asdict, dataclass, field
+from enum import Enum, auto
 from typing import TYPE_CHECKING, Any
 
 import torch
 import torch.nn as nn
 
-from ai_factory.core.schemas import (
-    BackendType,
-    HardwareProfile,
-    OptimizerType,
-    TitanConfig,
-)
-
 if TYPE_CHECKING:
     from training.src.config import ExperimentConfig
 
 logger = logging.getLogger(__name__)
+
+
+class BackendType(Enum):
+    """Available compute backends."""
+
+    METAL = auto()  # Apple Metal Performance Shaders
+    CUDA = auto()  # NVIDIA CUDA
+    ROCM = auto()  # AMD ROCm (HIP)
+    CPU = auto()  # CPU with advanced SIMD (AVX-512 / SVE / NEON)
+    XPU = auto()  # Intel XPU
+    TITAN = auto()  # Titan native kernels
+
+
+class OptimizerType(Enum):
+    """Available optimizer types."""
+
+    ADAMW = "adamw"
+    ADAMW_FUSED = "adamw_fused"
+    ADAMW_8BIT = "adamw_8bit"
+    ADAMW_4BIT = "adamw_4bit"  # New: 4-bit quantization
+    LION = "lion"
+    LION_8BIT = "lion_8bit"
+    SGD = "sgd"
+    ADAFACTOR = "adafactor"
+    ADAMW_TITAN = "adamw_titan"  # Titan fused kernels
+
+
+class QuantizationType(Enum):
+    """Quantization types for QAT."""
+
+    NONE = "none"
+    Q4_0 = "q4_0"
+    Q4_1 = "q4_1"
+    Q5_0 = "q5_0"
+    Q5_1 = "q5_1"
+    Q8_0 = "q8_0"
+    Q8_1 = "q8_1"
+    Q6_K = "q6_k"
+    Q8_K = "q8_k"
+
+
+@dataclass
+class HardwareProfile:
+    """Detected hardware capabilities with capability scoring."""
+
+    platform: str
+    device_name: str
+    backend: BackendType
+    unified_memory: bool = False
+    memory_gb: float = 0.0
+    compute_units: int = 0
+    supports_fp16: bool = False
+    supports_bf16: bool = False
+    supports_tf32: bool = False
+    supports_fp8: bool = False
+    supports_fp4: bool = False  # Blackwell FP4
+    tensor_cores: bool = False
+    matrix_cores: bool = False  # AMD Matrix Cores
+    bandwidth_gbps: float = 0.0
+    pcie_bandwidth_gbps: float = 0.0
+    recommended_batch_size: int = 1
+    recommended_workers: int = 0
+    pytorch_compile: bool = False
+    flash_attention: bool = False
+    titan_available: bool = False
+    titan_version: str = ""
+    capability_score: float = 0.0  # 0-100 score
+    extra: dict[str, Any] = field(default_factory=dict)
+
+    def to_dict(self) -> dict:
+        return {
+            **asdict(self),
+            "backend": self.backend.name,
+        }
+
+    def to_json(self) -> str:
+        return json.dumps(self.to_dict(), indent=2)
+
+    def get_flops_estimate(self) -> float:
+        """Estimate peak FP16 TFLOPS."""
+        if self.backend == BackendType.CUDA:
+            if self.supports_fp8:
+                return 2000.0  # Hopper/Blackwell ~2000 TFLOPS
+            elif self.tensor_cores:
+                return 300.0  # Ampere ~300 TFLOPS
+            return 50.0
+        elif self.backend == BackendType.METAL:
+            # M5 Ultra ~30 TFLOPS
+            if "Ultra" in self.device_name:
+                return 30.0
+            elif "Max" in self.device_name:
+                return 15.0
+            return 5.0
+        return 1.0
+
+
+@dataclass
+class OptimizationConfig:
+    """Optimized training configuration."""
+
+    batch_size: int
+    learning_rate: float
+    gradient_accumulation_steps: int
+    max_grad_norm: float
+    warmup_steps: int
+    bf16: bool
+    fp16: bool
+    fp8: bool
+    fp4: bool  # Blackwell FP4
+    gradient_checkpointing: bool
+    torch_compile: bool
+    compile_mode: str
+    optimizer: OptimizerType
+    dataloader_workers: int
+    pin_memory: bool
+    prefetch_factor: int
+    quantization: QuantizationType = QuantizationType.NONE
+    use_titan: bool = False
+    pipeline_parallel: bool = False
+    tensor_parallel: bool = False
+    sequence_parallel: bool = False
+    dynamic_batch_scaling: bool = False
+
+
+@dataclass
+class TitanConfig:
+    """Titan engine configuration."""
+
+    enabled: bool = False
+    use_cuda: bool = False
+    use_metal: bool = False
+    use_cpp: bool = False
+    kernel_version: str = "v0.5.0"
+    custom_kernels: list[str] = field(default_factory=list)
 
 
 class HardwareDetector:
@@ -114,7 +244,8 @@ class HardwareDetector:
         generation = "Unknown"
         gpu_cores = 0
         memory_gb = 0.0
-        bandwidth = 100.0  # Default estimate
+        bandwidth = 0.0
+        capability_score = 0.0
 
         if "M5" in chip_name:
             if "Ultra" in chip_name:
@@ -172,8 +303,6 @@ class HardwareDetector:
             bandwidth = 68.0
             memory_gb = 16.0
             capability_score = 30.0
-        else:
-            capability_score = 25.0
 
         # Get actual memory
         try:
@@ -205,9 +334,7 @@ class HardwareDetector:
             supports_bf16=supports_bf16,
             supports_tf32=False,
             tensor_cores=False,
-            matrix_cores=False,
             bandwidth_gbps=bandwidth,
-            pcie_bandwidth_gbps=0.0,
             recommended_batch_size=HardwareDetector._optimal_batch_size_metal(generation),
             recommended_workers=16 if "Ultra" in generation else (8 if "Max" in generation else 4),
             pytorch_compile=pytorch_compile,
@@ -274,9 +401,7 @@ class HardwareDetector:
             supports_fp8=supports_fp8,
             supports_fp4=supports_fp4,
             tensor_cores=tensor_cores,
-            matrix_cores=False,
             bandwidth_gbps=bandwidth,
-            pcie_bandwidth_gbps=0.0,
             recommended_batch_size=HardwareDetector._optimal_batch_size_cuda(major, memory_gb),
             recommended_workers=8,
             pytorch_compile=pytorch_compile,
@@ -321,16 +446,12 @@ class HardwareDetector:
             backend=BackendType.ROCM,
             unified_memory=False,
             memory_gb=memory_gb,
-            compute_units=304 if is_mi300x else 60,
+            compute_units=304 if is_mi300x else 60,  # MI300X has 304 CUs
             supports_fp16=True,
             supports_bf16=True,
             supports_tf32=False,
-            supports_fp8=is_mi300x,
-            supports_fp4=False,
-            tensor_cores=True,
             matrix_cores=True,
             bandwidth_gbps=5300.0 if is_mi300x else 1000.0,
-            pcie_bandwidth_gbps=0.0,
             recommended_batch_size=32 if is_mi300x else 8,
             recommended_workers=8,
             pytorch_compile=False,
@@ -356,6 +477,9 @@ class HardwareDetector:
         # Detect SIMD capabilities
         simd_support = "basic"
         has_avx512 = False
+        has_avx512_vnni = False
+        has_amx = False
+        has_sve = False
 
         try:
             result = subprocess.run(
@@ -384,16 +508,11 @@ class HardwareDetector:
             supports_fp16=False,
             supports_bf16=False,
             supports_tf32=False,
-            supports_fp8=False,
-            supports_fp4=False,
             tensor_cores=False,
-            matrix_cores=False,
             bandwidth_gbps=50.0,
-            pcie_bandwidth_gbps=0.0,
             recommended_batch_size=1,
             recommended_workers=min(8, cpu_count // 2),
             pytorch_compile=pytorch_compile,
-            flash_attention=False,
             titan_available=titan_available,
             titan_version=titan_version,
             capability_score=20.0 if has_avx512 else 10.0,
@@ -401,6 +520,9 @@ class HardwareDetector:
                 "simd_support": simd_support,
                 "cpu_count": cpu_count,
                 "has_avx512": has_avx512,
+                "has_avx512_vnni": has_avx512_vnni,
+                "has_amx": has_amx,
+                "has_sve": has_sve,
             },
         )
 
@@ -576,7 +698,7 @@ class AutoTuner:
         if model_size == "auto":
             # Scale based on capability score
             score = self.hardware.capability_score
-            if score >= 90:
+            if score >= 90:  # Blackwell/Hopper/MI300X
                 config = {
                     "hidden_size": 4096,
                     "num_layers": 32,
@@ -584,7 +706,7 @@ class AutoTuner:
                     "intermediate_size": 11008,
                     "max_position_embeddings": 8192,
                 }
-            elif score >= 70:
+            elif score >= 70:  # A100/RTX 4090
                 config = {
                     "hidden_size": 2048,
                     "num_layers": 24,
@@ -592,7 +714,7 @@ class AutoTuner:
                     "intermediate_size": 8192,
                     "max_position_embeddings": 4096,
                 }
-            elif score >= 50:
+            elif score >= 50:  # RTX 3090/M3
                 config = {
                     "hidden_size": 1024,
                     "num_layers": 16,
@@ -681,20 +803,25 @@ class TrainingOptimizer:
 
     def _configure_cuda(self) -> None:
         """Configure PyTorch for CUDA with next-gen optimizations."""
+        # Enable TF32 for Ampere+
         if self.hardware.supports_tf32:
             torch.backends.cuda.matmul.allow_tf32 = True
             torch.backends.cudnn.allow_tf32 = True
             logger.info("Enabled TF32 for Tensor Core acceleration")
 
+        # Enable cudnn benchmarking
         torch.backends.cudnn.benchmark = True
 
+        # Enable FP8 if available (Hopper/Blackwell)
         if self.hardware.supports_fp8:
             logger.info("FP8 support available for maximum throughput")
             os.environ["CUDA_ENABLE_FLASH_ATTENTION"] = "1"
 
+        # Enable FP4 for Blackwell
         if self.hardware.supports_fp4:
             logger.info("FP4 quantization available for Blackwell")
 
+        # Enable Flash Attention
         if self.hardware.flash_attention:
             os.environ["PYTORCH_CUDA_ENABLE_FLASH_ATTENTION"] = "1"
 
@@ -704,8 +831,11 @@ class TrainingOptimizer:
         """Configure PyTorch for CPU."""
         torch.backends.mkldnn.enabled = True
 
+        # Set optimal thread count
         threads = min(self.hardware.compute_units, 32)
         torch.set_num_threads(threads)
+
+        # Enable OpenMP if available
         os.environ["OMP_NUM_THREADS"] = str(threads)
 
         logger.info(f"Configured PyTorch for CPU ({threads} threads)")
@@ -745,11 +875,12 @@ class TrainingOptimizer:
 
     def _optimize_for_cuda(self, config: dict[str, Any]) -> dict[str, Any]:
         """Apply CUDA-specific optimizations."""
-        if self.hardware.supports_fp4:
+        # Optimal precision selection
+        if self.hardware.supports_fp4:  # Blackwell
             config["fp4"] = True
             config["fp8"] = False
             config["bf16"] = False
-        elif self.hardware.supports_fp8:
+        elif self.hardware.supports_fp8:  # Hopper
             config["fp8"] = True
             config["bf16"] = False
             config["fp16"] = False
@@ -826,6 +957,7 @@ class TrainingOptimizer:
                 except ImportError:
                     pass
 
+            # PyTorch 2.x fused AdamW
             try:
                 return torch.optim.AdamW(
                     model_parameters,
@@ -861,23 +993,36 @@ def create_supercharged_trainer_config(
     base_config: ExperimentConfig,
     hardware_override: HardwareProfile | None = None,
 ) -> ExperimentConfig:
-    """Create a supercharged-optimized training configuration."""
+    """Create a supercharged-optimized training configuration.
+
+    Args:
+        base_config: Base experiment configuration
+        hardware_override: Optional hardware profile to use
+
+    Returns:
+        Optimized experiment configuration
+    """
+    from training.src.config import ExperimentConfig
+
     optimizer = TrainingOptimizer(hardware_override)
     optimizer.configure_torch()
 
     config_dict = base_config.to_dict()
     optimized_dict = optimizer.get_training_config(config_dict)
 
+    # Add supercharged features
     optimized_dict["use_titan"] = optimizer.titan_config.enabled
     optimized_dict["flash_attention"] = optimizer.hardware.flash_attention
     optimized_dict["dynamic_batch_scaling"] = True
-
-    from training.src.config import ExperimentConfig
 
     optimized_config = ExperimentConfig.from_dict(optimized_dict)
     optimized_config.config_path = base_config.config_path
 
     logger.info("Created supercharged training configuration v3.0")
+    logger.info(f"Optimization level: {optimizer.optimization_level}")
+    logger.info(f"Hardware: {optimizer.hardware.device_name}")
+    logger.info(f"Capability score: {optimizer.hardware.capability_score:.0f}/100")
+
     return optimized_config
 
 

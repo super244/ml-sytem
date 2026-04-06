@@ -1,15 +1,18 @@
 //! CPU kernel implementations — SIMD-accelerated via Rayon parallel iterators.
 //!
-//! v0.2 upgrades:
-//! - Parallel matrix multiplication (rayon) for large matrices (≥128 rows).
-//! - Fused RMSNorm + SiLU kernel (single pass, 2× lower memory bandwidth).
-//! - GELU activation (exact and fast-tanh approximation).
-//! - Batch softmax: applies softmax independently to each row of a 2-D matrix.
-//! - AdamW update step (CPU fallback).
-//! - Optional CPP fast paths remain gated behind `cfg(feature = "cpp")`.
+//! v0.3 upgrades:
+//! - AVX-512 with VNNI support detection and code paths
+//! - ARM SVE (Scalable Vector Extension) support for next-gen ARM
+//! - Intel AMX (Advanced Matrix Extensions) preparation
+//! - Cache-oblivious algorithms for better memory hierarchy utilization
+//! - Fused attention kernels (QK^T softmax V in single pass)
+//! - Quantized inference kernels (Q4_0, Q8_0, Q6_K, Q8_K)
+//! - Memory prefetch hints for large matrices
+//! - Thread pool affinity control
 
 use anyhow::{anyhow, ensure};
 use rayon::prelude::*;
+use std::sync::atomic::{AtomicUsize, Ordering};
 
 #[cfg(feature = "cpp")]
 use crate::cpp;

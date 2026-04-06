@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 from datetime import UTC, datetime
 from enum import StrEnum
 from pathlib import Path
@@ -12,6 +13,121 @@ from ai_factory.core.hashing import normalize_text, stable_question_fingerprint
 Difficulty = Literal["easy", "medium", "hard", "olympiad"]
 DatasetSplit = Literal["train", "eval", "test", "benchmark", "unspecified"]
 ReasoningStyle = Literal["chain_of_thought", "proof", "exam", "verification", "mixed"]
+
+
+class BackendType(StrEnum):
+    """Available compute backends."""
+
+    METAL = "metal"
+    CUDA = "cuda"
+    ROCM = "rocm"
+    CPU = "cpu"
+    XPU = "xpu"
+    TITAN = "titan"
+
+
+class OptimizerType(StrEnum):
+    """Available optimizer types."""
+
+    ADAMW = "adamw"
+    ADAMW_FUSED = "adamw_fused"
+    ADAMW_8BIT = "adamw_8bit"
+    ADAMW_4BIT = "adamw_4bit"
+    LION = "lion"
+    LION_8BIT = "lion_8bit"
+    SGD = "sgd"
+    ADAFACTOR = "adafactor"
+    ADAMW_TITAN = "adamw_titan"
+
+
+class QuantizationType(StrEnum):
+    """Quantization types for QAT."""
+
+    NONE = "none"
+    Q4_0 = "q4_0"
+    Q4_1 = "q4_1"
+    Q5_0 = "q5_0"
+    Q5_1 = "q5_1"
+    Q8_0 = "q8_0"
+    Q8_1 = "q8_1"
+    Q6_K = "q6_k"
+    Q8_K = "q8_k"
+
+
+class HardwareProfile(BaseModel):
+    """Detected hardware capabilities with capability scoring."""
+
+    model_config = ConfigDict(use_enum_values=True)
+
+    platform: str
+    device_name: str
+    backend: BackendType
+    unified_memory: bool = False
+    memory_gb: float = 0.0
+    compute_units: int = 0
+    supports_fp16: bool = False
+    supports_bf16: bool = False
+    supports_tf32: bool = False
+    supports_fp8: bool = False
+    supports_fp4: bool = False
+    tensor_cores: bool = False
+    matrix_cores: bool = False
+    bandwidth_gbps: float = 0.0
+    pcie_bandwidth_gbps: float = 0.0
+    recommended_batch_size: int = 1
+    recommended_workers: int = 0
+    pytorch_compile: bool = False
+    flash_attention: bool = False
+    titan_available: bool = False
+    titan_version: str = ""
+    capability_score: float = 0.0
+    extra: dict[str, Any] = Field(default_factory=dict)
+
+    def to_dict(self) -> dict[str, Any]:
+        return self.model_dump()
+
+    def to_json(self) -> str:
+        return json.dumps(self.to_dict(), indent=2)
+
+
+class OptimizationConfig(BaseModel):
+    """Optimized training configuration."""
+
+    model_config = ConfigDict(use_enum_values=True)
+
+    batch_size: int
+    learning_rate: float
+    gradient_accumulation_steps: int
+    max_grad_norm: float
+    warmup_steps: int
+    bf16: bool
+    fp16: bool
+    fp8: bool
+    fp4: bool
+    gradient_checkpointing: bool
+    torch_compile: bool
+    compile_mode: str
+    optimizer: OptimizerType
+    dataloader_workers: int
+    pin_memory: bool
+    prefetch_factor: int
+    quantization: QuantizationType = QuantizationType.NONE
+    use_titan: bool = False
+    pipeline_parallel: bool = False
+    tensor_parallel: bool = False
+    sequence_parallel: bool = False
+    dynamic_batch_scaling: bool = False
+
+
+class TitanConfig(BaseModel):
+    """Titan engine configuration."""
+
+    enabled: bool = False
+    use_cuda: bool = False
+    use_metal: bool = False
+    use_cpp: bool = False
+    kernel_version: str = "v0.5.0"
+    custom_kernels: list[str] = Field(default_factory=list)
 
 
 class StepCheck(BaseModel):
