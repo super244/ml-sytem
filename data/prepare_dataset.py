@@ -1,3 +1,12 @@
+"""
+Module for preparing datasets for the AI-Factory training pipeline.
+
+This script acts as the entry point for normalizing, processing, and packaging
+math reasoning data into a structured corpus suitable for training models.
+It supports overriding configurations via CLI arguments and utilizes the
+corpus_builder backend to construct the final datasets.
+"""
+
 from __future__ import annotations
 
 import argparse
@@ -13,6 +22,13 @@ from data.builders.corpus_builder import build_corpus, load_processing_config
 
 
 def parse_args() -> argparse.Namespace:
+    """
+    Parse command-line arguments for dataset preparation.
+
+    Returns:
+        argparse.Namespace: The parsed command-line arguments containing paths
+        for config, sources, failure logs, and output directories.
+    """
     parser = argparse.ArgumentParser(description="Normalize and package math reasoning data.")
     parser.add_argument("--config", type=str, default="data/configs/processing.yaml")
     parser.add_argument("--source", action="append", default=None, help="Extra input file(s), URLs, or dataset specs.")
@@ -29,6 +45,13 @@ def parse_args() -> argparse.Namespace:
 
 
 def main() -> None:
+    """
+    Main entry point for dataset preparation.
+
+    Loads the processing configuration, applies CLI argument overrides,
+    and invokes the corpus builder to process and package the datasets.
+    Finally, prints the build results as a JSON string and logs the execution time.
+    """
     args = parse_args()
     config = load_processing_config(args.config)
     if args.source:

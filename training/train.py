@@ -148,6 +148,16 @@ def build_training_arguments(config: ExperimentConfig, layout) -> TrainingArgume
 
 
 def save_config_snapshot(config: ExperimentConfig, layout) -> Path:
+    """
+    Save a snapshot of the experiment configuration to the layout manifests directory.
+
+    Args:
+        config (ExperimentConfig): The experiment configuration to save.
+        layout (Any): The initialized layout structure for the run.
+
+    Returns:
+        Path: The file path where the config snapshot was saved.
+    """
     path = layout.manifests_dir / "config_snapshot.json"
     write_json(path, config.to_dict())
     return path
@@ -160,6 +170,18 @@ def write_config_report(
     warnings: list[str],
     resume_from_checkpoint: str | None,
 ) -> tuple[Path, dict[str, object]]:
+    """
+    Write a comprehensive configuration report including warnings and checkpoint data.
+
+    Args:
+        config (ExperimentConfig): The experiment configuration.
+        layout (Any): The directory layout for the run.
+        warnings (list[str]): List of warnings generated during config validation.
+        resume_from_checkpoint (str | None): The checkpoint path used for resuming (if any).
+
+    Returns:
+        tuple[Path, dict[str, object]]: The path to the report file and the report data dictionary.
+    """
     report = describe_experiment_config(config, warnings=warnings)
     report["resume_from_checkpoint"] = resume_from_checkpoint
     path = layout.manifests_dir / "config_report.json"
@@ -168,6 +190,16 @@ def write_config_report(
 
 
 def summarize_environment(snapshot: dict[str, object]) -> dict[str, object]:
+    """
+    Summarize the full environment snapshot into key metrics for tracking.
+
+    Args:
+        snapshot (dict[str, object]): The raw environment snapshot dictionary.
+
+    Returns:
+        dict[str, object]: A summarized dictionary containing git SHA, Python/Platform versions,
+        and CUDA availability.
+    """
     python_info = snapshot.get("python") if isinstance(snapshot.get("python"), dict) else {}
     platform_info = snapshot.get("platform") if isinstance(snapshot.get("platform"), dict) else {}
     torch_info = snapshot.get("torch") if isinstance(snapshot.get("torch"), dict) else {}
@@ -181,6 +213,17 @@ def summarize_environment(snapshot: dict[str, object]) -> dict[str, object]:
 
 
 def build_dataset_artifacts(config: ExperimentConfig, tokenizer, layout):
+    """
+    Build the train and evaluation datasets, and generate a dataset report.
+
+    Args:
+        config (ExperimentConfig): The experiment configuration containing data paths.
+        tokenizer (Any): The tokenizer to use for building the datasets.
+        layout (Any): The run layout directory structure.
+
+    Returns:
+        tuple: A tuple containing (train_dataset, eval_dataset, dataset_report_dict).
+    """
     logger.info("Building dataset artifacts.")
     train_dataset = build_dataset(
         file_path=config.data.train_file,
@@ -207,12 +250,28 @@ def build_dataset_artifacts(config: ExperimentConfig, tokenizer, layout):
 
 
 def load_json_if_exists(path: Path) -> dict:
+    """
+    Load a JSON file into a dictionary if the file exists.
+
+    Args:
+        path (Path): The path to the JSON file.
+
+    Returns:
+        dict: The parsed JSON dictionary or an empty dict if the file is missing.
+    """
     if not path.exists():
         return {}
     return json.loads(path.read_text())
 
 
 def main() -> None:
+    """
+    Main entry point for the training execution.
+
+    Handles argument parsing, orchestrator setup for distributed training,
+    configuration validation, artifact layout preparation, tokenizer/model loading,
+    dry-run execution, full training execution, and metric/lineage reporting.
+    """
     args = parse_args()
 
     # Orchestrator Integration: If distributed flag is set and we're not already the worker
