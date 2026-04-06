@@ -40,7 +40,7 @@ def test_distributed_orchestrator_launch_success(monkeypatch: pytest.MonkeyPatch
         return SimpleNamespace(returncode=0)
 
     monkeypatch.setattr("ai_factory.orchestration.distributed.subprocess.run", _fake_run)
-    code = orchestrator.launch("train.py", ["--epochs", "1"])
+    code = orchestrator.launch("train.py", ["--epochs", "1"], check=True)
     assert code == 0
 
 
@@ -53,4 +53,4 @@ def test_distributed_orchestrator_launch_failure(monkeypatch: pytest.MonkeyPatch
 
     monkeypatch.setattr("ai_factory.orchestration.distributed.subprocess.run", _fake_run)
     with pytest.raises(subprocess.CalledProcessError):
-        orchestrator.launch("train.py", ["--epochs", "1"])
+        orchestrator.launch("train.py", ["--epochs", "1"], check=True)

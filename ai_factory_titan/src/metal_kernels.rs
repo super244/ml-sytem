@@ -10,7 +10,8 @@
 //! - Memory-bounded kernel fusion to reduce bandwidth pressure
 
 use anyhow::{anyhow, Result};
-use metal::{Buffer, ComputePipelineState, Device, FunctionConstantValues, Library, MTLSize, CommandQueue};
+use metal::{Buffer, ComputePipelineState, Device, Library, MTLSize, CommandQueue};
+use metal::foreign_types::ForeignType;
 use std::collections::HashMap;
 use std::sync::Arc;
 
@@ -46,7 +47,7 @@ impl MetalKernelCache {
     }
     
     /// Get or create compute pipeline for kernel function
-    pub fn get_pipeline(&mut self, function_name: &str) -> Result<&ComputePipelineState> {
+    pub fn get_pipeline(&mut self, function_name: &str) -> Result<ComputePipelineState> {
         if !self.pipelines.contains_key(function_name) {
             let function = self.library
                 .get_function(function_name, None)
@@ -59,7 +60,7 @@ impl MetalKernelCache {
             self.pipelines.insert(function_name.to_string(), pipeline);
         }
         
-        Ok(self.pipelines.get(function_name).unwrap())
+        Ok(self.pipelines.get(function_name).unwrap().clone())
     }
     
     /// Get reference to Metal device
@@ -152,9 +153,9 @@ pub fn matmul_f32_metal(
     encoder.set_buffer(2, Some(&c_buffer), 0);
     
     // Pass dimensions as uniforms
-    var m_u32 = m as u32;
-    var k_u32 = k as u32;
-    var n_u32 = n as u32;
+    let m_u32 = m as u32;
+    let k_u32 = k as u32;
+    let n_u32 = n as u32;
     encoder.set_bytes(3, std::mem::size_of::<u32>() as u64, &m_u32 as *const _ as *const _);
     encoder.set_bytes(4, std::mem::size_of::<u32>() as u64, &k_u32 as *const _ as *const _);
     encoder.set_bytes(5, std::mem::size_of::<u32>() as u64, &n_u32 as *const _ as *const _);
@@ -479,7 +480,7 @@ pub fn detect_metal_capabilities() -> MetalCapabilities {
             gpu_cores,
             has_unified_memory,
             recommended_working_set_size_bytes: recommended_working_set_size,
-            supports_memoryless_framebuffers: device.supports_memoryless_framebuffers(),
+            supports_memoryless_framebuffers: false, // Placeholder if not available in current metal-rs
             supports_raytracing: device.supports_raytracing(),
         }
     } else {
@@ -535,4 +536,4 @@ fn estimate_gpu_cores(name: &str) -> usize {
 }
 
 // Use objc msg_send for advanced Metal features
-use objc::msg_send;
+use objc::{msg_send, sel};
