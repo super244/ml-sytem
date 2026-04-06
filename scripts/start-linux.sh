@@ -337,9 +337,19 @@ maybe_install_frontend() {
 
 maybe_probe_titan() {
   if command -v cargo >/dev/null 2>&1; then
-    run cargo build --manifest-path ai_factory_titan/Cargo.toml --features cuda,cpp || true
+    log "Building Titan engine with ultimate optimization features."
+    # Build with ultimate feature that includes metal, cuda, and cpp
+    cargo build --manifest-path ai_factory_titan/Cargo.toml --features ultimate --release 2>/dev/null || \
+      cargo build --manifest-path ai_factory_titan/Cargo.toml --features cuda,cpp --release 2>/dev/null || \
+      cargo build --manifest-path ai_factory_titan/Cargo.toml --features cuda,cpp 2>/dev/null || true
   fi
+  
+  log "Running Titan hardware probe with ultimate optimization detection."
   run python -m ai_factory.cli titan status --write-hardware-doc || true
+  
+  # Run the new hardware detection and optimization layer
+  log "Detecting hardware capabilities for ultimate optimization."
+  run python -m training.src.optimization || true
 }
 
 maybe_prepare_data() {
@@ -406,9 +416,14 @@ run_quality_checks() {
 }
 
 launch_training() {
-  if [[ "${LAUNCH_TRAINING}" != "1" ]]; then
-    log "Training launch disabled; setup complete."
-    return 0
+  # Check if using ultimate optimization profile and set appropriate env vars
+  if [[ "${TRAIN_CONFIG}" == *"ultimate"* ]]; then
+    log "Ultimate optimization profile detected."
+    export AI_FACTORY_ULTIMATE_OPTIMIZATION=1
+    
+    # Run quick benchmark to verify optimization is working
+    log "Running performance benchmark."
+    run python -c "from training.src.ultimate_harness import quick_benchmark; quick_benchmark()" || true
   fi
 
   local train_cmd=(python -m training.train --config "${TRAIN_CONFIG}")

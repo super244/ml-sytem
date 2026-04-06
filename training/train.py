@@ -29,6 +29,12 @@ from training.src.modeling import load_model_for_training, load_tokenizer, train
 from training.src.packaging import publish_model_artifacts, write_run_manifest, write_training_summary
 from training.src.tracking import build_tracker
 from training.src.validation import run_dry_validation
+from training.src.optimization import HardwareDetector, TrainingOptimizer
+from training.src.ultimate_harness import (
+    build_ultimate_trainer_with_harness,
+    HarnessConfig,
+    UltimateTrainingHarness,
+)
 
 # Set up structured logging
 logging.basicConfig(
@@ -474,7 +480,24 @@ def main() -> None:
 
         logger.info("Initializing full training run.")
         tokenizer = tokenizer or load_tokenizer(config)
-        model = load_model_for_training(config, tokenizer=tokenizer)
+        
+        # Detect hardware and initialize ultimate harness
+        logger.info("Detecting hardware and initializing ultimate optimization harness.")
+        hardware = HardwareDetector.detect()
+        harness_config = HarnessConfig(
+            enable_mixed_precision=config.training.bf16 or config.training.fp16,
+            enable_gradient_checkpointing=config.training.gradient_checkpointing,
+            enable_torch_compile=config.runtime.torch_compile,
+            enable_memory_profiling=os.environ.get("AI_FACTORY_MEMORY_PROFILE", "0") == "1",
+        )
+        harness = UltimateTrainingHarness(config, harness_config, hardware)
+        harness.print_summary()
+        
+        # Prepare model with ultimate optimizations
+        model = harness.prepare_model(model)
+        
+        # Get optimized training arguments from harness
+        args = harness.get_training_arguments(layout)
 
         parameter_report = trainable_parameter_report(model)
         write_json(layout.metrics_dir / "model_report.json", parameter_report)
@@ -494,12 +517,11 @@ def main() -> None:
 
         data_collator = WeightedDataCollator(tokenizer=tokenizer, label_pad_token_id=-100, pad_to_multiple_of=8)
 
-        from training.src.trainer import build_ultimate_trainer
-
-        trainer = build_ultimate_trainer(
+        # Build ultimate trainer with harness integration
+        trainer = build_ultimate_trainer_with_harness(
             config=config,
             model=model,
-            args=build_training_arguments(config, layout),
+            args=args,
             train_dataset=train_dataset,
             eval_dataset=eval_dataset,
             data_collator=data_collator,
@@ -508,10 +530,13 @@ def main() -> None:
                 JsonlMetricsCallback(layout.logs_dir / config.logging.jsonl_metrics_filename),
                 TrackerCallback(tracker),
             ],
+            layout=layout,
         )
 
-        logger.info("Starting training loop.")
-        print("[Titan Engine Wrapper] Connecting to Titan Engine and boosting performance...")
+        logger.info("Starting training loop with ultimate optimization.")
+        print("[Ultimate Training Harness] Hardware-aware optimization active.")
+        print(f"[Ultimate Training Harness] Backend: {harness.hardware.backend.name}")
+        print(f"[Ultimate Training Harness] Device: {harness.hardware.device_name}")
         trainer.train(resume_from_checkpoint=resume_from_checkpoint)
 
         logger.info("Training complete. Evaluating.")

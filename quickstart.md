@@ -10,6 +10,8 @@ Status as validated on April 5, 2026:
 - `python scripts/doctor.py` passes.
 - `ai-factory ready` passes.
 - `ai-factory train-preflight --config training/configs/profiles/failure_aware.yaml` passes with environment warnings on CPU-only hosts.
+- **Hardware detection and ultimate optimization** are available via `python -m training.src.optimization`
+- Ultimate profiles `m5_max_ultimate.yaml`, `cuda_ultimate_a100.yaml`, and `cuda_ultimate_h100.yaml` are ready for hardware-specific training
 - Frontend `npm run typecheck` and `npm run build` pass.
 - Dataset generation, corpus preparation, SQLite corpus export, tokenizer training smoke test, and scratch-training dry-run pass with a faster corpus/tokenizer path.
 - The Linux cloud bootstrap script and macOS local bootstrap script are the default operator entry points.
@@ -28,6 +30,7 @@ Use this if you want to:
 - run the API and frontend locally
 - validate the full training configuration on a CPU-only workstation before moving to a GPU box
 - use the Apple Silicon-safe local profile at `training/configs/profiles/local_metal.yaml`
+- **use ultimate optimization on Apple Silicon** with `training/configs/profiles/m5_max_ultimate.yaml`
 
 Recommended:
 
@@ -43,6 +46,7 @@ Use this if you want to:
 - run a real 2B scratch pretraining job on a rented GPU VM
 - keep artifacts on persistent attached storage
 - avoid local GPU limits
+- **use ultimate optimization on NVIDIA A100/H100** with `cuda_ultimate_a100.yaml` or `cuda_ultimate_h100.yaml`
 
 Recommended:
 
@@ -82,7 +86,25 @@ On Apple Silicon local machines, the bootstrap script prefers the Metal-aware lo
 
 If you intentionally skip Git LFS, regenerate `data/catalog.json` locally before relying on `ai-factory ready` or `ai-factory doctor`.
 
-## 3. Verify The Workspace
+## 2.5 Detect and Benchmark Your Hardware (Optional)
+
+Before training, detect your hardware capabilities and run a quick benchmark:
+
+```bash
+# Detect hardware and print optimization recommendations
+python -m training.src.optimization
+
+# Quick performance benchmark
+python -c "from training.src.ultimate_harness import quick_benchmark; quick_benchmark()"
+```
+
+Expected output includes:
+- Device name and backend (Metal/CUDA/CPU)
+- Memory capacity and bandwidth
+- Supported precision (FP16/BF16/TF32)
+- Recommended batch size and settings
+
+Use this information to choose the right training profile.
 
 ```bash
 ai-factory ready
@@ -227,6 +249,42 @@ Important:
 - the pretrained profiles in this repo now point at local foundation checkpoints such as `artifacts/foundation/qwen2-2b`
 - if those folders do not exist yet, those profiles will fail at model load
 - if you do not have local checkpoints yet, either create them first or edit the profile to use the real base model you want
+
+## 5.4 Choose Ultimate Optimization Profile (Optional)
+
+For maximum performance, use the hardware-specific ultimate profiles:
+
+### Apple Silicon Ultimate (M5 Max)
+```bash
+python -m training.train --config training/configs/profiles/m5_max_ultimate.yaml --dry-run
+```
+Optimizations:
+- Unified memory zero-copy path
+- 614 GB/s bandwidth utilization
+- 40-core GPU saturation
+- Fused RMSNorm+SiLU kernels
+
+### NVIDIA A100 Ultimate
+```bash
+python -m training.train --config training/configs/profiles/cuda_ultimate_a100.yaml --dry-run
+```
+Optimizations:
+- BF16 Tensor Core acceleration
+- TF32 automatic mixed precision
+- 2039 GB/s memory bandwidth
+- FlashAttention-2 fused kernels
+
+### NVIDIA H100 Ultimate
+```bash
+python -m training.train --config training/configs/profiles/cuda_ultimate_h100.yaml --dry-run
+```
+Optimizations:
+- FP8 Transformer Engine support
+- 3350 GB/s memory bandwidth
+- 4th gen Tensor Cores
+- Distributed training ready
+
+See the [Optimization Guide](docs/optimization-guide.md) for tuning details.
 
 ## 6. Choose The Scratch Model Size
 
