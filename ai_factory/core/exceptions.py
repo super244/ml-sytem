@@ -401,7 +401,7 @@ class APIError(AIFactoryError):
             message,
             error_code=error_code or self.error_code,
             context=ctx,
-            suggestion=suggestion,
+            suggestion=suggestion or "Check API documentation and verify request format.",
         )
 
 

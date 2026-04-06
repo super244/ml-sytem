@@ -107,7 +107,7 @@ class DistributedTrainingOrchestrator:
         env["PYTHONUNBUFFERED"] = "1"
         return env
 
-    def _build_torchrun_cmd(self, training_script: str, training_args: list[str]) -> list[str]:
+    def get_torchrun_cmd(self, training_script: str, training_args: list[str]) -> list[str]:
         """Build the torchrun command for distributed execution."""
         cmd = [
             sys.executable,
@@ -132,14 +132,14 @@ class DistributedTrainingOrchestrator:
         cmd.extend(training_args)
         return cmd
 
-    def launch(self, training_script: str, training_args: list[str]) -> int:
+    def launch(self, training_script: str, training_args: list[str], check: bool = False) -> int:
         """
         Launch distributed training job with fault tolerance.
 
         Args:
             training_script: Path to the training script.
             training_args: Arguments to pass to the script.
-
+            check: Whether to check the exit code and raise an error if it's non-zero.
         Returns:
             Exit code of the training process.
 
@@ -151,7 +151,7 @@ class DistributedTrainingOrchestrator:
 
         while self._restart_count <= self.config.max_restarts:
             try:
-                return self._launch_once(training_script, training_args)
+                return self._launch_once(training_script, training_args, check=check)
             except subprocess.CalledProcessError as e:
                 self._restart_count += 1
                 elapsed = time.time() - self._start_time
@@ -183,9 +183,9 @@ class DistributedTrainingOrchestrator:
 
         return 1  # Should never reach here
 
-    def _launch_once(self, training_script: str, training_args: list[str]) -> int:
+    def _launch_once(self, training_script: str, training_args: list[str], check: bool = False) -> int:
         """Execute a single training launch attempt."""
-        cmd = self._build_torchrun_cmd(training_script, training_args)
+        cmd = self.get_torchrun_cmd(training_script, training_args)
         env = self._build_env()
 
         logger.info(f"Launching distributed training: {' '.join(cmd)}")
@@ -198,6 +198,7 @@ class DistributedTrainingOrchestrator:
                 stdout=sys.stdout,
                 stderr=sys.stderr,
                 timeout=self.config.timeout_seconds if self.config.timeout_seconds > 0 else None,
+                check=check,
             )
             return result.returncode
         except subprocess.TimeoutExpired as e:
