@@ -1,8 +1,11 @@
 [package]
 name = "ai_factory_titan"
-version = "0.1.0"
+version = "0.3.0"
 edition = "2021"
-description = "Titan compute core for AI-Factory with Metal, CUDA, and CPU fallback paths."
+description = "Titan compute core for AI-Factory — Metal, CUDA, and CPU fallback with paged KV cache, priority scheduler, and mixed-precision kernels."
+authors = ["AI-Factory Team"]
+license = "MIT"
+repository = "https://github.com/super244/ai-factory"
 
 [lib]
 name = "ai_factory_titan"
@@ -14,44 +17,85 @@ path = "src/bin/titan-status.rs"
 
 [features]
 default = []
-metal = ["dep:metal", "dep:objc", "dep:objc_id"]
-cuda = ["dep:cudarc", "dep:half", "cudarc/cuda-12080", "cudarc/f16"]
-python = ["dep:pyo3"]
-cpp = []
+metal   = ["dep:metal", "dep:objc", "dep:objc_id"]
+cuda    = ["dep:cudarc", "dep:half", "cudarc/cuda-12080", "cudarc/f16"]
+python  = ["dep:pyo3"]
+cpp     = []
 ultimate = ["metal", "cuda", "cpp"]
 
 [dependencies]
-anyhow = "1"
-arrow-array = "54"
-arrow-buffer = "54"
-arrow-schema = "54"
-half = { version = "2.4", features = ["std"], optional = true }
-serde = { version = "1", features = ["derive"] }
-serde_json = "1"
-sys-info = "0.9"
-tokio = { version = "1", features = ["macros", "rt-multi-thread", "sync", "time"] }
+anyhow            = "1"
+arrow-array        = "55"
+arrow-buffer       = "55"
+arrow-schema       = "55"
+half              = { version = "2.4", features = ["std", "num-traits"], optional = true }
+log               = "0.4"
+serde             = { version = "1", features = ["derive"] }
+serde_json        = "1"
+sys-info          = "0.9"
+tokio             = { version = "1", features = ["macros", "rt-multi-thread", "sync", "time"] }
+# Rayon for data-parallel CPU kernels (SIMD-vectorised dot/matmul)
+rayon             = "1.10"
+# Lock-free concurrent hash map for pipeline-safe kernel caches
+dashmap           = "6"
+# High-resolution timing for kernel benchmarks
+instant           = "0.1"
+# Crossbeam channels for the priority scheduler
+crossbeam-channel = "0.5"
+# Bit-manipulation helpers for quantization packing
+bytemuck          = { version = "1.21", features = ["derive"] }
+# Parking-lot for faster Mutex/RwLock replacing std primitives
+parking_lot       = "0.12"
+# Compact error propagation
+thiserror         = "2"
 
 [dependencies.cudarc]
-version = "0.13"
+version  = "0.13"
 features = ["f16"]
 optional = true
 
 [dependencies.metal]
-version = "0.31"
+version  = "0.31"
 optional = true
 
 [dependencies.objc]
-version = "0.2"
+version  = "0.2"
 optional = true
 
 [dependencies.objc_id]
-version = "0.1"
+version  = "0.1"
 optional = true
 
 [dependencies.pyo3]
-version = "0.23"
+version  = "0.23"
 features = ["extension-module"]
 optional = true
 
+[dev-dependencies]
+tempfile         = "3"
+approx           = "0.5"
+criterion        = { version = "0.5", features = ["html_reports"] }
+tokio            = { version = "1", features = ["macros", "rt"] }
+
 [build-dependencies]
 cc = "1"
+
+[profile.release]
+opt-level     = 3
+lto           = "fat"
+codegen-units = 1
+panic         = "abort"
+strip         = "symbols"
+
+[profile.release-fast]
+inherits  = "release"
+opt-level = "s"  # size-optimised variant for embedded/edge
+
+[profile.bench]
+opt-level     = 3
+lto           = "thin"
+codegen-units = 4
+
+[profile.dev]
+opt-level     = 1  # faster incremental builds with minor optimisations
+

@@ -22,7 +22,7 @@ from typing import TYPE_CHECKING, Any
 
 import torch
 import torch.nn as nn
-from torch.cuda.amp import GradScaler, autocast
+from torch.amp import GradScaler, autocast
 from transformers import TrainerCallback, TrainingArguments
 
 from training.src.optimization import (

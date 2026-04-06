@@ -1,43 +1,69 @@
-FROM python:3.11-slim AS builder
+# ── Stage 1: dependency resolution ───────────────────────────────────────────
+FROM python:3.12-slim AS deps
 
 WORKDIR /build
 
-RUN pip install --upgrade pip
+# System deps required to compile some wheels (e.g. tokenizers, numpy)
+RUN apt-get update && apt-get install -y --no-install-recommends \
+        build-essential \
+        git \
+        curl \
+    && rm -rf /var/lib/apt/lists/*
 
+# Install Rust toolchain to compile ai_factory_titan (CPU/Python mode)
+RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
+ENV PATH="/root/.cargo/bin:${PATH}"
+
+RUN pip install --upgrade pip wheel
+
+# Copy only the manifest so Docker can cache this layer independently.
 COPY pyproject.toml ./
-COPY ai_factory/ ./ai_factory/
-COPY inference/ ./inference/
-COPY training/ ./training/
-COPY evaluation/ ./evaluation/
-COPY data/ ./data/
-COPY configs/ ./configs/
-RUN pip install --no-cache-dir -e . --target /build/deps
 
-FROM python:3.11-slim AS runtime
+# Install runtime deps into /build/deps (editable not needed at this stage).
+RUN pip install --no-cache-dir --target /build/deps .
 
+# ── Stage 2: runtime ──────────────────────────────────────────────────────────
+FROM python:3.12-slim AS runtime
+
+# Ensure libgcc/libstdc++ are available for the Rust extension
+RUN apt-get update && apt-get install -y --no-install-recommends libgcc-s1 curl && rm -rf /var/lib/apt/lists/*
+
+# Security: non-root user
 RUN addgroup --system appgroup && adduser --system --ingroup appgroup appuser
 
 WORKDIR /app
 
-COPY --from=builder /build/deps /usr/local/lib/python3.11/site-packages/
+# Copy pre-built site-packages from deps stage.
+COPY --from=deps /build/deps /usr/local/lib/python3.12/site-packages/
 
+# Copy application source (ordered largest-to-smallest for layer efficiency).
 COPY ai_factory/ ./ai_factory/
-COPY inference/ ./inference/
-COPY training/ ./training/
+COPY inference/  ./inference/
+COPY training/   ./training/
 COPY evaluation/ ./evaluation/
-COPY data/ ./data/
-COPY configs/ ./configs/
+COPY data/       ./data/
+COPY configs/    ./configs/
 COPY pyproject.toml ./
 
-RUN pip install --no-cache-dir -e . --no-deps
+# Standard install (not editable) to cleanly pack the wheel and extensions.
+RUN pip install --no-cache-dir . --no-deps
 
+# Artifact volume and ownership.
 RUN mkdir -p artifacts && chown -R appuser:appgroup /app
 
 USER appuser
 
 EXPOSE 8000
 
+# Healthcheck calls the lightweight /v1/health endpoint.
 HEALTHCHECK --interval=30s --timeout=10s --start-period=15s --retries=3 \
     CMD python -c "import urllib.request; urllib.request.urlopen('http://localhost:8000/v1/health')" || exit 1
 
-CMD ["uvicorn", "inference.app.main:app", "--host", "0.0.0.0", "--port", "8000", "--workers", "1"]
+# Use --workers 1 in container; scale via horizontal pod autoscaling.
+# Override AI_FACTORY_TITAN_RUNTIME env var to promote Rust inference.
+CMD ["uvicorn", "inference.app.main:app", \
+     "--host", "0.0.0.0", \
+     "--port", "8000", \
+     "--workers", "1", \
+     "--loop", "uvloop", \
+     "--http", "h11"]

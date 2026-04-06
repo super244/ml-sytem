@@ -493,11 +493,16 @@ def main() -> None:
         harness = UltimateTrainingHarness(config, harness_config, hardware)
         harness.print_summary()
 
-        # Prepare model with ultimate optimizations
+        # Load model first, then prepare it through the harness
+        logger.info("Loading model for training.")
+        tokenizer = tokenizer or load_tokenizer(config)
+        model = load_model_for_training(config, tokenizer=tokenizer)
+
+        # Prepare model with ultimate optimizations (apply LoRA, move to device, compile)
         model = harness.prepare_model(model)
 
         # Get optimized training arguments from harness
-        args = harness.get_training_arguments(layout)
+        training_args = harness.get_training_arguments(layout)
 
         parameter_report = trainable_parameter_report(model)
         write_json(layout.metrics_dir / "model_report.json", parameter_report)
@@ -521,7 +526,7 @@ def main() -> None:
         trainer = build_ultimate_trainer_with_harness(
             config=config,
             model=model,
-            args=args,
+            args=training_args,
             train_dataset=train_dataset,
             eval_dataset=eval_dataset,
             data_collator=data_collator,

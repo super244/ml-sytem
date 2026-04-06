@@ -8,7 +8,7 @@ import subprocess
 import sys
 import time
 from dataclasses import dataclass, field
-from enum import Enum
+from enum import StrEnum
 from typing import Any
 
 from ai_factory.core.exceptions import ClusterError, TimeoutError
@@ -16,7 +16,7 @@ from ai_factory.core.exceptions import ClusterError, TimeoutError
 logger = logging.getLogger(__name__)
 
 
-class DistributedBackend(str, Enum):
+class DistributedBackend(StrEnum):
     """Supported distributed training backends."""
 
     NCCL = "nccl"  # NVIDIA Collective Communication Library
@@ -24,7 +24,7 @@ class DistributedBackend(str, Enum):
     MPI = "mpi"  # Message Passing Interface
 
 
-class NodeStatus(str, Enum):
+class NodeStatus(StrEnum):
     """Status of a distributed training node."""
 
     PENDING = "pending"
@@ -158,6 +158,9 @@ class DistributedTrainingOrchestrator:
 
                 if self._restart_count > self.config.max_restarts:
                     logger.error(f"Distributed training failed after {self.config.max_restarts} restarts")
+                    if check:
+                        # Caller opted into strict error propagation — re-raise the original error.
+                        raise
                     raise ClusterError(
                         f"Training failed after {self.config.max_restarts} restart attempts",
                         cluster_id=f"{self.config.master_addr}:{self.config.master_port}",

@@ -5,7 +5,7 @@ import hashlib
 import secrets
 import uuid
 from collections import Counter
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from typing import TYPE_CHECKING, Any, Literal, cast
 
 if TYPE_CHECKING:
@@ -37,7 +37,7 @@ DEFAULT_CIRCUIT_REOPEN_AFTER_S = 60
 
 
 def _now() -> datetime:
-    return datetime.now(timezone.utc)
+    return datetime.now(UTC)
 
 
 def _iso_plus(seconds: float) -> str:

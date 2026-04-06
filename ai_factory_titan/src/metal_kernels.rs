@@ -10,7 +10,6 @@
 //! - Memory-bounded kernel fusion to reduce bandwidth pressure
 
 use anyhow::{anyhow, Result};
-use metal::foreign_types::ForeignType;
 use metal::{Buffer, CommandQueue, ComputePipelineState, Device, Library, MTLSize};
 use std::collections::HashMap;
 use std::sync::Arc;

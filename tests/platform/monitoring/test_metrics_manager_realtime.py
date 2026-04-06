@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 import pytest
@@ -24,7 +24,7 @@ def monitoring_config() -> MonitoringConfig:
 @pytest.mark.asyncio
 async def test_metrics_collector_historical_series(monitoring_config: MonitoringConfig) -> None:
     collector = MetricsCollector(monitoring_config)
-    start = datetime.now(timezone.utc)
+    start = datetime.now(UTC)
     end = start + timedelta(minutes=2)
     points = await collector.get_historical_metrics("instance-1", start, end)
 
@@ -42,7 +42,7 @@ async def test_monitoring_manager_health_score(monitoring_config: MonitoringConf
             severity="critical",
             message="critical",
             source="test",
-            timestamp=datetime.now(timezone.utc),
+            timestamp=datetime.now(UTC),
         )
     ]
     metrics = {

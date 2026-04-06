@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-from datetime import datetime, timezone
-from enum import Enum
+from datetime import UTC, datetime
+from enum import StrEnum
 from pathlib import Path
 from typing import Any, Literal
 
@@ -192,7 +192,7 @@ class PackagedMathRecordV2(MathRecordV2):
 
 class DatasetBuildInfo(BaseModel):
     build_id: str
-    created_at: str = Field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
+    created_at: str = Field(default_factory=lambda: datetime.now(UTC).isoformat())
     git_sha: str | None = None
     config_path: str | None = None
     config_sha256: str | None = None
@@ -225,7 +225,7 @@ class RunManifest(BaseModel):
     run_id: str
     run_name: str
     profile_name: str | None = None
-    created_at: str = Field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
+    created_at: str = Field(default_factory=lambda: datetime.now(UTC).isoformat())
     base_dir: str
     model_name: str
     base_model: str
@@ -393,7 +393,7 @@ def path_to_file_info(path: Path, sha256: str, num_rows: int = 0) -> DatasetFile
     )
 
 
-class DomainType(str, Enum):
+class DomainType(StrEnum):
     """Domain categorization for models and datasets."""
 
     MATHEMATICS = "mathematics"
@@ -441,7 +441,7 @@ class ModelLineage(BaseModel):
     parent_model: str | None = None
     training_dataset_ids: list[str] = Field(default_factory=list)
     training_run_ids: list[str] = Field(default_factory=list)
-    creation_timestamp: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    creation_timestamp: datetime = Field(default_factory=lambda: datetime.now(UTC))
 
 
 class ModelCapability(BaseModel):

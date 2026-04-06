@@ -9,7 +9,7 @@ import platform
 import shutil
 import subprocess
 from dataclasses import dataclass
-from enum import Enum
+from enum import StrEnum
 from typing import Any
 
 from ai_factory.titan import detect_titan_status
@@ -17,7 +17,7 @@ from ai_factory.titan import detect_titan_status
 logger = logging.getLogger(__name__)
 
 
-class AcceleratorType(str, Enum):
+class AcceleratorType(StrEnum):
     """Types of hardware accelerators."""
 
     CUDA = "cuda"

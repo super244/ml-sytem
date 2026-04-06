@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import json
 import re
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
@@ -28,8 +28,8 @@ def _parse_created_at(value: Any) -> datetime | None:
     except ValueError:
         return None
     if parsed.tzinfo is None:
-        return parsed.replace(tzinfo=timezone.utc)
-    return parsed.astimezone(timezone.utc)
+        return parsed.replace(tzinfo=UTC)
+    return parsed.astimezone(UTC)
 
 
 def _parse_run_id_timestamp(value: Any) -> datetime | None:
@@ -40,7 +40,7 @@ def _parse_run_id_timestamp(value: Any) -> datetime | None:
         return None
     try:
         timestamp = f"{match.group('date')}-{match.group('time')}"
-        return datetime.strptime(timestamp, "%Y%m%d-%H%M%S").replace(tzinfo=timezone.utc)
+        return datetime.strptime(timestamp, "%Y%m%d-%H%M%S").replace(tzinfo=UTC)
     except ValueError:
         return None
 
@@ -56,9 +56,9 @@ def _run_recency_key(run: dict[str, Any]) -> tuple[int, datetime, str]:
 
     output_dir = Path(str(run.get("output_dir") or "."))
     try:
-        modified_at = datetime.fromtimestamp(output_dir.stat().st_mtime, tz=timezone.utc)
+        modified_at = datetime.fromtimestamp(output_dir.stat().st_mtime, tz=UTC)
     except OSError:
-        modified_at = datetime.fromtimestamp(0, tz=timezone.utc)
+        modified_at = datetime.fromtimestamp(0, tz=UTC)
     return (1, modified_at, str(output_dir))
 
 

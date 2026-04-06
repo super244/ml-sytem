@@ -71,7 +71,7 @@ python_version_ok() {
   local python_bin="$1"
   "$python_bin" - <<'PY'
 import sys
-raise SystemExit(0 if sys.version_info >= (3, 10) else 1)
+raise SystemExit(0 if sys.version_info >= (3, 11) else 1)
 PY
 }
 
@@ -128,8 +128,8 @@ ensure_system_tools() {
   fi
 
   if ! have python3 || ! python_version_ok "$(command -v python3)"; then
-    log "Installing Python 3.11 via Homebrew."
-    brew install python@3.11
+    log "Installing Python 3.12 via Homebrew."
+    brew install python@3.12
   fi
 }
 
@@ -151,14 +151,14 @@ resolve_python() {
 
   if have brew; then
     local brew_python
-    brew_python="$(brew --prefix python@3.11 2>/dev/null || true)/bin/python3"
+    brew_python="$(brew --prefix python@3.12 2>/dev/null || brew --prefix python@3.11 2>/dev/null || true)/bin/python3"
     if [[ -x "${brew_python}" ]]; then
       PYTHON_BIN="${brew_python}"
       return
     fi
   fi
 
-  die "Could not find a Python 3.10+ interpreter."
+  die "Could not find a Python 3.11+ interpreter."
 }
 
 bootstrap_venv() {

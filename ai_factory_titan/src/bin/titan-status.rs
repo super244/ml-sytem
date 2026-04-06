@@ -6,13 +6,15 @@ use ai_factory_titan::{
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
     let hardware = detect_hardware();
-    let scheduler = TitanScheduler::status();
+    let sched = TitanScheduler::new(64);
+    let scheduler = sched.status();
     let engine = TitanEngineDescriptor::local_default();
     let kv_cache = KvCache::new(KvCacheConfig {
         page_size: 32,
         max_tokens: 2048,
         heads: 32,
         head_dim: 128,
+        max_pages: None,
     });
     let runtime = TitanRuntimePlan::current();
     let sampler = SamplerConfig::default();

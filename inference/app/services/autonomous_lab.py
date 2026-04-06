@@ -3,7 +3,7 @@ from __future__ import annotations
 import hashlib
 import json
 import time
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Literal
 
@@ -95,7 +95,7 @@ class AutonomousLabService:
         self.lineage_registry = LineageRegistry(Path(settings.artifacts_dir) / "lineage")
 
     def _utc_now(self) -> str:
-        return datetime.now(timezone.utc).isoformat()
+        return datetime.now(UTC).isoformat()
 
     def _campaign_id(self, name: str, goal: str) -> str:
         body = f"{name}|{goal}|{time.time():.6f}"

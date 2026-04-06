@@ -3,7 +3,7 @@ from __future__ import annotations
 import asyncio
 import uuid
 from copy import deepcopy
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any, Literal
 
@@ -535,7 +535,7 @@ class InstanceManager:
             return False
         retry_task = self.orchestration.retry_task(manifest.id)
         available_at = datetime.fromisoformat(retry_task.available_at.replace("Z", "+00:00"))
-        if available_at <= datetime.now(timezone.utc):
+        if available_at <= datetime.now(UTC):
             self.start_instance(manifest.id)
             return True
         return False

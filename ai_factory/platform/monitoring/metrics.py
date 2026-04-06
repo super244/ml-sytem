@@ -1,7 +1,7 @@
 """Metrics collection for AI-Factory monitoring."""
 
 import logging
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from typing import Any
 
 from ai_factory.core.monitoring.metrics import build_utilization_rollup
@@ -11,7 +11,7 @@ logger = logging.getLogger(__name__)
 
 
 def _utc_now() -> datetime:
-    return datetime.now(timezone.utc)
+    return datetime.now(UTC)
 
 
 class MetricsCollector:

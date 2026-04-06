@@ -1,3 +1,14 @@
+# AI-Factory v0.3.0 — Docker Compose service stack
+#
+# Services:
+#   api      — FastAPI inference server
+#   frontend — Next.js 22 dashboard
+#   redis    — Optional Celery / rate-limit broker (disabled by default)
+#
+# Usages:
+#   docker compose up -d               # api + frontend
+#   docker compose --profile full up -d  # + redis
+
 services:
   api:
     build:
@@ -11,17 +22,28 @@ services:
       BENCHMARK_REGISTRY_PATH: ${BENCHMARK_REGISTRY_PATH:-evaluation/benchmarks/registry.yaml}
       CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:3000}
       OPENAI_API_KEYS: ${OPENAI_API_KEYS:-}
+      # Promote to Rust-primary once Titan generation is wired
+      AI_FACTORY_TITAN_RUNTIME: ${AI_FACTORY_TITAN_RUNTIME:-python}
     ports:
-      - "8000:8000"
+      - "${API_PORT:-8000}:8000"
     volumes:
       - artifacts:/app/artifacts
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/v1/health')"]
+      test:
+        - "CMD"
+        - "python"
+        - "-c"
+        - "import urllib.request; urllib.request.urlopen('http://localhost:8000/v1/health', timeout=5)"
       interval: 30s
       timeout: 10s
-      start_period: 15s
+      start_period: 20s
       retries: 3
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
 
   frontend:
     build:
@@ -30,17 +52,45 @@ services:
     environment:
       NEXT_PUBLIC_API_BASE_URL: ${NEXT_PUBLIC_API_BASE_URL:-http://localhost:8000}
     ports:
-      - "3000:3000"
+      - "${FRONTEND_PORT:-3000}:3000"
     restart: unless-stopped
     depends_on:
       api:
         condition: service_healthy
     healthcheck:
-      test: ["CMD", "node", "-e", "require('http').get('http://localhost:3000', r => process.exit(r.statusCode < 500 ? 0 : 1)).on('error', () => process.exit(1))"]
+      test:
+        - "CMD"
+        - "wget"
+        - "-qO-"
+        - "http://localhost:3000/api/health"
       interval: 30s
       timeout: 10s
-      start_period: 20s
+      start_period: 25s
       retries: 3
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  # ── Optional: Redis (for Celery task queue / rate-limiting) ────────────────
+  redis:
+    image: redis:7-alpine
+    profiles: ["full"]
+    ports:
+      - "${REDIS_PORT:-6379}:6379"
+    volumes:
+      - redis_data:/data
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    command: ["redis-server", "--appendonly", "yes", "--maxmemory", "256mb", "--maxmemory-policy", "allkeys-lru"]
 
 volumes:
   artifacts:
+    driver: local
+  redis_data:
+    driver: local

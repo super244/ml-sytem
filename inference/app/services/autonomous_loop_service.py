@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import uuid
 from collections import Counter
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any, Literal
 
@@ -68,7 +68,7 @@ class AutonomousLoopService:
         self.loops_file = self.repo_root / "data" / "autonomous" / "loops.jsonl"
 
     def _now_iso(self) -> str:
-        return datetime.now(timezone.utc).isoformat()
+        return datetime.now(UTC).isoformat()
 
     def _load_loop_runs(self) -> list[AutonomousLoopRun]:
         if not self.loops_file.exists():

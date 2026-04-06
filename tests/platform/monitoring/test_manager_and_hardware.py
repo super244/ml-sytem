@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 import pytest
@@ -48,7 +48,7 @@ async def test_monitoring_manager_system_health_responds_to_alerts(tmp_path: Pat
                 severity="critical",
                 message="high pressure",
                 source="test",
-                timestamp=datetime.now(timezone.utc),
+                timestamp=datetime.now(UTC),
             )
         ]
 

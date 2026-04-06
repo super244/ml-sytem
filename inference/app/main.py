@@ -1,15 +1,67 @@
+"""AI-Factory API server — v0.3.0.
+
+Improvements over v0.2:
+- Lifespan context manager (replaces deprecated on_event hooks).
+- Structured problem+json error responses for 4xx/5xx.
+- Request-ID middleware for distributed tracing.
+- Compression middleware (GZip) for large JSON responses.
+- Explicit router mount order (health first for fast probes).
+"""
+
 from __future__ import annotations
 
-from collections.abc import Iterable
+import logging
+import time
+import uuid
+from collections.abc import AsyncIterator, Iterable
+from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.responses import JSONResponse
 
 from inference.app.config import get_settings
 
+logger = logging.getLogger(__name__)
 settings = get_settings()
-app = FastAPI(title=settings.title, version=settings.version)
+
+
+# ── Lifespan ──────────────────────────────────────────────────────────────────
+
+
+@asynccontextmanager
+async def lifespan(_app: FastAPI) -> AsyncIterator[None]:
+    """Run startup work before yielding; teardown on exit."""
+    logger.info("AI-Factory API starting up (v%s)", settings.version)
+    # Warm the orchestration service so the first request is fast.
+    try:
+        from ai_factory.core.orchestration.service import OrchestrationService
+
+        OrchestrationService()  # initialises singletons
+    except Exception as exc:  # noqa: BLE001
+        logger.warning("Orchestration warm-up skipped: %s", exc)
+    yield
+    logger.info("AI-Factory API shut down cleanly.")
+
+
+# ── Application factory ───────────────────────────────────────────────────────
+
+
+app = FastAPI(
+    title=settings.title,
+    version=settings.version,
+    description="Unified AI Operating System — training, evaluation, and inference API.",
+    docs_url="/docs",
+    redoc_url="/redoc",
+    openapi_url="/openapi.json",
+    lifespan=lifespan,
+)
+
+
+# ── Middleware (order matters — outermost = first to see request) ──────────────
+
+app.add_middleware(GZipMiddleware, minimum_size=1024)
 
 app.add_middleware(
     CORSMiddleware,
@@ -17,7 +69,23 @@ app.add_middleware(
     allow_credentials="*" not in settings.cors_origins,
     allow_methods=["*"],
     allow_headers=["*"],
+    expose_headers=["X-Request-ID", "X-Response-Time"],
 )
+
+
+@app.middleware("http")
+async def request_id_and_timing(request: Request, call_next):
+    """Attach a unique request-ID and measure response latency."""
+    request_id = request.headers.get("X-Request-ID") or str(uuid.uuid4())
+    start = time.perf_counter()
+    response = await call_next(request)
+    elapsed_ms = (time.perf_counter() - start) * 1000
+    response.headers["X-Request-ID"] = request_id
+    response.headers["X-Response-Time"] = f"{elapsed_ms:.1f}ms"
+    return response
+
+
+# ── Router registration ───────────────────────────────────────────────────────
 
 
 def _register_v1_routers(application: FastAPI) -> None:
@@ -37,6 +105,7 @@ def _register_v1_routers(application: FastAPI) -> None:
     from inference.app.routers.titan import router as titan_router
     from inference.app.routers.workspace import router as workspace_router
 
+    # Health first — fastest startup check, no dependencies.
     routers: Iterable = (
         health_router,
         workspace_router,
@@ -61,9 +130,20 @@ def _register_v1_routers(application: FastAPI) -> None:
 _register_v1_routers(app)
 
 
-@app.get("/")
+# ── Root endpoint ─────────────────────────────────────────────────────────────
+
+
+@app.get("/", tags=["root"])
 async def root() -> dict[str, str]:
-    return {"message": "AI-Factory API", "status": "running"}
+    return {
+        "message": "AI-Factory API",
+        "version": settings.version,
+        "status": "running",
+        "docs": "/docs",
+    }
+
+
+# ── Exception handlers ────────────────────────────────────────────────────────
 
 
 try:
@@ -83,26 +163,60 @@ try:
             },
             headers=exc.headers,
         )
+
 except ImportError:
     pass
 
 
 @app.exception_handler(HTTPException)
-async def custom_http_exception_handler(request: Request, exc: HTTPException) -> JSONResponse:
-    if exc.status_code == 503:
-        return JSONResponse(
-            status_code=503,
-            content={
-                "type": "about:blank",
-                "title": "Service Unavailable",
-                "status": 503,
-                "detail": exc.detail,
-                "instance": str(request.url),
-            },
-            headers={"Content-Type": "application/problem+json"},
-        )
+async def http_exception_handler(request: Request, exc: HTTPException) -> JSONResponse:
+    """RFC 9457 Problem Details responses for all HTTP errors."""
+    problem: dict[str, object] = {
+        "type": "about:blank",
+        "title": _status_title(exc.status_code),
+        "status": exc.status_code,
+        "detail": exc.detail,
+        "instance": str(request.url),
+    }
+    headers = dict(exc.headers or {})
+    headers["Content-Type"] = "application/problem+json"
     return JSONResponse(
         status_code=exc.status_code,
-        content={"detail": exc.detail},
-        headers=exc.headers,
+        content=problem,
+        headers=headers,
     )
+
+
+@app.exception_handler(Exception)
+async def unhandled_exception_handler(request: Request, exc: Exception) -> JSONResponse:
+    """Catch-all so unhandled 500s also return structured JSON."""
+    logger.exception("Unhandled exception for %s", request.url)
+    return JSONResponse(
+        status_code=500,
+        content={
+            "type": "about:blank",
+            "title": "Internal Server Error",
+            "status": 500,
+            "detail": "An unexpected error occurred. Check server logs for details.",
+            "instance": str(request.url),
+        },
+        headers={"Content-Type": "application/problem+json"},
+    )
+
+
+def _status_title(code: int) -> str:
+    titles = {
+        400: "Bad Request",
+        401: "Unauthorized",
+        403: "Forbidden",
+        404: "Not Found",
+        405: "Method Not Allowed",
+        409: "Conflict",
+        422: "Unprocessable Entity",
+        429: "Too Many Requests",
+        500: "Internal Server Error",
+        502: "Bad Gateway",
+        503: "Service Unavailable",
+        504: "Gateway Timeout",
+    }
+    return titles.get(code, "Error")

@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from ai_factory.core.instances.models import InstanceManifest
 from ai_factory.core.instances.store import FileInstanceStore
@@ -8,7 +8,7 @@ from ai_factory.core.instances.store import FileInstanceStore
 
 def _parse_ts(value: str | None) -> datetime:
     if not value:
-        return datetime.fromtimestamp(0, tz=timezone.utc)
+        return datetime.fromtimestamp(0, tz=UTC)
     normalized = value.replace("Z", "+00:00")
     return datetime.fromisoformat(normalized)
 

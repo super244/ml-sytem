@@ -12,12 +12,11 @@ import os
 import platform
 import shutil
 import subprocess
+import tomllib
 from dataclasses import asdict, dataclass
 from importlib.util import find_spec
 from pathlib import Path
 from typing import Any, cast
-
-import tomllib
 
 _APPLE_BANDWIDTH_GBPS = {
     "m1 max": 400,

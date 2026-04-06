@@ -5,7 +5,7 @@ import os
 import platform
 import sys
 from dataclasses import asdict
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
@@ -69,7 +69,7 @@ def collect_environment_snapshot(
     repo_root = Path(__file__).resolve().parents[2]
     runtime_env = detect_run_env()
     snapshot = {
-        "captured_at": datetime.now(timezone.utc).isoformat(),
+        "captured_at": datetime.now(UTC).isoformat(),
         "run_id": layout.run_id,
         "run_name": config.run_name,
         "profile_name": config.profile_name,

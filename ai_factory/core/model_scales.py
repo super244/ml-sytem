@@ -95,6 +95,18 @@ SUPPORTED_MODEL_SCALES: tuple[ModelScaleSpec, ...] = (
         preferred_gpu_count=2,
     ),
     ModelScaleSpec(
+        scale="14b",
+        parameter_count=14_000_000_000,
+        parameter_size_b=14.0,
+        tier="scaleup",
+        runtime_profile="ultimate_cuda",
+        recommended_quantization="none",
+        recommended_train_batch_size=1,
+        recommended_gradient_accumulation_steps=16,
+        recommended_context_length=8192,
+        preferred_gpu_count=2,
+    ),
+    ModelScaleSpec(
         scale="20b",
         parameter_count=20_000_000_000,
         parameter_size_b=20.0,

@@ -1,9 +1,9 @@
-from enum import Enum
+from enum import StrEnum
 
 from ai_factory.domains.interfaces import DomainInterface
 
 
-class DomainType(str, Enum):
+class DomainType(StrEnum):
     """Enumeration of supported domain types in the AI Factory."""
 
     CODE_GENERATION = "code_generation"

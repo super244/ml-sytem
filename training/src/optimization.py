@@ -2,17 +2,19 @@
 
 This module provides hardware-aware optimizations for training,
 automatically selecting the best kernels and configuration for:
-- Apple Silicon (M1/M2/M3/M4/M5) with Metal Performance Shaders
-- NVIDIA GPUs (A100, H100, RTX series) with CUDA/Tensor Cores
-- CPU fallback with SIMD vectorization
+- Apple Silicon (M1/M2/M3/M4/M5 family) with Metal Performance Shaders
+- NVIDIA GPUs (Blackwell/Hopper/Ampere/Ada Lovelace) with CUDA/Tensor Cores
+- AMD ROCm (MI300X / RX 7900)
+- CPU fallback with SIMD vectorisation (AVX-512 / NEON)
 
 Key features:
 - Automatic hardware detection and kernel selection
 - Unified memory optimizations for Apple Silicon
-- Tensor Core acceleration for NVIDIA GPUs
+- Tensor Core / Matrix Core acceleration for NVIDIA / AMD GPUs
 - Mixed precision training (FP16/BF16/TF32)
 - Memory-efficient gradient accumulation
-- Fused optimizer kernels
+- Fused optimizer kernels (PagedAdamW, fused AdamW)
+- Flash Attention 2 awareness
 """
 
 from __future__ import annotations
@@ -40,8 +42,8 @@ class BackendType(Enum):
 
     METAL = auto()  # Apple Metal Performance Shaders
     CUDA = auto()  # NVIDIA CUDA
-    ROCM = auto()  # AMD ROCm
-    CPU = auto()  # CPU with SIMD
+    ROCM = auto()  # AMD ROCm (HIP)
+    CPU = auto()  # CPU with SIMD (AVX-512 / NEON)
 
 
 @dataclass
@@ -76,12 +78,32 @@ class HardwareDetector:
         if system == "Darwin":
             return HardwareDetector._detect_apple_silicon()
 
-        # Check for CUDA
+        # Check for NVIDIA CUDA
         if torch.cuda.is_available():
             return HardwareDetector._detect_cuda()
 
+        # Check for AMD ROCm (HIP)
+        if HardwareDetector._is_rocm_available():
+            return HardwareDetector._detect_rocm()
+
         # CPU fallback
         return HardwareDetector._detect_cpu()
+
+    @staticmethod
+    def _is_rocm_available() -> bool:
+        """Detect AMD ROCm without importing rocm-specific packages."""
+        try:
+            import subprocess
+
+            result = subprocess.run(
+                ["rocminfo"],
+                capture_output=True,
+                text=True,
+                timeout=5,
+            )
+            return result.returncode == 0
+        except (FileNotFoundError, subprocess.TimeoutExpired):
+            return False
 
     @staticmethod
     def _detect_apple_silicon() -> HardwareProfile:
@@ -108,18 +130,22 @@ class HardwareDetector:
 
         if "M5" in chip_name:
             generation = "M5"
-            if "Max" in chip_name:
+            if "Ultra" in chip_name:
+                gpu_cores = 80
+                bandwidth = 1228.0  # GB/s (doubled Max)
+                memory_gb = 192.0
+            elif "Max" in chip_name:
                 gpu_cores = 40
-                bandwidth = 614.0  # GB/s
+                bandwidth = 614.0
                 memory_gb = 128.0
             elif "Pro" in chip_name:
                 gpu_cores = 24
                 bandwidth = 400.0
                 memory_gb = 64.0
             else:
-                gpu_cores = 10
-                bandwidth = 100.0
-                memory_gb = 24.0
+                gpu_cores = 14
+                bandwidth = 120.0
+                memory_gb = 32.0
         elif "M4" in chip_name:
             generation = "M4"
             gpu_cores = 10
@@ -154,30 +180,29 @@ class HardwareDetector:
         except (subprocess.SubprocessError, ValueError):
             pass
 
-        # Check MPS availability
+        # Metal supports FP16 at the shader level; BF16 is available at the ALU on M3+.
         mps_available = hasattr(torch.backends, "mps") and torch.backends.mps.is_available()
-
-        # Unified memory means zero-copy between CPU and GPU
-        unified_memory = True
+        supports_bf16 = generation in ("M3", "M4", "M5")
 
         return HardwareProfile(
             platform="Darwin",
             device_name=f"Apple {chip_name}",
             backend=BackendType.METAL if mps_available else BackendType.CPU,
-            unified_memory=unified_memory,
+            unified_memory=True,
             memory_gb=memory_gb,
             compute_units=gpu_cores,
             supports_fp16=True,
-            supports_bf16=False,  # Apple GPUs don't support BF16
+            supports_bf16=supports_bf16,
             supports_tf32=False,
             tensor_cores=False,
             bandwidth_gbps=bandwidth,
             recommended_batch_size=HardwareDetector._optimal_batch_size_metal(generation),
-            recommended_workers=2 if generation in ["M5", "M4", "M3"] else 0,
+            recommended_workers=4 if generation in ("M5", "M4", "M3") else 2,
             extra={
                 "generation": generation,
                 "mps_available": mps_available,
-                "zero_copy": unified_memory,
+                "zero_copy": True,
+                "chip_name": chip_name,
             },
         )
 
@@ -224,6 +249,44 @@ class HardwareDetector:
                 "compute_capability": f"{major}.{minor}",
                 "max_threads_per_sm": props.max_threads_per_multi_processor,
             },
+        )
+
+    @staticmethod
+    def _detect_rocm() -> HardwareProfile:
+        """Detect AMD ROCm GPU capabilities."""
+        import subprocess
+
+        device_name = "AMD GPU (ROCm)"
+        memory_gb = 0.0
+        try:
+            result = subprocess.run(
+                ["rocminfo"],
+                capture_output=True,
+                text=True,
+                timeout=10,
+            )
+            for line in result.stdout.splitlines():
+                if "Marketing Name" in line:
+                    device_name = line.split(":", 1)[-1].strip()
+                    break
+        except Exception:
+            pass
+
+        return HardwareProfile(
+            platform="Linux",
+            device_name=device_name,
+            backend=BackendType.ROCM,
+            unified_memory=False,
+            memory_gb=memory_gb,
+            compute_units=0,
+            supports_fp16=True,
+            supports_bf16=True,
+            supports_tf32=False,
+            tensor_cores=True,  # Matrix Cores
+            bandwidth_gbps=5300.0,  # MI300X
+            recommended_batch_size=8,
+            recommended_workers=4,
+            extra={"rocm": True},
         )
 
     @staticmethod
@@ -285,11 +348,17 @@ class HardwareDetector:
         device_lower = device_name.lower()
 
         bandwidths = {
+            "gb200": 16000.0,  # Grace Blackwell (NVLink-C2C)
+            "b200": 8000.0,
+            "b100": 7000.0,
             "h200": 4900.0,
             "h100": 3350.0,
+            "h800": 3350.0,
             "a100": 2039.0,
             "l40s": 864.0,
+            "rtx 6000": 960.0,
             "rtx 4090": 1008.0,
+            "rtx 4080": 716.8,
             "rtx 3090": 936.0,
             "v100": 900.0,
         }
@@ -304,9 +373,9 @@ class HardwareDetector:
     def _optimal_batch_size_metal(generation: str) -> int:
         """Determine optimal batch size for Metal devices."""
         batch_sizes = {
-            "M5": 4,
+            "M5": 8,
             "M4": 4,
-            "M3": 2,
+            "M3": 4,
             "M2": 2,
             "M1": 1,
         }
@@ -315,9 +384,11 @@ class HardwareDetector:
     @staticmethod
     def _optimal_batch_size_cuda(major: int, memory_gb: float) -> int:
         """Determine optimal batch size for CUDA devices."""
-        if major >= 9:  # Hopper
+        if major >= 10:  # Blackwell
+            return 32
+        elif major >= 9:  # Hopper
             return 16
-        elif major >= 8 and memory_gb >= 40:  # A100
+        elif major >= 8 and memory_gb >= 40:  # A100 / H100 / L40S
             return 8
         elif major >= 8:  # RTX 30/40 series
             return 4
@@ -517,19 +588,33 @@ class TrainingOptimizer:
         self,
         model_parameters: Any,
         lr: float = 5e-5,
+        weight_decay: float = 0.01,
     ) -> torch.optim.Optimizer:
-        """Get a memory-efficient optimizer for the hardware."""
+        """Get a memory-efficient optimizer tuned for the detected hardware."""
         if self.hardware.backend == BackendType.CUDA:
-            # Use fused AdamW for CUDA
+            # PyTorch 2.x fused AdamW is significantly faster on Ampere+.
             try:
-                from torch_optimizer import AdamW
+                return torch.optim.AdamW(
+                    model_parameters,
+                    lr=lr,
+                    weight_decay=weight_decay,
+                    fused=True,
+                )
+            except (TypeError, RuntimeError):
+                pass  # fall through to standard
 
-                return AdamW(model_parameters, lr=lr, fused=True)
-            except ImportError:
-                return torch.optim.AdamW(model_parameters, lr=lr, fused=True)
+        if self.hardware.backend == BackendType.ROCM:
+            try:
+                return torch.optim.AdamW(
+                    model_parameters,
+                    lr=lr,
+                    weight_decay=weight_decay,
+                    fused=True,
+                )
+            except (TypeError, RuntimeError):
+                pass
 
-        # Standard AdamW for other backends
-        return torch.optim.AdamW(model_parameters, lr=lr)
+        return torch.optim.AdamW(model_parameters, lr=lr, weight_decay=weight_decay)
 
     def to_json(self) -> str:
         """Serialize hardware profile to JSON."""

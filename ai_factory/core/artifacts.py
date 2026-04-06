@@ -5,7 +5,7 @@ import os
 import shutil
 import subprocess
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
@@ -55,7 +55,7 @@ def detect_run_env() -> RunEnv:
 
 def prepare_run_layout(base_dir: str | Path, run_name: str, explicit_run_id: str | None = None) -> ArtifactLayout:
     base_path = Path(base_dir)
-    run_id = explicit_run_id or f"{run_name}-{datetime.now(timezone.utc).strftime('%Y%m%d-%H%M%S')}"
+    run_id = explicit_run_id or f"{run_name}-{datetime.now(UTC).strftime('%Y%m%d-%H%M%S')}"
     root = base_path / "runs" / run_id
     layout = ArtifactLayout(
         run_id=run_id,
