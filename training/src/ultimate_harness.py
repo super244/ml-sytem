@@ -127,7 +127,7 @@ class UltimateTrainingHarness:
         """Initialize the harness."""
         logger.info("Initializing Ultimate Training Harness")
         logger.info(f"Hardware: {self.hardware.device_name}")
-        logger.info(f"Backend: {self.hardware.backend.name}")
+        logger.info(f"Backend: {self.hardware.backend.upper()}")
 
         # Configure PyTorch
         self.optimizer.configure_torch()
@@ -309,7 +309,7 @@ class UltimateTrainingHarness:
         harness_state = {
             "hardware_profile": {
                 "device_name": self.hardware.device_name,
-                "backend": self.hardware.backend.name,
+                "backend": self.hardware.backend.upper(),
             },
             "performance_stats": {
                 "steps": self.performance_monitor.step_count,
@@ -348,7 +348,7 @@ class UltimateTrainingHarness:
         print("ULTIMATE TRAINING HARNESS SUMMARY")
         print("=" * 70)
         print(f"Hardware: {self.hardware.device_name}")
-        print(f"Backend:  {self.hardware.backend.name}")
+        print(f"Backend:  {self.hardware.backend.upper()}")
         print(f"Memory:   {self.hardware.memory_gb:.1f} GB")
         print(f"Compute:  {self.hardware.compute_units} units")
         print(f"Bandwidth: {self.hardware.bandwidth_gbps:.0f} GB/s")

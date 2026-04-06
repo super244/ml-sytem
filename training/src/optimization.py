@@ -618,7 +618,7 @@ class TrainingOptimizer:
 
         logger.info(f"TrainingOptimizer v3.0 initialized with {self.hardware.device_name}")
         logger.info(
-            f"Backend: {self.hardware.backend.name}, "
+            f"Backend: {self.hardware.backend.upper()}, "
             f"Memory: {self.hardware.memory_gb:.1f}GB, "
             f"Bandwidth: {self.hardware.bandwidth_gbps:.0f}GB/s, "
             f"Capability: {self.hardware.capability_score:.0f}"
@@ -892,7 +892,7 @@ def print_hardware_summary() -> None:
     print("=" * 70)
     print(f"Platform:       {hardware.platform}")
     print(f"Device:         {hardware.device_name}")
-    print(f"Backend:        {hardware.backend.name}")
+    print(f"Backend:        {hardware.backend.upper()}")
     print(f"Memory:         {hardware.memory_gb:.1f} GB")
     print(f"Compute Units:  {hardware.compute_units}")
     print(f"Bandwidth:      {hardware.bandwidth_gbps:.0f} GB/s")
@@ -922,7 +922,6 @@ def print_hardware_summary() -> None:
     print(f"  Workers:        {recs['workers']}")
     print(f"  Mixed Prec:     {recs['mixed_precision']}")
     print(f"  Grad Checkpt:   {'Yes' if recs['gradient_checkpointing'] else 'No'}")
-    print(f"  Est. TFLOPS:    {hardware.get_flops_estimate():.0f}")
     print("=" * 70)
 
 

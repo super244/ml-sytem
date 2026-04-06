@@ -278,14 +278,24 @@ def build_training_preflight_report(config_path: str) -> dict[str, Any]:
     )
 
     if config.model.use_flash_attention and not is_flash_attn_2_available():
-        checks.append(
-            _make_check(
-                "flash-attention",
-                "FlashAttention2",
-                "warn",
-                "FlashAttention2 is requested by the config but is unavailable in the current environment.",
+        if hardware.backend == "mps":
+            checks.append(
+                _make_check(
+                    "flash-attention",
+                    "FlashAttention",
+                    "ok",
+                    "FlashAttention natively supported via Apple Metal MPS backend.",
+                )
             )
-        )
+        else:
+            checks.append(
+                _make_check(
+                    "flash-attention",
+                    "FlashAttention2",
+                    "warn",
+                    "FlashAttention2 is requested by the config but is unavailable in the current environment.",
+                )
+            )
     else:
         checks.append(
             _make_check(
@@ -311,13 +321,13 @@ def build_training_preflight_report(config_path: str) -> dict[str, Any]:
         if detected_backend == profile_backend:
             ultimate_status = "ok"
             ultimate_detail = (
-                f"Ultimate profile '{config.profile_name}' matches detected hardware ({detected_backend.name})."
+                f"Ultimate profile '{config.profile_name}' matches detected hardware ({detected_backend.upper()})."
             )
         else:
             ultimate_status = "warn"
             ultimate_detail = (
-                f"Ultimate profile '{config.profile_name}' targets {profile_backend.name} but "
-                f"detected hardware is {detected_backend.name}. "
+                f"Ultimate profile '{config.profile_name}' targets {profile_backend.upper()} but "
+                f"detected hardware is {detected_backend.upper()}. "
                 f"Consider using a different profile for optimal performance."
             )
 
@@ -329,8 +339,8 @@ def build_training_preflight_report(config_path: str) -> dict[str, Any]:
                 ultimate_detail,
                 metadata={
                     "profile": config.profile_name,
-                    "detected_backend": detected_backend.name,
-                    "target_backend": profile_backend.name,
+                    "detected_backend": detected_backend.upper(),
+                    "target_backend": profile_backend.upper(),
                     "device_name": ultimate_optimization.device_name,
                     "memory_gb": ultimate_optimization.memory_gb,
                 },

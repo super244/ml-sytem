@@ -540,7 +540,7 @@ def main() -> None:
 
         logger.info("Starting training loop with ultimate optimization.")
         print("[Ultimate Training Harness] Hardware-aware optimization active.")
-        print(f"[Ultimate Training Harness] Backend: {harness.hardware.backend.name}")
+        print(f"[Ultimate Training Harness] Backend: {harness.hardware.backend.upper()}")
         print(f"[Ultimate Training Harness] Device: {harness.hardware.device_name}")
         trainer.train(resume_from_checkpoint=resume_from_checkpoint)
 
