@@ -29,6 +29,12 @@ from training.src.modeling import load_model_for_training, load_tokenizer, train
 from training.src.packaging import publish_model_artifacts, write_run_manifest, write_training_summary
 from training.src.tracking import build_tracker
 from training.src.validation import run_dry_validation
+from training.src.optimization import HardwareDetector, TrainingOptimizer
+from training.src.ultimate_harness import (
+    build_ultimate_trainer_with_harness,
+    HarnessConfig,
+    UltimateTrainingHarness,
+)
 
 # Set up structured logging
 logging.basicConfig(
@@ -40,6 +46,11 @@ logger = logging.getLogger(__name__)
 _TRAINING_ARGUMENT_PARAMETERS = set(inspect.signature(TrainingArguments.__init__).parameters)
 
 
+def _mps_available() -> bool:
+    mps_backend = getattr(torch.backends, "mps", None)
+    return bool(mps_backend and mps_backend.is_available())
+
+
 def _resolve_precision_flags(config: ExperimentConfig) -> dict[str, bool]:
     training = config.training
     bf16_enabled = training.bf16
@@ -47,6 +58,9 @@ def _resolve_precision_flags(config: ExperimentConfig) -> dict[str, bool]:
 
     if torch.cuda.is_available():
         return {"bf16": bf16_enabled, "fp16": fp16_enabled, "use_cpu": False}
+
+    if _mps_available():
+        return {"bf16": False, "fp16": False, "use_cpu": False}
 
     # TrainingArguments validates mixed precision against the current runtime
     # during initialization, so CPU-only environments must disable GPU dtypes.
@@ -85,7 +99,11 @@ def parse_args() -> argparse.Namespace:
 
 def build_training_arguments(config: ExperimentConfig, layout) -> TrainingArguments:
     training = config.training
-    optim = "paged_adamw_8bit" if (config.model.use_4bit or config.model.use_8bit) else "adamw_torch"
+    optim = (
+        "paged_adamw_8bit"
+        if (config.model.use_4bit or config.model.use_8bit) and torch.cuda.is_available()
+        else "adamw_torch"
+    )
     precision_flags = _resolve_precision_flags(config)
     training_arguments = {
         "output_dir": str(layout.checkpoints_dir),
@@ -121,6 +139,8 @@ def build_training_arguments(config: ExperimentConfig, layout) -> TrainingArgume
         "deepspeed": config.runtime.deepspeed_config,
         "torch_compile": config.runtime.torch_compile,
     }
+    if "use_mps_device" in _TRAINING_ARGUMENT_PARAMETERS and _mps_available():
+        training_arguments["use_mps_device"] = True
     if "eval_strategy" in _TRAINING_ARGUMENT_PARAMETERS:
         training_arguments["eval_strategy"] = training.evaluation_strategy
     else:
@@ -134,6 +154,16 @@ def build_training_arguments(config: ExperimentConfig, layout) -> TrainingArgume
 
 
 def save_config_snapshot(config: ExperimentConfig, layout) -> Path:
+    """
+    Save a snapshot of the experiment configuration to the layout manifests directory.
+
+    Args:
+        config (ExperimentConfig): The experiment configuration to save.
+        layout (Any): The initialized layout structure for the run.
+
+    Returns:
+        Path: The file path where the config snapshot was saved.
+    """
     path = layout.manifests_dir / "config_snapshot.json"
     write_json(path, config.to_dict())
     return path
@@ -146,6 +176,18 @@ def write_config_report(
     warnings: list[str],
     resume_from_checkpoint: str | None,
 ) -> tuple[Path, dict[str, object]]:
+    """
+    Write a comprehensive configuration report including warnings and checkpoint data.
+
+    Args:
+        config (ExperimentConfig): The experiment configuration.
+        layout (Any): The directory layout for the run.
+        warnings (list[str]): List of warnings generated during config validation.
+        resume_from_checkpoint (str | None): The checkpoint path used for resuming (if any).
+
+    Returns:
+        tuple[Path, dict[str, object]]: The path to the report file and the report data dictionary.
+    """
     report = describe_experiment_config(config, warnings=warnings)
     report["resume_from_checkpoint"] = resume_from_checkpoint
     path = layout.manifests_dir / "config_report.json"
@@ -154,6 +196,16 @@ def write_config_report(
 
 
 def summarize_environment(snapshot: dict[str, object]) -> dict[str, object]:
+    """
+    Summarize the full environment snapshot into key metrics for tracking.
+
+    Args:
+        snapshot (dict[str, object]): The raw environment snapshot dictionary.
+
+    Returns:
+        dict[str, object]: A summarized dictionary containing git SHA, Python/Platform versions,
+        and CUDA availability.
+    """
     python_info = snapshot.get("python") if isinstance(snapshot.get("python"), dict) else {}
     platform_info = snapshot.get("platform") if isinstance(snapshot.get("platform"), dict) else {}
     torch_info = snapshot.get("torch") if isinstance(snapshot.get("torch"), dict) else {}
@@ -167,6 +219,17 @@ def summarize_environment(snapshot: dict[str, object]) -> dict[str, object]:
 
 
 def build_dataset_artifacts(config: ExperimentConfig, tokenizer, layout):
+    """
+    Build the train and evaluation datasets, and generate a dataset report.
+
+    Args:
+        config (ExperimentConfig): The experiment configuration containing data paths.
+        tokenizer (Any): The tokenizer to use for building the datasets.
+        layout (Any): The run layout directory structure.
+
+    Returns:
+        tuple: A tuple containing (train_dataset, eval_dataset, dataset_report_dict).
+    """
     logger.info("Building dataset artifacts.")
     train_dataset = build_dataset(
         file_path=config.data.train_file,
@@ -193,12 +256,28 @@ def build_dataset_artifacts(config: ExperimentConfig, tokenizer, layout):
 
 
 def load_json_if_exists(path: Path) -> dict:
+    """
+    Load a JSON file into a dictionary if the file exists.
+
+    Args:
+        path (Path): The path to the JSON file.
+
+    Returns:
+        dict: The parsed JSON dictionary or an empty dict if the file is missing.
+    """
     if not path.exists():
         return {}
     return json.loads(path.read_text())
 
 
 def main() -> None:
+    """
+    Main entry point for the training execution.
+
+    Handles argument parsing, orchestrator setup for distributed training,
+    configuration validation, artifact layout preparation, tokenizer/model loading,
+    dry-run execution, full training execution, and metric/lineage reporting.
+    """
     args = parse_args()
 
     # Orchestrator Integration: If distributed flag is set and we're not already the worker
@@ -401,7 +480,24 @@ def main() -> None:
 
         logger.info("Initializing full training run.")
         tokenizer = tokenizer or load_tokenizer(config)
-        model = load_model_for_training(config, tokenizer=tokenizer)
+        
+        # Detect hardware and initialize ultimate harness
+        logger.info("Detecting hardware and initializing ultimate optimization harness.")
+        hardware = HardwareDetector.detect()
+        harness_config = HarnessConfig(
+            enable_mixed_precision=config.training.bf16 or config.training.fp16,
+            enable_gradient_checkpointing=config.training.gradient_checkpointing,
+            enable_torch_compile=config.runtime.torch_compile,
+            enable_memory_profiling=os.environ.get("AI_FACTORY_MEMORY_PROFILE", "0") == "1",
+        )
+        harness = UltimateTrainingHarness(config, harness_config, hardware)
+        harness.print_summary()
+        
+        # Prepare model with ultimate optimizations
+        model = harness.prepare_model(model)
+        
+        # Get optimized training arguments from harness
+        args = harness.get_training_arguments(layout)
 
         parameter_report = trainable_parameter_report(model)
         write_json(layout.metrics_dir / "model_report.json", parameter_report)
@@ -421,12 +517,11 @@ def main() -> None:
 
         data_collator = WeightedDataCollator(tokenizer=tokenizer, label_pad_token_id=-100, pad_to_multiple_of=8)
 
-        from training.src.trainer import build_ultimate_trainer
-
-        trainer = build_ultimate_trainer(
+        # Build ultimate trainer with harness integration
+        trainer = build_ultimate_trainer_with_harness(
             config=config,
             model=model,
-            args=build_training_arguments(config, layout),
+            args=args,
             train_dataset=train_dataset,
             eval_dataset=eval_dataset,
             data_collator=data_collator,
@@ -435,9 +530,13 @@ def main() -> None:
                 JsonlMetricsCallback(layout.logs_dir / config.logging.jsonl_metrics_filename),
                 TrackerCallback(tracker),
             ],
+            layout=layout,
         )
 
-        logger.info("Starting training loop.")
+        logger.info("Starting training loop with ultimate optimization.")
+        print("[Ultimate Training Harness] Hardware-aware optimization active.")
+        print(f"[Ultimate Training Harness] Backend: {harness.hardware.backend.name}")
+        print(f"[Ultimate Training Harness] Device: {harness.hardware.device_name}")
         trainer.train(resume_from_checkpoint=resume_from_checkpoint)
 
         logger.info("Training complete. Evaluating.")

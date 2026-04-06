@@ -1,6 +1,7 @@
 import argparse
 import importlib.util
 import json
+import os
 import shlex
 import subprocess
 import sys
@@ -257,6 +258,86 @@ def cmd_refresh_lab(args: argparse.Namespace) -> None:
         print("[ai-factory] Workspace refresh complete.")
 
 
+def _tokenizer_artifact_ready(config: Any) -> bool:
+    from training.src.config import resolve_path_reference
+
+    tokenizer_path = resolve_path_reference(config.model.tokenizer_path, config.config_path)
+    if tokenizer_path is None or not tokenizer_path.exists():
+        return False
+    return all((tokenizer_path / name).exists() for name in ("tokenizer.json", "tokenizer_config.json"))
+
+
+def _resolve_bootstrap_tokenizer_dir(config: Any, explicit_output_dir: str | None) -> str | None:
+    from training.src.config import resolve_path_reference
+
+    candidate = explicit_output_dir or config.model.tokenizer_path
+    if not candidate:
+        return None
+    resolved = resolve_path_reference(candidate, config.config_path)
+    if resolved is not None:
+        return str(resolved)
+    return str(Path(candidate).expanduser().resolve())
+
+
+def cmd_bootstrap_train(args: argparse.Namespace) -> None:
+    from training.src.config import load_experiment_config, resolve_path_reference
+
+    repo_root = Path.cwd()
+    os.environ.setdefault("AI_FACTORY_REPO_ROOT", str(repo_root))
+
+    config = load_experiment_config(args.config)
+    artifacts_dir = resolve_path_reference(config.training.artifacts_dir, config.config_path)
+    os.environ.setdefault("ARTIFACTS_DIR", str(artifacts_dir or config.training.artifacts_dir))
+    python = sys.executable
+
+    if not args.skip_ready:
+        run_step("Workspace readiness", [python, "-m", "ai_factory.cli", "ready", "--root", str(repo_root)])
+    if not args.skip_doctor:
+        run_step("Workspace doctor", [python, "scripts/doctor.py"])
+    if not args.skip_dataset:
+        run_step("Prepare processed corpus", [python, "data/prepare_dataset.py", "--config", args.dataset_config])
+
+    tokenizer_output_dir = _resolve_bootstrap_tokenizer_dir(config, args.tokenizer_output_dir)
+    tokenizer_ready = _tokenizer_artifact_ready(config)
+    should_train_tokenizer = (
+        not args.skip_tokenizer
+        and tokenizer_output_dir is not None
+        and (
+            args.force_tokenizer
+            or (config.model.initialization.lower() == "scratch" and not tokenizer_ready)
+            or (args.ensure_tokenizer and not tokenizer_ready)
+        )
+    )
+    if should_train_tokenizer and tokenizer_output_dir:
+        run_step(
+            "Train tokenizer",
+            [
+                python,
+                "training/scripts/train_tokenizer.py",
+                "--config",
+                args.config,
+                "--output-dir",
+                str(tokenizer_output_dir),
+            ],
+        )
+
+    if not args.skip_preflight:
+        run_step("Training preflight", [python, "-m", "ai_factory.cli", "train-preflight", "--config", args.config])
+
+    if args.skip_training:
+        return
+
+    training_command = [python, "-m", "training.train", "--config", args.config]
+    if args.dry_run:
+        training_command.append("--dry-run")
+    if args.validate_model_load:
+        training_command.append("--validate-model-load")
+    if args.resume_from_latest_checkpoint:
+        training_command.append("--resume-from-latest-checkpoint")
+    training_command.extend(args.train_args or [])
+    run_step("Training run", training_command)
+
+
 def cmd_doctor(args: argparse.Namespace) -> None:
     root = Path(getattr(args, "root", None) or Path.cwd())
     catalog_status = inspect_json_asset(root / "data" / "catalog.json")
@@ -272,7 +353,7 @@ def cmd_doctor(args: argparse.Namespace) -> None:
     frontend_ready = (root / "frontend" / "node_modules").exists()
 
     recommended_next_steps = [
-        "ai-factory refresh-lab",
+        "ai-factory bootstrap-train --config training/configs/profiles/failure_aware.yaml --dry-run",
         "ai-factory train-preflight --config training/configs/profiles/failure_aware.yaml",
         "ai-factory serve --host 127.0.0.1 --port 8000",
         "ai-factory api-smoke",

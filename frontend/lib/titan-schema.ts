@@ -1,6 +1,6 @@
 import { z } from 'zod';
 
-const tensorLayoutSchema = z.object({
+export const tensorLayoutSchema = z.object({
   format: z.string(),
   block_size: z.number(),
   bytes_per_block: z.number(),
@@ -8,7 +8,7 @@ const tensorLayoutSchema = z.object({
   storage: z.string(),
 });
 
-const schedulerSchema = z.object({
+export const schedulerSchema = z.object({
   runtime: z.string(),
   queue_policy: z.string(),
   ui_frame_budget_hz: z.number(),
@@ -16,14 +16,14 @@ const schedulerSchema = z.object({
   priority_bands: z.number().optional(),
 });
 
-const quantizationSchema = z.object({
+export const quantizationSchema = z.object({
   formats: z.array(z.string()),
   memory_layout: z.string(),
   default_layout: tensorLayoutSchema.optional(),
   layout: tensorLayoutSchema.nullable().optional(),
 });
 
-const telemetrySchema = z.object({
+export const telemetrySchema = z.object({
   bridge: z.string(),
   target_latency_ms: z.number(),
   metrics: z.array(z.string()),
@@ -31,7 +31,7 @@ const telemetrySchema = z.object({
   runtime_enabled: z.boolean().optional(),
 });
 
-const rustCoreSchema = z.object({
+export const rustCoreSchema = z.object({
   crate_root: z.string(),
   cargo_toml: z.string(),
   toolchain_available: z.boolean(),
@@ -52,7 +52,7 @@ const rustCoreSchema = z.object({
   status_binary_available: z.boolean().optional(),
 });
 
-const runtimeSchema = z.object({
+export const runtimeSchema = z.object({
   selected: z.string().optional(),
   env_var: z.string().optional(),
   runtime_flag: z.string().optional(),
@@ -89,7 +89,7 @@ const runtimeSchema = z.object({
   sampler_stack: z.array(z.string()).optional(),
 });
 
-const engineSchema = z.object({
+export const engineSchema = z.object({
   architecture: z.string(),
   decode_model: z.string(),
   runtime_mode: z.string().optional(),
@@ -151,3 +151,30 @@ export const titanStatusSchema = z.object({
 });
 
 export type TitanStatus = z.infer<typeof titanStatusSchema>;
+
+// New types for kernel operations
+export type KernelOperation = 
+  | 'dot_product'
+  | 'matmul'
+  | 'vec_add'
+  | 'vec_mul'
+  | 'rms_norm'
+  | 'softmax'
+  | 'silu'
+  | 'dequantize_q4';
+
+export interface KernelMetrics {
+  operation: KernelOperation;
+  duration_ms: number;
+  input_size: number;
+  backend: 'cpp' | 'rust_fallback';
+}
+
+export interface TitanCapabilities {
+  backend: string;
+  gpu_count: number;
+  supports_metal: boolean;
+  supports_cuda: boolean;
+  cpp_kernels_available: boolean;
+  available_operations: KernelOperation[];
+}

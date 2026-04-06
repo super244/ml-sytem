@@ -74,6 +74,10 @@ class DataConfig(BaseModel):
     difficulty_weights: dict[str, float] = Field(default_factory=dict)
     failure_replay_boost: float = 1.35
     verification_boost: float = 1.15
+    tokenization_batch_size: int = 128
+    tokenization_num_proc: int = 0
+    use_tokenized_cache: bool = True
+    tokenized_cache_dir: str | None = None
 
 
 class TrainingConfig(BaseModel):
@@ -449,6 +453,8 @@ def validate_experiment_config(config: ExperimentConfig) -> list[str]:
         f"data.format must be one of {sorted(SUPPORTED_DATA_FORMATS)}.",
         errors,
     )
+    _require(config.data.tokenization_batch_size > 0, "data.tokenization_batch_size must be positive.", errors)
+    _require(config.data.tokenization_num_proc >= 0, "data.tokenization_num_proc must be >= 0.", errors)
     _require(
         config.adapter.method.lower() in SUPPORTED_ADAPTER_METHODS,
         f"adapter.method must be one of {sorted(SUPPORTED_ADAPTER_METHODS)}.",
@@ -675,6 +681,10 @@ def describe_experiment_config(config: ExperimentConfig, *, warnings: list[str] 
             "pack_manifest": config.data.pack_manifest,
             "max_length": config.data.max_length,
             "format": config.data.format,
+            "tokenization_batch_size": config.data.tokenization_batch_size,
+            "tokenization_num_proc": config.data.tokenization_num_proc,
+            "use_tokenized_cache": config.data.use_tokenized_cache,
+            "tokenized_cache_dir": config.data.tokenized_cache_dir,
             "curriculum_learning": config.data.curriculum_learning,
             "sequential_curriculum": config.data.sequential_curriculum,
         },

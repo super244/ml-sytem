@@ -17,7 +17,10 @@ COVERAGE_ARGS = --cov=ai_factory --cov=data --cov=training --cov=evaluation --co
 .PHONY: frontend-install frontend-dev frontend-build frontend-check
 
 # System Operations
-.PHONY: docker-up docker-down smoke
+.PHONY: docker-up docker-down smoke optimize optimize-detect optimize-benchmark
+
+# Optimization Operations
+.PHONY: optimize optimize-detect optimize-benchmark
 
 help:
 	@echo "AI-Factory Developer Commands"
@@ -39,6 +42,9 @@ help:
 	@echo "Training:   make train-dry        Dry-run training validation"
 	@echo "            make train-preflight  Hard fail preflight before a real run"
 	@echo "            make train            Run full training"
+	@echo "Optimize:   make optimize-detect  Detect hardware capabilities"
+	@echo "            make optimize-benchmark Run performance benchmark"
+	@echo "            make optimize-profile Show recommended optimization profile"
 	@echo "Eval:       make evaluate         Run evaluation pipeline"
 
 # Development Setup
@@ -153,6 +159,16 @@ titan-status:
 
 titan-doc:
 	$(PYTHON) -m ai_factory.cli titan hardware-doc
+
+# Optimization targets
+optimize-detect:
+	$(PYTHON) -m ai_factory.cli optimize detect
+
+optimize-benchmark:
+	$(PYTHON) -m ai_factory.cli optimize benchmark
+
+optimize-profile:
+	$(PYTHON) -m ai_factory.cli optimize profile
 
 generate-datasets: data-generate
 

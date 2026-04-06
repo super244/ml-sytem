@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import shutil
+from importlib.util import find_spec
 from pathlib import Path
 from typing import Any
 
@@ -9,6 +10,8 @@ from transformers.utils import is_flash_attn_2_available
 
 from ai_factory.core.model_scales import get_model_scale_spec
 from training.src.config import load_experiment_config, resolve_path_reference
+from training.src.hardware import detect_training_hardware
+from training.src.optimization import HardwareDetector, BackendType
 from training.src.scaling import resolve_scratch_architecture
 
 
@@ -209,21 +212,68 @@ def build_training_preflight_report(config_path: str) -> dict[str, Any]:
                 )
             )
 
-    cuda_available = torch.cuda.is_available()
+    hardware = detect_training_hardware()
+    cuda_available = hardware.cuda_available
+    mps_available = hardware.mps_available
     device_count = torch.cuda.device_count() if cuda_available else 0
     gpu_names = [torch.cuda.get_device_name(index) for index in range(device_count)] if cuda_available else []
+    accelerator = hardware.backend
     gpu_status = "ok" if cuda_available else "warn"
-    if config.model.initialization.lower() == "scratch" and not cuda_available:
+    if accelerator == "mps":
+        gpu_detail = "MPS available via Apple Metal."
+    else:
+        gpu_detail = (
+            f"CUDA available={cuda_available}, device_count={device_count}, devices={gpu_names or ['cpu-only']}."
+        )
+    if config.model.initialization.lower() == "scratch" and not (cuda_available or mps_available):
         gpu_status = "error"
-    elif config.adapter.method.lower() in {"full", "sft"} and not cuda_available:
+    elif config.adapter.method.lower() in {"full", "sft"} and not (cuda_available or mps_available):
         gpu_status = "error"
     checks.append(
         _make_check(
             "hardware",
             "Hardware",
             gpu_status,
-            f"CUDA available={cuda_available}, device_count={device_count}, devices={gpu_names or ['cpu-only']}.",
-            metadata={"cuda_available": cuda_available, "device_count": device_count, "gpu_names": gpu_names},
+            gpu_detail,
+            metadata={
+                "accelerator": accelerator,
+                "cuda_available": cuda_available,
+                "mps_available": mps_available,
+                "device_count": device_count,
+                "gpu_names": gpu_names,
+            },
+        )
+    )
+
+    quantized_runtime = bool(config.model.use_4bit or config.model.use_8bit)
+    quantization_status = "ok"
+    quantization_detail = "Selected quantization/runtime combination is compatible with the current host."
+    if quantized_runtime and not hardware.bitsandbytes_supported:
+        quantization_status = "warn"
+        quantization_detail = (
+            "bitsandbytes-backed 4-bit/8-bit training requires Linux with CUDA. "
+            f"This host will fall back to non-quantized loading on the {hardware.backend} backend."
+        )
+    elif quantized_runtime and find_spec("bitsandbytes") is None:
+        quantization_status = "error"
+        quantization_detail = (
+            "bitsandbytes is not installed in the active environment. Install the `train-cuda` extra or use the "
+            "Linux cloud bootstrap script before launching quantized training."
+        )
+    checks.append(
+        _make_check(
+            "quantization-runtime",
+            "Quantization runtime",
+            quantization_status,
+            quantization_detail,
+            metadata={
+                "use_4bit": config.model.use_4bit,
+                "use_8bit": config.model.use_8bit,
+                "platform": hardware.system,
+                "cuda_available": cuda_available,
+                "mps_available": mps_available,
+                "backend": hardware.backend,
+            },
         )
     )
 
@@ -243,6 +293,41 @@ def build_training_preflight_report(config_path: str) -> dict[str, Any]:
                 "FlashAttention2",
                 "ok",
                 "Attention backend is aligned with the current environment.",
+            )
+        )
+
+    # Ultimate optimization profile check
+    ultimate_optimization = HardwareDetector.detect()
+    is_ultimate_profile = "ultimate" in config.profile_name.lower()
+    
+    if is_ultimate_profile:
+        profile_backend = BackendType.METAL if "metal" in config.profile_name.lower() or "m5" in config.profile_name.lower() else BackendType.CUDA
+        detected_backend = ultimate_optimization.backend
+        
+        if detected_backend == profile_backend:
+            ultimate_status = "ok"
+            ultimate_detail = f"Ultimate profile '{config.profile_name}' matches detected hardware ({detected_backend.name})."
+        else:
+            ultimate_status = "warn"
+            ultimate_detail = (
+                f"Ultimate profile '{config.profile_name}' targets {profile_backend.name} but "
+                f"detected hardware is {detected_backend.name}. "
+                f"Consider using a different profile for optimal performance."
+            )
+        
+        checks.append(
+            _make_check(
+                "ultimate-optimization",
+                "Ultimate Optimization",
+                ultimate_status,
+                ultimate_detail,
+                metadata={
+                    "profile": config.profile_name,
+                    "detected_backend": detected_backend.name,
+                    "target_backend": profile_backend.name,
+                    "device_name": ultimate_optimization.device_name,
+                    "memory_gb": ultimate_optimization.memory_gb,
+                },
             )
         )
 

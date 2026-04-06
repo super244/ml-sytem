@@ -1,3 +1,10 @@
+"""
+Hardware telemetry and status detection for the Titan engine.
+
+Collects system metrics, GPU capabilities, and engine manifests for both
+Apple Silicon and NVIDIA environments, bridging local execution and Rust core.
+"""
+
 from __future__ import annotations
 
 import json
@@ -23,6 +30,10 @@ _APPLE_BANDWIDTH_GBPS = {
 
 @dataclass(frozen=True)
 class TitanStatus:
+    """
+    Dataclass representing the comprehensive hardware and engine status.
+    """
+
     silicon: str
     platform: str
     backend: str
@@ -96,6 +107,12 @@ def _run_json_command(args: list[str]) -> dict[str, Any] | None:
 
 
 def _detect_apple_gpu() -> tuple[str | None, float | None]:
+    """
+    Detect Apple Silicon GPU capabilities.
+
+    Returns:
+        tuple[str | None, float | None]: Chip name and unified memory in GB.
+    """
     chip_name = _run_command(["sysctl", "-n", "machdep.cpu.brand_string"])
     mem_bytes = _run_command(["sysctl", "-n", "hw.memsize"])
     unified_memory_gb = None
@@ -105,6 +122,12 @@ def _detect_apple_gpu() -> tuple[str | None, float | None]:
 
 
 def _detect_nvidia_gpu() -> dict[str, Any]:
+    """
+    Detect NVIDIA GPU capabilities using nvidia-smi.
+
+    Returns:
+        dict[str, Any]: A dictionary containing GPU details.
+    """
     output = _run_command(
         [
             "nvidia-smi",
@@ -168,6 +191,12 @@ def _bandwidth_for_silicon(silicon: str | None) -> int | None:
 
 
 def _default_layout() -> dict[str, Any]:
+    """
+    Return the default memory layout configuration.
+
+    Returns:
+        dict[str, Any]: The default layout dict.
+    """
     return {
         "format": "q4_k",
         "block_size": 32,
@@ -228,6 +257,12 @@ def _rust_core_manifest(repo_root: Path) -> dict[str, Any]:
 
 
 def _detect_pyo3_bridge_support() -> bool:
+    """
+    Detect if the PyO3 Python bridge is supported.
+
+    Returns:
+        bool: True if supported.
+    """
     if _env_flag("AI_FACTORY_TITAN_ENABLE_PYO3_BRIDGE"):
         return True
     try:

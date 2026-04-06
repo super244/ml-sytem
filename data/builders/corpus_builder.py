@@ -5,11 +5,13 @@ import glob
 import io
 import json
 import math
+import os
 import random
 import re
 import sqlite3
 from collections import Counter, defaultdict
 from collections.abc import Iterable
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
@@ -77,6 +79,7 @@ class ProcessingConfig:
     derived_packs: list[str] | None = None
     emit_sqlite: bool = True
     sqlite_output_path: str | None = "corpus.sqlite"
+    source_load_workers: int = 0
 
 
 @dataclass
@@ -117,10 +120,11 @@ def resolve_source_paths(paths: list[str] | None) -> list[Path]:
 def read_records(path: Path) -> Iterable[dict[str, Any]]:
     suffix = path.suffix.lower()
     if suffix == ".jsonl":
-        for line in path.read_text().splitlines():
-            line = line.strip()
-            if line:
-                yield json.loads(line)
+        with path.open(encoding="utf-8") as handle:
+            for line in handle:
+                line = line.strip()
+                if line:
+                    yield json.loads(line)
         return
     if suffix == ".json":
         payload = json.loads(path.read_text())
@@ -361,39 +365,27 @@ def _sample_source_rows(rows: list[dict[str, Any]], spec: SourceSpec, seed: int)
     return [row for _, row in ranked_rows[:sample_size]]
 
 
+def _load_and_sample_source(spec: SourceSpec, *, seed: int) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
+    raw_rows = load_source_rows(spec)
+    selected_rows = _sample_source_rows(raw_rows, spec, seed)
+    return raw_rows, selected_rows
+
+
 def load_source_records(
     specs: list[SourceSpec],
     *,
     seed: int,
+    max_workers: int = 0,
 ) -> tuple[list[tuple[SourceSpec, dict[str, Any]]], list[dict[str, Any]], list[str]]:
     loaded_rows: list[tuple[SourceSpec, dict[str, Any]]] = []
     summaries: list[dict[str, Any]] = []
     warnings: list[str] = []
-    for spec in specs:
-        try:
-            raw_rows = load_source_rows(spec)
-            selected_rows = _sample_source_rows(raw_rows, spec, seed)
-        except Exception as exc:  # noqa: BLE001
-            if spec.optional:
-                warnings.append(f"Skipped optional source '{spec.id}': {exc}")
-                summaries.append(
-                    {
-                        "id": spec.id,
-                        "kind": spec.kind,
-                        "path": spec.path,
-                        "version": spec.version,
-                        "sample_ratio": spec.sample_ratio,
-                        "sample_strategy": "deterministic_hash_rank",
-                        "sample_seed": seed,
-                        "optional": True,
-                        "status": "skipped",
-                        "rows_loaded": 0,
-                        "rows_selected": 0,
-                        "error": str(exc),
-                    }
-                )
-                continue
-            raise
+
+    def record_source_result(
+        spec: SourceSpec,
+        raw_rows: list[dict[str, Any]],
+        selected_rows: list[dict[str, Any]],
+    ) -> None:
         if not raw_rows:
             warning = f"Source '{spec.id}' loaded 0 rows from {spec.path or '<unknown>'}."
             if spec.optional:
@@ -415,6 +407,60 @@ def load_source_records(
             }
         )
         loaded_rows.extend((spec, row) for row in selected_rows)
+
+    worker_count = max_workers
+    if worker_count <= 0:
+        worker_count = min(len(specs), max(1, min(os.cpu_count() or 1, 8)))
+    worker_count = max(1, min(worker_count, len(specs) or 1))
+
+    indexed_results: dict[int, tuple[list[dict[str, Any]], list[dict[str, Any]]]] = {}
+    indexed_errors: dict[int, Exception] = {}
+    if worker_count == 1:
+        for index, spec in enumerate(specs):
+            try:
+                indexed_results[index] = _load_and_sample_source(spec, seed=seed)
+            except Exception as exc:  # noqa: BLE001
+                indexed_errors[index] = exc
+    else:
+        with ThreadPoolExecutor(max_workers=worker_count) as executor:
+            future_map = {
+                executor.submit(_load_and_sample_source, spec, seed=seed): (index, spec)
+                for index, spec in enumerate(specs)
+            }
+            for future in as_completed(future_map):
+                index, spec = future_map[future]
+                try:
+                    indexed_results[index] = future.result()
+                except Exception as exc:  # noqa: BLE001
+                    indexed_errors[index] = exc
+
+    for index, spec in enumerate(specs):
+        try:
+            if index in indexed_errors:
+                raise indexed_errors[index]
+            raw_rows, selected_rows = indexed_results[index]
+        except Exception as exc:  # noqa: BLE001
+            if spec.optional:
+                warnings.append(f"Skipped optional source '{spec.id}': {exc}")
+                summaries.append(
+                    {
+                        "id": spec.id,
+                        "kind": spec.kind,
+                        "path": spec.path,
+                        "version": spec.version,
+                        "sample_ratio": spec.sample_ratio,
+                        "sample_strategy": "deterministic_hash_rank",
+                        "sample_seed": seed,
+                        "optional": True,
+                        "status": "skipped",
+                        "rows_loaded": 0,
+                        "rows_selected": 0,
+                        "error": str(exc),
+                    }
+                )
+                continue
+            raise
+        record_source_result(spec, raw_rows, selected_rows)
     return loaded_rows, summaries, warnings
 
 
@@ -796,6 +842,10 @@ def _write_sqlite_corpus(
         path.unlink()
     connection = sqlite3.connect(path)
     try:
+        connection.execute("PRAGMA journal_mode=WAL")
+        connection.execute("PRAGMA synchronous=NORMAL")
+        connection.execute("PRAGMA temp_store=MEMORY")
+        connection.execute("PRAGMA cache_size=-200000")
         connection.execute(
             """
             CREATE TABLE records (
@@ -852,7 +902,8 @@ def _write_sqlite_corpus(
 def _build_file_info(path: Path) -> DatasetFileInfo:
     num_rows = 0
     if path.exists() and path.suffix.lower() == ".jsonl":
-        num_rows = sum(1 for line in path.read_text().splitlines() if line.strip())
+        with path.open(encoding="utf-8") as handle:
+            num_rows = sum(1 for line in handle if line.strip())
     elif path.exists() and path.suffix.lower() in {".sqlite", ".db"}:
         connection = sqlite3.connect(path)
         try:
@@ -871,7 +922,11 @@ def build_corpus(config: ProcessingConfig, config_path: str | Path) -> dict[str,
     all_records: list[dict[str, Any]] = []
     validation_issues: list[dict[str, Any]] = []
     source_specs = coerce_source_specs(config.sources)
-    source_rows, source_summaries, source_warnings = load_source_records(source_specs, seed=config.seed)
+    source_rows, source_summaries, source_warnings = load_source_records(
+        source_specs,
+        seed=config.seed,
+        max_workers=config.source_load_workers,
+    )
     summary_lookup = {
         (summary["id"], summary.get("path"), summary.get("version")): summary for summary in source_summaries
     }

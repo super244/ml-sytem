@@ -1,11 +1,14 @@
 from __future__ import annotations
 
+import hashlib
 import json
+import shutil
 import sqlite3
+from functools import partial
 from pathlib import Path
 from typing import Any
 
-from datasets import Dataset
+from datasets import Dataset, load_from_disk
 
 from training.src.config import DataConfig
 
@@ -22,19 +25,20 @@ def load_jsonl(path: str) -> list[dict[str, Any]]:
     if not path_obj.exists():
         raise FileNotFoundError(f"JSONL dataset not found: {path_obj}")
     records: list[dict[str, Any]] = []
-    for line_number, line in enumerate(path_obj.read_text().splitlines(), start=1):
-        line = line.strip()
-        if not line:
-            continue
-        try:
-            record = json.loads(line)
-        except json.JSONDecodeError as exc:
-            raise ValueError(f"Invalid JSONL record in {path_obj} at line {line_number}: {exc.msg}") from exc
-        if not isinstance(record, dict):
-            raise ValueError(
-                f"Expected object record in {path_obj} at line {line_number}, got {type(record).__name__}."
-            )
-        records.append(record)
+    with path_obj.open(encoding="utf-8") as handle:
+        for line_number, line in enumerate(handle, start=1):
+            line = line.strip()
+            if not line:
+                continue
+            try:
+                record = json.loads(line)
+            except json.JSONDecodeError as exc:
+                raise ValueError(f"Invalid JSONL record in {path_obj} at line {line_number}: {exc.msg}") from exc
+            if not isinstance(record, dict):
+                raise ValueError(
+                    f"Expected object record in {path_obj} at line {line_number}, got {type(record).__name__}."
+                )
+            records.append(record)
     return records
 
 
@@ -184,6 +188,68 @@ def build_training_text(record: dict[str, Any], data_config: DataConfig) -> str:
     return render_plain_chat(build_messages(record, data_config), add_generation_prompt=False)
 
 
+def _batch_to_records(batch: dict[str, list[Any]]) -> list[dict[str, Any]]:
+    if not batch:
+        return []
+    batch_size = len(next(iter(batch.values())))
+    return [{key: values[index] for key, values in batch.items()} for index in range(batch_size)]
+
+
+def _tokenize_batch(batch: dict[str, list[Any]], tokenizer: Any, data_config: DataConfig) -> dict[str, list[Any]]:
+    records = _batch_to_records(batch)
+    if not records:
+        return {"input_ids": [], "attention_mask": [], "labels": [], "sample_weight": []}
+
+    if data_config.format == "pretraining_text":
+        texts = [build_pretraining_text(record, data_config) for record in records]
+        encoded = tokenizer(
+            texts,
+            max_length=data_config.max_length,
+            truncation=True,
+            add_special_tokens=True,
+        )
+        return {
+            "input_ids": encoded["input_ids"],
+            "attention_mask": encoded["attention_mask"],
+            "labels": [list(input_ids) for input_ids in encoded["input_ids"]],
+            "sample_weight": [compute_sample_weight(record, data_config) for record in records],
+        }
+
+    message_batches = [build_messages(record, data_config) for record in records]
+    prompt_message_batches = [messages[:-1] for messages in message_batches]
+    full_texts = [render_chat(tokenizer, messages, add_generation_prompt=False) for messages in message_batches]
+    prompt_texts = [
+        render_chat(tokenizer, prompt_messages, add_generation_prompt=True)
+        for prompt_messages in prompt_message_batches
+    ]
+    full_tokens = tokenizer(
+        full_texts,
+        max_length=data_config.max_length,
+        truncation=True,
+        add_special_tokens=False,
+    )
+    prompt_tokens = tokenizer(
+        prompt_texts,
+        max_length=data_config.max_length,
+        truncation=True,
+        add_special_tokens=False,
+    )
+
+    labels: list[list[int]] = []
+    for input_ids, prompt_ids in zip(full_tokens["input_ids"], prompt_tokens["input_ids"], strict=False):
+        masked_labels = list(input_ids)
+        prompt_length = min(len(prompt_ids), len(masked_labels))
+        masked_labels[:prompt_length] = [-100] * prompt_length
+        labels.append(masked_labels)
+
+    return {
+        "input_ids": full_tokens["input_ids"],
+        "attention_mask": full_tokens["attention_mask"],
+        "labels": labels,
+        "sample_weight": [compute_sample_weight(record, data_config) for record in records],
+    }
+
+
 def tokenize_example(record: dict[str, Any], tokenizer: Any, data_config: DataConfig) -> dict[str, Any]:
     if data_config.format == "pretraining_text":
         text = build_pretraining_text(record, data_config)
@@ -233,6 +299,40 @@ def tokenize_example(record: dict[str, Any], tokenizer: Any, data_config: DataCo
     }
 
 
+def _resolve_tokenization_num_proc(data_config: DataConfig, num_rows: int) -> int | None:
+    requested = data_config.tokenization_num_proc
+    if requested <= 0:
+        return None
+    if num_rows < 2:
+        return None
+    return max(1, min(requested, num_rows))
+
+
+def _tokenized_cache_path(file_path: str, tokenizer: Any, data_config: DataConfig, split: str) -> Path:
+    path_obj = Path(file_path).expanduser().resolve()
+    stat = path_obj.stat()
+    cache_root = (
+        Path(data_config.tokenized_cache_dir).expanduser()
+        if data_config.tokenized_cache_dir
+        else path_obj.parent / ".tokenized_cache"
+    )
+    tokenizer_id = getattr(tokenizer, "name_or_path", None) or tokenizer.__class__.__name__
+    fingerprint = hashlib.sha256(
+        json.dumps(
+            {
+                "file_path": str(path_obj),
+                "file_size": stat.st_size,
+                "file_mtime_ns": stat.st_mtime_ns,
+                "split": split,
+                "tokenizer": tokenizer_id,
+                "data_config": data_config.model_dump(),
+            },
+            sort_keys=True,
+        ).encode("utf-8")
+    ).hexdigest()[:20]
+    return cache_root / fingerprint
+
+
 def build_dataset(file_path: str, tokenizer: Any, data_config: DataConfig, split: str) -> Dataset:
     records = load_records(file_path, split=split)
     if split == "train" and data_config.max_train_samples:
@@ -242,9 +342,28 @@ def build_dataset(file_path: str, tokenizer: Any, data_config: DataConfig, split
     if split == "train" and data_config.curriculum_learning:
         records = curriculum_sort(records, data_config.curriculum_phases)
 
+    if data_config.use_tokenized_cache:
+        cache_path = _tokenized_cache_path(file_path, tokenizer, data_config, split)
+        if cache_path.exists():
+            try:
+                return load_from_disk(str(cache_path))
+            except Exception:
+                shutil.rmtree(cache_path, ignore_errors=True)
+
     dataset = Dataset.from_list(records)
-    return dataset.map(
-        lambda example: tokenize_example(example, tokenizer, data_config),
+    tokenize_batch = partial(_tokenize_batch, tokenizer=tokenizer, data_config=data_config)
+    tokenized = dataset.map(
+        tokenize_batch,
+        batched=True,
+        batch_size=max(1, data_config.tokenization_batch_size),
+        num_proc=_resolve_tokenization_num_proc(data_config, len(records)),
         remove_columns=dataset.column_names,
+        load_from_cache_file=data_config.use_tokenized_cache,
         desc=f"Tokenizing {split} dataset",
     )
+    if data_config.use_tokenized_cache:
+        cache_path.parent.mkdir(parents=True, exist_ok=True)
+        if cache_path.exists():
+            shutil.rmtree(cache_path)
+        tokenized.save_to_disk(str(cache_path))
+    return tokenized

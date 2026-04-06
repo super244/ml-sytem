@@ -18,6 +18,7 @@ The notebook lab is generated from `build_notebooks.py` so the research workbenc
 - `11_benchmark_slice_analysis.ipynb`
 - `12_error_driven_retraining.ipynb`
 - `13_run_artifact_explorer.ipynb`
+- `14_colab_training_pipeline.ipynb`
 
 ## Regeneration
 

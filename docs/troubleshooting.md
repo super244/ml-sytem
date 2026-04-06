@@ -11,9 +11,13 @@
 
 Public dataset normalization depends on Hugging Face `datasets` and network access. If those are unavailable, skip normalization and continue with the local synthetic corpora.
 
+If the bootstrap script failed before the dataset step, rerun the platform-specific start script first so the Python dependencies, tokenizer assets, and platform checks are all refreshed.
+
 ## Dry-run passes but training fails on model load
 
 Use dry-run to validate configs and tokenization first. If full training still fails, confirm local model availability, adapter settings, and VRAM budget.
+
+On Linux GPU hosts, use the cloud start script to re-check CUDA installation and dependency resolution. On Apple Silicon machines, use the macOS start script to re-verify the Metal-aware local path.
 
 ## Empty benchmark results
 

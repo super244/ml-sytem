@@ -10,8 +10,11 @@ Status as validated on April 5, 2026:
 - `python scripts/doctor.py` passes.
 - `ai-factory ready` passes.
 - `ai-factory train-preflight --config training/configs/profiles/failure_aware.yaml` passes with environment warnings on CPU-only hosts.
+- **Hardware detection and ultimate optimization** are available via `python -m training.src.optimization`
+- Ultimate profiles `m5_max_ultimate.yaml`, `cuda_ultimate_a100.yaml`, and `cuda_ultimate_h100.yaml` are ready for hardware-specific training
 - Frontend `npm run typecheck` and `npm run build` pass.
-- Dataset generation, corpus preparation, SQLite corpus export, tokenizer training smoke test, and scratch-training dry-run pass.
+- Dataset generation, corpus preparation, SQLite corpus export, tokenizer training smoke test, and scratch-training dry-run pass with a faster corpus/tokenizer path.
+- The Linux cloud bootstrap script and macOS local bootstrap script are the default operator entry points.
 - `finetuned` evaluation, finetuned inference, and real deployment require a first real training run because the repo does not ship packaged adapters in `artifacts/models/`.
 
 ## 1. Choose Your Track
@@ -26,12 +29,15 @@ Use this if you want to:
 - run a real small-model or adapter-based fine-tune on your own GPU
 - run the API and frontend locally
 - validate the full training configuration on a CPU-only workstation before moving to a GPU box
+- use the Apple Silicon-safe local profile at `training/configs/profiles/local_metal.yaml`
+- **use ultimate optimization on Apple Silicon** with `training/configs/profiles/m5_max_ultimate.yaml`
 
 Recommended:
 
 - Python 3.10+
 - Node.js 20+
 - optional CUDA GPU
+- the macOS bootstrap script for Apple Silicon local runs
 
 ### Cloud GPU track
 
@@ -40,6 +46,7 @@ Use this if you want to:
 - run a real 2B scratch pretraining job on a rented GPU VM
 - keep artifacts on persistent attached storage
 - avoid local GPU limits
+- **use ultimate optimization on NVIDIA A100/H100** with `cuda_ultimate_a100.yaml` or `cuda_ultimate_h100.yaml`
 
 Recommended:
 
@@ -47,6 +54,7 @@ Recommended:
 - CUDA-compatible PyTorch environment
 - persistent disk mounted for artifacts
 - `tmux` or `screen`
+- the Linux cloud bootstrap script after SSHing into the instance
 
 Do not treat `--distributed` as the primary path yet. The validated cloud path for this repo is: run the same single-process training commands on a bigger machine.
 
@@ -56,22 +64,14 @@ Do not treat `--distributed` as the primary path yet. The validated cloud path f
 git clone https://github.com/super244/ai-factory.git
 cd ai-factory
 
-python -m venv .venv
-source .venv/bin/activate
-pip install -U pip
-pip install -e ".[dev]"
-git lfs install
-git lfs pull
-cp .env.example .env
+# Linux cloud GPU instance
+bash scripts/start_cloud_linux.sh
+
+# Apple Silicon local machine
+bash scripts/start_local_macos.sh
 ```
 
-Frontend dependencies:
-
-```bash
-cd frontend
-npm install
-cd ..
-```
+The bootstrap scripts install dependencies, download tokenizer and model prerequisites, handle the common CUDA and platform checks, and launch the appropriate training path without a manual virtualenv step.
 
 Cloud-only environment variables:
 
@@ -82,9 +82,29 @@ export ARTIFACTS_DIR="/mnt/ai-factory-artifacts"
 
 Use a writable persistent path for `ARTIFACTS_DIR` on cloud VMs.
 
+On Apple Silicon local machines, the bootstrap script prefers the Metal-aware local path and keeps the same corpus and tokenizer automation.
+
 If you intentionally skip Git LFS, regenerate `data/catalog.json` locally before relying on `ai-factory ready` or `ai-factory doctor`.
 
-## 3. Verify The Workspace
+## 2.5 Detect and Benchmark Your Hardware (Optional)
+
+Before training, detect your hardware capabilities and run a quick benchmark:
+
+```bash
+# Detect hardware and print optimization recommendations
+python -m training.src.optimization
+
+# Quick performance benchmark
+python -c "from training.src.ultimate_harness import quick_benchmark; quick_benchmark()"
+```
+
+Expected output includes:
+- Device name and backend (Metal/CUDA/CPU)
+- Memory capacity and bandwidth
+- Supported precision (FP16/BF16/TF32)
+- Recommended batch size and settings
+
+Use this information to choose the right training profile.
 
 ```bash
 ai-factory ready
@@ -93,6 +113,8 @@ ai-factory doctor
 ```
 
 If you are validating on a CPU-only machine, expect `ai-factory train-preflight` to warn about CUDA visibility and FlashAttention availability for GPU-oriented profiles. Those warnings are informational until you start a real training run.
+
+The Titan runtime now reports CUDA, Metal, and CPU fallback capability more clearly, so hardware-specific launches are easier to validate before you commit to a long run.
 
 Optional container sanity check:
 
@@ -128,7 +150,7 @@ python data/public/normalize_public_datasets.py --registry data/public/registry.
 python data/prepare_dataset.py --config data/configs/processing.yaml
 ```
 
-This now writes both JSONL splits and a SQLite corpus database.
+This now writes both JSONL splits and a SQLite corpus database, and the tokenizer/tokenization path is optimized to reduce waiting on larger corpora.
 
 ### 4.4 Validate the processed training split
 
@@ -165,6 +187,7 @@ Important note on SQLite:
 - the training stack can read either JSONL or SQLite
 - the existing JSONL outputs remain in place because they are simple to diff, inspect, and reuse with external tooling
 - this SQLite corpus is separate from the orchestration control-plane SQLite database under `artifacts/control_plane/`
+- the faster preprocessing path is designed to reuse corpus artifacts instead of rebuilding work on every run
 
 ## 5. Choose Your Training Mode
 
@@ -183,6 +206,8 @@ This path:
 Use this profile as the starting point:
 
 - `training/configs/profiles/pretraining.yaml`
+- run the Linux cloud bootstrap script first if you are training on a rented GPU VM
+- run the macOS bootstrap script first if you are validating locally on Apple Silicon
 
 ### 5.2 Continued pretraining
 
@@ -217,12 +242,49 @@ Examples:
 - `training/configs/profiles/failure_aware.yaml`
 - `training/configs/profiles/math_specialist.yaml`
 - `training/configs/profiles/full_finetune.yaml`
+- `training/configs/profiles/local_metal.yaml` for Apple Silicon local dry-runs and lighter LoRA-style iteration
 
 Important:
 
 - the pretrained profiles in this repo now point at local foundation checkpoints such as `artifacts/foundation/qwen2-2b`
 - if those folders do not exist yet, those profiles will fail at model load
 - if you do not have local checkpoints yet, either create them first or edit the profile to use the real base model you want
+
+## 5.4 Choose Ultimate Optimization Profile (Optional)
+
+For maximum performance, use the hardware-specific ultimate profiles:
+
+### Apple Silicon Ultimate (M5 Max)
+```bash
+python -m training.train --config training/configs/profiles/m5_max_ultimate.yaml --dry-run
+```
+Optimizations:
+- Unified memory zero-copy path
+- 614 GB/s bandwidth utilization
+- 40-core GPU saturation
+- Fused RMSNorm+SiLU kernels
+
+### NVIDIA A100 Ultimate
+```bash
+python -m training.train --config training/configs/profiles/cuda_ultimate_a100.yaml --dry-run
+```
+Optimizations:
+- BF16 Tensor Core acceleration
+- TF32 automatic mixed precision
+- 2039 GB/s memory bandwidth
+- FlashAttention-2 fused kernels
+
+### NVIDIA H100 Ultimate
+```bash
+python -m training.train --config training/configs/profiles/cuda_ultimate_h100.yaml --dry-run
+```
+Optimizations:
+- FP8 Transformer Engine support
+- 3350 GB/s memory bandwidth
+- 4th gen Tensor Cores
+- Distributed training ready
+
+See the [Optimization Guide](docs/optimization-guide.md) for tuning details.
 
 ## 6. Choose The Scratch Model Size
 
@@ -600,7 +662,7 @@ Recommended flow:
 
 ```bash
 tmux new -s ai-factory
-source .venv/bin/activate
+bash scripts/start_cloud_linux.sh
 export AI_FACTORY_REPO_ROOT="$PWD"
 export ARTIFACTS_DIR="/mnt/ai-factory-artifacts"
 python data/prepare_dataset.py --config data/configs/processing.yaml
@@ -608,6 +670,8 @@ python -m training.train --config training/configs/profiles/baseline_qlora.yaml 
 python -m training.train --config training/configs/profiles/failure_aware.yaml
 python -m evaluation.evaluate --config evaluation/configs/base_vs_finetuned.yaml
 ```
+
+If you already launched through the bootstrap script, the remaining commands are the same validation and training steps you would run on any Linux GPU host.
 
 Use cloud mainly for:
 

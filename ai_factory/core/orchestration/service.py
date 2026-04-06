@@ -30,6 +30,7 @@ from ai_factory.core.orchestration.models import (
     utc_now_iso,
 )
 from ai_factory.core.platform.settings import PlatformSettings
+from ai_factory.titan import detect_titan_status
 
 DEFAULT_CIRCUIT_FAILURE_THRESHOLD = 3
 DEFAULT_CIRCUIT_REOPEN_AFTER_S = 60
@@ -60,6 +61,37 @@ class OrchestrationService:
         self.control_plane = control_plane
         self.settings = settings
         self.registry = AgentRegistry()
+        self._titan_status: dict[str, Any] | None = None
+        self._titan_status_cached_at: datetime | None = None
+
+    def _get_titan_status(self) -> dict[str, Any]:
+        """Get cached Titan status with TTL of 60 seconds."""
+        now = _now()
+        if (
+            self._titan_status is None
+            or self._titan_status_cached_at is None
+            or (now - self._titan_status_cached_at).total_seconds() > 60
+        ):
+            try:
+                self._titan_status = detect_titan_status()
+                self._titan_status_cached_at = now
+            except Exception:
+                self._titan_status = {}
+                self._titan_status_cached_at = now
+        return self._titan_status
+
+    def get_hardware_capabilities(self) -> dict[str, Any]:
+        """Get hardware capabilities for scheduling decisions."""
+        titan = self._get_titan_status()
+        return {
+            "backend": titan.get("backend", "unknown"),
+            "gpu_count": titan.get("gpu_count", 0),
+            "gpu_name": titan.get("gpu_name"),
+            "supports_cuda": titan.get("supports_cuda", False),
+            "supports_metal": titan.get("supports_metal", False),
+            "cpu_threads": titan.get("cpu_threads", 1),
+            "unified_memory_gb": titan.get("unified_memory_gb"),
+        }
 
     def _primary_ids(self, legacy_instance_id: str) -> tuple[str, str]:
         suffix = _stable_hash([legacy_instance_id])
