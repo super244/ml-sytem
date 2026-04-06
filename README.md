@@ -45,6 +45,8 @@ AI-Factory is a comprehensive platform designed to manage the entire lifecycle o
 - **Experiment Tracking**: Comprehensive run manifests and metadata
 - **Model Comparison**: Side-by-side performance analysis
 - **Scale Ladder**: Canonical scratch templates for `1b`, `2b`, `4b`, `9b`, `12b`, `20b`, `27b`, `30b`, `70b`, and `120b`
+- **Bootstrap-First Runs**: Linux cloud and macOS local start scripts handle dependency install, tokenizer setup, and launch orchestration
+- **Faster Data Prep**: The corpus pipeline now emphasizes faster tokenization and lower-wait dataset preparation
 
 ### **🔍 Evaluation & Monitoring**
 - **Benchmark Registry**: Standardized evaluation benchmarks
@@ -57,6 +59,7 @@ AI-Factory is a comprehensive platform designed to manage the entire lifecycle o
 - **FastAPI Backend**: High-performance inference server
 - **Prompt Management**: Configurable prompt presets and templates
 - **Model Registry**: Centralized model versioning and management
+- **Accelerator Awareness**: Titan runtime reporting surfaces CUDA, Metal, and CPU fallback capability for hardware-aware launches. The Titan C++ Engine now accelerates operations and talks directly to the GPU for boosted performance.
 
 ## 🏗️ **Architecture Overview**
 
@@ -86,18 +89,18 @@ AI-Factory/
 git clone https://github.com/super244/ai-factory.git
 cd ai-factory
 
-python -m venv .venv
-source .venv/bin/activate
-pip install -U pip
-pip install -e ".[dev]"
-git lfs install
-git lfs pull
-cp .env.example .env
+# Linux cloud GPU instance
+bash scripts/start-linux.sh
+
+# Apple Silicon local machine
+bash scripts/start-mac.sh
 
 # Verify the workspace
 ai-factory ready
 python scripts/doctor.py
 ```
+
+The bootstrap scripts install dependencies, fetch tokenizer and model prerequisites, validate the runtime, and start the right training path without a manual virtual environment step.
 
 ### **Basic Usage**
 ```bash

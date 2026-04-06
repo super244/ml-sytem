@@ -14,6 +14,15 @@ The training system is built around composed profiles rather than one-off monoli
 
 Profiles combine these pieces to define the full experiment.
 
+## Operator Entry Points
+
+The recommended first step for a new run is to use the platform-specific bootstrap script:
+
+- Linux cloud GPU hosts: `bash scripts/start_cloud_linux.sh`
+- Apple Silicon local hosts: `bash scripts/start_local_macos.sh`
+
+Those scripts are designed to install dependencies, prepare tokenizer assets, and hand off to the selected training profile with minimal manual setup.
+
 ## Supported Modes
 
 - instruction tuning
@@ -69,6 +78,7 @@ The repo includes:
 - scale-up runtime settings
 - Accelerate-ready config
 - DeepSpeed Zero-2 example config
+- Titan runtime hardware reporting for CUDA, Metal, and CPU fallback
 
 ## Main Commands
 
@@ -82,3 +92,5 @@ python3 training/scripts/package_adapter.py --run-dir artifacts/runs/<run_id>
 python3 training/scripts/export_merged_model.py --run-dir artifacts/runs/<run_id>
 python3 training/scripts/compare_runs.py --run-a artifacts/runs/<run_a> --run-b artifacts/runs/<run_b>
 ```
+
+The data preparation path is optimized to reduce repeated work during tokenization and corpus assembly, so the preprocessing steps behind these commands should complete faster on large datasets.

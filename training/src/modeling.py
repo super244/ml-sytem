@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+from importlib.util import find_spec
 from pathlib import Path
 from typing import Any
 
@@ -10,9 +11,15 @@ from transformers import AutoConfig, AutoModelForCausalLM, AutoTokenizer, BitsAn
 from transformers.utils import is_flash_attn_2_available
 
 from training.src.config import ExperimentConfig, resolve_path_reference
+from training.src.hardware import detect_training_hardware
 from training.src.scaling import resolve_scratch_architecture
 
 logger = logging.getLogger(__name__)
+
+
+def _mps_available() -> bool:
+    mps_backend = getattr(torch.backends, "mps", None)
+    return bool(mps_backend and mps_backend.is_available())
 
 
 def resolve_dtype(name: str) -> torch.dtype:
@@ -30,7 +37,22 @@ def build_quantization_config(config: ExperimentConfig) -> BitsAndBytesConfig | 
     model_config = config.model
     if model_config.use_full_precision:
         return None
+    hardware = detect_training_hardware()
     if model_config.use_4bit:
+        if not hardware.bitsandbytes_supported:
+            logger.warning(
+                "4-bit bitsandbytes quantization requires Linux with CUDA. The active backend is %s on %s/%s, "
+                "so this run will continue without quantized loading.",
+                hardware.backend,
+                hardware.system,
+                hardware.machine,
+            )
+            return None
+        if find_spec("bitsandbytes") is None:
+            raise RuntimeError(
+                "bitsandbytes is not installed. Install the `train-cuda` extra or run the Linux/CUDA bootstrap "
+                "script before launching quantized training."
+            )
         return BitsAndBytesConfig(
             load_in_4bit=True,
             bnb_4bit_quant_type=model_config.bnb_4bit_quant_type,
@@ -38,6 +60,20 @@ def build_quantization_config(config: ExperimentConfig) -> BitsAndBytesConfig | 
             bnb_4bit_compute_dtype=resolve_dtype(model_config.bnb_compute_dtype),
         )
     if model_config.use_8bit:
+        if not hardware.bitsandbytes_supported:
+            logger.warning(
+                "8-bit bitsandbytes quantization requires Linux with CUDA. The active backend is %s on %s/%s, "
+                "so this run will continue without quantized loading.",
+                hardware.backend,
+                hardware.system,
+                hardware.machine,
+            )
+            return None
+        if find_spec("bitsandbytes") is None:
+            raise RuntimeError(
+                "bitsandbytes is not installed. Install the `train-cuda` extra or run the Linux/CUDA bootstrap "
+                "script before launching quantized training."
+            )
         return BitsAndBytesConfig(load_in_8bit=True)
     return None
 
@@ -82,13 +118,29 @@ def load_tokenizer(config: ExperimentConfig, *, require_local_path: bool = False
 def resolve_attention_implementation(config: ExperimentConfig) -> str | None:
     if not config.model.use_flash_attention:
         return None
-    if is_flash_attn_2_available():
+    hardware = detect_training_hardware()
+    if hardware.cuda_available and is_flash_attn_2_available():
         return "flash_attention_2"
-    logger.warning(
-        "FlashAttention2 was requested for %s, but it is unavailable in the current environment. "
-        "Falling back to the default attention implementation.",
-        config.model.base_model_name,
-    )
+    if hardware.cuda_available:
+        logger.warning(
+            "FlashAttention2 was requested for %s, but it is unavailable in the current environment. "
+            "Falling back to the default attention implementation.",
+            config.model.base_model_name,
+        )
+    else:
+        logger.info(
+            "FlashAttention2 was requested for %s, but the active backend is %s. "
+            "Falling back to the default attention implementation.",
+            config.model.base_model_name,
+            hardware.backend,
+        )
+    return None
+
+
+def resolve_device_map(config: ExperimentConfig) -> str | None:
+    hardware = detect_training_hardware()
+    if hardware.cuda_available:
+        return config.model.device_map
     return None
 
 
@@ -150,12 +202,14 @@ def load_model_for_training(config: ExperimentConfig, tokenizer: Any | None = No
     method = (config.lora.method or "qlora").lower()
     if method in {"full", "sft"} and quantization_config is not None:
         raise ValueError("Full/SFT training requires use_4bit=false and use_8bit=false.")
+    if quantization_config is None and _mps_available():
+        dtype = torch.float32
 
     model = AutoModelForCausalLM.from_pretrained(
         config.model.base_model_name,
         trust_remote_code=config.model.trust_remote_code,
         quantization_config=quantization_config,
-        device_map=config.model.device_map,
+        device_map=resolve_device_map(config),
         torch_dtype=dtype,
         low_cpu_mem_usage=config.runtime.low_cpu_mem_usage,
         attn_implementation=resolve_attention_implementation(config),
