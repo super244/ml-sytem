@@ -19,6 +19,7 @@ logger = logging.getLogger(__name__)
 
 class AcceleratorType(str, Enum):
     """Types of hardware accelerators."""
+
     CUDA = "cuda"
     METAL = "metal"
     MPS = "mps"  # Apple Metal Performance Shaders
@@ -29,6 +30,7 @@ class AcceleratorType(str, Enum):
 @dataclass
 class GPUInfo:
     """Information about a GPU."""
+
     id: int
     name: str
     type: AcceleratorType
@@ -38,9 +40,10 @@ class GPUInfo:
     driver_version: str | None = None
 
 
-@dataclass  
+@dataclass
 class NodeInfo:
     """Information about a compute node."""
+
     id: str
     name: str
     hostname: str
@@ -55,7 +58,7 @@ class NodeInfo:
 def get_system_ram_gb() -> float:
     """
     Get system RAM in GB with platform-specific detection.
-    
+
     Returns:
         System RAM in GB, or 16.0 as fallback.
     """
@@ -91,12 +94,12 @@ def _get_torch() -> Any | None:
 
 def detect_gpus_torch() -> list[GPUInfo]:
     """Detect GPUs using PyTorch."""
-    gpus = []
+    gpus: list[GPUInfo] = []
     torch = _get_torch()
-    
+
     if torch is None:
         return gpus
-    
+
     # Check CUDA
     if torch.cuda.is_available():
         for i in range(torch.cuda.device_count()):
@@ -104,39 +107,43 @@ def detect_gpus_torch() -> list[GPUInfo]:
                 name = torch.cuda.get_device_name(i)
                 props = torch.cuda.get_device_properties(i)
                 memory_gb = props.total_memory / (1024**3)
-                
+
                 # Try to get memory usage
                 allocated = torch.cuda.memory_allocated(i) / (1024**3)
                 reserved = torch.cuda.memory_reserved(i) / (1024**3)
                 utilization = int((allocated / reserved) * 100) if reserved > 0 else 0
-                
-                gpus.append(GPUInfo(
-                    id=i,
-                    name=name,
-                    type=AcceleratorType.CUDA,
-                    memory_gb=memory_gb,
-                    memory_used_gb=allocated,
-                    utilization_percent=utilization,
-                ))
+
+                gpus.append(
+                    GPUInfo(
+                        id=i,
+                        name=name,
+                        type=AcceleratorType.CUDA,
+                        memory_gb=memory_gb,
+                        memory_used_gb=allocated,
+                        utilization_percent=utilization,
+                    )
+                )
             except (AttributeError, RuntimeError, ValueError) as exc:
                 logger.debug("CUDA GPU %d probe failed: %s", i, exc)
-    
+
     # Check MPS (Apple Silicon)
     elif hasattr(torch.backends, "mps") and torch.backends.mps.is_available():
         try:
             # MPS doesn't give us GPU info directly, use Titan instead
             titan_status = detect_titan_status()
             memory_gb = titan_status.get("unified_memory_gb", get_system_ram_gb())
-            
-            gpus.append(GPUInfo(
-                id=0,
-                name=titan_status.get("gpu_name", "Apple Silicon"),
-                type=AcceleratorType.MPS,
-                memory_gb=memory_gb or get_system_ram_gb(),
-            ))
+
+            gpus.append(
+                GPUInfo(
+                    id=0,
+                    name=titan_status.get("gpu_name", "Apple Silicon"),
+                    type=AcceleratorType.MPS,
+                    memory_gb=memory_gb or get_system_ram_gb(),
+                )
+            )
         except Exception as exc:
             logger.debug("MPS detection failed: %s", exc)
-    
+
     return gpus
 
 
@@ -147,36 +154,38 @@ def detect_gpus_titan() -> list[GPUInfo]:
         status = detect_titan_status()
         gpu_name = status.get("gpu_name")
         gpu_count = status.get("gpu_count", 0)
-        
+
         if gpu_count > 0 and gpu_name:
             for i in range(gpu_count):
                 accel_type = AcceleratorType.METAL if status.get("supports_metal") else AcceleratorType.CUDA
                 if status.get("supports_cuda"):
                     accel_type = AcceleratorType.CUDA
-                    
+
                 memory_gb = status.get("unified_memory_gb") or status.get("cuda_memory_gb")
-                
-                gpus.append(GPUInfo(
-                    id=i,
-                    name=gpu_name,
-                    type=accel_type,
-                    memory_gb=memory_gb or 16.0,
-                    driver_version=status.get("cuda_driver_version"),
-                ))
+
+                gpus.append(
+                    GPUInfo(
+                        id=i,
+                        name=gpu_name,
+                        type=accel_type,
+                        memory_gb=memory_gb or 16.0,
+                        driver_version=status.get("cuda_driver_version"),
+                    )
+                )
     except Exception as exc:
         logger.debug("Titan GPU detection failed: %s", exc)
-    
+
     return gpus
 
 
 def detect_gpus_nvidia_smi() -> list[GPUInfo]:
     """Detect NVIDIA GPUs using nvidia-smi."""
-    gpus = []
+    gpus: list[GPUInfo] = []
     nvidia_smi = shutil.which("nvidia-smi")
-    
+
     if not nvidia_smi:
         return gpus
-    
+
     try:
         result = subprocess.run(
             [
@@ -188,28 +197,30 @@ def detect_gpus_nvidia_smi() -> list[GPUInfo]:
             text=True,
             timeout=5.0,
         )
-        
+
         if result.returncode != 0:
             return gpus
-        
+
         for line in result.stdout.strip().split("\n"):
             parts = [p.strip() for p in line.split(",")]
             if len(parts) >= 5:
                 try:
-                    gpus.append(GPUInfo(
-                        id=int(parts[0]),
-                        name=parts[1],
-                        type=AcceleratorType.CUDA,
-                        memory_gb=float(parts[2]) / 1024,  # Convert MB to GB
-                        memory_used_gb=float(parts[3]) / 1024,
-                        utilization_percent=int(float(parts[4])),
-                        driver_version=parts[5] if len(parts) > 5 else None,
-                    ))
+                    gpus.append(
+                        GPUInfo(
+                            id=int(parts[0]),
+                            name=parts[1],
+                            type=AcceleratorType.CUDA,
+                            memory_gb=float(parts[2]) / 1024,  # Convert MB to GB
+                            memory_used_gb=float(parts[3]) / 1024,
+                            utilization_percent=int(float(parts[4])),
+                            driver_version=parts[5] if len(parts) > 5 else None,
+                        )
+                    )
                 except (ValueError, IndexError) as exc:
                     logger.debug("Failed to parse nvidia-smi line: %s - %s", line, exc)
     except (subprocess.SubprocessError, TimeoutError) as exc:
         logger.debug("nvidia-smi detection failed: %s", exc)
-    
+
     return gpus
 
 
@@ -217,23 +228,23 @@ def detect_local_node() -> NodeInfo:
     """Detect local compute node hardware."""
     # Try multiple GPU detection methods in order of preference
     gpus = detect_gpus_titan() or detect_gpus_nvidia_smi() or detect_gpus_torch()
-    
+
     # Determine accelerator type
     if gpus:
         accel_type = gpus[0].type
     else:
         accel_type = AcceleratorType.CPU
-    
+
     # Get system info
     hostname = platform.node()
     memory_gb = get_system_ram_gb()
     cpu_count = 0
-    
+
     try:
         cpu_count = os.cpu_count() or 0
     except Exception:
         pass
-    
+
     return NodeInfo(
         id="local-primary",
         name=f"{hostname} ({accel_type.value.upper()})",
@@ -250,36 +261,38 @@ def detect_local_node() -> NodeInfo:
 def get_cluster_nodes() -> list[dict[str, Any]]:
     """
     Get all cluster nodes including local and remote.
-    
+
     Returns:
         List of node dictionaries for API consumption.
     """
     nodes = []
-    
+
     # Add local node
     local = detect_local_node()
-    nodes.append({
-        "id": local.id,
-        "name": local.name,
-        "hostname": local.hostname,
-        "type": local.accelerator_type.value,
-        "gpus": [
-            {
-                "id": gpu.id,
-                "name": gpu.name,
-                "memory_gb": gpu.memory_gb,
-                "memory_used_gb": gpu.memory_used_gb,
-                "utilization_percent": gpu.utilization_percent,
-            }
-            for gpu in local.gpus
-        ],
-        "memory": f"{local.memory_gb:.1f}GB",
-        "cpu_count": local.cpu_count,
-        "status": local.status,
-        "active_jobs": local.active_jobs,
-    })
-    
+    nodes.append(
+        {
+            "id": local.id,
+            "name": local.name,
+            "hostname": local.hostname,
+            "type": local.accelerator_type.value,
+            "gpus": [
+                {
+                    "id": gpu.id,
+                    "name": gpu.name,
+                    "memory_gb": gpu.memory_gb,
+                    "memory_used_gb": gpu.memory_used_gb,
+                    "utilization_percent": gpu.utilization_percent,
+                }
+                for gpu in local.gpus
+            ],
+            "memory": f"{local.memory_gb:.1f}GB",
+            "cpu_count": local.cpu_count,
+            "status": local.status,
+            "active_jobs": local.active_jobs,
+        }
+    )
+
     # TODO: In a real cluster setup, query the control plane for remote nodes
     # For now, return just the local node to avoid hardcoded mock data
-    
+
     return nodes

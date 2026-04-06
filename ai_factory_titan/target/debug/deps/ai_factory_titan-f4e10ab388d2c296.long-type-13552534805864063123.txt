@@ -1,5 +1,0 @@
-half::f16: cudarc::driver::DeviceRepr
-&cudarc::driver::CudaSlice<T>
-&cudarc::driver::CudaView<'_, T>
-&mut cudarc::driver::CudaSlice<T>
-&mut cudarc::driver::CudaViewMut<'_, T>

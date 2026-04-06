@@ -26,15 +26,15 @@ from training.src.config import (
 from training.src.data import build_dataset
 from training.src.environment import collect_environment_snapshot
 from training.src.modeling import load_model_for_training, load_tokenizer, trainable_parameter_report
+from training.src.optimization import HardwareDetector
 from training.src.packaging import publish_model_artifacts, write_run_manifest, write_training_summary
 from training.src.tracking import build_tracker
-from training.src.validation import run_dry_validation
-from training.src.optimization import HardwareDetector, TrainingOptimizer
 from training.src.ultimate_harness import (
-    build_ultimate_trainer_with_harness,
     HarnessConfig,
     UltimateTrainingHarness,
+    build_ultimate_trainer_with_harness,
 )
+from training.src.validation import run_dry_validation
 
 # Set up structured logging
 logging.basicConfig(
@@ -480,7 +480,7 @@ def main() -> None:
 
         logger.info("Initializing full training run.")
         tokenizer = tokenizer or load_tokenizer(config)
-        
+
         # Detect hardware and initialize ultimate harness
         logger.info("Detecting hardware and initializing ultimate optimization harness.")
         hardware = HardwareDetector.detect()
@@ -492,10 +492,10 @@ def main() -> None:
         )
         harness = UltimateTrainingHarness(config, harness_config, hardware)
         harness.print_summary()
-        
+
         # Prepare model with ultimate optimizations
         model = harness.prepare_model(model)
-        
+
         # Get optimized training arguments from harness
         args = harness.get_training_arguments(layout)
 
