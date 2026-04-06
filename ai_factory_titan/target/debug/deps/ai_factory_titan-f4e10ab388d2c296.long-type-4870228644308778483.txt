@@ -1,0 +1,5 @@
+half::f16: cudarc::driver::ValidAsZeroBits
+(A, B, C, D, E, F, G, H, I, J, K, L)
+(B, C, D, E, F, G, H, I, J, K, L)
+(C, D, E, F, G, H, I, J, K, L)
+(D, E, F, G, H, I, J, K, L)

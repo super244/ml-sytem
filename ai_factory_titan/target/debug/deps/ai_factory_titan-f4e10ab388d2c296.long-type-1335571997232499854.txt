@@ -1,0 +1,7 @@
+&[u32]: cudarc::driver::DeviceRepr
+&cudarc::driver::CudaSlice<T>
+&cudarc::driver::CudaView<'_, T>
+&mut cudarc::driver::CudaSlice<T>
+&mut cudarc::driver::CudaViewMut<'_, T>
+cudarc::driver::CudaFunction
+cudarc::driver::LaunchAsync<(&cudarc::driver::CudaSlice<f32>, &cudarc::driver::CudaSlice<f32>, &cudarc::driver::CudaSlice<f32>, &mut cudarc::driver::CudaSlice<f32>, &[u32])>
