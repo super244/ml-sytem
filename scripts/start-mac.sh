@@ -243,11 +243,18 @@ run_preflight() {
 
 probe_titan() {
   if have cargo; then
-    log "Building Titan status binary (best effort)."
-    cargo build --manifest-path "${REPO_ROOT}/ai_factory_titan/Cargo.toml" --features metal,cpp || true
+    log "Building Titan engine with ultimate optimization features."
+    # Build with ultimate feature that includes metal, cuda, and cpp
+    cargo build --manifest-path "${REPO_ROOT}/ai_factory_titan/Cargo.toml" --features ultimate --release 2>/dev/null || \
+      cargo build --manifest-path "${REPO_ROOT}/ai_factory_titan/Cargo.toml" --features metal,cpp --release 2>/dev/null || \
+      cargo build --manifest-path "${REPO_ROOT}/ai_factory_titan/Cargo.toml" --features metal,cpp 2>/dev/null || true
   fi
-  log "Running Titan hardware probe."
+  log "Running Titan hardware probe with ultimate optimization detection."
   "${PYTHON_BIN}" -m ai_factory.cli titan status --write-hardware-doc || true
+  
+  # Run the new hardware detection and optimization layer
+  log "Detecting hardware capabilities for ultimate optimization."
+  "${PYTHON_BIN}" -m training.src.optimization || true
 }
 
 run_training() {
@@ -389,6 +396,12 @@ main() {
 
   maybe_print_runtime_summary
   probe_titan
+  
+  # Check if using ultimate optimization profile
+  if [[ "${CONFIG_PATH}" == *"ultimate"* ]]; then
+    log "Ultimate optimization profile detected. Running performance benchmark."
+    "${PYTHON_BIN}" -c "from training.src.ultimate_harness import quick_benchmark; quick_benchmark()" || true
+  fi
 
   if [[ "${DO_PREPARE_DATA}" == "auto" ]]; then
     if [[ ! -f "${REPO_ROOT}/data/processed/manifest.json" || ! -f "${REPO_ROOT}/data/processed/corpus.sqlite" ]]; then

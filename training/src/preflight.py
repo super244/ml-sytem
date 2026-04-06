@@ -11,6 +11,7 @@ from transformers.utils import is_flash_attn_2_available
 from ai_factory.core.model_scales import get_model_scale_spec
 from training.src.config import load_experiment_config, resolve_path_reference
 from training.src.hardware import detect_training_hardware
+from training.src.optimization import HardwareDetector, BackendType
 from training.src.scaling import resolve_scratch_architecture
 
 
@@ -292,6 +293,41 @@ def build_training_preflight_report(config_path: str) -> dict[str, Any]:
                 "FlashAttention2",
                 "ok",
                 "Attention backend is aligned with the current environment.",
+            )
+        )
+
+    # Ultimate optimization profile check
+    ultimate_optimization = HardwareDetector.detect()
+    is_ultimate_profile = "ultimate" in config.profile_name.lower()
+    
+    if is_ultimate_profile:
+        profile_backend = BackendType.METAL if "metal" in config.profile_name.lower() or "m5" in config.profile_name.lower() else BackendType.CUDA
+        detected_backend = ultimate_optimization.backend
+        
+        if detected_backend == profile_backend:
+            ultimate_status = "ok"
+            ultimate_detail = f"Ultimate profile '{config.profile_name}' matches detected hardware ({detected_backend.name})."
+        else:
+            ultimate_status = "warn"
+            ultimate_detail = (
+                f"Ultimate profile '{config.profile_name}' targets {profile_backend.name} but "
+                f"detected hardware is {detected_backend.name}. "
+                f"Consider using a different profile for optimal performance."
+            )
+        
+        checks.append(
+            _make_check(
+                "ultimate-optimization",
+                "Ultimate Optimization",
+                ultimate_status,
+                ultimate_detail,
+                metadata={
+                    "profile": config.profile_name,
+                    "detected_backend": detected_backend.name,
+                    "target_backend": profile_backend.name,
+                    "device_name": ultimate_optimization.device_name,
+                    "memory_gb": ultimate_optimization.memory_gb,
+                },
             )
         )
 

@@ -702,6 +702,15 @@ def parse_args() -> argparse.Namespace:
     titan_doc_parser = titan_subparsers.add_parser("hardware-doc", parents=[common_json])
     titan_doc_parser.add_argument("--path", default="HARDWARE.md")
 
+    # Ultimate Optimization commands
+    optimize_parser = subparsers.add_parser("optimize", parents=[common_json])
+    optimize_subparsers = optimize_parser.add_subparsers(dest="optimize_command", required=True)
+    
+    optimize_detect_parser = optimize_subparsers.add_parser("detect", parents=[common_json])
+    optimize_benchmark_parser = optimize_subparsers.add_parser("benchmark", parents=[common_json])
+    optimize_profile_parser = optimize_subparsers.add_parser("profile", parents=[common_json])
+    optimize_profile_parser.add_argument("--device", choices=["m5_max", "a100", "h100", "auto"], default="auto")
+
     serve_parser = subparsers.add_parser("serve", parents=[common_json])
     serve_parser.add_argument("--host", default="127.0.0.1")
     serve_parser.add_argument("--port", type=int, default=8000)
@@ -783,6 +792,53 @@ def main() -> None:
             return
         _render_titan_status(status)
         return
+
+    if args.command == "optimize":
+        if args.optimize_command == "detect":
+            from training.src.optimization import HardwareDetector
+            
+            hardware = HardwareDetector.detect()
+            if args.json:
+                _render_payload(hardware.to_dict(), as_json=True)
+            else:
+                HardwareDetector.print_hardware_summary()
+            return
+        
+        if args.optimize_command == "benchmark":
+            from training.src.ultimate_harness import quick_benchmark
+            
+            results = quick_benchmark()
+            if args.json:
+                _render_payload(results, as_json=True)
+            return
+        
+        if args.optimize_command == "profile":
+            profile_map = {
+                "m5_max": "training/configs/profiles/m5_max_ultimate.yaml",
+                "a100": "training/configs/profiles/cuda_ultimate_a100.yaml",
+                "h100": "training/configs/profiles/cuda_ultimate_h100.yaml",
+            }
+            
+            if args.device == "auto":
+                from training.src.optimization import HardwareDetector, BackendType
+                
+                hardware = HardwareDetector.detect()
+                if hardware.backend == BackendType.METAL:
+                    profile_path = profile_map["m5_max"]
+                elif hardware.backend == BackendType.CUDA:
+                    # Default to A100 for CUDA, could be smarter here
+                    profile_path = profile_map["a100"]
+                else:
+                    print("No ultimate profile available for CPU-only systems.")
+                    return
+            else:
+                profile_path = profile_map.get(args.device)
+            
+            if profile_path:
+                print(f"Recommended ultimate profile: {profile_path}")
+                if args.json:
+                    _render_payload({"profile_path": profile_path, "device": args.device}, as_json=True)
+            return
 
     if args.command == "serve":
         import subprocess

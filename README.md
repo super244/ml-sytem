@@ -26,10 +26,14 @@ AI-Factory is a comprehensive platform designed to manage the entire lifecycle o
 - **Web**: Modern web-based management interface
 - **Desktop**: Native desktop application
 
-### **⚡ Scalable & Extensible**
-- **Local to Cloud**: Scale from laptop to distributed systems
-- **Platform Capabilities**: Distributed training, real-time monitoring
-- **Plugin Architecture**: Easy to extend with new domains and features
+### **⚡ Ultimate Hardware Optimization**
+- **Apple Silicon (M5/M4/M3/M2/M1)**: Metal Performance Shaders with unified memory, 614 GB/s bandwidth on M5 Max
+- **NVIDIA GPUs (H100/H200/A100/RTX)**: CUDA with Tensor Cores, FP8/BF16/TF32 mixed precision
+- **Automatic Detection**: Hardware-aware kernel selection and configuration
+- **Fused Kernels**: RMSNorm+SiLU fusion, FlashAttention, optimized memory layouts
+- **Zero-Copy Memory**: Unified memory path on Apple Silicon, pinned memory on CUDA
+
+See the [Optimization Guide](docs/optimization-guide.md) for full details.
 
 ## 🚀 **Key Features**
 
@@ -61,6 +65,7 @@ AI-Factory is a comprehensive platform designed to manage the entire lifecycle o
 - **Model Registry**: Centralized model versioning and management
 - **Accelerator Awareness**: Titan runtime reporting surfaces CUDA, Metal, and CPU fallback capability for hardware-aware launches. The Titan Rust core natively accelerates operations and provides robust telemetry for both NVIDIA and Apple Silicon.
 - **Titan Engine with C++/Rust Acceleration**: Native SIMD kernels (AVX2/AVX512/NEON) for dot products, matrix multiplication, vector operations, RMS normalization, softmax, and SiLU activation functions. Zero-copy memory layouts with Q4_0/Q4K/Q8_0 quantization support.
+- **Ultimate Hardware Optimization**: Automatic hardware detection and kernel selection for maximum performance on Apple Silicon (M1/M2/M3/M4/M5) with Metal Performance Shaders and NVIDIA GPUs (A100/H100/RTX) with CUDA/Tensor Cores. Includes fused kernels, FlashAttention, mixed precision (FP16/BF16/TF32), and unified memory optimizations.
 - **Durable Control Plane**: Local-first SQLite control plane for orchestration runs, tasks, and telemetry, paired with a SQLite-backed corpus.
 
 ## 🏗️ **Architecture Overview**
@@ -87,21 +92,26 @@ AI-Factory/
 
 ## 🚀 **Quick Start**
 
-### **Installation**
+### **Quick Start with Ultimate Optimization**
+
+**1. Detect your hardware:**
 ```bash
-git clone https://github.com/super244/ai-factory.git
-cd ai-factory
-
-# Linux cloud GPU instance
-bash scripts/start-linux.sh
-
-# Apple Silicon local machine
-bash scripts/start-mac.sh
-
-# Verify the workspace
-ai-factory ready
-python scripts/doctor.py
+python -m training.src.optimization
 ```
+
+**2. Train with hardware-optimized profile:**
+```bash
+# Apple Silicon (M5 Max)
+python -m training.train --config training/configs/profiles/m5_max_ultimate.yaml
+
+# NVIDIA A100
+python -m training.train --config training/configs/profiles/cuda_ultimate_a100.yaml
+
+# NVIDIA H100  
+python -m training.train --config training/configs/profiles/cuda_ultimate_h100.yaml
+```
+
+See [Optimization Guide](docs/optimization-guide.md) for full tuning options.
 
 The bootstrap scripts install dependencies, fetch tokenizer and model prerequisites, validate the runtime, and start the right training path without a manual virtual environment step.
 
@@ -147,6 +157,7 @@ Full operator setup, including local vs cloud guidance, dataset generation, trai
 - **[Architecture Guide](docs/architecture.md)** - System design and principles
 - **[Data System Guide](docs/data-system.md)** - Data layer and processing
 - **[Quickstart](quickstart.md)** - Exact local and cloud setup plus the full lifecycle
+- **[Optimization Guide](docs/optimization-guide.md)** - Hardware-aware training optimization
 - **[Training Guide](training/README.md)** - Training profiles, artifacts, and workflow details
 - **[Deployment Guide](docs/deployment-guide.md)** - Deployment and production
 
@@ -172,6 +183,10 @@ mypy .                    # Type checking
 # Testing
 pytest                    # Run tests
 pytest --cov=ai_factory  # With coverage
+
+# Hardware detection and benchmarking
+python -m training.src.optimization           # Detect hardware
+python -c "from training.src.ultimate_harness import quick_benchmark; quick_benchmark()"  # Benchmark
 ```
 
 Training note: `python -m training.train --config ... --dry-run` is safe to use on CPU-only machines for config and dataset validation. Real training still needs the hardware profile described by the selected training config.
