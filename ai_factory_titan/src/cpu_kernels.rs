@@ -40,3 +40,70 @@ pub fn matmul_f32(lhs: &[f32], m: usize, k: usize, rhs: &[f32], n: usize) -> any
     }
     Ok(out)
 }
+
+pub fn vec_add_f32(a: &[f32], b: &[f32]) -> anyhow::Result<Vec<f32>> {
+    ensure!(a.len() == b.len(), "vector addition dimension mismatch");
+
+    #[cfg(feature = "cpp")]
+    if let Some(result) = cpp::vec_add_f32(a, b) {
+        return Ok(result);
+    }
+
+    Ok(a.iter().zip(b).map(|(x, y)| x + y).collect())
+}
+
+pub fn vec_mul_f32(a: &[f32], b: &[f32]) -> anyhow::Result<Vec<f32>> {
+    ensure!(a.len() == b.len(), "vector multiplication dimension mismatch");
+
+    #[cfg(feature = "cpp")]
+    if let Some(result) = cpp::vec_mul_f32(a, b) {
+        return Ok(result);
+    }
+
+    Ok(a.iter().zip(b).map(|(x, y)| x * y).collect())
+}
+
+pub fn rms_norm_f32(input: &[f32], eps: f32) -> Vec<f32> {
+    #[cfg(feature = "cpp")]
+    {
+        return cpp::rms_norm_f32(input, eps);
+    }
+    #[cfg(not(feature = "cpp"))]
+    {
+        if input.is_empty() {
+            return vec![];
+        }
+        let sum_sq: f32 = input.iter().map(|x| x * x).sum();
+        let rms = (sum_sq / input.len() as f32 + eps).sqrt();
+        let scale = 1.0 / rms;
+        input.iter().map(|x| x * scale).collect()
+    }
+}
+
+pub fn softmax_f32(input: &[f32]) -> Vec<f32> {
+    #[cfg(feature = "cpp")]
+    {
+        return cpp::softmax_f32(input);
+    }
+    #[cfg(not(feature = "cpp"))]
+    {
+        if input.is_empty() {
+            return vec![];
+        }
+        let max_val = input.iter().fold(f32::NEG_INFINITY, |a, &b| a.max(b));
+        let exp_vals: Vec<f32> = input.iter().map(|x| (x - max_val).exp()).collect();
+        let sum: f32 = exp_vals.iter().sum();
+        exp_vals.iter().map(|x| x / sum).collect()
+    }
+}
+
+pub fn silu_f32(input: &[f32]) -> Vec<f32> {
+    #[cfg(feature = "cpp")]
+    {
+        return cpp::silu_f32(input);
+    }
+    #[cfg(not(feature = "cpp"))]
+    {
+        input.iter().map(|&x| x / (1.0 + (-x).exp())).collect()
+    }
+}
