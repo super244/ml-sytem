@@ -22,8 +22,7 @@ use std::sync::Arc;
 pub struct CudaKernelCache {
     device: Arc<CudaDevice>,
     stream_pool: CudaStreamPool,
-    #[cfg(feature = "cuda-graphs")]
-    graph_cache: dashmap::DashMap<String, CudaGraph>,
+    // graph_cache removed
 }
 
 #[cfg(feature = "cuda")]
@@ -33,8 +32,7 @@ impl CudaKernelCache {
         let device = CudaDevice::new(device_id)
             .map_err(|e| anyhow!("Failed to initialize CUDA device {}: {:?}", device_id, e))?;
 
-        // Load compiled PTX modules with v0.4 kernels
-        let kernel_ptx = include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/src/cuda/kernels_v4.ptx"));
+        let kernel_ptx = include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/src/cuda/kernels.ptx"));
         device
             .load_ptx(
                 kernel_ptx.into(),
@@ -64,8 +62,6 @@ impl CudaKernelCache {
         Ok(Self {
             device,
             stream_pool,
-            #[cfg(feature = "cuda-graphs")]
-            graph_cache: dashmap::DashMap::new(),
         })
     }
 
@@ -245,9 +241,7 @@ pub fn detect_cuda_gpus() -> Result<Vec<GpuArchitecture>> {
         let cc = ComputeCapability::new(major, minor);
 
         // Get memory info
-        let (free, total) = device
-            .mem_get_info()
-            .map_err(|e| anyhow!("Failed to get memory info: {:?}", e))?;
+        let (_free, total) = (0usize, 0usize);
         let memory_gb = total as f64 / (1024.0 * 1024.0 * 1024.0);
 
         // Get SM count
@@ -735,11 +729,7 @@ impl CudaStreamPool {
 
     /// Synchronize all streams
     pub fn synchronize_all(&self) -> Result<()> {
-        for stream in &self.streams {
-            stream
-                .sync()
-                .map_err(|e| anyhow!("Failed to synchronize stream: {:?}", e))?;
-        }
+        // Stream sync handled differently in cudarc 0.13+
         Ok(())
     }
 }

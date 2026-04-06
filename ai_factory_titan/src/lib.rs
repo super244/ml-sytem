@@ -52,7 +52,7 @@ pub use backend::{BackendKind, TitanBackend};
 #[cfg(feature = "cuda")]
 pub use cuda_kernels::{
     detect_cuda_gpus, ComputeCapability, CudaKernelCache, GpuArchitecture,
-    CudaStreamPool, GradientAccumulator, CudaGraphExecutor, SecureCudaContext,
+    CudaStreamPool, GradientAccumulator,
 };
 
 // ─── Metal (optional) ─────────────────────────────────────────────────────────
@@ -62,7 +62,7 @@ pub use metal_kernels::{
     detect_metal_capabilities, AppleSiliconGeneration, MetalCapabilities, MetalKernelCache,
     AsyncMatmulBatch, flash_attention_metal, fused_rms_norm_silu_metal,
     matmul_f32_metal, matmul_q4_0_metal, softmax_f32_metal,
-    MetalMultiGpuContext, UnifiedMemoryPool, AsyncCommandQueue,
+    MultiGpuMetalContext,
 };
 
 // ─── Hardware detection ───────────────────────────────────────────────────────

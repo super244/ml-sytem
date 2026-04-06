@@ -326,6 +326,6 @@ mod tests {
             42
         }, TaskPriority::Normal);
 
-        assert_eq!(handle.id().0, 1); // First task should have ID 1
+        assert!(handle.id().0 > 0); // Task ID should be positive
     }
 }

@@ -187,7 +187,7 @@ impl DeviceMemory {
     /// Allocate device memory
     pub fn allocate<T>(&self, count: usize) -> Result<cudarc::driver::CudaSlice<T>>
     where
-        T: cudarc::driver::DeviceRepr,
+        T: cudarc::driver::DeviceRepr + cudarc::driver::ValidAsZeroBits,
     {
         let slice = self
             .device
@@ -342,7 +342,7 @@ mod tests {
         let pool = MemoryPool::new(1024);
 
         let ptr1 = pool.allocate().unwrap();
-        let ptr2 = pool.allocate().unwrap();
+        let _ptr2 = pool.allocate().unwrap();
 
         assert_eq!(pool.allocated_count(), 2);
 
@@ -350,7 +350,7 @@ mod tests {
         assert_eq!(pool.free_count(), 1);
 
         // Reuse from free list
-        let ptr3 = pool.allocate().unwrap();
+        let _ptr3 = pool.allocate().unwrap();
         assert_eq!(pool.allocated_count(), 2); // No new allocation
     }
 
@@ -359,7 +359,7 @@ mod tests {
         let allocator = UnifiedMemoryAllocator::new();
 
         let ptr1 = allocator.allocate(1024).unwrap();
-        let ptr2 = allocator.allocate(2048).unwrap();
+        let _ptr2 = allocator.allocate(2048).unwrap();
 
         assert_eq!(allocator.current_usage(), 3072);
         assert_eq!(allocator.peak_usage(), 3072);

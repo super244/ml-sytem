@@ -5,7 +5,7 @@
 //! - Ring-based algorithms for bandwidth efficiency
 //! - Automatic topology detection and optimization
 
-use anyhow::{anyhow, Result};
+use anyhow::Result;
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 
@@ -124,7 +124,7 @@ pub fn all_reduce(
 ///
 /// This algorithm reduces bandwidth requirement from O(n) to O(2*(n-1)/n)
 /// by passing data around a ring instead of all-to-all communication.
-fn ring_allreduce(data: &mut [f32], _communicator: &TitanCommunicator) -> Result<()> {
+fn ring_allreduce(_data: &mut [f32], _communicator: &TitanCommunicator) -> Result<()> {
     // Implementation:
     // 1. Scatter-reduce: Each rank sends to next, accumulating
     // 2. All-gather: Each rank sends full data to next
@@ -135,7 +135,7 @@ fn ring_allreduce(data: &mut [f32], _communicator: &TitanCommunicator) -> Result
 
 /// Broadcast data from master to all ranks
 pub fn broadcast(
-    data: &mut [f32],
+    _data: &mut [f32],
     communicator: &TitanCommunicator,
 ) -> Result<()> {
     if communicator.world_size() == 1 {
