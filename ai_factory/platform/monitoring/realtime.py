@@ -3,6 +3,8 @@
 import logging
 from typing import Any
 
+from ai_factory.core.monitoring.metrics import build_utilization_rollup
+
 logger = logging.getLogger(__name__)
 
 
@@ -39,7 +41,31 @@ class IntelligentAlertManager:
         alerts: list[str] = []
         if metrics.get("cpu_usage_pct", 0) > 90.0:
             alerts.append("High CPU Usage Detected")
+        if metrics.get("gpu_utilization_pct", 0) > 90.0:
+            alerts.append("High GPU Utilization Detected")
+        if metrics.get("anomalies"):
+            alerts.append(f"{len(metrics['anomalies'])} anomaly signal(s) detected")
         return alerts
+
+    def build_alert_payloads(self, metrics: dict[str, Any]) -> list[dict[str, Any]]:
+        """Build structured alert payloads for downstream dashboards."""
+        rollup = metrics.get("utilization_rollup") or build_utilization_rollup(metrics)
+        payloads: list[dict[str, Any]] = []
+        for message in self.evaluate_metrics(metrics):
+            severity = "critical" if "anomaly" in message.lower() else "warning"
+            payloads.append(
+                {
+                    "message": message,
+                    "severity": severity,
+                    "utilization_rollup": rollup,
+                    "observed": {
+                        "cpu_usage_pct": metrics.get("cpu_usage_pct"),
+                        "gpu_utilization_pct": metrics.get("gpu_utilization_pct"),
+                        "memory_usage_mb": metrics.get("memory_usage_mb"),
+                    },
+                }
+            )
+        return payloads
 
     def dispatch_alert(self, alert_msg: str) -> None:
         """Dispatches an alert to configured notification channels."""
@@ -71,9 +97,30 @@ class PerformanceAnalyzer:
     def __init__(self, history_window_minutes: int = 60) -> None:
         self.history_window_minutes = history_window_minutes
 
-    def analyze_trends(self, current_metrics: dict[str, Any]) -> dict[str, str]:
+    def analyze_trends(self, current_metrics: dict[str, Any]) -> dict[str, Any]:
         """Analyzes trends and returns a report on system performance health."""
-        return {"status": "healthy", "trend": "stable"}
+        utilization_rollup = build_utilization_rollup(current_metrics)
+        anomalies: list[dict[str, Any]] = []
+        if current_metrics.get("cpu_usage_pct", 0) > 90.0:
+            anomalies.append(
+                {"metric": "cpu_usage_pct", "value": current_metrics.get("cpu_usage_pct"), "severity": "high"}
+            )
+        if current_metrics.get("gpu_utilization_pct", 0) > 90.0:
+            anomalies.append(
+                {
+                    "metric": "gpu_utilization_pct",
+                    "value": current_metrics.get("gpu_utilization_pct"),
+                    "severity": "high",
+                }
+            )
+        status = "degraded" if anomalies else "healthy"
+        trend = "volatile" if anomalies else "stable"
+        return {
+            "status": status,
+            "trend": trend,
+            "utilization_rollup": utilization_rollup,
+            "anomalies": anomalies,
+        }
 
 
 class RealTimeMonitoringSystem:
@@ -118,6 +165,7 @@ class RealTimeMonitoringSystem:
 
         # 3. Alert
         alerts = self.alert_manager.evaluate_metrics(metrics)
+        alert_payloads = self.alert_manager.build_alert_payloads(metrics)
         for alert in alerts:
             self.alert_manager.dispatch_alert(alert)
 
@@ -126,6 +174,7 @@ class RealTimeMonitoringSystem:
             "metrics": metrics,
             "analysis": analysis,
             "alerts": alerts,
+            "alert_payloads": alert_payloads,
         }
         self.streamer.broadcast_update(payload)
 

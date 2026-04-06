@@ -8,7 +8,7 @@ def _write(path: Path, body: str) -> None:
     path.write_text(body)
 
 
-def test_build_workspace_overview_discovers_profiles_and_commands(tmp_path: Path):
+def test_build_workspace_overview_discovers_profiles_and_commands(tmp_path: Path) -> None:
     _write(tmp_path / "data" / "catalog.json", '{"summary": {"num_datasets": 2}}')
     _write(
         tmp_path / "data" / "processed" / "pack_summary.json",
@@ -45,7 +45,17 @@ def test_build_workspace_overview_discovers_profiles_and_commands(tmp_path: Path
     )
     _write(
         tmp_path / "inference" / "configs" / "model_registry.yaml",
-        "models:\n  - name: base\n    base_model: Qwen/Qwen2.5-Math-1.5B-Instruct\n",
+        (
+            "models:\n"
+            "  - name: base\n"
+            "    label: Base 1.5B\n"
+            "    base_model: Qwen/Qwen2.5-Math-1.5B-Instruct\n"
+            "    parameter_size_b: 1.5\n"
+            "    quantization: 4bit\n"
+            "    tier: baseline\n"
+            "    tags: [baseline, local]\n"
+            "    scale_tags: [baseline, local]\n"
+        ),
     )
 
     overview = build_workspace_overview(tmp_path)
@@ -56,7 +66,12 @@ def test_build_workspace_overview_discovers_profiles_and_commands(tmp_path: Path
     assert overview["summary"]["training_profiles"] == 1
     assert overview["summary"]["evaluation_configs"] == 1
     assert overview["summary"]["orchestration_templates"] == 1
+    assert overview["models"][0]["parameter_size_label"] == "1.5B"
+    assert overview["models"][0]["quantization"] == "4bit"
+    assert overview["models"][0]["availability_context"]["state"] == "available"
     assert any(recipe["id"] == "refresh-lab" for recipe in overview["command_recipes"])
+    assert any(recipe["command"] == "ai-factory refresh-lab" for recipe in overview["command_recipes"])
+    assert any(recipe["command"] == "ai-factory doctor --json" for recipe in overview["command_recipes"])
     assert any(capability["id"] == "feedback-loop" for capability in overview["orchestration_capabilities"])
     assert overview["orchestration_templates"][0]["orchestration_mode"] == "hybrid"
     assert overview["summary"]["interfaces"] == 4
@@ -64,3 +79,21 @@ def test_build_workspace_overview_discovers_profiles_and_commands(tmp_path: Path
     assert any(tier["id"] == "beginner" for tier in overview["experience_tiers"])
     assert any(extension["id"] == "qlora" for extension in overview["extension_points"])
     assert any(extension["id"] == "benchmark:benchmark_holdout" for extension in overview["extension_points"])
+
+
+def test_build_workspace_overview_reports_invalid_catalog_asset(tmp_path: Path) -> None:
+    _write(
+        tmp_path / "data" / "catalog.json",
+        "version https://git-lfs.github.com/spec/v1\noid sha256:deadbeef\nsize 10\n",
+    )
+    _write(tmp_path / "data" / "processed" / "pack_summary.json", '{"packs": []}')
+    _write(tmp_path / "data" / "processed" / "manifest.json", '{"schema_version": "v2"}')
+    _write(tmp_path / "evaluation" / "benchmarks" / "registry.yaml", "benchmarks: []\n")
+    _write(tmp_path / "inference" / "configs" / "model_registry.yaml", "models: []\n")
+
+    overview = build_workspace_overview(tmp_path)
+
+    catalog_check = next(item for item in overview["readiness_checks"] if item["id"] == "dataset-catalog")
+    assert catalog_check["ok"] is False
+    assert overview["status"] == "degraded"
+    assert any("git lfs pull" in error for error in overview["errors"])

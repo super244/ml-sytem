@@ -4,7 +4,7 @@ from ai_factory.interfaces.web import main as web_main
 from ai_factory.interfaces.web.main import WebInterface
 
 
-def test_web_interface_injects_api_base_url_for_frontend(tmp_path, monkeypatch):
+def test_web_interface_injects_api_base_url_for_frontend(tmp_path, monkeypatch) -> None:
     (tmp_path / "frontend").mkdir()
     interface = WebInterface(repo_root=tmp_path)
 

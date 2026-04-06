@@ -1,100 +1,123 @@
 from __future__ import annotations
 
-import asyncio
-import json
-import uuid
-from pathlib import Path
 from typing import Any
 
-from fastapi import APIRouter, BackgroundTasks, HTTPException, status
+from fastapi import APIRouter, Depends, status
 from pydantic import BaseModel, Field
+
+from inference.app.config import get_settings
+from inference.app.dependencies import get_instance_service
+from inference.app.services.autonomous_lab import (
+    AutonomousExperimentRequest,
+    AutonomousExperimentResponse,
+    AutonomousLabService,
+)
+from inference.app.services.autonomous_lab import (
+    AutonomousLoopSnapshot as AutonomousCampaignSnapshot,
+)
+from inference.app.services.autonomous_loop_service import (
+    AutonomousLoopRun,
+    AutonomousLoopService,
+    AutonomousLoopSnapshot,
+)
+from inference.app.services.mission_control_service import AutonomyOverview, MissionControlService
 
 router = APIRouter(prefix="/experiments/autonomous", tags=["autonomous"])
 
-REPO_ROOT = Path(__file__).resolve().parents[3]
-EXPERIMENTS_FILE = REPO_ROOT / "data" / "autonomous" / "experiments.jsonl"
+
+class AutonomousLoopRunRequest(BaseModel):
+    max_actions: int = Field(default=2, ge=1, le=8)
+    dry_run: bool = False
+    start_instances: bool = False
 
 
-def _load_experiments() -> dict[str, dict[str, Any]]:
-    if not EXPERIMENTS_FILE.exists():
-        return {}
-    store: dict[str, dict[str, Any]] = {}
-    with open(EXPERIMENTS_FILE) as f:
-        for line in f:
-            line = line.strip()
-            if not line:
-                continue
-            try:
-                obj = json.loads(line)
-                store[obj["experiment_id"]] = obj
-            except Exception:
-                pass
-    return store
+class AutonomousLoopPlanRequest(BaseModel):
+    max_actions: int = Field(default=6, ge=1, le=25)
 
 
-def _save_experiment(exp: dict[str, Any]) -> None:
-    EXPERIMENTS_FILE.parent.mkdir(parents=True, exist_ok=True)
-    all_exps = _load_experiments()
-    all_exps[exp["experiment_id"]] = exp
-    with open(EXPERIMENTS_FILE, "w") as f:
-        for e in all_exps.values():
-            f.write(json.dumps(e) + "\n")
+def _loop_service(
+    settings: Any = Depends(get_settings), instance_service: Any = Depends(get_instance_service)
+) -> AutonomousLoopService:
+    return AutonomousLoopService(settings, instance_service=instance_service)
 
 
-async def _experiment_worker(experiment_id: str) -> None:
-    stages = ["running", "analyzing", "completed"]
-    for stage in stages:
-        await asyncio.sleep(2.0)  # Simulate workload progression
-        exps = _load_experiments()
-        if experiment_id in exps:
-            exps[experiment_id]["status"] = stage
-            _save_experiment(exps[experiment_id])
+def _lab_service(
+    settings: Any = Depends(get_settings), instance_service: Any = Depends(get_instance_service)
+) -> AutonomousLabService:
+    return AutonomousLabService(settings, instance_service=instance_service)
 
 
-class AutonomousExperimentRequest(BaseModel):
-    experiment_name: str = Field(..., description="The name of the autonomous experiment")
-    goal: str = Field(..., description="The primary goal or objective of the experiment")
-    parameters: dict[str, str | int | float | bool] | None = Field(
-        default=None, description="Optional parameters for the experiment"
+def _mission_control_service(
+    settings: Any = Depends(get_settings), instance_service: Any = Depends(get_instance_service)
+) -> MissionControlService:
+    return MissionControlService(settings, instance_service=instance_service)
+
+
+@router.get("", response_model=AutonomousLoopSnapshot)
+def autonomous_snapshot(service: AutonomousLoopService = Depends(_loop_service)) -> AutonomousLoopSnapshot:
+    return service.snapshot()
+
+
+@router.get("/overview", response_model=AutonomyOverview)
+def autonomous_overview(service: MissionControlService = Depends(_mission_control_service)) -> AutonomyOverview:
+    return service.autonomy_overview()
+
+
+@router.post("/plan", response_model=AutonomousLoopRun)
+def plan_autonomous_loop(
+    request: AutonomousLoopPlanRequest, service: AutonomousLoopService = Depends(_loop_service)
+) -> AutonomousLoopRun:
+    return service.plan(max_actions=request.max_actions)
+
+
+@router.post("/run", response_model=AutonomousLoopRun)
+def run_autonomous_loop(
+    request: AutonomousLoopRunRequest, service: AutonomousLoopService = Depends(_loop_service)
+) -> AutonomousLoopRun:
+    return service.execute(
+        max_actions=request.max_actions,
+        dry_run=request.dry_run,
+        start_instances=request.start_instances,
     )
 
 
-class AutonomousExperimentResponse(BaseModel):
-    experiment_id: str = Field(..., description="The unique identifier for the started experiment")
-    status: str = Field(..., description="The current status of the experiment")
-    message: str = Field(..., description="Status message regarding the experiment initiation")
+@router.post("/execute", response_model=AutonomousLoopRun)
+def execute_autonomous_loop(
+    request: AutonomousLoopRunRequest, service: AutonomousLoopService = Depends(_loop_service)
+) -> AutonomousLoopRun:
+    return service.execute(
+        max_actions=request.max_actions,
+        dry_run=request.dry_run,
+        start_instances=request.start_instances,
+    )
 
 
-@router.post("/run", response_model=AutonomousExperimentResponse, status_code=status.HTTP_202_ACCEPTED)
-async def run_autonomous_experiment(
-    request: AutonomousExperimentRequest, background_tasks: BackgroundTasks
+@router.get("/campaigns", response_model=AutonomousCampaignSnapshot)
+def autonomous_campaigns(service: AutonomousLabService = Depends(_lab_service)) -> AutonomousCampaignSnapshot:
+    return service.snapshot()
+
+
+@router.post("/campaigns/run", response_model=AutonomousExperimentResponse, status_code=status.HTTP_202_ACCEPTED)
+def run_autonomous_campaign(
+    request: AutonomousExperimentRequest, service: AutonomousLabService = Depends(_lab_service)
 ) -> AutonomousExperimentResponse:
-    """
-    Start a new autonomous AI-driven experiment.
-    """
-    experiment_id = f"exp_{uuid.uuid4().hex[:8]}"
-
-    exp_data = {
-        "experiment_id": experiment_id,
-        "experiment_name": request.experiment_name,
-        "goal": request.goal,
-        "parameters": request.parameters or {},
-        "status": "accepted",
-    }
-    _save_experiment(exp_data)
-
-    background_tasks.add_task(_experiment_worker, experiment_id)
-
+    campaign = service.create_campaign(request)
     return AutonomousExperimentResponse(
-        experiment_id=experiment_id,
-        status="accepted",
-        message=f"Autonomous experiment '{request.experiment_name}' started successfully.",
+        experiment_id=campaign.campaign_id,
+        status=campaign.status,
+        message=f"Autonomous campaign '{request.experiment_name}' created.",
+        campaign=campaign,
     )
 
 
-@router.get("/{experiment_id}")
-def get_experiment(experiment_id: str) -> dict[str, Any]:
-    exps = _load_experiments()
-    if experiment_id not in exps:
-        raise HTTPException(status_code=404, detail="Experiment not found")
-    return exps[experiment_id]
+@router.get("/campaigns/{experiment_id}", response_model=AutonomousExperimentResponse)
+def autonomous_campaign_detail(
+    experiment_id: str, service: AutonomousLabService = Depends(_lab_service)
+) -> AutonomousExperimentResponse:
+    campaign = service.get_campaign(experiment_id)
+    return AutonomousExperimentResponse(
+        experiment_id=campaign.campaign_id,
+        status=campaign.status,
+        message=f"Autonomous campaign '{campaign.experiment_name}'.",
+        campaign=campaign,
+    )

@@ -60,7 +60,7 @@ function createMenu() {
         {
           label: "About AI-Factory",
           click: () => {
-            shell.openExternal("https://github.com/super244/ml-sytem");
+            shell.openExternal("https://github.com/super244/ai-factory");
           },
         },
         { type: "separator" },

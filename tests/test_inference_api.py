@@ -37,10 +37,10 @@ def anyio_backend():
 
 
 @pytest.mark.anyio
-async def test_generate_endpoint(monkeypatch):
+async def test_generate_endpoint(monkeypatch) -> None:
     from inference.app.routers import generation as generation_router
 
-    monkeypatch.setattr(generation_router, "get_generation_service", lambda: DummyGenerationService())
+    app.dependency_overrides[generation_router.get_generation_service] = lambda: DummyGenerationService()
     transport = httpx.ASGITransport(app=app)
     async with httpx.AsyncClient(transport=transport, base_url="http://testserver") as client:
         response = await client.post(
@@ -67,7 +67,7 @@ async def test_generate_endpoint(monkeypatch):
 
 
 @pytest.mark.anyio
-async def test_models_endpoint_still_exposes_legacy_models_key(monkeypatch):
+async def test_models_endpoint_still_exposes_legacy_models_key(monkeypatch) -> None:
     transport = httpx.ASGITransport(app=app)
     async with httpx.AsyncClient(transport=transport, base_url="http://testserver") as client:
         response = await client.get("/v1/models")
@@ -77,3 +77,9 @@ async def test_models_endpoint_still_exposes_legacy_models_key(monkeypatch):
     assert "models" in body
     assert body["object"] == "list"
     assert isinstance(body["data"], list)
+    assert any(
+        model["metadata"]["parameter_size_label"] == "2B"
+        and "2b" in (model["metadata"].get("scale_tags") or [])
+        and model["metadata"]["availability_context"]["state"] == "available"
+        for model in body["data"]
+    )

@@ -3,7 +3,7 @@
 import asyncio
 import logging
 from collections.abc import AsyncIterator
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
@@ -15,6 +15,10 @@ from .metrics import MetricsCollector
 logger = logging.getLogger(__name__)
 
 
+def _utc_now() -> datetime:
+    return datetime.now(timezone.utc)
+
+
 class MonitoringManager:
     """Manages real-time monitoring of AI-Factory operations."""
 
@@ -24,7 +28,7 @@ class MonitoringManager:
         self.metrics_collector = MetricsCollector(config)
         self.alert_manager = AlertManager(config)
         self._running = False
-        self._monitoring_task: asyncio.Task | None = None
+        self._monitoring_task: asyncio.Task[Any] | None = None
         self._metrics_buffer: dict[str, Any] = {}
 
     async def start_monitoring(self) -> None:
@@ -79,13 +83,16 @@ class MonitoringManager:
         """Stream real-time metrics."""
         while self._running:
             metrics = await self.get_realtime_metrics(instance_id)
-            yield {"timestamp": datetime.utcnow().isoformat(), "metrics": metrics}
+            yield {"timestamp": _utc_now().isoformat(), "metrics": metrics}
             await asyncio.sleep(1)  # 1-second updates
 
     async def get_system_health(self) -> dict[str, Any]:
         """Get overall system health status."""
-        metrics = await self.metrics_collector.get_system_metrics()
+        metrics = await self.metrics_collector.collect_all_metrics()
         alerts = await self.alert_manager.get_active_alerts()
+        observability = metrics.get("observability") or {}
+        utilization_rollup = metrics.get("utilization_rollup") or observability.get("utilization_rollup") or {}
+        anomaly_summary = observability.get("anomalies", [])
 
         health_score = self._calculate_health_score(metrics, alerts)
 
@@ -93,6 +100,8 @@ class MonitoringManager:
             "health_score": health_score,
             "status": "healthy" if health_score > 0.8 else "degraded" if health_score > 0.5 else "unhealthy",
             "metrics": metrics,
+            "utilization_rollup": utilization_rollup,
+            "anomaly_summary": anomaly_summary,
             "active_alerts": len(alerts),
             "critical_alerts": len([a for a in alerts if a.severity == "critical"]),
         }
@@ -116,14 +125,32 @@ class MonitoringManager:
             elif alert.severity == "info":
                 base_score -= 0.05
 
-        # Consider resource utilization
-        cpu_usage = metrics.get("system", {}).get("cpu_usage", 0)
-        memory_usage = metrics.get("system", {}).get("memory_usage", 0)
+        utilization_rollup = (
+            metrics.get("utilization_rollup") or (metrics.get("observability") or {}).get("utilization_rollup") or {}
+        )
+        peak_utilization = utilization_rollup.get("peak_pct")
+        average_utilization = utilization_rollup.get("average_pct")
 
-        if cpu_usage > 90 or memory_usage > 90:
+        def _normalize_usage(value: Any) -> float:
+            if isinstance(value, (int, float)):
+                numeric = float(value)
+                return numeric * 100.0 if 0.0 <= numeric <= 1.0 else numeric
+            return 0.0
+
+        # Consider resource utilization and overload rollups.
+        cpu_usage = _normalize_usage(metrics.get("system", {}).get("cpu_usage", 0))
+        memory_usage = _normalize_usage(metrics.get("system", {}).get("memory_usage", 0))
+        peak_utilization = float(peak_utilization) if isinstance(peak_utilization, (int, float)) else 0.0
+        average_utilization = float(average_utilization) if isinstance(average_utilization, (int, float)) else 0.0
+
+        if cpu_usage > 90 or memory_usage > 90 or peak_utilization > 90:
             base_score -= 0.2
-        elif cpu_usage > 80 or memory_usage > 80:
+        elif cpu_usage > 80 or memory_usage > 80 or average_utilization > 80:
             base_score -= 0.1
+
+        anomaly_summary = (metrics.get("observability") or {}).get("anomalies", [])
+        if anomaly_summary:
+            base_score -= min(0.25, 0.05 * len(anomaly_summary))
 
         return max(0.0, base_score)
 

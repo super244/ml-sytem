@@ -8,7 +8,7 @@ COVERAGE_ARGS = --cov=ai_factory --cov=data --cov=training --cov=evaluation --co
 .PHONY: data-generate data-prepare data-validate data-audit data-preview
 
 # Training Operations
-.PHONY: train train-dry validate-model
+.PHONY: train train-dry train-preflight validate-model
 
 # Evaluation Operations
 .PHONY: evaluate analyze-failures
@@ -17,7 +17,10 @@ COVERAGE_ARGS = --cov=ai_factory --cov=data --cov=training --cov=evaluation --co
 .PHONY: frontend-install frontend-dev frontend-build frontend-check
 
 # System Operations
-.PHONY: docker-up docker-down smoke
+.PHONY: docker-up docker-down smoke optimize optimize-detect optimize-benchmark
+
+# Optimization Operations
+.PHONY: optimize optimize-detect optimize-benchmark
 
 help:
 	@echo "AI-Factory Developer Commands"
@@ -37,7 +40,11 @@ help:
 	@echo "Data:       make data-generate    Generate synthetic datasets"
 	@echo "            make data-prepare     Normalize + pack datasets"
 	@echo "Training:   make train-dry        Dry-run training validation"
+	@echo "            make train-preflight  Hard fail preflight before a real run"
 	@echo "            make train            Run full training"
+	@echo "Optimize:   make optimize-detect  Detect hardware capabilities"
+	@echo "            make optimize-benchmark Run performance benchmark"
+	@echo "            make optimize-profile Show recommended optimization profile"
 	@echo "Eval:       make evaluate         Run evaluation pipeline"
 
 # Development Setup
@@ -103,6 +110,9 @@ train:
 train-dry:
 	$(PYTHON) -m training.train --config training/configs/profiles/failure_aware.yaml --dry-run
 
+train-preflight:
+	$(PYTHON) -m ai_factory.cli train-preflight --config training/configs/profiles/failure_aware.yaml
+
 validate-model:
 	$(PYTHON) -m training.train --config training/configs/profiles/failure_aware.yaml --dry-run --validate-model-load
 
@@ -129,26 +139,36 @@ frontend-check:
 
 # Docker Operations
 docker-up:
-	docker-compose up -d
+	docker compose up -d
 
 docker-down:
-	docker-compose down
+	docker compose down
 
 # Legacy Aliases (for backward compatibility)
 refresh-lab:
-	$(PYTHON) scripts/refresh_lab.py
+	$(PYTHON) -m ai_factory.cli refresh-lab
 
 latest-run:
-	$(PYTHON) scripts/latest_run.py
+	$(PYTHON) -m ai_factory.cli latest-run
 
 api-smoke:
-	$(PYTHON) scripts/api_smoke.py
+	$(PYTHON) -m ai_factory.cli api-smoke
 
 titan-status:
 	$(PYTHON) -m ai_factory.cli titan status
 
 titan-doc:
 	$(PYTHON) -m ai_factory.cli titan hardware-doc
+
+# Optimization targets
+optimize-detect:
+	$(PYTHON) -m ai_factory.cli optimize detect
+
+optimize-benchmark:
+	$(PYTHON) -m ai_factory.cli optimize benchmark
+
+optimize-profile:
+	$(PYTHON) -m ai_factory.cli optimize profile
 
 generate-datasets: data-generate
 

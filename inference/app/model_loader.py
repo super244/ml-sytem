@@ -1,14 +1,17 @@
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import asdict, dataclass, field, fields
 from pathlib import Path
 from threading import Lock
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 import torch
 import yaml
-from peft import PeftModel
-from transformers import AutoModelForCausalLM, AutoTokenizer, BitsAndBytesConfig
+
+from inference.app.model_catalog import normalize_model_record
+
+if TYPE_CHECKING:
+    from transformers import BitsAndBytesConfig
 
 
 @dataclass
@@ -23,17 +26,35 @@ class ModelSpec:
     label: str | None = None
     description: str | None = None
     tags: list[str] = field(default_factory=list)
+    parameter_size_b: float | None = None
+    parameter_size_label: str | None = None
+    quantization: str | None = None
+    tier: str | None = None
+    scale_tags: list[str] = field(default_factory=list)
+    metadata: dict[str, Any] = field(default_factory=dict)
 
     @property
     def available(self) -> bool:
-        if self.adapter_path is None:
+        if not self.adapter_path:
             return True
         return Path(self.adapter_path).exists()
 
 
+def _build_model_spec(item: dict[str, Any]) -> ModelSpec:
+    model_fields = {field.name for field in fields(ModelSpec)}
+    spec_payload: dict[str, Any] = {key: value for key, value in item.items() if key in model_fields}
+    extra_payload = {key: value for key, value in item.items() if key not in model_fields}
+    metadata = dict(spec_payload.get("metadata") or {})
+    if extra_payload:
+        metadata.update(extra_payload)
+    if metadata:
+        spec_payload["metadata"] = metadata
+    return ModelSpec(**spec_payload)
+
+
 def load_registry_from_yaml(path: str | Path) -> dict[str, ModelSpec]:
     payload = yaml.safe_load(Path(path).read_text()) or {}
-    return {item["name"]: ModelSpec(**item) for item in payload.get("models", [])}
+    return {item["name"]: _build_model_spec(item) for item in payload.get("models", [])}
 
 
 def resolve_dtype(name: str) -> torch.dtype:
@@ -46,6 +67,8 @@ def resolve_dtype(name: str) -> torch.dtype:
 
 
 def build_quant_config(spec: ModelSpec) -> BitsAndBytesConfig | None:
+    from transformers import BitsAndBytesConfig
+
     if spec.load_in_4bit:
         return BitsAndBytesConfig(
             load_in_4bit=True,
@@ -83,6 +106,9 @@ class MathModelRuntime:
                 raise FileNotFoundError(
                     f"Adapter path for model '{self.spec.name}' was not found: {self.spec.adapter_path}"
                 )
+            from peft import PeftModel
+            from transformers import AutoModelForCausalLM, AutoTokenizer
+
             tokenizer = AutoTokenizer.from_pretrained(
                 self.spec.base_model,
                 trust_remote_code=self.spec.trust_remote_code,
@@ -112,15 +138,15 @@ class MathModelRegistry:
 
     def list_models(self) -> list[dict[str, Any]]:
         return [
-            {
-                "name": name,
-                "label": runtime.spec.label or name,
-                "description": runtime.spec.description,
-                "base_model": runtime.spec.base_model,
-                "adapter_path": runtime.spec.adapter_path,
-                "available": runtime.is_available(),
-                "tags": runtime.spec.tags,
-            }
+            normalize_model_record(
+                {
+                    **asdict(runtime.spec),
+                    "name": name,
+                    "base_model": runtime.spec.base_model,
+                },
+                source="runtime",
+                available=runtime.is_available(),
+            )
             for name, runtime in self._runtimes.items()
         ]
 

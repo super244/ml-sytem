@@ -6,6 +6,7 @@ from pathlib import Path
 from ai_factory.core.control.service import FactoryControlService
 from ai_factory.core.instances.manager import InstanceManager
 from ai_factory.core.instances.store import FileInstanceStore
+from ai_factory.core.lineage.registry import LineageRegistry
 from ai_factory.core.orchestration.service import OrchestrationService
 from ai_factory.core.orchestration.sqlite import SqliteControlPlane
 from ai_factory.core.platform.settings import PlatformSettings, get_platform_settings
@@ -20,6 +21,7 @@ class PlatformContainer:
     plugin_registry: PluginRegistry
     orchestration: OrchestrationService
     manager: InstanceManager
+    lineage_registry: LineageRegistry
     control_service: FactoryControlService
 
 
@@ -39,11 +41,13 @@ def build_platform_container(
         platform_settings=settings,
         plugin_registry=plugin_registry,
     )
+    lineage_registry = LineageRegistry(settings.artifacts_dir / "lineage")
     control_service = FactoryControlService(
         manager=manager,
         store=store,
         settings=settings,
         plugin_registry=plugin_registry,
+        lineage_registry=lineage_registry,
     )
     return PlatformContainer(
         settings=settings,
@@ -52,5 +56,6 @@ def build_platform_container(
         plugin_registry=plugin_registry,
         orchestration=orchestration,
         manager=manager,
+        lineage_registry=lineage_registry,
         control_service=control_service,
     )

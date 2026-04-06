@@ -31,15 +31,18 @@ def workspace_overview_fast() -> dict:
 def workspace_status() -> dict[str, Any]:
     """Get workspace status without heavy operations."""
     try:
-        from inference.app.workspace import REPO_ROOT, _build_readiness_checks
+        from inference.app.workspace import REPO_ROOT, build_workspace_overview_fast
 
-        repo_root = REPO_ROOT
-        readiness_checks = _build_readiness_checks(repo_root)
+        payload = build_workspace_overview_fast(REPO_ROOT)
+        readiness_checks = payload["readiness_checks"]
         ready_count = sum(1 for item in readiness_checks if item["ok"])
 
         return {
-            "status": "ready" if ready_count == len(readiness_checks) else "partial",
-            "repo_root": str(repo_root),
+            "status": "ready"
+            if payload.get("status") == "available" and ready_count == len(readiness_checks)
+            else "degraded",
+            "errors": payload.get("errors", []),
+            "repo_root": str(REPO_ROOT),
             "ready_checks": ready_count,
             "total_checks": len(readiness_checks),
             "checks": readiness_checks,

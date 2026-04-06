@@ -31,18 +31,67 @@ def parse_args() -> argparse.Namespace:
 
 
 def load_config(path: str) -> dict[str, Any]:
-    return yaml.safe_load(Path(path).read_text())
+    config_path = Path(path).expanduser()
+    if not config_path.exists():
+        raise FileNotFoundError(f"Evaluation config not found: {config_path}")
+    payload = yaml.safe_load(config_path.read_text())
+    if not isinstance(payload, dict):
+        raise ValueError(f"Evaluation config must be a mapping: {config_path}")
+    return payload
 
 
-def build_generator(config: dict[str, Any]) -> MathGenerator:
-    model_registry = MathModelRegistry(load_registry_from_yaml(config["models"]["registry_path"]))
-    prompt_presets = load_prompt_presets(config["prompt_library_path"])
-    return MathGenerator(model_registry, prompt_presets=prompt_presets)
+def _require_mapping(config: dict[str, Any], key: str) -> dict[str, Any]:
+    value = config.get(key)
+    if not isinstance(value, dict):
+        raise ValueError(f"Evaluation config must define a '{key}' mapping.")
+    return value
+
+
+def _resolve_repo_path(value: str) -> str:
+    path = Path(value).expanduser()
+    if path.is_absolute():
+        return str(path)
+    return str((REPO_ROOT / path).resolve())
+
+
+def validate_model_availability(registry: MathModelRegistry, model_names: list[str]) -> None:
+    missing: list[str] = []
+    for name in model_names:
+        runtime = registry.get_runtime(name)
+        if runtime.spec.adapter_path and not runtime.is_available():
+            missing.append(f"{name} -> {runtime.spec.adapter_path}")
+    if missing:
+        missing_lines = "\n".join(f"  - {item}" for item in missing)
+        raise FileNotFoundError(
+            "Model artifacts required for evaluation are missing:\n"
+            f"{missing_lines}\n"
+            "Run training and packaging first (for example `make train`) or point the model registry "
+            "to an existing adapter artifact."
+        )
+
+
+def build_generator(config: dict[str, Any]) -> tuple[MathGenerator, MathModelRegistry]:
+    models = _require_mapping(config, "models")
+    registry_path = models.get("registry_path")
+    if not registry_path:
+        raise ValueError("Evaluation config must define models.registry_path.")
+    prompt_library_path = config.get("prompt_library_path")
+    if not prompt_library_path:
+        raise ValueError("Evaluation config must define prompt_library_path.")
+    model_registry = MathModelRegistry(load_registry_from_yaml(_resolve_repo_path(str(registry_path))))
+    prompt_presets = load_prompt_presets(_resolve_repo_path(str(prompt_library_path)))
+    return MathGenerator(model_registry, prompt_presets=prompt_presets), model_registry
 
 
 def merged_generation_config(config: dict[str, Any], side: str) -> dict[str, Any]:
-    merged = dict(config.get("generation", {}))
-    merged.update(config.get(f"{side}_generation_overrides", {}))
+    generation = config.get("generation") or {}
+    if not isinstance(generation, dict):
+        raise ValueError("Evaluation config generation settings must be a mapping.")
+    overrides = config.get(f"{side}_generation_overrides") or {}
+    if not isinstance(overrides, dict):
+        raise ValueError(f"Evaluation config {side}_generation_overrides must be a mapping.")
+    merged = dict(generation)
+    merged.update(overrides)
     return merged
 
 
@@ -104,25 +153,36 @@ def run_generation(
 def main() -> None:
     args = parse_args()
     config = load_config(args.config)
+    benchmark_config = _require_mapping(config, "benchmark")
+    models_config = _require_mapping(config, "models")
+    output_dir_value = config.get("output_dir")
+    if not output_dir_value:
+        raise ValueError("Evaluation config must define output_dir.")
+    registry_path = benchmark_config.get("registry_path")
+    if not registry_path:
+        raise ValueError("Evaluation config must define benchmark.registry_path.")
+    if "primary_model" not in models_config or "secondary_model" not in models_config:
+        raise ValueError("Evaluation config must define models.primary_model and models.secondary_model.")
     benchmark_file, benchmark_entry = resolve_benchmark_file(
-        registry_path=config["benchmark"]["registry_path"],
-        benchmark_id=config["benchmark"].get("benchmark_id"),
-        benchmark_file=config["benchmark"].get("benchmark_file"),
+        registry_path=_resolve_repo_path(str(registry_path)),
+        benchmark_id=benchmark_config.get("benchmark_id"),
+        benchmark_file=benchmark_config.get("benchmark_file"),
     )
     benchmark = read_jsonl(benchmark_file)
-    generator = build_generator(config)
-    output_dir = Path(config["output_dir"])
+    generator, model_registry = build_generator(config)
+    output_dir = Path(output_dir_value).expanduser()
     output_dir.mkdir(parents=True, exist_ok=True)
 
-    primary_model = config["models"]["primary_model"]
-    secondary_model = config["models"]["secondary_model"]
+    primary_model = models_config["primary_model"]
+    secondary_model = models_config["secondary_model"]
+    validate_model_availability(model_registry, [primary_model, secondary_model])
     labels = {
-        "primary": config["models"].get("primary_label", primary_model),
-        "secondary": config["models"].get("secondary_label", secondary_model),
+        "primary": models_config.get("primary_label", primary_model),
+        "secondary": models_config.get("secondary_label", secondary_model),
     }
     model_costs = {
-        "input_cost_per_million": config["models"].get("input_cost_per_million"),
-        "output_cost_per_million": config["models"].get("output_cost_per_million"),
+        "input_cost_per_million": models_config.get("input_cost_per_million"),
+        "output_cost_per_million": models_config.get("output_cost_per_million"),
     }
 
     results: list[dict[str, Any]] = []
@@ -161,7 +221,17 @@ def main() -> None:
         )
         results.append(result)
 
-    summary = build_summary(results, labels=labels)
+    summary = build_summary(
+        results,
+        labels=labels,
+        metadata={
+            "benchmark_id": benchmark_entry.get("id"),
+            "benchmark_path": benchmark_file,
+            "benchmark_resolved_path": benchmark_entry.get("resolved_path"),
+            "run_name": output_dir.name,
+            "output_dir": str(output_dir),
+        },
+    )
     write_jsonl(output_dir / "per_example.jsonl", results)
     write_json(output_dir / "summary.json", summary)
     write_json(
@@ -179,4 +249,7 @@ def main() -> None:
 
 
 if __name__ == "__main__":
-    main()
+    try:
+        main()
+    except Exception as exc:
+        raise SystemExit(f"Evaluation failed: {exc}") from exc

@@ -11,6 +11,7 @@ from ai_factory.core.artifacts import sha256_file
 from ai_factory.core.io import write_json, write_jsonl, write_markdown
 from ai_factory.core.schemas import DatasetBuildInfo, DatasetFileInfo, DatasetManifest
 from data.adapters.base import iter_source_rows, load_public_registry, matches_filters, normalize_public_record
+from data.quality.profiles import build_dataset_profile
 from data.quality.scoring import estimate_quality_score
 from data.reports.cards import dataset_card_text
 
@@ -71,6 +72,9 @@ def main() -> None:
                 for row in normalized_rows[:5]
             ],
         }
+        profile_summary = build_dataset_profile(normalized_rows, title=entry.title)
+        entry_payload["profile_summary"] = profile_summary
+        entry_payload["quality_summary"] = profile_summary.get("quality_summary", {})
         write_markdown(output_path.with_suffix(".md"), dataset_card_text(entry_payload))
         manifest = DatasetManifest(
             manifest_type="dataset",
@@ -92,6 +96,8 @@ def main() -> None:
                 "default_weight": entry.default_weight,
                 "benchmark_tags": entry.benchmark_tags,
                 "expected_topic": entry.expected_topic,
+                "profile_summary": profile_summary,
+                "quality_summary": profile_summary.get("quality_summary", {}),
             },
         )
         write_json(output_path.with_suffix(".manifest.json"), manifest.model_dump())

@@ -9,7 +9,10 @@ require_final_answer: false
 sources:
   - data/examples/math_reasoning_examples.jsonl
   - data/custom/*.jsonl
-  - data/public/normalized/*.jsonl
+  - id: public_normalized
+    kind: local
+    path: data/public/normalized/*.jsonl
+    optional: true
 failure_logs: []
 topic_allowlist: []
 source_allowlist: []
@@ -22,6 +25,8 @@ derived_packs:
   - verification_pack
   - benchmark_holdout_pack
 output_dir: data/processed
+emit_sqlite: true
+sqlite_output_path: corpus.sqlite
 system_prompt: |
   You are training Atlas Math Lab, a specialist model for advanced calculus and olympiad reasoning.
   Solve each problem carefully, show rigorous reasoning, and end with a line formatted exactly as:

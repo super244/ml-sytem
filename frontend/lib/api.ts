@@ -1,47 +1,47 @@
-import { titanStatusSchema, type TitanStatus } from "@/lib/titan-schema";
+import { titanStatusSchema, type TitanStatus } from '@/lib/titan-schema';
 
-export type { TitanStatus } from "@/lib/titan-schema";
+export type { TitanStatus } from '@/lib/titan-schema';
 
 export type ModelVariant = string;
-export type Difficulty = "easy" | "medium" | "hard" | "olympiad";
-export type SolverMode = "rigorous" | "exam" | "concise" | "verification";
-export type OutputFormat = "text" | "json";
-export type TrainingOrigin = "existing_model" | "from_scratch";
+export type Difficulty = 'easy' | 'medium' | 'hard' | 'olympiad';
+export type SolverMode = 'rigorous' | 'exam' | 'concise' | 'verification';
+export type OutputFormat = 'text' | 'json';
+export type TrainingOrigin = 'existing_model' | 'from_scratch';
 export type LearningMode =
-  | "supervised"
-  | "unsupervised"
-  | "rlhf"
-  | "dpo"
-  | "orpo"
-  | "ppo"
-  | "lora"
-  | "qlora"
-  | "full_finetune";
+  | 'supervised'
+  | 'unsupervised'
+  | 'rlhf'
+  | 'dpo'
+  | 'orpo'
+  | 'ppo'
+  | 'lora'
+  | 'qlora'
+  | 'full_finetune';
 export type DeploymentTarget =
-  | "huggingface"
-  | "ollama"
-  | "lmstudio"
-  | "api"
-  | "openai_compatible_api"
-  | "custom_api";
+  | 'huggingface'
+  | 'ollama'
+  | 'lmstudio'
+  | 'api'
+  | 'openai_compatible_api'
+  | 'custom_api';
 export type LifecycleStage =
-  | "prepare"
-  | "train"
-  | "evaluate"
-  | "decide"
-  | "finetune"
-  | "infer"
-  | "publish";
+  | 'prepare'
+  | 'train'
+  | 'evaluate'
+  | 'decide'
+  | 'finetune'
+  | 'infer'
+  | 'publish';
 
 export type ArchitectureSpec = {
   base_model: string;
   context_window?: number;
   parameter_size_b?: number | null;
-  quantization?: "4bit" | "8bit" | "16bit" | "none";
+  quantization?: '4bit' | '8bit' | '16bit' | 'none';
   lora_target_modules?: string[] | null;
   lora_rank?: number | null;
   lora_alpha?: number | null;
-  metadata?: Record<string, any>;
+  metadata?: Record<string, unknown>;
 };
 
 export type EvaluationSuiteSpec = {
@@ -162,6 +162,17 @@ export type GenerateResult = {
   latency_s?: number | null;
   prompt_preset?: string | null;
   candidate_agreement?: number;
+  runtime?: {
+    selected: string;
+    execution_path: string;
+    source: string;
+    canary_requested?: boolean;
+    canary_active?: boolean;
+    gguf_support?: boolean;
+    kv_cache?: boolean;
+    sampler_stack?: string[];
+    reason?: string | null;
+  } | null;
 };
 
 export type GenerateResponse = GenerateResult & {
@@ -211,7 +222,7 @@ export type CompareRequest = {
 const REQUEST_TIMEOUT_MS = 20_000;
 
 function normalizeBase(base: string): string {
-  return base.replace(/\/$/, "");
+  return base.replace(/\/$/, '');
 }
 
 function resolveApiBases(): string[] {
@@ -220,9 +231,10 @@ function resolveApiBases(): string[] {
     return [normalizeBase(configured)];
   }
 
-  const bases = ["http://127.0.0.1:8000", "http://localhost:8000"];
-  if (typeof window !== "undefined") {
-    const protocol = window.location.protocol === "https:" ? "https:" : "http:";
+  const bases = ['http://127.0.0.1:8000', 'http://localhost:8000'];
+  if (typeof window !== 'undefined') {
+    bases.unshift(window.location.origin);
+    const protocol = window.location.protocol === 'https:' ? 'https:' : 'http:';
     bases.unshift(`${protocol}//${window.location.hostname}:8000`);
   }
 
@@ -230,46 +242,46 @@ function resolveApiBases(): string[] {
 }
 
 function extractErrorMessage(payload: unknown): string | null {
-  if (typeof payload === "string") {
+  if (typeof payload === 'string') {
     return payload.trim() || null;
   }
 
-  if (!payload || typeof payload !== "object" || Array.isArray(payload)) {
+  if (!payload || typeof payload !== 'object' || Array.isArray(payload)) {
     return null;
   }
 
   const record = payload as Record<string, unknown>;
   const detail = record.detail;
-  if (typeof detail === "string" && detail.trim()) {
+  if (typeof detail === 'string' && detail.trim()) {
     return detail;
   }
   if (Array.isArray(detail) && detail.length > 0) {
     return detail
       .map((entry) => {
-        if (typeof entry === "string") {
+        if (typeof entry === 'string') {
           return entry;
         }
-        if (entry && typeof entry === "object" && !Array.isArray(entry)) {
+        if (entry && typeof entry === 'object' && !Array.isArray(entry)) {
           const nested = entry as Record<string, unknown>;
-          const location = Array.isArray(nested.loc) ? nested.loc.join(".") : null;
-          const message = typeof nested.msg === "string" ? nested.msg : null;
-          return [location, message].filter(Boolean).join(": ");
+          const location = Array.isArray(nested.loc) ? nested.loc.join('.') : null;
+          const message = typeof nested.msg === 'string' ? nested.msg : null;
+          return [location, message].filter(Boolean).join(': ');
         }
-        return "";
+        return '';
       })
       .filter(Boolean)
-      .join("; ");
+      .join('; ');
   }
 
   const error = record.error;
-  if (error && typeof error === "object" && !Array.isArray(error)) {
+  if (error && typeof error === 'object' && !Array.isArray(error)) {
     const nested = error as Record<string, unknown>;
-    if (typeof nested.message === "string" && nested.message.trim()) {
+    if (typeof nested.message === 'string' && nested.message.trim()) {
       return nested.message;
     }
   }
 
-  if (typeof record.message === "string" && record.message.trim()) {
+  if (typeof record.message === 'string' && record.message.trim()) {
     return record.message;
   }
 
@@ -343,7 +355,7 @@ export type DatasetLineageSummary = {
 
 export type DatasetManifest = {
   schema_version: string;
-  manifest_type: "dataset" | "pack" | "benchmark";
+  manifest_type: 'dataset' | 'pack' | 'benchmark';
   build: DatasetBuildInfo;
   pack_id?: string | null;
   description?: string | null;
@@ -367,7 +379,7 @@ export type DatasetManifest = {
 export type DatasetEntry = {
   id: string;
   title: string;
-  kind: "custom" | "public";
+  kind: 'custom' | 'public';
   family: string;
   topic: string;
   path: string;
@@ -433,8 +445,18 @@ export type PromptExample = {
 };
 
 export type PromptLibrary = {
+  status?: 'available' | 'degraded';
+  errors?: string[];
   presets: PromptPreset[];
   examples: PromptExample[];
+};
+
+export type ModelAvailabilityContext = {
+  state: 'available' | 'missing' | 'degraded' | 'unknown';
+  detail?: string | null;
+  adapter_path?: string | null;
+  adapter_path_exists?: boolean | null;
+  source?: string | null;
 };
 
 export type ModelInfo = {
@@ -445,6 +467,17 @@ export type ModelInfo = {
   adapter_path?: string | null;
   available: boolean;
   tags?: string[];
+  scale_tags?: string[];
+  parameter_size_b?: number | null;
+  parameter_size_label?: string | null;
+  quantization?: '4bit' | '8bit' | '16bit' | 'none' | string | null;
+  tier?: string | null;
+  load_in_4bit?: boolean;
+  load_in_8bit?: boolean;
+  dtype?: string | null;
+  trust_remote_code?: boolean;
+  metadata?: Record<string, unknown>;
+  availability_context?: ModelAvailabilityContext;
 };
 
 export type BenchmarkInfo = {
@@ -473,7 +506,18 @@ export type RunInfo = {
 export type StatusInfo = {
   title: string;
   version: string;
+  status?: 'available' | 'degraded';
+  errors?: string[];
   models: ModelInfo[];
+  model_inventory?: {
+    total: number;
+    ready: number;
+    missing: number;
+    quantization_counts?: Record<string, number>;
+    tier_counts?: Record<string, number>;
+    scale_tags?: string[];
+    parameter_sizes_b?: number[];
+  };
   cache: {
     enabled?: boolean;
     entries?: number;
@@ -561,6 +605,8 @@ export type WorkspaceExtensionPoint = {
 };
 
 export type WorkspaceOverview = {
+  status?: 'available' | 'degraded';
+  errors?: string[];
   repo_root: string;
   summary: {
     datasets: number;
@@ -688,9 +734,11 @@ export type MissionControlSnapshot = {
   repo_root: string;
   workspace: WorkspaceOverview;
   orchestration: OrchestrationSummary;
+  autonomous?: AutonomousCampaignSnapshot;
+  autonomy: AutonomyOverview;
   titan: TitanStatus;
   criticality: {
-    level: "critical" | "warning" | "opportunity" | "info";
+    level: 'critical' | 'warning' | 'opportunity' | 'info';
     counts: Record<string, number>;
   };
   recommendations: MissionControlRecommendation[];
@@ -724,6 +772,16 @@ export type MissionControlSnapshot = {
   cluster: {
     nodes: ClusterNodeHardware[];
     status_counts: Record<string, number>;
+    placements?: Array<Record<string, unknown>>;
+    pressure?: Record<string, unknown>;
+  };
+  lineage?: {
+    records?: number;
+    roots?: number;
+    covered_instances?: number;
+    gap_count?: number;
+    gaps?: Array<Record<string, unknown>>;
+    latest?: Array<Record<string, unknown>>;
   };
   telemetry: {
     flagged: {
@@ -746,6 +804,10 @@ export type MissionControlSnapshot = {
     running_instances: number;
     failed_instances: number;
     orchestration_runs: number;
+    autonomous_campaigns?: number;
+    ready_autonomous_actions?: number;
+    lineage_records?: number;
+    lineage_gaps?: number;
     agents: number;
     automl_sweeps: number;
     cluster_nodes: number;
@@ -759,14 +821,21 @@ export type MissionControlSnapshot = {
     datasets: number;
     training_profiles: number;
     open_circuits: number;
+    autonomous_actions?: number;
+    autonomous_executable_actions?: number;
+    autonomous_ready?: boolean;
+    autonomous_blockers: number;
     titan_backend?: string;
     titan_mode?: string;
+    autonomy_status?: AutonomyOverview['status'];
+    autonomy_mode?: AutonomyOverview['mode'];
+    stalled_runs?: number;
   };
 };
 
 export type MissionControlRecommendation = {
   id: string;
-  severity: "critical" | "warning" | "opportunity" | "info";
+  severity: 'critical' | 'warning' | 'opportunity' | 'info';
   title: string;
   detail: string;
   surface: string;
@@ -776,13 +845,222 @@ export type MissionControlRecommendation = {
   command?: string | null;
 };
 
+export type AutonomyStageSnapshot = {
+  id: string;
+  title: string;
+  status: 'blocked' | 'active' | 'attention' | 'ready' | 'idle';
+  headline: string;
+  detail: string;
+  href: string;
+  metric_label?: string | null;
+  metric_value?: string | null;
+  counts: Record<string, number>;
+};
+
+export type AutonomyAgentCoverage = {
+  agent_type: string;
+  label: string;
+  status: 'blocked' | 'active' | 'attention' | 'ready' | 'idle';
+  queued_tasks: number;
+  running_tasks: number;
+  active_swarm_agents: number;
+  open_circuit: boolean;
+  resource_classes: string[];
+  recommended_action: string;
+};
+
+export type AutonomyLineageAlert = {
+  id: string;
+  severity: 'critical' | 'warning' | 'opportunity' | 'info';
+  title: string;
+  detail: string;
+  href: string;
+  instance_id?: string | null;
+};
+
+export type AutonomyNextAction = {
+  id: string;
+  title: string;
+  detail: string;
+  href: string;
+  category: 'stabilize' | 'dispatch' | 'optimize' | 'lineage';
+  blocking: boolean;
+  command?: string | null;
+};
+
+export type AutonomyCapacitySnapshot = {
+  status: 'blocked' | 'active' | 'ready' | 'idle';
+  idle_nodes: number;
+  busy_nodes: number;
+  offline_nodes: number;
+  active_gpu_tasks: number;
+  active_cpu_tasks: number;
+  schedulable_trials: number;
+  suggested_parallelism: number;
+  bottleneck: string;
+  execution_modes: Record<string, number>;
+};
+
+export type AutonomyOverview = {
+  status: 'blocked' | 'degraded' | 'active' | 'ready' | 'idle';
+  mode: 'manual' | 'assisted' | 'autonomous';
+  summary: string;
+  open_circuits: number;
+  telemetry_backlog: number;
+  active_runs: number;
+  running_sweeps: number;
+  stalled_runs: number;
+  stages: AutonomyStageSnapshot[];
+  agent_coverage: AutonomyAgentCoverage[];
+  capacity: AutonomyCapacitySnapshot;
+  lineage_alerts: AutonomyLineageAlert[];
+  next_actions: AutonomyNextAction[];
+};
+
+export type AutonomousLoopAction = {
+  id: string;
+  kind: 'launch_training' | 'run_action' | 'advisory';
+  title: string;
+  detail: string;
+  priority: number;
+  executable: boolean;
+  status: 'planned' | 'executed' | 'blocked' | 'failed' | 'skipped';
+  source_instance_id?: string | null;
+  source_instance_name?: string | null;
+  action?: string | null;
+  config_path?: string | null;
+  deployment_target?: string | null;
+  surface: string;
+  href: string;
+  command?: string | null;
+  created_instance_id?: string | null;
+  error?: string | null;
+  metadata: Record<string, unknown>;
+};
+
+export type AutonomousLoopRun = {
+  id: string;
+  created_at: string;
+  status: 'planned' | 'executed' | 'partial' | 'blocked' | 'failed';
+  dry_run: boolean;
+  start_instances: boolean;
+  blockers: string[];
+  summary: Record<string, unknown>;
+  actions: AutonomousLoopAction[];
+};
+
+export type AutonomousLoopSnapshot = {
+  generated_at: string;
+  ready: boolean;
+  blockers: string[];
+  summary: {
+    workspace_ready: boolean;
+    ready_checks: number;
+    total_checks: number;
+    instances: number;
+    completed_instances: number;
+    running_instances: number;
+    failed_instances: number;
+    completed_evaluations: number;
+    completed_training_branches: number;
+    telemetry_backlog: number;
+    idle_nodes: number;
+    open_circuits: number;
+    total_actions: number;
+    executable_actions: number;
+    advisory_actions: number;
+    [key: string]: unknown;
+  };
+  actions: AutonomousLoopAction[];
+  recent_loops: AutonomousLoopRun[];
+  latest_loop: AutonomousLoopRun | null;
+};
+
+export type AutonomousCampaignAction = {
+  id: string;
+  kind: 'prepare' | 'train' | 'finetune' | 'evaluate' | 'inference' | 'deploy' | 'lineage';
+  title: string;
+  detail: string;
+  status: 'planned' | 'started' | 'blocked' | 'completed' | 'failed' | 'skipped';
+  config_path?: string | null;
+  source_instance_id?: string | null;
+  instance_id?: string | null;
+  depends_on: string[];
+  metadata: Record<string, unknown>;
+};
+
+export type AutonomousCampaign = {
+  campaign_id: string;
+  experiment_name: string;
+  goal: string;
+  status: 'planned' | 'running' | 'completed' | 'degraded';
+  created_at: string;
+  updated_at: string;
+  parameters: Record<string, unknown>;
+  plan: AutonomousCampaignAction[];
+  execution: Array<Record<string, unknown>>;
+  summary: Record<string, unknown>;
+};
+
+export type AutonomousCampaignSnapshot = {
+  status: 'available';
+  write_enabled: boolean;
+  path: string;
+  count: number;
+  status_counts: Record<string, number>;
+  active_campaigns: number;
+  campaigns: AutonomousCampaign[];
+  ready_actions: AutonomousCampaignAction[];
+  actions: AutonomousLoopAction[];
+  loop_health: Record<string, unknown>;
+  lineage: {
+    records: number;
+    roots: number;
+    covered_instances: number;
+    gap_count: number;
+    gaps: Array<Record<string, unknown>>;
+    latest: Array<Record<string, unknown>>;
+  };
+  cluster: {
+    nodes: ClusterNodeHardware[];
+    idle_nodes: number;
+    placements: Array<Record<string, unknown>>;
+    pressure: Record<string, unknown>;
+  };
+  summary: {
+    total_actions: number;
+    executable_actions: number;
+    advisory_actions: number;
+    telemetry_backlog: number;
+    idle_nodes: number;
+    [key: string]: unknown;
+  };
+  ready: boolean;
+  blockers: string[];
+};
+
+export type CreateAutonomousCampaignRequest = {
+  experiment_name: string;
+  goal: string;
+  parameters?: Record<string, string | number | boolean>;
+  auto_start?: boolean;
+  max_actions?: number;
+};
+
+export type AutonomousCampaignResponse = {
+  experiment_id: string;
+  status: string;
+  message: string;
+  campaign: AutonomousCampaign;
+};
+
 export type CreateManagedInstanceRequest = {
   config_path: string;
   start?: boolean;
   environment?: EnvironmentSpec | null;
   parent_instance_id?: string | null;
   name?: string | null;
-  user_level?: "beginner" | "hobbyist" | "dev" | null;
+  user_level?: 'beginner' | 'hobbyist' | 'dev' | null;
   lifecycle?: LifecycleProfile | null;
   subsystem_overrides?: Record<string, unknown>;
   metadata?: Record<string, unknown>;
@@ -800,13 +1078,13 @@ async function fetchJson<T>(path: string, options?: RequestInit): Promise<T> {
       if (externalSignal.aborted) {
         controller.abort();
       } else {
-        externalSignal.addEventListener("abort", () => controller.abort(), { once: true });
+        externalSignal.addEventListener('abort', () => controller.abort(), { once: true });
       }
     }
 
     try {
       const response = await fetch(`${base}${path}`, {
-        cache: "no-store",
+        cache: 'no-store',
         ...options,
         signal: controller.signal,
       });
@@ -814,19 +1092,20 @@ async function fetchJson<T>(path: string, options?: RequestInit): Promise<T> {
       if (!response.ok) {
         const payload = await readResponsePayload(response);
         const message =
-          extractErrorMessage(payload) ??
-          `Request failed (${response.status}): ${path}`;
+          extractErrorMessage(payload) ?? `Request failed (${response.status}): ${path}`;
         throw new Error(message);
       }
 
       const payload = await readResponsePayload(response);
       return payload as T;
     } catch (error) {
-      if (error instanceof Error && error.message.startsWith("Request failed")) {
+      if (error instanceof Error && error.message.startsWith('Request failed')) {
         throw error;
       }
-      if (error instanceof DOMException && error.name === "AbortError") {
-        lastNetworkError = new Error(`Request timed out after ${REQUEST_TIMEOUT_MS / 1000}s: ${path}`);
+      if (error instanceof DOMException && error.name === 'AbortError') {
+        lastNetworkError = new Error(
+          `Request timed out after ${REQUEST_TIMEOUT_MS / 1000}s: ${path}`,
+        );
         continue;
       }
       if (error instanceof TypeError) {
@@ -843,62 +1122,62 @@ async function fetchJson<T>(path: string, options?: RequestInit): Promise<T> {
     lastNetworkError instanceof Error
       ? lastNetworkError.message
       : `Network request failed for ${path}. Check that the AI-Factory API is reachable.`;
-  throw new Error(`${errorMessage} Tried: ${resolveApiBases().join(", ")}`);
+  throw new Error(`${errorMessage} Tried: ${resolveApiBases().join(', ')}`);
 }
 
 export async function generateAnswer(payload: GenerateRequest): Promise<GenerateResponse> {
-  return fetchJson<GenerateResponse>("/v1/generate", {
-    method: "POST",
+  return fetchJson<GenerateResponse>('/v1/generate', {
+    method: 'POST',
     headers: {
-      "Content-Type": "application/json",
+      'Content-Type': 'application/json',
     },
     body: JSON.stringify(payload),
   });
 }
 
 export async function compareModels(payload: CompareRequest): Promise<CompareResponse> {
-  return fetchJson<CompareResponse>("/v1/compare", {
-    method: "POST",
+  return fetchJson<CompareResponse>('/v1/compare', {
+    method: 'POST',
     headers: {
-      "Content-Type": "application/json",
+      'Content-Type': 'application/json',
     },
     body: JSON.stringify(payload),
   });
 }
 
 export async function getDatasetDashboard(): Promise<DatasetDashboard> {
-  return fetchJson<DatasetDashboard>("/v1/datasets");
+  return fetchJson<DatasetDashboard>('/v1/datasets');
 }
 
 export async function getPromptLibrary(): Promise<PromptLibrary> {
-  return fetchJson<PromptLibrary>("/v1/prompts");
+  return fetchJson<PromptLibrary>('/v1/prompts');
 }
 
 export async function getModels(): Promise<ModelInfo[]> {
-  const payload = await fetchJson<{ models: ModelInfo[] }>("/v1/models");
+  const payload = await fetchJson<{ models: ModelInfo[] }>('/v1/models');
   return payload.models;
 }
 
 export async function getBenchmarks(): Promise<BenchmarkInfo[]> {
-  const payload = await fetchJson<{ benchmarks: BenchmarkInfo[] }>("/v1/benchmarks");
+  const payload = await fetchJson<{ benchmarks: BenchmarkInfo[] }>('/v1/benchmarks');
   return payload.benchmarks;
 }
 
 export async function getRuns(): Promise<RunInfo[]> {
-  const payload = await fetchJson<{ runs: RunInfo[] }>("/v1/runs");
+  const payload = await fetchJson<{ runs: RunInfo[] }>('/v1/runs');
   return payload.runs;
 }
 
 export async function getStatus(): Promise<StatusInfo> {
-  return fetchJson<StatusInfo>("/v1/status");
+  return fetchJson<StatusInfo>('/v1/status');
 }
 
 export async function getWorkspaceOverview(): Promise<WorkspaceOverview> {
-  return fetchJson<WorkspaceOverview>("/v1/workspace");
+  return fetchJson<WorkspaceOverview>('/v1/workspace');
 }
 
 export async function getOrchestrationRuns(): Promise<OrchestrationRun[]> {
-  const payload = await fetchJson<{ runs: OrchestrationRun[] }>("/v1/orchestration/runs");
+  const payload = await fetchJson<{ runs: OrchestrationRun[] }>('/v1/orchestration/runs');
   return payload.runs;
 }
 
@@ -907,7 +1186,7 @@ export async function getOrchestrationRun(runId: string): Promise<OrchestrationR
 }
 
 export async function getInstances(): Promise<InstanceSummary[]> {
-  const payload = await fetchJson<{ instances: InstanceSummary[] }>("/v1/instances");
+  const payload = await fetchJson<{ instances: InstanceSummary[] }>('/v1/instances');
   return payload.instances;
 }
 
@@ -918,10 +1197,10 @@ export async function getInstanceDetail(instanceId: string): Promise<InstanceDet
 export async function createManagedInstance(
   payload: CreateManagedInstanceRequest,
 ): Promise<InstanceDetail> {
-  return fetchJson<InstanceDetail>("/v1/instances", {
-    method: "POST",
+  return fetchJson<InstanceDetail>('/v1/instances', {
+    method: 'POST',
     headers: {
-      "Content-Type": "application/json",
+      'Content-Type': 'application/json',
     },
     body: JSON.stringify(payload),
   });
@@ -929,12 +1208,17 @@ export async function createManagedInstance(
 
 export async function runManagedInstanceAction(
   instanceId: string,
-  payload: { action: string; config_path?: string | null; deployment_target?: DeploymentTarget | null; start?: boolean },
+  payload: {
+    action: string;
+    config_path?: string | null;
+    deployment_target?: DeploymentTarget | null;
+    start?: boolean;
+  },
 ): Promise<InstanceDetail> {
   return fetchJson<InstanceDetail>(`/v1/instances/${instanceId}/actions`, {
-    method: "POST",
+    method: 'POST',
     headers: {
-      "Content-Type": "application/json",
+      'Content-Type': 'application/json',
     },
     body: JSON.stringify(payload),
   });
@@ -945,9 +1229,9 @@ export async function evaluateManagedInstance(
   payload?: { config_path?: string | null; start?: boolean },
 ): Promise<InstanceDetail> {
   return fetchJson<InstanceDetail>(`/v1/instances/${instanceId}/evaluate`, {
-    method: "POST",
+    method: 'POST',
     headers: {
-      "Content-Type": "application/json",
+      'Content-Type': 'application/json',
     },
     body: JSON.stringify(payload ?? {}),
   });
@@ -958,9 +1242,9 @@ export async function startManagedInference(
   payload?: { config_path?: string | null; start?: boolean },
 ): Promise<InstanceDetail> {
   return fetchJson<InstanceDetail>(`/v1/instances/${instanceId}/inference`, {
-    method: "POST",
+    method: 'POST',
     headers: {
-      "Content-Type": "application/json",
+      'Content-Type': 'application/json',
     },
     body: JSON.stringify(payload ?? {}),
   });
@@ -971,25 +1255,81 @@ export async function deployManagedInstance(
   payload: { target: DeploymentTarget; config_path?: string | null; start?: boolean },
 ): Promise<InstanceDetail> {
   return fetchJson<InstanceDetail>(`/v1/instances/${instanceId}/deploy`, {
-    method: "POST",
+    method: 'POST',
     headers: {
-      "Content-Type": "application/json",
+      'Content-Type': 'application/json',
     },
     body: JSON.stringify(payload),
   });
 }
 
 export async function getOrchestrationSummary(): Promise<OrchestrationSummary> {
-  const payload = await fetchJson<{ summary: OrchestrationSummary }>("/v1/orchestration/summary");
+  const payload = await fetchJson<{ summary: OrchestrationSummary }>('/v1/orchestration/summary');
   return payload.summary;
 }
 
 export async function getMissionControl(): Promise<MissionControlSnapshot> {
-  return fetchJson<MissionControlSnapshot>("/v1/lab/mission-control");
+  return fetchJson<MissionControlSnapshot>('/v1/lab/mission-control');
+}
+
+export async function getAutonomousSnapshot(): Promise<AutonomousLoopSnapshot> {
+  return fetchJson<AutonomousLoopSnapshot>('/v1/experiments/autonomous');
+}
+
+export async function getAutonomousOverview(): Promise<AutonomyOverview> {
+  return fetchJson<AutonomyOverview>('/v1/experiments/autonomous/overview');
+}
+
+export async function getAutonomousCampaigns(): Promise<AutonomousCampaignSnapshot> {
+  return fetchJson<AutonomousCampaignSnapshot>('/v1/experiments/autonomous/campaigns');
+}
+
+export async function runAutonomousCampaign(
+  payload: CreateAutonomousCampaignRequest,
+): Promise<AutonomousCampaignResponse> {
+  return fetchJson<AutonomousCampaignResponse>('/v1/experiments/autonomous/campaigns/run', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  });
+}
+
+export async function getAutonomousCampaign(
+  experimentId: string,
+): Promise<AutonomousCampaignResponse> {
+  return fetchJson<AutonomousCampaignResponse>(
+    `/v1/experiments/autonomous/campaigns/${experimentId}`,
+  );
+}
+
+export async function planAutonomousLoop(payload?: {
+  max_actions?: number;
+}): Promise<AutonomousLoopRun> {
+  return fetchJson<AutonomousLoopRun>('/v1/experiments/autonomous/plan', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(payload ?? {}),
+  });
+}
+
+export async function executeAutonomousLoop(payload?: {
+  max_actions?: number;
+  dry_run?: boolean;
+  start_instances?: boolean;
+}): Promise<AutonomousLoopRun> {
+  return fetchJson<AutonomousLoopRun>('/v1/experiments/autonomous/run', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(payload ?? {}),
+  });
 }
 
 export async function getTitanStatus(): Promise<TitanStatus> {
-  const payload = await fetchJson<unknown>("/v1/titan/status");
+  const payload = await fetchJson<unknown>('/v1/titan/status');
   return titanStatusSchema.parse(payload);
 }
 
@@ -1001,11 +1341,13 @@ export type FlagTelemetryRequest = {
   latency_s?: number | null;
 };
 
-export async function flagTelemetry(payload: FlagTelemetryRequest): Promise<{status: string, message: string}> {
-  return fetchJson<{status: string, message: string}>("/v1/telemetry/flag", {
-    method: "POST",
+export async function flagTelemetry(
+  payload: FlagTelemetryRequest,
+): Promise<{ status: string; message: string }> {
+  return fetchJson<{ status: string; message: string }>('/v1/telemetry/flag', {
+    method: 'POST',
     headers: {
-      "Content-Type": "application/json",
+      'Content-Type': 'application/json',
     },
     body: JSON.stringify(payload),
   });
@@ -1017,12 +1359,12 @@ export type ClusterNodeHardware = {
   type: string;
   memory: string;
   usage: number;
-  status: "online" | "idle" | "offline";
+  status: 'online' | 'idle' | 'offline';
   activeJobs: number;
 };
 
 export async function getClusterNodes(): Promise<ClusterNodeHardware[]> {
-  const payload = await fetchJson<{ nodes: ClusterNodeHardware[] }>("/v1/cluster/nodes");
+  const payload = await fetchJson<{ nodes: ClusterNodeHardware[] }>('/v1/cluster/nodes');
   return payload.nodes;
 }
 
@@ -1044,19 +1386,19 @@ export type TelemetryActionResult = {
 };
 
 export async function getTelemetryBacklog(): Promise<TelemetryRecord[]> {
-  const payload = await fetchJson<{ telemetry: TelemetryRecord[] }>("/v1/datasets/telemetry");
+  const payload = await fetchJson<{ telemetry: TelemetryRecord[] }>('/v1/datasets/telemetry');
   return payload.telemetry;
 }
 
 export async function promoteTelemetryRecord(recordId: string): Promise<TelemetryActionResult> {
   return fetchJson<TelemetryActionResult>(`/v1/datasets/telemetry/${recordId}/promote`, {
-    method: "POST",
+    method: 'POST',
   });
 }
 
 export async function discardTelemetryRecord(recordId: string): Promise<TelemetryActionResult> {
   return fetchJson<TelemetryActionResult>(`/v1/datasets/telemetry/${recordId}/discard`, {
-    method: "POST",
+    method: 'POST',
   });
 }
 
@@ -1086,10 +1428,10 @@ export type SynthesisJob = {
 };
 
 export async function synthesizeDataset(payload: SynthesizeRequest): Promise<SynthesizeResponse> {
-  return fetchJson<SynthesizeResponse>("/v1/datasets/synthesize", {
-    method: "POST",
+  return fetchJson<SynthesizeResponse>('/v1/datasets/synthesize', {
+    method: 'POST',
     headers: {
-      "Content-Type": "application/json",
+      'Content-Type': 'application/json',
     },
     body: JSON.stringify(payload),
   });
@@ -1104,7 +1446,7 @@ export type AgentSwarmStatus = {
   name: string;
   role: string;
   model: string;
-  status: "active" | "sleeping" | "offline";
+  status: 'active' | 'sleeping' | 'offline';
   uptime_s: number;
   tokens_used: number;
 };
@@ -1115,13 +1457,34 @@ export type AgentLogEvent = {
   level: string;
 };
 
+export type AgentSwarmSnapshot = {
+  status?: string;
+  write_enabled?: boolean;
+  deploy_enabled?: boolean;
+  swarm: AgentSwarmStatus[];
+};
+
+export type AgentLogsSnapshot = {
+  status?: string;
+  simulation_enabled?: boolean;
+  logs: AgentLogEvent[];
+};
+
+export async function getAgentSwarmSnapshot(): Promise<AgentSwarmSnapshot> {
+  return fetchJson<AgentSwarmSnapshot>('/v1/agents/swarm');
+}
+
 export async function getAgentSwarmStatus(): Promise<AgentSwarmStatus[]> {
-  const payload = await fetchJson<{ swarm: AgentSwarmStatus[] }>("/v1/agents/swarm");
+  const payload = await getAgentSwarmSnapshot();
   return payload.swarm;
 }
 
+export async function getAgentLogsSnapshot(limit: number = 20): Promise<AgentLogsSnapshot> {
+  return fetchJson<AgentLogsSnapshot>(`/v1/agents/logs?limit=${limit}`);
+}
+
 export async function getAgentLogs(limit: number = 20): Promise<AgentLogEvent[]> {
-  const payload = await fetchJson<{ logs: AgentLogEvent[] }>(`/v1/agents/logs?limit=${limit}`);
+  const payload = await getAgentLogsSnapshot(limit);
   return payload.logs;
 }
 
@@ -1135,14 +1498,16 @@ export type AgentUpdateRequest = {
   name?: string;
   role?: string;
   model?: string;
-  status?: AgentSwarmStatus["status"];
+  status?: AgentSwarmStatus['status'];
 };
 
-export async function deployAgent(payload: AgentDeployRequest): Promise<{ status: string; agent: AgentSwarmStatus }> {
-  return fetchJson<{ status: string; agent: AgentSwarmStatus }>("/v1/agents/deploy", {
-    method: "POST",
+export async function deployAgent(
+  payload: AgentDeployRequest,
+): Promise<{ status: string; agent: AgentSwarmStatus }> {
+  return fetchJson<{ status: string; agent: AgentSwarmStatus }>('/v1/agents/deploy', {
+    method: 'POST',
     headers: {
-      "Content-Type": "application/json",
+      'Content-Type': 'application/json',
     },
     body: JSON.stringify(payload),
   });
@@ -1153,9 +1518,9 @@ export async function updateAgent(
   payload: AgentUpdateRequest,
 ): Promise<{ status: string; agent: AgentSwarmStatus }> {
   return fetchJson<{ status: string; agent: AgentSwarmStatus }>(`/v1/agents/${agentId}`, {
-    method: "PATCH",
+    method: 'PATCH',
     headers: {
-      "Content-Type": "application/json",
+      'Content-Type': 'application/json',
     },
     body: JSON.stringify(payload),
   });
@@ -1195,6 +1560,12 @@ export type AutoMLSweep = {
   trials: AutoMLTrial[];
 };
 
+export type AutoMLSweepSnapshot = {
+  status?: string;
+  write_enabled?: boolean;
+  sweeps: AutoMLSweep[];
+};
+
 export type LaunchSweepRequest = {
   name: string;
   base_model: string;
@@ -1208,15 +1579,19 @@ export type LaunchSweepRequest = {
   };
 };
 
+export async function getSweepsSnapshot(): Promise<AutoMLSweepSnapshot> {
+  return fetchJson<AutoMLSweepSnapshot>('/v1/automl/sweeps');
+}
+
 export async function getSweeps(): Promise<AutoMLSweep[]> {
-  const payload = await fetchJson<{ sweeps: AutoMLSweep[] }>("/v1/automl/sweeps");
+  const payload = await getSweepsSnapshot();
   return payload.sweeps;
 }
 
 export async function launchSweep(payload: LaunchSweepRequest): Promise<AutoMLSweep> {
-  return fetchJson<AutoMLSweep>("/v1/automl/sweeps", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
+  return fetchJson<AutoMLSweep>('/v1/automl/sweeps', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(payload),
   });
 }
@@ -1234,7 +1609,7 @@ export type DatasetSpec = {
   difficulty_range?: string[];
   size?: number;
   format?: string;
-  metadata?: Record<string, any>;
+  metadata?: Record<string, unknown>;
 };
 
 export type MetricSpec = {
@@ -1244,7 +1619,7 @@ export type MetricSpec = {
   domain: string;
   subdomain?: string | null;
   range?: number[] | null;
-  metadata?: Record<string, any>;
+  metadata?: Record<string, unknown>;
 };
 
 export type EvaluationSpec = {
@@ -1256,7 +1631,7 @@ export type EvaluationSpec = {
   metrics: string[];
   splits?: string[];
   size?: number;
-  metadata?: Record<string, any>;
+  metadata?: Record<string, unknown>;
 };
 
 export type TrainingProfileSpec = {
@@ -1268,8 +1643,8 @@ export type TrainingProfileSpec = {
   datasets: string[];
   config_path: string;
   curriculum_order?: string[] | null;
-  model_requirements?: Record<string, any>;
-  metadata?: Record<string, any>;
+  model_requirements?: Record<string, unknown>;
+  metadata?: Record<string, unknown>;
 };
 
 export type ModelArtifact = {
@@ -1280,39 +1655,39 @@ export type ModelArtifact = {
   architecture: string;
   parameters: number;
   format: string;
-  metadata?: Record<string, any>;
+  metadata?: Record<string, unknown>;
 };
 
 export type DeploymentSpec = {
   target: string;
   model_name: string;
-  config?: Record<string, any>;
+  config?: Record<string, unknown>;
   public?: boolean;
-  metadata?: Record<string, any>;
+  metadata?: Record<string, unknown>;
 };
 
 export type ScalingConfig = {
   max_nodes?: number;
-  default_resources?: Record<string, any>;
+  default_resources?: Record<string, unknown>;
   cluster_type?: string;
-  metadata?: Record<string, any>;
+  metadata?: Record<string, unknown>;
 };
 
 export type MonitoringConfig = {
   collection_interval_seconds?: number;
   storage_backend?: string;
   alert_channels?: string[];
-  thresholds?: Record<string, any>;
-  metadata?: Record<string, any>;
+  thresholds?: Record<string, unknown>;
+  metadata?: Record<string, unknown>;
 };
 
 export type TrainingJob = {
   name: string;
   profile: string;
-  resource_requirements?: Record<string, any>;
+  resource_requirements?: Record<string, unknown>;
   estimated_duration_hours?: number;
   priority?: string;
-  metadata?: Record<string, any>;
+  metadata?: Record<string, unknown>;
 };
 
 export type Alert = {
@@ -1321,10 +1696,10 @@ export type Alert = {
   message: string;
   source: string;
   timestamp: string;
-  metadata?: Record<string, any>;
+  metadata?: Record<string, unknown>;
 };
 
-export type DomainType = "mathematics" | "coding" | "reasoning" | "vision" | "general";
+export type DomainType = 'mathematics' | 'coding' | 'reasoning' | 'vision' | 'general';
 
 export type ResourceProfile = {
   vram_required_gb: number;
@@ -1366,11 +1741,11 @@ export type UniversalModelSpec = {
   lineage?: ModelLineage;
   capabilities?: ModelCapability[];
   tags?: string[];
-  metadata?: Record<string, any>;
+  metadata?: Record<string, unknown>;
 };
 
 export type SearchSpaceSpec = {
-  hyperparameters?: Record<string, any[]>;
+  hyperparameters?: Record<string, unknown[]>;
   architectures?: string[] | null;
   datasets?: string[] | null;
 };
@@ -1418,5 +1793,5 @@ export type AutonomousExperimentConfig = {
   budget?: ResourceBudget;
   evaluation_criteria?: EvaluationCriterion[];
   deployment_policy?: AutoDeploymentPolicy;
-  metadata?: Record<string, any>;
+  metadata?: Record<string, unknown>;
 };

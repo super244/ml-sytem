@@ -28,7 +28,7 @@ TaskStatus = Literal[
 AttemptStatus = Literal["running", "completed", "failed", "cancelled"]
 CircuitStatus = Literal["closed", "open", "half_open"]
 ResourceClass = Literal["control", "cpu", "gpu", "io", "network"]
-TaskKind = Literal[
+TaskType = Literal[
     "prepare",
     "train",
     "finetune",
@@ -55,14 +55,14 @@ class RetryPolicy(BaseModel):
 
 class AgentCapability(BaseModel):
     agent_type: AgentType
-    task_types: list[TaskKind] = Field(default_factory=list)
+    task_types: list[TaskType] = Field(default_factory=list)
     resource_classes: list[ResourceClass] = Field(default_factory=list)
     max_concurrency: int = 1
     retry_policy: RetryPolicy = Field(default_factory=RetryPolicy)
 
 
 class TaskInputEnvelope(BaseModel):
-    task_type: TaskKind
+    task_type: TaskType
     legacy_instance_id: str | None = None
     config_path: str | None = None
     command: list[str] | None = None
@@ -100,7 +100,7 @@ class OrchestrationTask(BaseModel):
     run_id: str
     legacy_instance_id: str | None = None
     parent_task_id: str | None = None
-    task_type: TaskKind
+    task_type: TaskType
     agent_type: AgentType
     status: TaskStatus = "queued"
     priority: int = 100

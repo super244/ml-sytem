@@ -5,7 +5,6 @@ description = "Unified AI operating system for managing the complete LLM lifecyc
 requires-python = ">=3.10"
 dependencies = [
   "accelerate>=1.2.1",
-  "bitsandbytes>=0.45.0",
   "datasets>=3.2.0",
   "fastapi>=0.115.6",
   "httpx>=0.28.1",
@@ -17,13 +16,23 @@ dependencies = [
   "python-multipart>=0.0.20",
   "pyyaml>=6.0.2",
   "sympy>=1.13.3",
+  "tokenizers>=0.21.0",
   "torch>=2.5.1",
   "transformers>=4.47.1",
+  "trl>=0.12.0",
   "tqdm>=4.67.1",
   "uvicorn[standard]>=0.34.0",
 ]
 
 [project.optional-dependencies]
+train-cuda = [
+  "bitsandbytes>=0.45.0",
+]
+macos = [
+  "mlx>=0.28.0; platform_system == 'Darwin' and platform_machine == 'arm64'",
+  "mlx-lm>=0.20.6; platform_system == 'Darwin' and platform_machine == 'arm64'",
+  "sentencepiece>=0.2.0",
+]
 dev = [
   "pre-commit>=4.0.1",
   "mypy>=1.15.0",
@@ -33,50 +42,19 @@ dev = [
   "ruff>=0.15.7",
   "types-PyYAML>=6.0.12",
   "types-requests>=2.32.0",
+  "bandit>=1.7.0",
+  "safety>=3.0.0",
 ]
 
 [project.scripts]
 ai-factory = "ai_factory.cli:main"
 
 [tool.setuptools]
-packages = [
-  "ai_factory",
-  "ai_factory.core",
-  "ai_factory.core.config",
-  "ai_factory.core.control",
-  "ai_factory.core.decisions",
-  "ai_factory.core.execution",
-  "ai_factory.core.instances",
-  "ai_factory.core.monitoring",
-  "ai_factory.core.orchestration",
-  "ai_factory.core.platform",
-  "ai_factory.core.plugins",
-  "ai_factory.domains",
-  "ai_factory.domains.mathematics",
-  "ai_factory.interfaces",
-  "ai_factory.interfaces.cli",
-  "ai_factory.interfaces.tui",
-  "ai_factory.interfaces.web",
-  "ai_factory.interfaces.desktop",
-  "ai_factory.platform",
-  "ai_factory.platform.scaling",
-  "ai_factory.platform.monitoring",
-  "ai_factory.platform.deployment",
-  "training",
-  "training.src",
-  "inference",
-  "inference.app",
-  "inference.app.routers",
-  "inference.app.services",
-  "evaluation",
-  "data",
-  "data.adapters",
-  "data.builders",
-  "data.quality",
-  "data.reports",
-  "data.synthesis",
-  "data.synthesis.families",
-]
+include-package-data = true
+
+[tool.setuptools.packages.find]
+include = ["ai_factory*", "training*", "inference*", "evaluation*", "data*"]
+exclude = ["tests", "tests.*"]
 
 [build-system]
 requires = ["setuptools>=75.6.0", "wheel"]
@@ -90,30 +68,26 @@ target-version = "py310"
 select = ["E", "F", "I", "B", "UP"]
 extend-ignore = ["E501"]
 
+[tool.ruff.lint.per-file-ignores]
+"inference/app/routers/*.py" = ["B008"]
+
 [tool.mypy]
 python_version = "3.10"
 ignore_missing_imports = true
 warn_return_any = false
 warn_no_return = false
-disallow_untyped_defs = false
+disallow_untyped_defs = true
+exclude = ["^tests/"]
 
 [[tool.mypy.overrides]]
 module = [
-    "ai_factory.core.orchestration.*",
-    "ai_factory.core.control.*",
-    "ai_factory.core.plugins.*",
-    "ai_factory.core.decisions.*",
-    "ai_factory.core.monitoring.*",
-    "ai_factory.core.instances.*",
-    "ai_factory.core.state.*",
-    "ai_factory.core.platform.*",
-    "ai_factory.core.config.*",
-    "ai_factory.platform.*",
-    "ai_factory.cli",
     "data.*",
     "evaluation.*",
     "training.*",
-    "inference.*"
+    "inference.*",
+    "ai_factory.interfaces.*",
+    "ai_factory.cli",
+    "tests.*"
 ]
 ignore_errors = true
 warn_unused_ignores = true

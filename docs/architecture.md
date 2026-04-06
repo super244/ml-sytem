@@ -2,12 +2,62 @@
 
 AI-Factory is organized as a shared-core platform rather than a loose stack of scripts. The same canonical schema, answer utilities, artifact layout, and metadata conventions are reused by data preparation, training, inference, evaluation, notebooks, and the frontend.
 
+## New Core Modules (v2)
+
+### `ai_factory/core/async_utils.py`
+Async utilities for managing concurrent operations, rate limiting, and backpressure handling.
+
+### `ai_factory/core/cache/`
+Memory-backed caching layer for frequent lookups (dataset records, model weights, tokenizer states).
+
+### `ai_factory/core/distributed/`
+Distributed compute primitives: worker registration, job dispatch, result aggregation across cluster nodes.
+
+### `ai_factory/core/security/`
+Security abstractions: credential rotation, encrypted artifact storage, access control lists.
+
+### `ai_factory/core/instances/`
+Refactored instance management module emphasizing separation of concerns:
+- `utils.py`: Utility functions and helper classes.
+- `creation.py`: Instance creation service.
+- `manager.py`: Main instance management logic.
+This modularity improves maintainability, enhances testability, and reduces overall complexity.
+
+## Updated Modules
+
+### `ai_factory/core/orchestration/service.py`
+Enhanced orchestration service with:
+- Circuit breaker patterns for fault tolerance
+- Lease-based task ownership
+- Retry policies with exponential backoff
+- Task dependency resolution
+- Real-time heartbeat monitoring
+
+### `ai_factory/platform/monitoring/metrics.py` & `collectors.py`
+Improved metrics collection with robust multi-platform support:
+- System-level metrics (CPU, memory, disk, GPU)
+- Training job metrics (loss, accuracy, job counts)
+- Inference metrics (latency, throughput, success rate)
+- Historical queries via time-series database
+- **Non-blocking GPU metrics**: Lazily checks `nvidia-smi` availability with caching and a 2.0s strict timeout to prevent API hangs on non-NVIDIA systems (like Apple Silicon).
+- **Titan Telemetry Bridge**: Native integration with the `ai_factory_titan` Rust core. Falls back to `_titan_snapshot()` when `nvidia-smi` is unavailable to capture silicon type (Apple M1/M2/M3), unified memory status, and backend capabilities (Metal/CUDA/CPU).
+
+## Core vs. Subsystem Boundaries
+
+The `ai_factory.core` layer is strictly foundational:
+- No business logic
+- No imports from `data`, `training`, `evaluation`, `inference`, `agents` subsystems
+- All cross-subsystem communication flows through `FastAPI` or shared protocols
+
+This boundary is enforced by CI checks, accompanied by strict `mypy` typing compliance across modules (e.g., reaching 100% strict compliance in `ai_factory/core/execution/`).
+
 ## Design Principles
 
 - Quality over scale: specialize a tractable model for calculus and olympiad reasoning rather than chasing generic coverage.
 - Research velocity: keep every stage config-driven, reproducible, and introspectable through manifests and summaries.
 - Product realism: the backend API, benchmark suite, and frontend are part of the system design, not a thin wrapper around a notebook.
 - Extensibility: new datasets, model variants, prompts, benchmark slices, and notebook workflows should plug into the same scaffolding.
+- Maintainability & Code Quality: automated cleanups, consistent formatting with `ruff`, robust test coverage, and optimized imports to reduce memory footprint and avoid circular dependencies.
 
 ## Shared Core
 
@@ -72,6 +122,8 @@ Training is composed from reusable config parts:
 - packaging config
 
 Profiles such as `baseline_qlora` or `verifier_augmented` are thin compositions over these components. The trainer stack supports LoRA/QLoRA by default, optional full-precision exports, difficulty-aware sample weights, curriculum ordering, failure-case replay, checkpoint policies, and packaged serving artifacts.
+
+**Bootstrap-First Workflow:** Platform-specific Linux cloud and macOS local start scripts bootstrap dependencies, tokenizer assets, and runtime checks automatically. The corpus preparation and tokenization flow is optimized to reduce redundant work. Titan hardware reporting ensures CUDA, Metal, and CPU fallback capabilities are verified before launching.
 
 ## Orchestration Architecture
 
@@ -141,7 +193,10 @@ The frontend is a multi-route research product:
 - `/benchmarks`: benchmark registry explorer
 - `/runs`: training/evaluation run viewer
 
-The solve view mirrors the backend capabilities by surfacing model selection, prompt presets, solver modes, reasoning visibility, structured output, sample count, verification state, and candidate inspection.
+The workspace view mirrors backend capabilities by surfacing model selection, prompt presets, solver modes, structured output, sample count, and verification state. The environment includes polished refinements such as:
+- Support for workspace density switching (Compact/Balanced/Expanded).
+- Integrated model comparison in the control rail.
+- Real-time candidate inspection and verifier-aware reasoning visibility.
 
 ## End-to-End Flow
 
@@ -151,3 +206,5 @@ The solve view mirrors the backend capabilities by surfacing model selection, pr
 4. The async control plane dispatches tasks, records attempts, heartbeats, retries, and structured events, and projects status back into instance manifests.
 5. Serve models through the inference API and frontend.
 6. Evaluate against benchmark packs, mine failures, and let the control plane recommend or queue the next step.
+
+For the concrete V1 route, degraded-mode, and artifact contract that the web and desktop shells consume, see [V1 Operational Contract](v1-operational-contract.md).

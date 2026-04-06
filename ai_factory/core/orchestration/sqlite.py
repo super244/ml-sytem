@@ -14,6 +14,7 @@ from ai_factory.core.orchestration.models import (
     OrchestrationTask,
     TaskAttempt,
     TaskDependency,
+    TaskLease,
 )
 
 
@@ -96,6 +97,10 @@ class SqliteControlPlane:
                 );
                 CREATE INDEX IF NOT EXISTS idx_tasks_run_id ON orchestration_tasks(run_id);
                 CREATE INDEX IF NOT EXISTS idx_tasks_status_available ON orchestration_tasks(status, available_at);
+                CREATE INDEX IF NOT EXISTS idx_tasks_legacy_instance_updated
+                ON orchestration_tasks(legacy_instance_id, updated_at DESC, created_at DESC);
+                CREATE INDEX IF NOT EXISTS idx_tasks_run_status_priority
+                ON orchestration_tasks(run_id, status, priority, created_at);
                 CREATE UNIQUE INDEX IF NOT EXISTS idx_tasks_idempotency
                 ON orchestration_tasks(run_id, legacy_instance_id, task_type);
 
@@ -148,6 +153,8 @@ class SqliteControlPlane:
                 );
                 CREATE INDEX IF NOT EXISTS idx_events_run_id_created_at
                 ON orchestration_events(run_id, created_at);
+                CREATE INDEX IF NOT EXISTS idx_events_run_task_attempt_created_at
+                ON orchestration_events(run_id, task_id, attempt_id, created_at);
 
                 CREATE TABLE IF NOT EXISTS orchestration_circuits (
                     agent_type TEXT PRIMARY KEY,
@@ -158,8 +165,116 @@ class SqliteControlPlane:
                     last_error TEXT,
                     updated_at TEXT NOT NULL
                 );
+
+                CREATE TABLE IF NOT EXISTS dataset_telemetry (
+                    id TEXT PRIMARY KEY,
+                    payload_json TEXT NOT NULL,
+                    status TEXT NOT NULL,
+                    timestamp REAL NOT NULL,
+                    actioned_at REAL
+                );
+                CREATE INDEX IF NOT EXISTS idx_telemetry_status ON dataset_telemetry(status, timestamp DESC);
+
+                CREATE TABLE IF NOT EXISTS synth_jobs (
+                    job_id TEXT PRIMARY KEY,
+                    status TEXT NOT NULL,
+                    seed_prompt TEXT NOT NULL,
+                    num_variants INTEGER NOT NULL,
+                    model_variant TEXT NOT NULL,
+                    created_at REAL NOT NULL,
+                    estimated_time_s REAL NOT NULL,
+                    completed_rows INTEGER NOT NULL,
+                    output_path TEXT NOT NULL
+                );
                 """
             )
+            connection.execute("CREATE INDEX IF NOT EXISTS idx_leases_expires_at ON orchestration_leases(expires_at)")
+
+    def upsert_telemetry_record(
+        self, record_id: str, payload: dict[str, Any], status: str, timestamp: float, actioned_at: float | None = None
+    ) -> None:
+        with self.connection() as connection:
+            connection.execute(
+                """
+                INSERT INTO dataset_telemetry (id, payload_json, status, timestamp, actioned_at)
+                VALUES (?, ?, ?, ?, ?)
+                ON CONFLICT(id) DO UPDATE SET
+                    payload_json=excluded.payload_json,
+                    status=excluded.status,
+                    timestamp=excluded.timestamp,
+                    actioned_at=excluded.actioned_at
+                """,
+                (record_id, _dump(payload), status, timestamp, actioned_at),
+            )
+
+    def list_telemetry(self, status: str) -> list[dict[str, Any]]:
+        with self.connection() as connection:
+            rows = connection.execute(
+                "SELECT * FROM dataset_telemetry WHERE status = ? ORDER BY timestamp DESC", (status,)
+            ).fetchall()
+        return [
+            {
+                "id": row["id"],
+                "status": row["status"],
+                "timestamp": row["timestamp"],
+                "actioned_at": row["actioned_at"],
+                **_load(row["payload_json"], {}),
+            }
+            for row in rows
+        ]
+
+    def update_telemetry_status(self, record_id: str, status: str, actioned_at: float) -> dict[str, Any] | None:
+        with self.connection() as connection:
+            row = connection.execute("SELECT * FROM dataset_telemetry WHERE id = ?", (record_id,)).fetchone()
+            if not row:
+                return None
+            connection.execute(
+                "UPDATE dataset_telemetry SET status = ?, actioned_at = ? WHERE id = ?",
+                (status, actioned_at, record_id),
+            )
+            return {
+                "id": record_id,
+                "status": status,
+                "timestamp": row["timestamp"],
+                "actioned_at": actioned_at,
+                **_load(row["payload_json"], {}),
+            }
+
+    def upsert_synth_job(self, job: dict[str, Any]) -> None:
+        with self.connection() as connection:
+            connection.execute(
+                """
+                INSERT INTO synth_jobs (
+                    job_id, status, seed_prompt, num_variants, model_variant, created_at,
+                    estimated_time_s, completed_rows, output_path
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ON CONFLICT(job_id) DO UPDATE SET
+                    status=excluded.status,
+                    seed_prompt=excluded.seed_prompt,
+                    num_variants=excluded.num_variants,
+                    model_variant=excluded.model_variant,
+                    created_at=excluded.created_at,
+                    estimated_time_s=excluded.estimated_time_s,
+                    completed_rows=excluded.completed_rows,
+                    output_path=excluded.output_path
+                """,
+                (
+                    job["job_id"],
+                    job["status"],
+                    job["seed_prompt"],
+                    job["num_variants"],
+                    job["model_variant"],
+                    job["created_at"],
+                    job["estimated_time_s"],
+                    job["completed_rows"],
+                    job["output_path"],
+                ),
+            )
+
+    def get_synth_job(self, job_id: str) -> dict[str, Any] | None:
+        with self.connection() as connection:
+            row = connection.execute("SELECT * FROM synth_jobs WHERE job_id = ?", (job_id,)).fetchone()
+        return dict(row) if row else None
 
     def upsert_run(self, run: OrchestrationRun) -> OrchestrationRun:
         with self.connection() as connection:
@@ -210,12 +325,35 @@ class SqliteControlPlane:
             ).fetchone()
         return self._run_from_row(row) if row else None
 
-    def list_runs(self) -> list[OrchestrationRun]:
+    def list_runs(
+        self,
+        *,
+        status: str | None = None,
+        legacy_instance_id: str | None = None,
+    ) -> list[OrchestrationRun]:
         with self.connection() as connection:
-            rows = connection.execute(
-                "SELECT * FROM orchestration_runs ORDER BY updated_at DESC, created_at DESC"
-            ).fetchall()
+            query = "SELECT * FROM orchestration_runs"
+            clauses: list[str] = []
+            params: list[Any] = []
+            if status is not None:
+                clauses.append("status = ?")
+                params.append(status)
+            if legacy_instance_id is not None:
+                clauses.append("legacy_instance_id = ?")
+                params.append(legacy_instance_id)
+            if clauses:
+                query += " WHERE " + " AND ".join(clauses)
+            query += " ORDER BY updated_at DESC, created_at DESC"
+            rows = connection.execute(query, params).fetchall()
         return [self._run_from_row(row) for row in rows]
+
+    def get_run_by_idempotency_key(self, idempotency_key: str) -> OrchestrationRun | None:
+        with self.connection() as connection:
+            row = connection.execute(
+                "SELECT * FROM orchestration_runs WHERE idempotency_key = ?",
+                (idempotency_key,),
+            ).fetchone()
+        return self._run_from_row(row) if row else None
 
     def upsert_task(self, task: OrchestrationTask) -> OrchestrationTask:
         with self.connection() as connection:
@@ -289,20 +427,58 @@ class SqliteControlPlane:
     def get_task_by_legacy_instance(self, legacy_instance_id: str) -> OrchestrationTask | None:
         with self.connection() as connection:
             row = connection.execute(
-                "SELECT * FROM orchestration_tasks WHERE legacy_instance_id = ? ORDER BY created_at LIMIT 1",
+                """
+                SELECT * FROM orchestration_tasks
+                WHERE legacy_instance_id = ?
+                ORDER BY
+                    CASE status
+                        WHEN 'running' THEN 0
+                        WHEN 'ready' THEN 1
+                        WHEN 'retry_waiting' THEN 2
+                        WHEN 'blocked' THEN 3
+                        WHEN 'queued' THEN 4
+                        WHEN 'completed' THEN 5
+                        WHEN 'failed' THEN 6
+                        WHEN 'dead_lettered' THEN 7
+                        WHEN 'cancelled' THEN 8
+                        ELSE 9
+                    END,
+                    updated_at DESC,
+                    created_at DESC
+                LIMIT 1
+                """,
                 (legacy_instance_id,),
             ).fetchone()
         return self._task_from_row(row) if row else None
 
-    def list_tasks(self, *, run_id: str | None = None) -> list[OrchestrationTask]:
+    def list_tasks(
+        self,
+        *,
+        run_id: str | None = None,
+        legacy_instance_id: str | None = None,
+        status: str | None = None,
+        agent_type: str | None = None,
+    ) -> list[OrchestrationTask]:
         with self.connection() as connection:
-            if run_id:
-                rows = connection.execute(
-                    "SELECT * FROM orchestration_tasks WHERE run_id = ? ORDER BY created_at, priority",
-                    (run_id,),
-                ).fetchall()
-            else:
-                rows = connection.execute("SELECT * FROM orchestration_tasks ORDER BY created_at, priority").fetchall()
+            query = "SELECT * FROM orchestration_tasks"
+            clauses: list[str] = []
+            params: list[Any] = []
+            if run_id is not None:
+                clauses.append("run_id = ?")
+                params.append(run_id)
+            if legacy_instance_id is not None:
+                clauses.append("legacy_instance_id = ?")
+                params.append(legacy_instance_id)
+            if status is not None:
+                clauses.append("status = ?")
+                params.append(status)
+            if agent_type is not None:
+                clauses.append("agent_type = ?")
+                params.append(agent_type)
+            if clauses:
+                query += " WHERE " + " AND ".join(clauses)
+            query += " ORDER BY created_at, priority"
+            rows = connection.execute(query, params).fetchall()
         return [self._task_from_row(row) for row in rows]
 
     def create_dependency(self, dependency: TaskDependency) -> TaskDependency:
@@ -393,12 +569,15 @@ class SqliteControlPlane:
             ).fetchone()
         return self._attempt_from_row(row) if row else None
 
-    def list_attempts(self, task_id: str) -> list[TaskAttempt]:
+    def list_attempts(self, task_id: str, *, status: str | None = None) -> list[TaskAttempt]:
         with self.connection() as connection:
-            rows = connection.execute(
-                "SELECT * FROM orchestration_attempts WHERE task_id = ? ORDER BY sequence",
-                (task_id,),
-            ).fetchall()
+            query = "SELECT * FROM orchestration_attempts WHERE task_id = ?"
+            params: list[Any] = [task_id]
+            if status is not None:
+                query += " AND status = ?"
+                params.append(status)
+            query += " ORDER BY sequence"
+            rows = connection.execute(query, params).fetchall()
         return [self._attempt_from_row(row) for row in rows]
 
     def write_lease(
@@ -440,6 +619,25 @@ class SqliteControlPlane:
             ).fetchall()
         return rows
 
+    def get_lease(self, task_id: str) -> TaskLease | None:
+        with self.connection() as connection:
+            row = connection.execute(
+                "SELECT * FROM orchestration_leases WHERE task_id = ?",
+                (task_id,),
+            ).fetchone()
+        return self._lease_from_row(row) if row else None
+
+    def list_leases(self, *, stale_before: str | None = None) -> list[TaskLease]:
+        with self.connection() as connection:
+            if stale_before is None:
+                rows = connection.execute("SELECT * FROM orchestration_leases ORDER BY expires_at").fetchall()
+            else:
+                rows = connection.execute(
+                    "SELECT * FROM orchestration_leases WHERE expires_at <= ? ORDER BY expires_at",
+                    (stale_before,),
+                ).fetchall()
+        return [self._lease_from_row(row) for row in rows]
+
     def append_event(self, event: OrchestrationEvent) -> OrchestrationEvent:
         with self.connection() as connection:
             connection.execute(
@@ -463,24 +661,34 @@ class SqliteControlPlane:
             )
         return event
 
-    def list_events(self, *, run_id: str, limit: int | None = None) -> list[OrchestrationEvent]:
+    def list_events(
+        self,
+        *,
+        run_id: str,
+        limit: int | None = None,
+        task_id: str | None = None,
+        attempt_id: str | None = None,
+        event_type: str | None = None,
+    ) -> list[OrchestrationEvent]:
         with self.connection() as connection:
-            if limit:
-                rows = connection.execute(
-                    """
-                    SELECT * FROM orchestration_events
-                    WHERE run_id = ?
-                    ORDER BY created_at DESC
-                    LIMIT ?
-                    """,
-                    (run_id, limit),
-                ).fetchall()
-                rows = list(reversed(rows))
+            query = "SELECT * FROM orchestration_events WHERE run_id = ?"
+            params: list[Any] = [run_id]
+            if task_id is not None:
+                query += " AND task_id = ?"
+                params.append(task_id)
+            if attempt_id is not None:
+                query += " AND attempt_id = ?"
+                params.append(attempt_id)
+            if event_type is not None:
+                query += " AND event_type = ?"
+                params.append(event_type)
+            if limit is not None and limit > 0:
+                query += " ORDER BY created_at DESC LIMIT ?"
+                params.append(limit)
+                rows = list(reversed(connection.execute(query, params).fetchall()))
             else:
-                rows = connection.execute(
-                    "SELECT * FROM orchestration_events WHERE run_id = ? ORDER BY created_at",
-                    (run_id,),
-                ).fetchall()
+                query += " ORDER BY created_at"
+                rows = connection.execute(query, params).fetchall()
         return [self._event_from_row(row) for row in rows]
 
     def upsert_circuit(self, circuit: CircuitState) -> CircuitState:
@@ -518,6 +726,11 @@ class SqliteControlPlane:
             ).fetchone()
         return CircuitState.model_validate(dict(row)) if row else None
 
+    def list_circuits(self) -> list[CircuitState]:
+        with self.connection() as connection:
+            rows = connection.execute("SELECT * FROM orchestration_circuits ORDER BY agent_type").fetchall()
+        return [CircuitState.model_validate(dict(row)) for row in rows]
+
     @staticmethod
     def _run_from_row(row: sqlite3.Row) -> OrchestrationRun:
         payload = dict(row)
@@ -538,6 +751,10 @@ class SqliteControlPlane:
         payload = dict(row)
         payload["metadata"] = _load(payload.pop("metadata_json"), {})
         return TaskAttempt.model_validate(payload)
+
+    @staticmethod
+    def _lease_from_row(row: sqlite3.Row) -> TaskLease:
+        return TaskLease.model_validate(dict(row))
 
     @staticmethod
     def _event_from_row(row: sqlite3.Row) -> OrchestrationEvent:

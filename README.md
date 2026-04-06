@@ -26,10 +26,14 @@ AI-Factory is a comprehensive platform designed to manage the entire lifecycle o
 - **Web**: Modern web-based management interface
 - **Desktop**: Native desktop application
 
-### **⚡ Scalable & Extensible**
-- **Local to Cloud**: Scale from laptop to distributed systems
-- **Platform Capabilities**: Distributed training, real-time monitoring
-- **Plugin Architecture**: Easy to extend with new domains and features
+### **⚡ Ultimate Hardware Optimization**
+- **Apple Silicon (M5/M4/M3/M2/M1)**: Metal Performance Shaders with unified memory, 614 GB/s bandwidth on M5 Max
+- **NVIDIA GPUs (H100/H200/A100/RTX)**: CUDA with Tensor Cores, FP8/BF16/TF32 mixed precision
+- **Automatic Detection**: Hardware-aware kernel selection and configuration
+- **Fused Kernels**: RMSNorm+SiLU fusion, FlashAttention, optimized memory layouts
+- **Zero-Copy Memory**: Unified memory path on Apple Silicon, pinned memory on CUDA
+
+See the [Optimization Guide](docs/optimization-guide.md) for full details.
 
 ## 🚀 **Key Features**
 
@@ -44,6 +48,9 @@ AI-Factory is a comprehensive platform designed to manage the entire lifecycle o
 - **Distributed Training**: Multi-node scaling with resource management
 - **Experiment Tracking**: Comprehensive run manifests and metadata
 - **Model Comparison**: Side-by-side performance analysis
+- **Scale Ladder**: Canonical scratch templates for `1b`, `2b`, `4b`, `9b`, `12b`, `20b`, `27b`, `30b`, `70b`, and `120b`
+- **Bootstrap-First Runs**: Linux cloud and macOS local start scripts handle dependency install, tokenizer setup, and launch orchestration
+- **Faster Data Prep**: The corpus pipeline now emphasizes faster tokenization and lower-wait dataset preparation
 
 ### **🔍 Evaluation & Monitoring**
 - **Benchmark Registry**: Standardized evaluation benchmarks
@@ -56,6 +63,10 @@ AI-Factory is a comprehensive platform designed to manage the entire lifecycle o
 - **FastAPI Backend**: High-performance inference server
 - **Prompt Management**: Configurable prompt presets and templates
 - **Model Registry**: Centralized model versioning and management
+- **Accelerator Awareness**: Titan runtime reporting surfaces CUDA, Metal, and CPU fallback capability for hardware-aware launches. The Titan Rust core natively accelerates operations and provides robust telemetry for both NVIDIA and Apple Silicon.
+- **Titan Engine with C++/Rust Acceleration**: Native SIMD kernels (AVX2/AVX512/NEON) for dot products, matrix multiplication, vector operations, RMS normalization, softmax, and SiLU activation functions. Zero-copy memory layouts with Q4_0/Q4K/Q8_0 quantization support.
+- **Ultimate Hardware Optimization**: Automatic hardware detection and kernel selection for maximum performance on Apple Silicon (M1/M2/M3/M4/M5) with Metal Performance Shaders and NVIDIA GPUs (A100/H100/RTX) with CUDA/Tensor Cores. Includes fused kernels, FlashAttention, mixed precision (FP16/BF16/TF32), and unified memory optimizations.
+- **Durable Control Plane**: Local-first SQLite control plane for orchestration runs, tasks, and telemetry, paired with a SQLite-backed corpus.
 
 ## 🏗️ **Architecture Overview**
 
@@ -75,73 +86,90 @@ AI-Factory/
 ├── 📓 notebooks/       # Research notebooks and tutorials
 ├── 📚 docs/           # Documentation and guides
 ├── 🧪 tests/          # Comprehensive test suite
-└── ⚙️ configs/        # Configuration files and profiles
+├── ⚙️ configs/        # Configuration files and profiles
+└── ⚡ ai_factory_titan/ # Rust-based inference engine with C++ acceleration
 ```
 
 ## 🚀 **Quick Start**
 
-### **Installation**
+### **Quick Start with Ultimate Optimization**
+
+**1. Detect your hardware:**
 ```bash
-# Clone the repository
-git clone https://github.com/super244/ai-factory.git
-cd ai-factory
-
-# Install in development mode
-pip install -e .[dev]
-
-# Verify installation
-ai-factory --help
+python -m training.src.optimization
 ```
+
+**2. Train with hardware-optimized profile:**
+```bash
+# Apple Silicon (M5 Max)
+python -m training.train --config training/configs/profiles/m5_max_ultimate.yaml
+
+# NVIDIA A100
+python -m training.train --config training/configs/profiles/cuda_ultimate_a100.yaml
+
+# NVIDIA H100  
+python -m training.train --config training/configs/profiles/cuda_ultimate_h100.yaml
+```
+
+See [Optimization Guide](docs/optimization-guide.md) for full tuning options.
+
+The bootstrap scripts install dependencies, fetch tokenizer and model prerequisites, validate the runtime, and start the right training path without a manual virtual environment step.
 
 ### **Basic Usage**
 ```bash
-# List available domains
-ai-factory domain list
+# Prepare data
+python data/prepare_dataset.py --config data/configs/processing.yaml
 
-# Check platform status
-ai-factory platform status
+# Validate the training path
+python -m training.train --config training/configs/profiles/baseline_qlora.yaml --dry-run
 
-# Start training with default config
-ai-factory new --config configs/finetune.yaml
+# Hard fail preflight before a real run
+ai-factory train-preflight --config training/configs/profiles/failure_aware.yaml
 
-# Monitor progress
-ai-factory tui
+# Serve the API
+ai-factory serve --host 127.0.0.1 --port 8000
 
-# Launch web interface
-ai-factory serve
+# Smoke-test a live server
+ai-factory api-smoke
 ```
 
 ### **Development Setup**
 ```bash
-# Install frontend dependencies
 cd frontend && npm install
+cd ..
 
-# Run development servers
-ai-factory serve           # Backend server
-npm run dev               # Frontend development
+# Run checks
+ruff check .
+mypy .
+pytest
+cd frontend && npm run lint && npm run typecheck
+cd ..
 
-# Run tests
-pytest                    # Python tests
-npm test                   # Frontend tests
+# Build the frontend
+cd frontend && npm run build
 ```
+
+Full operator setup, including local vs cloud guidance, dataset generation, training, evaluation, optimization, deployment, and inference, is documented in [quickstart.md](quickstart.md).
 
 ## 📚 **Documentation**
 
 ### **Core Guides**
 - **[Architecture Guide](docs/architecture.md)** - System design and principles
 - **[Data System Guide](docs/data-system.md)** - Data layer and processing
-- **[Training Guide](tune-guide.md)** - Model training and fine-tuning
+- **[Quickstart](quickstart.md)** - Exact local and cloud setup plus the full lifecycle
+- **[Optimization Guide](docs/optimization-guide.md)** - Hardware-aware training optimization
+- **[Training Guide](training/README.md)** - Training profiles, artifacts, and workflow details
 - **[Deployment Guide](docs/deployment-guide.md)** - Deployment and production
 
 ### **API Documentation**
 - **[API Reference](docs/api/README.md)** - REST API and endpoints
-- **[CLI Reference](docs/cli-guide.md)** - Command-line interface
-- **[Configuration Guide](docs/config-guide.md)** - Configuration options
+- **[API Guide](docs/api-guide.md)** - API usage patterns and examples
+- **[Runbook](docs/runbook.md)** - Operational commands and recovery steps
 
 ### **Tutorials & Examples**
 - **[Notebooks](notebooks/)** - Interactive tutorials and explorations
-- **[Examples](examples/)** - Code examples and templates
-- **[Best Practices](docs/best-practices.md)** - Development guidelines
+- **[Docs Examples](docs/examples/)** - Reference examples and templates
+- **[Contributor Guide](docs/contributor-guide.md)** - Development guidelines
 
 ## 🛠️ **Development**
 
@@ -150,12 +178,18 @@ npm test                   # Frontend tests
 # Linting and formatting
 ruff check .              # Lint code
 ruff format .             # Format code
-mypy ai_factory/         # Type checking
+mypy .                    # Type checking
 
 # Testing
 pytest                    # Run tests
 pytest --cov=ai_factory  # With coverage
+
+# Hardware detection and benchmarking
+python -m training.src.optimization           # Detect hardware
+python -c "from training.src.ultimate_harness import quick_benchmark; quick_benchmark()"  # Benchmark
 ```
+
+Training note: `python -m training.train --config ... --dry-run` is safe to use on CPU-only machines for config and dataset validation. Real training still needs the hardware profile described by the selected training config.
 
 ### **Contributing**
 1. Fork the repository
@@ -189,8 +223,8 @@ See [Contributor Guide](docs/contributor-guide.md) for detailed guidelines.
 ### **Environment Variables**
 ```bash
 export AI_FACTORY_REPO_ROOT="/path/to/ai-factory"
-export AI_FACTORY_ARTIFACTS_DIR="/path/to/artifacts"
-export AI_FACTORY_LOG_LEVEL="INFO"
+export ARTIFACTS_DIR="/path/to/artifacts"
+export CORS_ORIGINS="http://localhost:3000"
 ```
 
 ### **Key Configuration Files**
@@ -198,6 +232,7 @@ export AI_FACTORY_LOG_LEVEL="INFO"
 - `configs/eval.yaml` - Evaluation settings
 - `configs/inference.yaml` - Inference server settings
 - `data/configs/processing.yaml` - Data processing pipeline
+- `training/configs/components/models/` - Canonical scratch scale templates
 - `training/configs/profiles/` - Training profiles
 
 ## 🌟 **Community & Support**

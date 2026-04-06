@@ -1,12 +1,14 @@
 from __future__ import annotations
 
 import argparse
+import inspect
 import json
 import logging
 import os
 import sys
 from pathlib import Path
 
+import torch
 from transformers import TrainingArguments, set_seed
 
 from ai_factory.core.artifacts import prepare_run_layout, write_json
@@ -26,8 +28,13 @@ from training.src.environment import collect_environment_snapshot
 from training.src.modeling import load_model_for_training, load_tokenizer, trainable_parameter_report
 from training.src.packaging import publish_model_artifacts, write_run_manifest, write_training_summary
 from training.src.tracking import build_tracker
-from training.src.trainer import MathTrainer
 from training.src.validation import run_dry_validation
+from training.src.optimization import HardwareDetector, TrainingOptimizer
+from training.src.ultimate_harness import (
+    build_ultimate_trainer_with_harness,
+    HarnessConfig,
+    UltimateTrainingHarness,
+)
 
 # Set up structured logging
 logging.basicConfig(
@@ -36,10 +43,34 @@ logging.basicConfig(
     handlers=[logging.StreamHandler(sys.stdout)],
 )
 logger = logging.getLogger(__name__)
+_TRAINING_ARGUMENT_PARAMETERS = set(inspect.signature(TrainingArguments.__init__).parameters)
+
+
+def _mps_available() -> bool:
+    mps_backend = getattr(torch.backends, "mps", None)
+    return bool(mps_backend and mps_backend.is_available())
+
+
+def _resolve_precision_flags(config: ExperimentConfig) -> dict[str, bool]:
+    training = config.training
+    bf16_enabled = training.bf16
+    fp16_enabled = training.fp16
+
+    if torch.cuda.is_available():
+        return {"bf16": bf16_enabled, "fp16": fp16_enabled, "use_cpu": False}
+
+    if _mps_available():
+        return {"bf16": False, "fp16": False, "use_cpu": False}
+
+    # TrainingArguments validates mixed precision against the current runtime
+    # during initialization, so CPU-only environments must disable GPU dtypes.
+    return {"bf16": False, "fp16": False, "use_cpu": True}
 
 
 def parse_args() -> argparse.Namespace:
-    parser = argparse.ArgumentParser(description="Fine-tune a math model with QLoRA and research-grade artifacts.")
+    parser = argparse.ArgumentParser(
+        description="Train or fine-tune a causal language model with research-grade artifacts."
+    )
     parser.add_argument("--config", required=True, help="Path to the YAML config file.")
     parser.add_argument("--resume-from-checkpoint", default=None)
     parser.add_argument(
@@ -68,44 +99,71 @@ def parse_args() -> argparse.Namespace:
 
 def build_training_arguments(config: ExperimentConfig, layout) -> TrainingArguments:
     training = config.training
-    optim = "paged_adamw_8bit" if (config.model.use_4bit or config.model.use_8bit) else "adamw_torch"
+    optim = (
+        "paged_adamw_8bit"
+        if (config.model.use_4bit or config.model.use_8bit) and torch.cuda.is_available()
+        else "adamw_torch"
+    )
+    precision_flags = _resolve_precision_flags(config)
+    training_arguments = {
+        "output_dir": str(layout.checkpoints_dir),
+        "run_name": config.run_name,
+        "num_train_epochs": training.num_train_epochs,
+        "max_steps": training.max_steps,
+        "learning_rate": training.learning_rate,
+        "weight_decay": training.weight_decay,
+        "warmup_ratio": training.warmup_ratio,
+        "lr_scheduler_type": training.lr_scheduler_type,
+        "per_device_train_batch_size": training.per_device_train_batch_size,
+        "per_device_eval_batch_size": training.per_device_eval_batch_size,
+        "gradient_accumulation_steps": training.gradient_accumulation_steps,
+        "max_grad_norm": training.max_grad_norm,
+        "logging_steps": training.logging_steps,
+        "eval_steps": training.eval_steps,
+        "save_steps": training.save_steps,
+        "save_total_limit": training.save_total_limit,
+        "bf16": precision_flags["bf16"],
+        "fp16": precision_flags["fp16"],
+        "use_cpu": precision_flags["use_cpu"],
+        "save_strategy": training.save_strategy,
+        "load_best_model_at_end": training.load_best_model_at_end,
+        "report_to": config.logging.report_to,
+        "dataloader_num_workers": training.dataloader_num_workers,
+        "remove_unused_columns": False,
+        "optim": optim,
+        "logging_dir": str(layout.logs_dir),
+        "logging_first_step": config.logging.logging_first_step,
+        "group_by_length": training.group_by_length,
+        "save_safetensors": training.save_safetensors,
+        "seed": config.seed,
+        "deepspeed": config.runtime.deepspeed_config,
+        "torch_compile": config.runtime.torch_compile,
+    }
+    if "use_mps_device" in _TRAINING_ARGUMENT_PARAMETERS and _mps_available():
+        training_arguments["use_mps_device"] = True
+    if "eval_strategy" in _TRAINING_ARGUMENT_PARAMETERS:
+        training_arguments["eval_strategy"] = training.evaluation_strategy
+    else:
+        training_arguments["evaluation_strategy"] = training.evaluation_strategy
+    training_arguments = {
+        key: value for key, value in training_arguments.items() if key in _TRAINING_ARGUMENT_PARAMETERS
+    }
     return TrainingArguments(
-        output_dir=str(layout.checkpoints_dir),
-        run_name=config.run_name,
-        num_train_epochs=training.num_train_epochs,
-        max_steps=training.max_steps,
-        learning_rate=training.learning_rate,
-        weight_decay=training.weight_decay,
-        warmup_ratio=training.warmup_ratio,
-        lr_scheduler_type=training.lr_scheduler_type,
-        per_device_train_batch_size=training.per_device_train_batch_size,
-        per_device_eval_batch_size=training.per_device_eval_batch_size,
-        gradient_accumulation_steps=training.gradient_accumulation_steps,
-        max_grad_norm=training.max_grad_norm,
-        logging_steps=training.logging_steps,
-        eval_steps=training.eval_steps,
-        save_steps=training.save_steps,
-        save_total_limit=training.save_total_limit,
-        bf16=training.bf16,
-        fp16=training.fp16,
-        evaluation_strategy=training.evaluation_strategy,
-        save_strategy=training.save_strategy,
-        load_best_model_at_end=training.load_best_model_at_end,
-        report_to=config.logging.report_to,
-        dataloader_num_workers=training.dataloader_num_workers,
-        remove_unused_columns=False,
-        optim=optim,
-        logging_dir=str(layout.logs_dir),
-        logging_first_step=config.logging.logging_first_step,
-        group_by_length=training.group_by_length,
-        save_safetensors=training.save_safetensors,
-        seed=config.seed,
-        deepspeed=config.runtime.deepspeed_config,
-        torch_compile=config.runtime.torch_compile,
+        **training_arguments,
     )
 
 
 def save_config_snapshot(config: ExperimentConfig, layout) -> Path:
+    """
+    Save a snapshot of the experiment configuration to the layout manifests directory.
+
+    Args:
+        config (ExperimentConfig): The experiment configuration to save.
+        layout (Any): The initialized layout structure for the run.
+
+    Returns:
+        Path: The file path where the config snapshot was saved.
+    """
     path = layout.manifests_dir / "config_snapshot.json"
     write_json(path, config.to_dict())
     return path
@@ -118,6 +176,18 @@ def write_config_report(
     warnings: list[str],
     resume_from_checkpoint: str | None,
 ) -> tuple[Path, dict[str, object]]:
+    """
+    Write a comprehensive configuration report including warnings and checkpoint data.
+
+    Args:
+        config (ExperimentConfig): The experiment configuration.
+        layout (Any): The directory layout for the run.
+        warnings (list[str]): List of warnings generated during config validation.
+        resume_from_checkpoint (str | None): The checkpoint path used for resuming (if any).
+
+    Returns:
+        tuple[Path, dict[str, object]]: The path to the report file and the report data dictionary.
+    """
     report = describe_experiment_config(config, warnings=warnings)
     report["resume_from_checkpoint"] = resume_from_checkpoint
     path = layout.manifests_dir / "config_report.json"
@@ -126,6 +196,16 @@ def write_config_report(
 
 
 def summarize_environment(snapshot: dict[str, object]) -> dict[str, object]:
+    """
+    Summarize the full environment snapshot into key metrics for tracking.
+
+    Args:
+        snapshot (dict[str, object]): The raw environment snapshot dictionary.
+
+    Returns:
+        dict[str, object]: A summarized dictionary containing git SHA, Python/Platform versions,
+        and CUDA availability.
+    """
     python_info = snapshot.get("python") if isinstance(snapshot.get("python"), dict) else {}
     platform_info = snapshot.get("platform") if isinstance(snapshot.get("platform"), dict) else {}
     torch_info = snapshot.get("torch") if isinstance(snapshot.get("torch"), dict) else {}
@@ -139,6 +219,17 @@ def summarize_environment(snapshot: dict[str, object]) -> dict[str, object]:
 
 
 def build_dataset_artifacts(config: ExperimentConfig, tokenizer, layout):
+    """
+    Build the train and evaluation datasets, and generate a dataset report.
+
+    Args:
+        config (ExperimentConfig): The experiment configuration containing data paths.
+        tokenizer (Any): The tokenizer to use for building the datasets.
+        layout (Any): The run layout directory structure.
+
+    Returns:
+        tuple: A tuple containing (train_dataset, eval_dataset, dataset_report_dict).
+    """
     logger.info("Building dataset artifacts.")
     train_dataset = build_dataset(
         file_path=config.data.train_file,
@@ -155,8 +246,8 @@ def build_dataset_artifacts(config: ExperimentConfig, tokenizer, layout):
             split="eval",
         )
     dataset_report = {
-        "train": dataset_summary(config.data.train_file),
-        "eval": dataset_summary(config.data.eval_file) if config.data.eval_file else None,
+        "train": dataset_summary(config.data.train_file, split="train"),
+        "eval": dataset_summary(config.data.eval_file, split="eval") if config.data.eval_file else None,
         "tokenized_train_rows": len(train_dataset),
         "tokenized_eval_rows": len(eval_dataset) if eval_dataset is not None else 0,
     }
@@ -165,12 +256,28 @@ def build_dataset_artifacts(config: ExperimentConfig, tokenizer, layout):
 
 
 def load_json_if_exists(path: Path) -> dict:
+    """
+    Load a JSON file into a dictionary if the file exists.
+
+    Args:
+        path (Path): The path to the JSON file.
+
+    Returns:
+        dict: The parsed JSON dictionary or an empty dict if the file is missing.
+    """
     if not path.exists():
         return {}
     return json.loads(path.read_text())
 
 
 def main() -> None:
+    """
+    Main entry point for the training execution.
+
+    Handles argument parsing, orchestrator setup for distributed training,
+    configuration validation, artifact layout preparation, tokenizer/model loading,
+    dry-run execution, full training execution, and metric/lineage reporting.
+    """
     args = parse_args()
 
     # Orchestrator Integration: If distributed flag is set and we're not already the worker
@@ -197,6 +304,8 @@ def main() -> None:
     logger.info("Loading experiment config.")
     config = load_experiment_config(args.config)
     validation_warnings = validate_experiment_config(config)
+    for warning in validation_warnings:
+        logger.warning("Config validation: %s", warning)
     set_seed(config.seed)
 
     layout = prepare_run_layout(config.training.artifacts_dir, config.run_name)
@@ -204,6 +313,9 @@ def main() -> None:
         layout.checkpoints_dir,
         explicit_checkpoint=args.resume_from_checkpoint,
         resume_from_latest=args.resume_from_latest_checkpoint,
+        artifacts_dir=config.training.artifacts_dir,
+        run_name=config.run_name,
+        exclude_run_id=layout.run_id,
     )
     config_snapshot_path = save_config_snapshot(config, layout)
     config_report_path, config_report = write_config_report(
@@ -266,7 +378,12 @@ def main() -> None:
     validate_model_load = args.validate_model_load or config.runtime.validate_model_load
 
     logger.info("Loading tokenizer.")
-    tokenizer = load_tokenizer(config) if (not args.dry_run or validate_model_load) else None
+    require_local_tokenizer = config.model.initialization.lower() == "scratch" and not args.dry_run
+    tokenizer = (
+        load_tokenizer(config, require_local_path=require_local_tokenizer)
+        if (not args.dry_run or validate_model_load)
+        else None
+    )
 
     dry_validation = run_dry_validation(config, tokenizer)
     write_json(layout.metrics_dir / "dry_run_validation.json", dry_validation)
@@ -286,7 +403,7 @@ def main() -> None:
             if validate_model_load:
                 logger.info("Validating model load.")
                 tokenizer = tokenizer or load_tokenizer(config)
-                model = load_model_for_training(config)
+                model = load_model_for_training(config, tokenizer=tokenizer)
                 parameter_report = trainable_parameter_report(model)
                 write_json(layout.metrics_dir / "model_report.json", parameter_report)
                 tracker.log_metrics({"trainable_ratio": parameter_report["trainable_ratio"]})
@@ -363,7 +480,24 @@ def main() -> None:
 
         logger.info("Initializing full training run.")
         tokenizer = tokenizer or load_tokenizer(config)
-        model = load_model_for_training(config)
+        
+        # Detect hardware and initialize ultimate harness
+        logger.info("Detecting hardware and initializing ultimate optimization harness.")
+        hardware = HardwareDetector.detect()
+        harness_config = HarnessConfig(
+            enable_mixed_precision=config.training.bf16 or config.training.fp16,
+            enable_gradient_checkpointing=config.training.gradient_checkpointing,
+            enable_torch_compile=config.runtime.torch_compile,
+            enable_memory_profiling=os.environ.get("AI_FACTORY_MEMORY_PROFILE", "0") == "1",
+        )
+        harness = UltimateTrainingHarness(config, harness_config, hardware)
+        harness.print_summary()
+        
+        # Prepare model with ultimate optimizations
+        model = harness.prepare_model(model)
+        
+        # Get optimized training arguments from harness
+        args = harness.get_training_arguments(layout)
 
         parameter_report = trainable_parameter_report(model)
         write_json(layout.metrics_dir / "model_report.json", parameter_report)
@@ -383,22 +517,27 @@ def main() -> None:
 
         data_collator = WeightedDataCollator(tokenizer=tokenizer, label_pad_token_id=-100, pad_to_multiple_of=8)
 
-        trainer = MathTrainer(
+        # Build ultimate trainer with harness integration
+        trainer = build_ultimate_trainer_with_harness(
+            config=config,
             model=model,
-            args=build_training_arguments(config, layout),
+            args=args,
             train_dataset=train_dataset,
             eval_dataset=eval_dataset,
             data_collator=data_collator,
             tokenizer=tokenizer,
-            sequential_training=(config.data.curriculum_learning and config.data.sequential_curriculum),
             callbacks=[
                 JsonlMetricsCallback(layout.logs_dir / config.logging.jsonl_metrics_filename),
                 TrackerCallback(tracker),
             ],
+            layout=layout,
         )
 
-        logger.info("Starting training loop.")
-        trainer.train(resume_from_checkpoint=args.resume_from_checkpoint)
+        logger.info("Starting training loop with ultimate optimization.")
+        print("[Ultimate Training Harness] Hardware-aware optimization active.")
+        print(f"[Ultimate Training Harness] Backend: {harness.hardware.backend.name}")
+        print(f"[Ultimate Training Harness] Device: {harness.hardware.device_name}")
+        trainer.train(resume_from_checkpoint=resume_from_checkpoint)
 
         logger.info("Training complete. Evaluating.")
         metrics = trainer.evaluate() if eval_dataset is not None else {}
@@ -409,6 +548,25 @@ def main() -> None:
         logger.info("Publishing artifacts.")
         published = publish_model_artifacts(layout, config, trainer, tokenizer)
         trainer.save_state()
+
+        # Automatic Lineage Registration
+        try:
+            from ai_factory.core.lineage.models import LineageRecord
+            from ai_factory.core.platform.container import build_platform_container
+
+            container = build_platform_container(repo_root=Path.cwd())
+            record = LineageRecord(
+                id=layout.run_id,
+                base_model=config.model.base_model_name,
+                dataset_hash=config.data.pack_manifest or "unspecified",
+                training_config=config.to_dict(),
+                metrics={k: float(v) for k, v in metrics.items() if isinstance(v, (int, float))},
+                tags=config.tracking.tags + [config.adapter.method],
+            )
+            container.control_service.record_lineage(record)
+            logger.info(f"Model lineage registered: {layout.run_id}")
+        except Exception as e:
+            logger.warning(f"Lineage registration failed: {e}")
 
         summary = {
             "run_name": config.run_name,

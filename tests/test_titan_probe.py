@@ -3,7 +3,7 @@ from __future__ import annotations
 from ai_factory import titan
 
 
-def test_detect_titan_status_prefers_remote_cuda_when_configured(monkeypatch):
+def test_detect_titan_status_prefers_remote_cuda_when_configured(monkeypatch) -> None:
     monkeypatch.setenv("AI_FACTORY_TITAN_REMOTE_EXECUTION", "1")
     monkeypatch.setenv("AI_FACTORY_TITAN_REMOTE_GPU_NAME", "NVIDIA H100")
     monkeypatch.setenv("AI_FACTORY_TITAN_REMOTE_GPU_COUNT", "4")
@@ -24,6 +24,34 @@ def test_detect_titan_status_prefers_remote_cuda_when_configured(monkeypatch):
             "driver_version": None,
         },
     )
+    monkeypatch.setattr(
+        titan,
+        "_load_rust_status",
+        lambda repo_root: {
+            "scheduler": {
+                "runtime": "tokio",
+                "queue_policy": "bounded-priority",
+                "ui_budget_hz": 120,
+                "max_inflight_tasks": 64,
+                "priority_bands": 3,
+            },
+            "engine": {
+                "architecture": "llm-runtime",
+                "decode_model": "llama.cpp-inspired",
+            },
+            "runtime": {
+                "selected": "rust",
+                "status_source": "rust-binary",
+                "gguf_support": True,
+                "kv_cache": True,
+                "sampler_stack": ["argmax", "top_k"],
+            },
+            "quantization": {
+                "formats": ["q4_k", "q8_0"],
+                "layout": {"storage": "blocked-row-major"},
+            },
+        },
+    )
 
     status = titan.detect_titan_status("/tmp")
 
@@ -35,3 +63,21 @@ def test_detect_titan_status_prefers_remote_cuda_when_configured(monkeypatch):
     assert status["cuda_compute_capability"] == "9.0"
     assert status["cloud_provider"] == "runpod"
     assert status["remote_execution"] is True
+    assert status["runtime_source"] == "rust-binary"
+    assert status["scheduler"]["max_inflight_tasks"] == 64
+    assert status["quantization"]["memory_layout"] == "blocked-row-major"
+    assert status["runtime"]["selected"] == "rust"
+    assert status["runtime"]["gguf_support"] is True
+    assert status["engine"]["runtime_mode"] == "rust-primary"
+    assert status["engine"]["runtime_ready"] is False
+    assert status["engine"]["supports_gguf"] is True
+    assert status["engine"]["supports_kv_cache"] is True
+    assert status["engine"]["supports_sampler_stack"] is True
+
+
+def test_find_titan_status_binary_uses_release_or_windows_paths(tmp_path) -> None:
+    binary = tmp_path / "ai_factory_titan" / "target" / "release" / "titan-status.exe"
+    binary.parent.mkdir(parents=True)
+    binary.write_text("")
+
+    assert titan._find_titan_status_binary(tmp_path) == binary

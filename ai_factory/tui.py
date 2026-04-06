@@ -1,3 +1,10 @@
+"""
+Terminal User Interface (TUI) for monitoring AI-Factory instances.
+
+Provides an interactive curses-based dashboard to view live instances, logs,
+metrics, and quickly execute operational actions.
+"""
+
 from __future__ import annotations
 
 import argparse
@@ -24,6 +31,10 @@ _ACTION_KEYS = {
 
 @dataclass
 class DashboardSnapshot:
+    """
+    Represents a point-in-time snapshot of the dashboard state.
+    """
+
     instances: list[Any]
     summary: dict[str, Any]
     logs: dict[str, str]
@@ -141,6 +152,10 @@ def _wrap_lines(text: str, width: int) -> list[str]:
 
 
 class TuiController:
+    """
+    Controls the state and interactions of the TUI dashboard.
+    """
+
     def __init__(self, *, repo_root: str | None, artifacts_dir: str | None, refresh_seconds: float):
         self.control = build_platform_container(
             repo_root=repo_root,
@@ -217,7 +232,7 @@ class TuiController:
             return
         instance = self.snapshot.instances[self.selected_index]
         try:
-            self.control.execute_action(instance.id, action_name)
+            self.control.execute_action(instance.id, action=action_name)
             self.last_action_msg = f"{action_name} triggered on {instance.name}"
         except Exception as exc:
             self.last_action_msg = f"Error: {exc}"

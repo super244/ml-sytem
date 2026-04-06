@@ -1,0 +1,26 @@
+name: qwen2_scratch_2b
+scale: 2b
+parameter_size_b: 2.0
+initialization: scratch
+model_type: qwen2
+target_parameters: 2b
+base_model_name: scratch/qwen2-2b
+tokenizer_name: gpt2
+tokenizer_path: artifacts/tokenizers/qwen2_math_2b
+trust_remote_code: false
+use_4bit: false
+use_8bit: false
+use_full_precision: true
+bnb_compute_dtype: bfloat16
+gradient_checkpointing: true
+use_flash_attention: true
+device_map: auto
+recommended_runtime_profile: hybrid_local
+recommended_quantization: none
+deployment_tier: local
+context_length: 4096
+architecture:
+  vocab_size: 50257
+  max_position_embeddings: 4096
+  rope_theta: 1000000.0
+  tie_word_embeddings: false

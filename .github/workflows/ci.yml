@@ -1,64 +1,239 @@
-name: ci
+name: AI-Factory CI
 
 on:
   push:
-    branches:
-      - main
+    branches: [ main, develop ]
   pull_request:
+    branches: [ main, develop ]
+
+permissions:
+  contents: read
+  security-events: write
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+defaults:
+  run:
+    shell: bash
 
 jobs:
-  python:
+  python-quality:
+    name: "Python: Quality & Security"
     runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ["3.10", "3.11", "3.12"]
     steps:
       - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
 
-      - uses: actions/setup-python@v5
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v5
         with:
-          python-version: "3.11"
-          cache: pip
-          cache-dependency-path: pyproject.toml
+          python-version: ${{ matrix.python-version }}
+          cache: 'pip'
 
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          python -m pip install -e .[dev]
+          pip install -e ".[dev]"
 
-      - name: Format check
+      - name: Ruff formatting check
         run: ruff format --check .
 
-      - name: Lint
+      - name: Ruff linting
         run: ruff check .
 
-      - name: Type check
+      - name: MyPy type checking
         run: mypy .
 
-      - name: Test
-        run: make test
+      - name: Bandit security scan
+        run: bandit -r ai_factory/ -f json -o bandit-report.json
+        continue-on-error: true
 
-      - name: Smoke
-        run: python -m compileall ai_factory data training inference evaluation
+      - name: Upload Bandit report
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: bandit-report-py${{ matrix.python-version }}
+          path: bandit-report.json
+          if-no-files-found: ignore
 
-  frontend:
+  python-tests:
+    name: "Python: Tests"
     runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: frontend
+    needs: python-quality
+    strategy:
+      matrix:
+        python-version: ["3.11"]
     steps:
       - uses: actions/checkout@v4
 
-      - uses: actions/setup-node@v4
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v5
         with:
-          node-version: "20"
-          cache: npm
-          cache-dependency-path: frontend/package-lock.json
+          python-version: ${{ matrix.python-version }}
+          cache: 'pip'
 
       - name: Install dependencies
-        run: npm ci
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e ".[dev]"
 
-      - name: Typecheck
+      - name: Run tests
+        run: |
+          python -m pytest -q --tb=short --cov=ai_factory --cov-report=xml --cov-report=term-missing
+
+      - name: Upload coverage
+        uses: codecov/codecov-action@v4
+        with:
+          file: ./coverage.xml
+          flags: python
+        continue-on-error: true
+
+  rust-checks:
+    name: "Rust: Titan Engine"
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Rust
+        uses: actions-rust-lang/setup-rust-toolchain@v1
+        with:
+          toolchain: stable
+          components: rustfmt, clippy
+          cache: true
+
+      - name: Rust checks
+        run: |
+          if [ -f ai_factory_titan/Cargo.toml ]; then
+            cd ai_factory_titan
+            cargo fmt --check
+            cargo check
+            cargo clippy --all-targets -- -D warnings
+          else
+            echo "No Rust/Titan components found"
+          fi
+
+  frontend-checks:
+    name: "Frontend: Build & Test"
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install frontend dependencies
+        working-directory: frontend
+        run: npm ci --legacy-peer-deps
+
+      - name: Lint frontend
+        working-directory: frontend
+        run: npm run lint
+
+      - name: Type check
+        working-directory: frontend
         run: npm run typecheck
 
-      - name: Build
+      - name: Build frontend
+        working-directory: frontend
         run: npm run build
+
+  desktop-checks:
+    name: "Desktop: Shell Validation"
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: desktop/package-lock.json
+
+      - name: Install desktop dependencies
+        working-directory: desktop
+        run: npm ci --legacy-peer-deps
+
+      - name: Validate desktop JavaScript entrypoints
+        working-directory: desktop
+        run: |
+          node --check main.js
+          node --check preload.js
+          npx electron-builder --version
+
+  integration-tests:
+    name: "Integration: System Tests"
+    runs-on: ubuntu-latest
+    needs: [python-tests, frontend-checks, desktop-checks]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: 'pip'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e ".[dev]"
+
+      - name: Run doctor script (if exists)
+        run: |
+          if [ -f scripts/doctor.py ]; then
+            python3 scripts/doctor.py
+          else
+            echo "No doctor script found"
+          fi
+
+      - name: Workspace readiness
+        run: python3 -m ai_factory.cli ready
+
+      - name: Training preflight
+        run: python3 -m ai_factory.cli train-preflight --config training/configs/profiles/failure_aware.yaml
+
+      - name: Basic import tests
+        run: |
+          python3 -c "import ai_factory.core; print('Core imports OK')"
+          python3 -c "import inference.app.main; print('Inference app imports OK')"
+
+      - name: CLI test
+        run: |
+          python3 -m ai_factory.cli --help
+
+  security-scan:
+    name: "Security: Vulnerability Scan"
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Run Trivy vulnerability scanner
+        uses: aquasecurity/trivy-action@0.28.0
+        with:
+          scan-type: 'fs'
+          scan-ref: '.'
+          format: 'sarif'
+          output: 'trivy-results.sarif'
+
+      - name: Upload Trivy scan results to GitHub Security tab
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: 'trivy-results.sarif'
+        continue-on-error: true
+
+      - name: Upload Trivy report
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: trivy-results
+          path: trivy-results.sarif
+          if-no-files-found: ignore

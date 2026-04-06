@@ -48,9 +48,13 @@ struct ControlCenterView: View {
                 Label("Electron fallback remains available", systemImage: "window.viewfinder")
                 HStack(spacing: 6) {
                     Circle()
-                        .fill(store.apiReachable ? Color.green : Color.red)
+                        .fill(store.apiReachable ? (store.apiDegraded ? Color.orange : Color.green) : Color.red)
                         .frame(width: 8, height: 8)
-                    Text(store.apiReachable ? "Backend connected" : "Backend unreachable")
+                    Text(
+                        store.apiReachable
+                            ? (store.apiDegraded ? "Backend degraded" : "Backend connected")
+                            : "Backend unreachable"
+                    )
                 }
                 .font(.system(size: 13, weight: .medium, design: .rounded))
             }
@@ -63,8 +67,8 @@ struct ControlCenterView: View {
         HStack(spacing: 16) {
             statusPill(
                 icon: "dot.radiowaves.left.and.right",
-                label: store.apiReachable ? "API Online" : "API Offline",
-                color: store.apiReachable ? .green : .red
+                label: store.apiReachable ? (store.apiDegraded ? "API Degraded" : "API Online") : "API Offline",
+                color: store.apiReachable ? (store.apiDegraded ? .orange : .green) : .red
             )
             statusPill(
                 icon: "square.stack.3d.up",

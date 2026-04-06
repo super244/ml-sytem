@@ -1,6 +1,7 @@
 import argparse
 import importlib.util
 import json
+import os
 import shlex
 import subprocess
 import sys
@@ -8,8 +9,9 @@ import urllib.error
 import urllib.request
 from pathlib import Path
 from typing import Any
+from urllib.parse import urlparse
 
-from ai_factory.core.datasets import load_catalog, load_pack_summary
+from ai_factory.core.datasets import inspect_json_asset, load_catalog, load_pack_summary
 from ai_factory.core.discovery import (
     latest_training_run,
     list_training_runs,
@@ -61,25 +63,34 @@ def run_step(label: str, command: list[str], cwd: Path | None = None) -> None:
             transient=True,
         ) as progress:
             progress.add_task(description=f"Running {label}...", total=None)
-            subprocess.run(command, cwd=str(cwd or Path.cwd()), check=True)
+            subprocess.run(command, cwd=str(cwd or Path.cwd()), check=True)  # nosec B603 - internal argv execution
         console.print(f"[green]✓[/green] {label}")
     else:
         print(f"[ai-factory] {label}: {rendered}")
-        subprocess.run(command, cwd=str(cwd or Path.cwd()), check=True)
+        subprocess.run(command, cwd=str(cwd or Path.cwd()), check=True)  # nosec B603 - internal argv execution
 
 
 def has_package(name: str) -> bool:
     return importlib.util.find_spec(name) is not None
 
 
+def _validate_http_url(url: str) -> None:
+    parsed = urlparse(url)
+    if parsed.scheme not in {"http", "https"}:
+        raise ValueError(f"unsupported URL scheme: {parsed.scheme!r}")
+    if not parsed.netloc:
+        raise ValueError("URL must include a host")
+
+
 def _request_json(method: str, url: str, payload: dict[str, Any] | None = None) -> dict[str, Any]:
+    _validate_http_url(url)
     data = None
     headers: dict[str, str] = {}
     if payload is not None:
         data = json.dumps(payload).encode("utf-8")
         headers["Content-Type"] = "application/json"
     request = urllib.request.Request(url, data=data, headers=headers, method=method)
-    with urllib.request.urlopen(request, timeout=15) as response:
+    with urllib.request.urlopen(request, timeout=15) as response:  # nosec B310
         body = response.read().decode("utf-8")
     return json.loads(body) if body else {}
 
@@ -247,21 +258,108 @@ def cmd_refresh_lab(args: argparse.Namespace) -> None:
         print("[ai-factory] Workspace refresh complete.")
 
 
+def _tokenizer_artifact_ready(config: Any) -> bool:
+    from training.src.config import resolve_path_reference
+
+    tokenizer_path = resolve_path_reference(config.model.tokenizer_path, config.config_path)
+    if tokenizer_path is None or not tokenizer_path.exists():
+        return False
+    return all((tokenizer_path / name).exists() for name in ("tokenizer.json", "tokenizer_config.json"))
+
+
+def _resolve_bootstrap_tokenizer_dir(config: Any, explicit_output_dir: str | None) -> str | None:
+    from training.src.config import resolve_path_reference
+
+    candidate = explicit_output_dir or config.model.tokenizer_path
+    if not candidate:
+        return None
+    resolved = resolve_path_reference(candidate, config.config_path)
+    if resolved is not None:
+        return str(resolved)
+    return str(Path(candidate).expanduser().resolve())
+
+
+def cmd_bootstrap_train(args: argparse.Namespace) -> None:
+    from training.src.config import load_experiment_config, resolve_path_reference
+
+    repo_root = Path.cwd()
+    os.environ.setdefault("AI_FACTORY_REPO_ROOT", str(repo_root))
+
+    config = load_experiment_config(args.config)
+    artifacts_dir = resolve_path_reference(config.training.artifacts_dir, config.config_path)
+    os.environ.setdefault("ARTIFACTS_DIR", str(artifacts_dir or config.training.artifacts_dir))
+    python = sys.executable
+
+    if not args.skip_ready:
+        run_step("Workspace readiness", [python, "-m", "ai_factory.cli", "ready", "--root", str(repo_root)])
+    if not args.skip_doctor:
+        run_step("Workspace doctor", [python, "scripts/doctor.py"])
+    if not args.skip_dataset:
+        run_step("Prepare processed corpus", [python, "data/prepare_dataset.py", "--config", args.dataset_config])
+
+    tokenizer_output_dir = _resolve_bootstrap_tokenizer_dir(config, args.tokenizer_output_dir)
+    tokenizer_ready = _tokenizer_artifact_ready(config)
+    should_train_tokenizer = (
+        not args.skip_tokenizer
+        and tokenizer_output_dir is not None
+        and (
+            args.force_tokenizer
+            or (config.model.initialization.lower() == "scratch" and not tokenizer_ready)
+            or (args.ensure_tokenizer and not tokenizer_ready)
+        )
+    )
+    if should_train_tokenizer and tokenizer_output_dir:
+        run_step(
+            "Train tokenizer",
+            [
+                python,
+                "training/scripts/train_tokenizer.py",
+                "--config",
+                args.config,
+                "--output-dir",
+                str(tokenizer_output_dir),
+            ],
+        )
+
+    if not args.skip_preflight:
+        run_step("Training preflight", [python, "-m", "ai_factory.cli", "train-preflight", "--config", args.config])
+
+    if args.skip_training:
+        return
+
+    training_command = [python, "-m", "training.train", "--config", args.config]
+    if args.dry_run:
+        training_command.append("--dry-run")
+    if args.validate_model_load:
+        training_command.append("--validate-model-load")
+    if args.resume_from_latest_checkpoint:
+        training_command.append("--resume-from-latest-checkpoint")
+    training_command.extend(args.train_args or [])
+    run_step("Training run", training_command)
+
+
 def cmd_doctor(args: argparse.Namespace) -> None:
     root = Path(getattr(args, "root", None) or Path.cwd())
-    catalog = load_catalog(root / "data" / "catalog.json")
-    packs = load_pack_summary(root / "data" / "processed" / "pack_summary.json").get("packs", [])
+    catalog_status = inspect_json_asset(root / "data" / "catalog.json")
+    pack_summary_status = inspect_json_asset(root / "data" / "processed" / "pack_summary.json")
+    catalog = load_catalog(root / "data" / "catalog.json") if catalog_status["ok"] else {"summary": {}}
+    packs = (
+        load_pack_summary(root / "data" / "processed" / "pack_summary.json").get("packs", [])
+        if pack_summary_status["ok"]
+        else []
+    )
     runs = list_training_runs(str(root / "artifacts"))
     benchmarks = load_benchmark_registry(root / "evaluation" / "benchmarks" / "registry.yaml")
     frontend_ready = (root / "frontend" / "node_modules").exists()
 
     recommended_next_steps = [
-        "python scripts/refresh_lab.py",
-        "uvicorn inference.app.main:app --reload",
-        "python scripts/api_smoke.py",
+        "ai-factory bootstrap-train --config training/configs/profiles/failure_aware.yaml --dry-run",
+        "ai-factory train-preflight --config training/configs/profiles/failure_aware.yaml",
+        "ai-factory serve --host 127.0.0.1 --port 8000",
+        "ai-factory api-smoke",
     ]
     if runs:
-        recommended_next_steps.append("python scripts/latest_run.py")
+        recommended_next_steps.append("ai-factory latest-run")
     else:
         recommended_next_steps.append(
             "python -m training.train --config training/configs/profiles/baseline_qlora.yaml --dry-run"
@@ -283,7 +381,9 @@ def cmd_doctor(args: argparse.Namespace) -> None:
         "python_packages": packages,
         "data": {
             "catalog_present": (root / "data" / "catalog.json").exists(),
+            "catalog_status": catalog_status,
             "processed_manifest_present": (root / "data" / "processed" / "manifest.json").exists(),
+            "pack_summary_status": pack_summary_status,
             "num_catalog_datasets": catalog.get("summary", {}).get("num_datasets", 0),
             "num_derived_packs": len(packs),
         },
@@ -302,20 +402,27 @@ def cmd_doctor(args: argparse.Namespace) -> None:
     }
 
     if args.json:
-        from ai_factory.cli import _render_ready_summary
-        from inference.app.workspace import build_workspace_overview
+        try:
+            from inference.app.workspace import build_workspace_overview
+        except ImportError:
+            _emit_json({**payload, "workspace_overview_error": "inference package not available"})
+            return
 
         workspace_payload = build_workspace_overview(root)
-        if args.json:
-            _emit_json({**payload, **workspace_payload})
-        else:
-            _emit_json(payload)
+        _emit_json({**payload, **workspace_payload})
         return
 
     from ai_factory.cli import _print_section, _render_ready_summary
-    from inference.app.workspace import build_workspace_overview
 
-    workspace_payload = build_workspace_overview(root)
+    try:
+        from inference.app.workspace import build_workspace_overview
+    except ImportError:
+        from inference.app.workspace_minimal import get_instant_status
+
+        # Fallback: build minimal workspace payload
+        workspace_payload = {"readiness_checks": get_instant_status()["readiness_checks"]}
+    else:
+        workspace_payload = build_workspace_overview(root)
 
     if RICH_AVAILABLE:
         # First display the workspace readiness summary cleanly
@@ -340,7 +447,9 @@ def cmd_doctor(args: argparse.Namespace) -> None:
 
         data_rows = [
             ["Catalog Present", str(payload["data"]["catalog_present"])],
+            ["Catalog Status", payload["data"]["catalog_status"]["detail"]],
             ["Manifest Present", str(payload["data"]["processed_manifest_present"])],
+            ["Pack Summary Status", payload["data"]["pack_summary_status"]["detail"]],
             ["Catalog Datasets", str(payload["data"]["num_catalog_datasets"])],
             ["Derived Packs", str(payload["data"]["num_derived_packs"])],
         ]

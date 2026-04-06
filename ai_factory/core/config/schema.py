@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Any, Literal
+from typing import Any, Literal, cast
 
 from pydantic import BaseModel, Field, model_validator
 
@@ -108,7 +108,7 @@ class SubAgentConfig(BaseModel):
             "finetune": "optimization_feedback",
             "publish": "deployment",
         }
-        self.agent_roles = [mapping[item] for item in self.workloads if item in mapping]
+        self.agent_roles = cast(list[AgentType], [mapping[item] for item in self.workloads if item in mapping])
         return self
 
 

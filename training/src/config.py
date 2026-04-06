@@ -2,22 +2,35 @@ from __future__ import annotations
 
 import os
 import sys
-from dataclasses import asdict, dataclass, field
 from pathlib import Path
 from typing import Any
 
 import yaml
+from pydantic import BaseModel, ConfigDict, Field
+
+from ai_factory.core.model_scales import (
+    DEFAULT_MODEL_SCALE,
+    default_foundation_model_ref,
+    get_model_scale_spec,
+)
+from training.src.scaling import resolve_scratch_architecture
 
 
 class ConfigValidationError(ValueError):
     pass
 
 
-@dataclass
-class ModelConfig:
-    name: str = "qwen25_math_1p5b"
-    base_model_name: str = "Qwen/Qwen2.5-Math-1.5B-Instruct"
+class ModelConfig(BaseModel):
+    model_config = ConfigDict(strict=True)
+    name: str = "qwen2_foundation_2b"
+    scale: str | None = None
+    parameter_size_b: float | None = None
+    initialization: str = "pretrained"
+    model_type: str | None = None
+    target_parameters: str | int | None = None
+    base_model_name: str = default_foundation_model_ref(DEFAULT_MODEL_SCALE)
     tokenizer_name: str | None = None
+    tokenizer_path: str | None = None
     trust_remote_code: bool = True
     use_4bit: bool = True
     use_8bit: bool = False
@@ -26,20 +39,28 @@ class ModelConfig:
     bnb_compute_dtype: str = "bfloat16"
     double_quant: bool = True
     gradient_checkpointing: bool = True
+    use_flash_attention: bool = True
+    device_map: str = "auto"
+    recommended_runtime_profile: str | None = None
+    recommended_quantization: str | None = None
+    deployment_tier: str | None = None
+    context_length: int | None = None
+    architecture: dict[str, Any] = Field(default_factory=dict)
     input_cost_per_million: float | None = None
     output_cost_per_million: float | None = None
 
 
-@dataclass
-class DataConfig:
+class DataConfig(BaseModel):
+    model_config = ConfigDict(strict=True)
     train_file: str = "data/processed/train.jsonl"
     eval_file: str | None = "data/processed/eval.jsonl"
     test_file: str | None = "data/processed/test.jsonl"
     pack_manifest: str | None = "data/processed/manifest.json"
     max_length: int = 2048
+    format: str = "chat_sft"
     curriculum_learning: bool = False
     sequential_curriculum: bool = False
-    curriculum_phases: list[str] = field(default_factory=lambda: ["easy", "medium", "hard", "olympiad"])
+    curriculum_phases: list[str] = Field(default_factory=lambda: ["easy", "medium", "hard", "olympiad"])
     oversample_hard_examples: bool = False
     hard_weight: float = 2.0
     include_failure_tag: bool = True
@@ -49,14 +70,18 @@ class DataConfig:
     max_train_samples: int | None = None
     max_eval_samples: int | None = None
     system_prompt: str = "You are an elite competition mathematician. Solve carefully and end with Final Answer: ..."
-    source_weights: dict[str, float] = field(default_factory=dict)
-    difficulty_weights: dict[str, float] = field(default_factory=dict)
+    source_weights: dict[str, float] = Field(default_factory=dict)
+    difficulty_weights: dict[str, float] = Field(default_factory=dict)
     failure_replay_boost: float = 1.35
     verification_boost: float = 1.15
+    tokenization_batch_size: int = 128
+    tokenization_num_proc: int = 0
+    use_tokenized_cache: bool = True
+    tokenized_cache_dir: str | None = None
 
 
-@dataclass
-class TrainingConfig:
+class TrainingConfig(BaseModel):
+    model_config = ConfigDict(strict=True)
     artifacts_dir: str = "artifacts"
     num_train_epochs: float = 2.0
     max_steps: int = -1
@@ -84,15 +109,15 @@ class TrainingConfig:
     max_validation_eval_rows: int = 16
 
 
-@dataclass
-class AdapterConfig:
+class AdapterConfig(BaseModel):
+    model_config = ConfigDict(strict=True)
     method: str = "qlora"
     r: int = 32
     alpha: int = 64
     dropout: float = 0.05
     bias: str = "none"
     task_type: str = "CAUSAL_LM"
-    target_modules: list[str] = field(
+    target_modules: list[str] = Field(
         default_factory=lambda: [
             "q_proj",
             "k_proj",
@@ -105,8 +130,8 @@ class AdapterConfig:
     )
 
 
-@dataclass
-class RuntimeConfig:
+class RuntimeConfig(BaseModel):
+    model_config = ConfigDict(strict=True)
     profile_name: str = "hybrid_local"
     accelerate_config: str | None = None
     deepspeed_config: str | None = None
@@ -116,23 +141,23 @@ class RuntimeConfig:
     low_cpu_mem_usage: bool = True
 
 
-@dataclass
-class LoggingConfig:
-    report_to: list[str] = field(default_factory=lambda: ["none"])
+class LoggingConfig(BaseModel):
+    model_config = ConfigDict(strict=True)
+    report_to: list[str] = Field(default_factory=lambda: ["none"])
     logging_first_step: bool = True
     jsonl_metrics_filename: str = "training_metrics.jsonl"
     summary_markdown_filename: str = "run_summary.md"
     manifest_filename: str = "run_manifest.json"
 
 
-@dataclass
-class TrackingConfig:
+class TrackingConfig(BaseModel):
+    model_config = ConfigDict(strict=True)
     provider: str = "none"
     project: str = "ai-factory"
     experiment_name: str = "default"
     run_name: str | None = None
-    tags: list[str] = field(default_factory=list)
-    metadata: dict[str, Any] = field(default_factory=dict)
+    tags: list[str] = Field(default_factory=list)
+    metadata: dict[str, Any] = Field(default_factory=dict)
     mlflow_tracking_uri: str | None = None
     wandb_entity: str | None = None
     wandb_mode: str = "offline"
@@ -144,8 +169,8 @@ class TrackingConfig:
     log_summary_artifact: bool = True
 
 
-@dataclass
-class PackagingConfig:
+class PackagingConfig(BaseModel):
+    model_config = ConfigDict(strict=True)
     publish_model_name: str = "atlas-math-failure-aware"
     export_merged_model: bool = False
     publish_latest: bool = True
@@ -154,8 +179,20 @@ class PackagingConfig:
     merged_model_subdir: str = "published/merged_model"
 
 
-@dataclass
-class ExperimentConfig:
+class PreferenceConfig(BaseModel):
+    model_config = ConfigDict(strict=True)
+    enabled: bool = False
+    beta: float = 0.1
+    loss_type: str = "sigmoid"
+    max_prompt_length: int = 1024
+    max_target_length: int = 1024
+    label_smoothing: float = 0.0
+    ipo_alpha: float = 1.0
+    orpo_alpha: float = 0.1
+
+
+class ExperimentConfig(BaseModel):
+    model_config = ConfigDict(strict=True)
     run_name: str
     seed: int
     profile_name: str
@@ -163,10 +200,11 @@ class ExperimentConfig:
     data: DataConfig
     training: TrainingConfig
     adapter: AdapterConfig
-    runtime: RuntimeConfig
-    logging: LoggingConfig
-    tracking: TrackingConfig
-    packaging: PackagingConfig
+    preference: PreferenceConfig = Field(default_factory=PreferenceConfig)
+    runtime: RuntimeConfig = Field(default_factory=RuntimeConfig)
+    logging: LoggingConfig = Field(default_factory=LoggingConfig)
+    tracking: TrackingConfig = Field(default_factory=TrackingConfig)
+    packaging: PackagingConfig = Field(default_factory=PackagingConfig)
     config_path: str | None = None
 
     @property
@@ -174,13 +212,15 @@ class ExperimentConfig:
         return self.adapter
 
     def to_dict(self) -> dict[str, Any]:
-        return asdict(self)
+        return self.model_dump()
 
 
 SUPPORTED_ADAPTER_METHODS = {"qlora", "lora", "full", "sft"}
 SUPPORTED_DTYPE_NAMES = {"bf16", "bfloat16", "fp16", "float16", "fp32", "float32"}
 SUPPORTED_TRACKING_PROVIDERS = {"none", "jsonl", "mlflow", "wandb"}
 SUPPORTED_STRATEGIES = {"no", "steps", "epoch"}
+SUPPORTED_MODEL_INITIALIZATIONS = {"pretrained", "scratch"}
+SUPPORTED_DATA_FORMATS = {"chat_sft", "pretraining_text"}
 
 
 def _deep_merge(left: dict[str, Any], right: dict[str, Any]) -> dict[str, Any]:
@@ -194,7 +234,7 @@ def _deep_merge(left: dict[str, Any], right: dict[str, Any]) -> dict[str, Any]:
 
 
 def _construct(dataclass_type: type[Any], payload: dict[str, Any] | None) -> Any:
-    return dataclass_type(**(payload or {}))
+    return dataclass_type.model_validate(payload or {})
 
 
 def _load_yaml(path: Path) -> dict[str, Any]:
@@ -244,6 +284,53 @@ def _find_project_root(start_path: Path) -> Path:
     return start_path
 
 
+def resolve_path_reference(path_like: str | None, base_path: str | None = None) -> Path | None:
+    """Resolve a config path against the config file, project root, and cwd."""
+    if not path_like:
+        return None
+
+    path = Path(path_like).expanduser()
+    if path.is_absolute():
+        return path
+
+    candidates: list[Path] = []
+    if base_path:
+        base_dir = Path(base_path).resolve().parent
+        project_root = _find_project_root(base_dir)
+        base_candidate = (base_dir / path).resolve()
+        project_candidate = (project_root / path).resolve()
+        repo_root_relative_prefixes = {
+            "artifacts",
+            "configs",
+            "data",
+            "desktop",
+            "docs",
+            "evaluation",
+            "frontend",
+            "inference",
+            "scripts",
+            "training",
+        }
+        if path.parts and path.parts[0] in repo_root_relative_prefixes:
+            candidates.extend([project_candidate, base_candidate])
+        else:
+            candidates.extend([base_candidate, project_candidate])
+
+    cwd_candidate = (Path.cwd() / path).resolve()
+    if cwd_candidate not in candidates:
+        candidates.append(cwd_candidate)
+
+    deduped_candidates: list[Path] = []
+    for candidate in candidates:
+        if candidate not in deduped_candidates:
+            deduped_candidates.append(candidate)
+
+    for candidate in deduped_candidates:
+        if candidate.exists():
+            return candidate
+    return deduped_candidates[0] if deduped_candidates else path.resolve()
+
+
 def _path_exists(path_like: str | None, base_path: str | None = None) -> bool:
     """Check if a path exists, handling relative paths intelligently.
 
@@ -256,52 +343,38 @@ def _path_exists(path_like: str | None, base_path: str | None = None) -> bool:
     """
     if not path_like:
         return True
-
-    path = Path(path_like)
-
-    # If absolute, just check existence
-    if path.is_absolute():
-        return path.exists()
-
-    # If no base path provided, check relative to current working directory
-    if not base_path:
-        return path.exists()
-
-    base_dir = Path(base_path).parent
-
-    # First try resolving relative to config file directory
-    resolved = base_dir / path
+    resolved = resolve_path_reference(path_like, base_path)
+    if resolved is None:
+        return False
     if resolved.exists():
         return True
 
-    # For data/ paths, try resolving from project root
-    # This handles the case where data files are relative to project root
-    # but config files are in subdirectories
-    if path_like.startswith("data/"):
-        # Find project root dynamically
-        project_root = _find_project_root(base_dir)
-        resolved = project_root / path
+    if not base_path:
+        return False
 
-        # In test environments, be more permissive about data files
-        # Check if we're in a test environment
-        is_test_env = (
-            "PYTEST_CURRENT_TEST" in os.environ
-            or "TESTING" in os.environ
-            or "pytest" in sys.modules
-            or "test" in Path.cwd().name.lower()
-        )
+    # In test environments, be more permissive about generated data files.
+    is_test_env = (
+        "PYTEST_CURRENT_TEST" in os.environ
+        or "TESTING" in os.environ
+        or "pytest" in sys.modules
+        or "test" in Path.cwd().name.lower()
+    )
+    if is_test_env and path_like.startswith("data/processed/"):
+        project_root = _find_project_root(Path(base_path).resolve().parent)
+        data_dir = project_root / "data" / "processed"
+        return data_dir.exists() and data_dir.is_dir()
 
-        if is_test_env and path_like.startswith("data/processed/"):
-            # For test environments, check if the data directory structure exists
-            # rather than requiring specific files
-            data_dir = project_root / "data" / "processed"
-            return data_dir.exists() and data_dir.is_dir()
+    return False
 
-        return resolved.exists()
 
-    # Try other common relative patterns
-    # Check relative to current working directory as fallback
-    return path.exists()
+def _resolve_model_scale_spec(config: ExperimentConfig) -> Any | None:
+    scale_value = config.model.scale or config.model.target_parameters
+    if scale_value is None:
+        return None
+    try:
+        return get_model_scale_spec(scale_value)
+    except ValueError:
+        return None
 
 
 def validate_experiment_config(config: ExperimentConfig) -> list[str]:
@@ -366,10 +439,22 @@ def validate_experiment_config(config: ExperimentConfig) -> list[str]:
         errors,
     )
     _require(
+        config.model.initialization.lower() in SUPPORTED_MODEL_INITIALIZATIONS,
+        f"model.initialization must be one of {sorted(SUPPORTED_MODEL_INITIALIZATIONS)}.",
+        errors,
+    )
+    _require(
         config.model.bnb_compute_dtype.lower() in SUPPORTED_DTYPE_NAMES,
         "model.bnb_compute_dtype must be one of bf16, fp16, or fp32.",
         errors,
     )
+    _require(
+        config.data.format in SUPPORTED_DATA_FORMATS,
+        f"data.format must be one of {sorted(SUPPORTED_DATA_FORMATS)}.",
+        errors,
+    )
+    _require(config.data.tokenization_batch_size > 0, "data.tokenization_batch_size must be positive.", errors)
+    _require(config.data.tokenization_num_proc >= 0, "data.tokenization_num_proc must be >= 0.", errors)
     _require(
         config.adapter.method.lower() in SUPPORTED_ADAPTER_METHODS,
         f"adapter.method must be one of {sorted(SUPPORTED_ADAPTER_METHODS)}.",
@@ -414,6 +499,59 @@ def validate_experiment_config(config: ExperimentConfig) -> list[str]:
         "data.sequential_curriculum requires data.curriculum_learning.",
         errors,
     )
+    if config.model.initialization.lower() == "pretrained":
+        _require(bool(config.model.base_model_name.strip()), "model.base_model_name must be non-empty.", errors)
+    if config.model.scale:
+        try:
+            scale_spec = get_model_scale_spec(config.model.scale)
+        except ValueError as exc:
+            errors.append(str(exc))
+            scale_spec = None
+        if scale_spec is not None and config.model.parameter_size_b is not None:
+            _require(
+                abs(config.model.parameter_size_b - scale_spec.parameter_size_b) < 0.01,
+                (
+                    "model.parameter_size_b must match the declared model.scale "
+                    f"({scale_spec.parameter_size_b:.1f} for {scale_spec.scale})."
+                ),
+                errors,
+            )
+    else:
+        scale_spec = _resolve_model_scale_spec(config)
+    if config.model.initialization.lower() == "scratch":
+        _require(bool(config.model.model_type), "scratch initialization requires model.model_type.", errors)
+        _require(
+            bool(config.model.architecture) or config.model.target_parameters is not None,
+            "scratch initialization requires model.architecture or model.target_parameters.",
+            errors,
+        )
+        _require(
+            config.adapter.method.lower() in {"full", "sft"},
+            "scratch initialization currently supports adapter.method=full or sft only.",
+            errors,
+        )
+        _require(
+            not config.model.use_4bit and not config.model.use_8bit,
+            "scratch initialization cannot be combined with 4-bit or 8-bit loading.",
+            errors,
+        )
+    if config.model.tokenizer_path:
+        tokenizer_path_exists = _path_exists(config.model.tokenizer_path, config.config_path)
+        if not tokenizer_path_exists and not config.model.tokenizer_name:
+            errors.append(f"tokenizer path not found: {config.model.tokenizer_path}")
+        if not tokenizer_path_exists and config.model.tokenizer_name:
+            if config.model.initialization.lower() == "scratch":
+                warnings.append(
+                    f"Scratch tokenizer path {config.model.tokenizer_path} does not exist yet; "
+                    f"dry-runs may fall back to tokenizer_name={config.model.tokenizer_name}, "
+                    "but a real training run should first build the local tokenizer with "
+                    "`python training/scripts/train_tokenizer.py --config <profile> --output-dir <tokenizer_dir>`."
+                )
+            else:
+                warnings.append(
+                    f"Tokenizer path {config.model.tokenizer_path} does not exist yet; "
+                    f"falling back to tokenizer_name={config.model.tokenizer_name}."
+                )
     _require(
         _path_exists(config.data.train_file, config.config_path),
         f"training data file not found: {config.data.train_file}",
@@ -466,6 +604,26 @@ def validate_experiment_config(config: ExperimentConfig) -> list[str]:
         warnings.append("torch_compile with 4-bit quantization can be brittle; validate on a small run first.")
     if config.runtime.torch_compile and config.runtime.deepspeed_config:
         warnings.append("torch_compile with DeepSpeed should be validated carefully for your exact backend.")
+    if scale_spec is not None:
+        runtime_profile = config.model.recommended_runtime_profile or scale_spec.runtime_profile
+        if config.runtime.profile_name != runtime_profile:
+            warnings.append(
+                f"model scale {scale_spec.scale} is typically paired with runtime.profile_name={runtime_profile}."
+            )
+        if scale_spec.parameter_size_b >= 20.0 and not config.runtime.deepspeed_config:
+            warnings.append(
+                f"model scale {scale_spec.scale} is large enough that a DeepSpeed config is strongly recommended."
+            )
+        if (
+            scale_spec.parameter_size_b >= 20.0
+            and config.model.initialization.lower() == "pretrained"
+            and not config.model.use_4bit
+            and not config.model.use_8bit
+            and not config.model.use_full_precision
+        ):
+            warnings.append(
+                f"model scale {scale_spec.scale} should usually specify a quantized loading mode for reliable bring-up."
+            )
 
     if errors:
         raise ConfigValidationError("\n".join(f"- {item}" for item in errors))
@@ -480,6 +638,14 @@ def describe_experiment_config(config: ExperimentConfig, *, warnings: list[str] 
         model_mode = "8bit"
     elif config.model.use_full_precision:
         model_mode = "full_precision"
+    scale_spec = _resolve_model_scale_spec(config)
+    resolved_architecture = dict(config.model.architecture)
+    if config.model.initialization.lower() == "scratch" and config.model.model_type:
+        resolved_architecture, _ = resolve_scratch_architecture(
+            model_type=config.model.model_type,
+            architecture_overrides=config.model.architecture,
+            target_parameters=config.model.target_parameters,
+        )
     return {
         "run": {
             "run_name": config.run_name,
@@ -489,10 +655,24 @@ def describe_experiment_config(config: ExperimentConfig, *, warnings: list[str] 
         },
         "model": {
             "name": config.model.name,
+            "scale": config.model.scale or (scale_spec.scale if scale_spec is not None else None),
+            "parameter_size_b": config.model.parameter_size_b or (scale_spec.parameter_size_b if scale_spec else None),
+            "initialization": config.model.initialization,
+            "model_type": config.model.model_type,
+            "target_parameters": config.model.target_parameters,
             "base_model_name": config.model.base_model_name,
             "tokenizer_name": config.model.tokenizer_name,
+            "tokenizer_path": config.model.tokenizer_path,
             "mode": model_mode,
+            "recommended_runtime_profile": config.model.recommended_runtime_profile
+            or (scale_spec.runtime_profile if scale_spec else None),
+            "recommended_quantization": config.model.recommended_quantization
+            or (scale_spec.recommended_quantization if scale_spec else None),
+            "deployment_tier": config.model.deployment_tier or (scale_spec.tier if scale_spec else None),
+            "context_length": config.model.context_length
+            or (scale_spec.recommended_context_length if scale_spec else None),
             "adapter_method": config.adapter.method,
+            "architecture": resolved_architecture,
         },
         "data": {
             "train_file": config.data.train_file,
@@ -500,6 +680,11 @@ def describe_experiment_config(config: ExperimentConfig, *, warnings: list[str] 
             "test_file": config.data.test_file,
             "pack_manifest": config.data.pack_manifest,
             "max_length": config.data.max_length,
+            "format": config.data.format,
+            "tokenization_batch_size": config.data.tokenization_batch_size,
+            "tokenization_num_proc": config.data.tokenization_num_proc,
+            "use_tokenized_cache": config.data.use_tokenized_cache,
+            "tokenized_cache_dir": config.data.tokenized_cache_dir,
             "curriculum_learning": config.data.curriculum_learning,
             "sequential_curriculum": config.data.sequential_curriculum,
         },
@@ -554,6 +739,7 @@ def load_experiment_config(path: str) -> ExperimentConfig:
         data=_construct(DataConfig, merged.get("data")),
         training=_construct(TrainingConfig, merged.get("training")),
         adapter=_construct(AdapterConfig, merged.get("adapter")),
+        preference=_construct(PreferenceConfig, merged.get("preference")),
         runtime=_construct(RuntimeConfig, merged.get("runtime")),
         logging=_construct(LoggingConfig, merged.get("logging")),
         tracking=_construct(TrackingConfig, merged.get("tracking")),

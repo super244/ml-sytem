@@ -1,13 +1,27 @@
 from __future__ import annotations
 
+import logging
+import shutil
 import subprocess
+import time
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 from ai_factory.core.discovery import latest_training_run, list_training_runs
 from ai_factory.core.instances.models import InstanceManifest, MetricPoint, ProgressSnapshot
 from ai_factory.core.io import load_json, read_jsonl
-from ai_factory.core.monitoring.metrics import metric_points_from_summary
+from ai_factory.core.monitoring.metrics import build_observability_summary, metric_points_from_summary
+
+logger = logging.getLogger(__name__)
+
+# ---------------------------------------------------------------------------
+# GPU snapshot cache – avoid running nvidia-smi on every list_instances call.
+# ---------------------------------------------------------------------------
+_GPU_CACHE_TTL_S: float = 30.0
+_gpu_cache: tuple[float, dict[str, Any] | None] | None = None  # (monotonic_ts, payload)
+_NVIDIA_SMI_AVAILABLE: bool | None = None  # lazily determined
+_NVIDIA_SMI_PATH: str | None = None
+_TITAN_SMI_AVAILABLE: bool | None = None  # lazily determined
 
 
 def _prepare_output_dir(snapshot: dict[str, Any]) -> Path:
@@ -20,8 +34,10 @@ def _prepare_metrics(snapshot: dict[str, Any]) -> tuple[dict[str, Any], list[Met
     manifest = load_json(output_dir / "manifest.json", default={}) or {}
     stats = load_json(output_dir / "stats.json", default={}) or {}
     pack_summary = load_json(output_dir / "pack_summary.json", default={}) or {}
-    manifest_stats = manifest.get("stats") if isinstance(manifest.get("stats"), dict) else {}
-    summary = {
+    manifest_stats: dict[str, Any] = (
+        cast(dict[str, Any], manifest.get("stats")) if isinstance(manifest.get("stats"), dict) else {}
+    )
+    summary: dict[str, Any] = {
         "records": (manifest_stats.get("num_records") or stats.get("num_records") or stats.get("records_total")),
         "train_rows": stats.get("train_rows"),
         "eval_rows": stats.get("eval_rows"),
@@ -36,7 +52,10 @@ def _prepare_metrics(snapshot: dict[str, Any]) -> tuple[dict[str, Any], list[Met
         "pack_summary_json": str(output_dir / "pack_summary.json"),
         "card_markdown": str(output_dir / "card.md"),
     }
-    return summary, metric_points_from_summary(summary, stage="prepare"), refs
+    points = metric_points_from_summary(summary, stage="prepare")
+    summary["observability"] = build_observability_summary(points, summary, stage="prepare")
+    summary["utilization_rollup"] = summary["observability"]["utilization_rollup"]
+    return summary, points, refs
 
 
 def _prepare_progress(snapshot: dict[str, Any]) -> ProgressSnapshot:
@@ -87,7 +106,7 @@ def _training_metrics(
         for key, value in row.items():
             if key in {"step", "epoch"} or not isinstance(value, (int, float)):
                 continue
-            tags = {"stage": manifest.type}
+            tags: dict[str, str] = {"stage": str(manifest.type)}
             if step is not None:
                 tags["step"] = str(step)
             points.append(MetricPoint(name=key, value=value, tags=tags))
@@ -110,6 +129,8 @@ def _training_metrics(
     published = (run_manifest.get("metadata") or {}).get("published", {})
     if published:
         refs["published"] = published
+    summary["observability"] = build_observability_summary(points, summary, stage=str(manifest.type))
+    summary["utilization_rollup"] = summary["observability"]["utilization_rollup"]
     return summary, points, refs
 
 
@@ -134,7 +155,7 @@ def _training_progress(manifest: InstanceManifest, snapshot: dict[str, Any]) -> 
     step = latest.get("step")
     total_steps = training.get("max_steps")
     try:
-        total_steps = int(total_steps) if total_steps not in (None, "", -1) else None
+        total_steps = int(total_steps) if total_steps and str(total_steps).strip() not in ("", "-1") else None
     except (TypeError, ValueError):
         total_steps = None
     percent = None
@@ -173,7 +194,11 @@ def _evaluation_metrics(snapshot: dict[str, Any]) -> tuple[dict[str, Any], list[
         "leaderboard": str(output_dir / "leaderboard.json"),
         "per_example": str(output_dir / "per_example.jsonl"),
     }
-    return compact, metric_points_from_summary(compact, stage="evaluate"), refs
+    points = metric_points_from_summary(compact, stage="evaluate")
+    observability = build_observability_summary(points, compact, stage="evaluate")
+    compact["observability"] = observability
+    compact["utilization_rollup"] = observability.get("utilization_rollup")
+    return compact, points, refs
 
 
 def _evaluation_progress(snapshot: dict[str, Any]) -> ProgressSnapshot | None:
@@ -208,17 +233,19 @@ def _inference_metrics(snapshot: dict[str, Any]) -> tuple[dict[str, Any], list[M
         "INFERENCE_TELEMETRY_PATH"
     ) or "artifacts/inference/telemetry/requests.jsonl"
     rows = read_jsonl(telemetry_path)
-    latencies = [row.get("latency_s") for row in rows if isinstance(row.get("latency_s"), (int, float))]
-    prompt_tokens = [row.get("prompt_tokens") for row in rows if isinstance(row.get("prompt_tokens"), (int, float))]
-    completion_tokens = [
-        row.get("completion_tokens") for row in rows if isinstance(row.get("completion_tokens"), (int, float))
+    latencies: list[float] = [float(row["latency_s"]) for row in rows if isinstance(row.get("latency_s"), (int, float))]
+    prompt_tokens: list[float] = [
+        float(row["prompt_tokens"]) for row in rows if isinstance(row.get("prompt_tokens"), (int, float))
     ]
-    ttft_values = [row.get("ttft_s") for row in rows if isinstance(row.get("ttft_s"), (int, float))]
+    completion_tokens: list[float] = [
+        float(row["completion_tokens"]) for row in rows if isinstance(row.get("completion_tokens"), (int, float))
+    ]
+    ttft_values: list[float] = [float(row["ttft_s"]) for row in rows if isinstance(row.get("ttft_s"), (int, float))]
     cache_hits = sum(1 for row in rows if row.get("cache_hit"))
     total_prompt_tokens = sum(prompt_tokens)
     total_completion_tokens = sum(completion_tokens)
     total_latency_s = sum(latencies) if latencies else None
-    summary = {
+    summary: dict[str, Any] = {
         "requests": len(rows),
         "cache_hits": cache_hits,
         "avg_latency_s": (sum(latencies) / len(latencies)) if latencies else None,
@@ -227,10 +254,16 @@ def _inference_metrics(snapshot: dict[str, Any]) -> tuple[dict[str, Any], list[M
         "avg_tokens_per_second": (
             total_completion_tokens / total_latency_s if total_completion_tokens and total_latency_s else None
         ),
-        "avg_time_to_first_token_s": (sum(ttft_values) / len(ttft_values)) if ttft_values else None,
+        "avg_time_to_first_token_s": (sum(t for t in ttft_values if t is not None) / len(ttft_values))
+        if ttft_values
+        else None,
     }
     refs = {"telemetry": telemetry_path}
-    return summary, metric_points_from_summary(summary, stage="inference"), refs
+    points = metric_points_from_summary(summary, stage="inference")
+    observability = build_observability_summary(points, summary, stage="inference")
+    summary["observability"] = observability
+    summary["utilization_rollup"] = observability.get("utilization_rollup")
+    return summary, points, refs
 
 
 def _inference_progress(snapshot: dict[str, Any]) -> ProgressSnapshot | None:
@@ -238,13 +271,13 @@ def _inference_progress(snapshot: dict[str, Any]) -> ProgressSnapshot | None:
         "INFERENCE_TELEMETRY_PATH"
     ) or "artifacts/inference/telemetry/requests.jsonl"
     rows = read_jsonl(telemetry_path)
-    latencies = [row.get("latency_s") for row in rows if isinstance(row.get("latency_s"), (int, float))]
-    completion_tokens = [
-        row.get("completion_tokens") for row in rows if isinstance(row.get("completion_tokens"), (int, float))
+    latencies: list[float] = [float(row["latency_s"]) for row in rows if isinstance(row.get("latency_s"), (int, float))]
+    completion_tokens: list[float] = [
+        float(row["completion_tokens"]) for row in rows if isinstance(row.get("completion_tokens"), (int, float))
     ]
     total_latency_s = sum(latencies) if latencies else None
     total_completion_tokens = sum(completion_tokens)
-    summary = {
+    summary: dict[str, Any] = {
         "requests": len(rows),
         "cache_hits": sum(1 for row in rows if row.get("cache_hit")),
         "avg_tokens_per_second": (
@@ -260,24 +293,32 @@ def _inference_progress(snapshot: dict[str, Any]) -> ProgressSnapshot | None:
 
 
 def _deploy_metrics(manifest: InstanceManifest) -> tuple[dict[str, Any], list[MetricPoint], dict[str, Any]]:
-    summary = {"status": manifest.status}
-    return summary, metric_points_from_summary(summary, stage="deploy"), {}
+    summary: dict[str, Any] = {"status": manifest.status}
+    points = metric_points_from_summary(summary, stage="deploy")
+    observability = build_observability_summary(points, summary, stage="deploy")
+    summary["observability"] = observability
+    summary["utilization_rollup"] = observability.get("utilization_rollup")
+    return summary, points, {}
 
 
 def _report_metrics(snapshot: dict[str, Any]) -> tuple[dict[str, Any], list[MetricPoint], dict[str, Any]]:
     raw = snapshot.get("subsystem") or {}
     output_path = Path(str(raw.get("output_dir_override") or "evaluation/results/failure_analysis.json"))
     payload = load_json(output_path, default={}) or {}
-    summary = {
+    summary: dict[str, Any] = {
         "report_exists": output_path.exists(),
         "taxonomy_buckets": len(payload) if isinstance(payload, dict) else 0,
     }
     refs = {"report_json": str(output_path)}
-    return summary, metric_points_from_summary(summary, stage="report"), refs
+    points = metric_points_from_summary(summary, stage="report")
+    observability = build_observability_summary(points, summary, stage="report")
+    summary["observability"] = observability
+    summary["utilization_rollup"] = observability.get("utilization_rollup")
+    return summary, points, refs
 
 
 def _deploy_progress(manifest: InstanceManifest) -> ProgressSnapshot:
-    status_map = {
+    status_map: dict[str, tuple[str, float | None, str | None]] = {
         "pending": ("queued", 0.0, "Deployment is queued."),
         "running": ("deploying", 0.5, "Deployment is in progress."),
         "completed": ("deployed", 1.0, "Deployment completed."),
@@ -300,35 +341,146 @@ def _report_progress(snapshot: dict[str, Any]) -> ProgressSnapshot:
 
 
 def _gpu_snapshot() -> dict[str, Any] | None:
+    """Return GPU utilisation snapshot from nvidia-smi, with caching and a timeout.
+
+    • Checks ``shutil.which`` once so we skip the subprocess entirely on
+      Apple-Silicon / CPU-only machines where ``nvidia-smi`` is absent.
+    • Results are cached for ``_GPU_CACHE_TTL_S`` seconds to avoid running a
+      subprocess on every ``list_instances`` call.
+    • A 2-second ``timeout`` prevents the call from blocking indefinitely.
+    """
+    global _gpu_cache, _NVIDIA_SMI_AVAILABLE, _NVIDIA_SMI_PATH
+
+    # Fast path: we already know nvidia-smi is not on this machine.
+    if _NVIDIA_SMI_AVAILABLE is False:
+        return None
+
+    now = time.monotonic()
+
+    # Return from cache if still fresh.
+    if _gpu_cache is not None:
+        cached_ts, cached_payload = _gpu_cache
+        if now - cached_ts < _GPU_CACHE_TTL_S:
+            return cached_payload
+
+    # First call or cache expired – probe availability.
+    if _NVIDIA_SMI_AVAILABLE is None:
+        _NVIDIA_SMI_PATH = shutil.which("nvidia-smi")
+        _NVIDIA_SMI_AVAILABLE = _NVIDIA_SMI_PATH is not None
+
+    if not _NVIDIA_SMI_AVAILABLE:
+        _gpu_cache = (now, None)
+        return None
+
+    nvidia_smi = _NVIDIA_SMI_PATH or "nvidia-smi"
     try:
-        result = subprocess.run(
+        result = subprocess.run(  # nosec B603
             [
-                "nvidia-smi",
+                nvidia_smi,
                 "--query-gpu=utilization.gpu,memory.used,memory.total",
                 "--format=csv,noheader,nounits",
             ],
             check=True,
             capture_output=True,
             text=True,
+            timeout=2.0,  # Never block the main thread for more than 2 s
         )
-    except Exception:
+    except (OSError, subprocess.SubprocessError) as exc:
+        logger.debug("nvidia-smi probe failed: %s", exc)
+        _gpu_cache = (now, None)
         return None
+
     lines = [line.strip() for line in result.stdout.splitlines() if line.strip()]
     if not lines:
+        _gpu_cache = (now, None)
         return None
+
     gpu_rows: list[dict[str, int]] = []
     for line in lines:
         parts = [part.strip() for part in line.split(",")]
         if len(parts) != 3:
             continue
-        gpu_rows.append(
-            {
-                "utilization_gpu": int(parts[0]),
-                "memory_used_mb": int(parts[1]),
-                "memory_total_mb": int(parts[2]),
-            }
+        try:
+            gpu_rows.append(
+                {
+                    "utilization_gpu": int(parts[0]),
+                    "memory_used_mb": int(parts[1]),
+                    "memory_total_mb": int(parts[2]),
+                }
+            )
+        except (ValueError, IndexError):
+            continue
+
+    payload = {"gpus": gpu_rows} if gpu_rows else None
+    _gpu_cache = (now, payload)
+    return payload
+
+
+def _titan_snapshot() -> dict[str, Any] | None:
+    """Return hardware snapshot from ai-factory-titan binary."""
+    global _gpu_cache, _TITAN_SMI_AVAILABLE
+
+    now = time.monotonic()
+
+    # Reuse cache if still fresh.
+    if _gpu_cache is not None:
+        cached_ts, cached_payload = _gpu_cache
+        if now - cached_ts < _GPU_CACHE_TTL_S:
+            return cached_payload
+
+    if _TITAN_SMI_AVAILABLE is None:
+        # Check if the binary is built and available.
+        # We look for it in the standard Cargo output directories.
+        titan_bin = next(
+            (
+                candidate
+                for candidate in (
+                    Path("ai_factory_titan/target/debug/titan-status"),
+                    Path("ai_factory_titan/target/release/titan-status"),
+                    Path("ai_factory_titan/target/debug/titan-status.exe"),
+                    Path("ai_factory_titan/target/release/titan-status.exe"),
+                )
+                if candidate.exists()
+            ),
+            None,
         )
-    return {"gpus": gpu_rows} if gpu_rows else None
+        _TITAN_SMI_AVAILABLE = titan_bin is not None
+
+    if not _TITAN_SMI_AVAILABLE:
+        return None
+
+    titan_command = next(
+        (
+            [str(candidate)]
+            for candidate in (
+                Path("ai_factory_titan/target/debug/titan-status"),
+                Path("ai_factory_titan/target/release/titan-status"),
+                Path("ai_factory_titan/target/debug/titan-status.exe"),
+                Path("ai_factory_titan/target/release/titan-status.exe"),
+            )
+            if candidate.exists()
+        ),
+        None,
+    )
+    if titan_command is None:
+        return None
+    try:
+        result = subprocess.run(  # nosec B603
+            titan_command,
+            capture_output=True,
+            text=True,
+            timeout=2.0,
+        )
+        if result.returncode == 0:
+            import json
+
+            payload = cast(dict[str, Any], json.loads(result.stdout))
+            _gpu_cache = (now, payload)
+            return payload
+    except (OSError, subprocess.SubprocessError, ValueError) as exc:
+        logger.debug("titan status probe failed: %s", exc)
+
+    return None
 
 
 def collect_metrics_for_instance(
@@ -351,6 +503,8 @@ def collect_metrics_for_instance(
         summary, points, refs = _deploy_metrics(manifest)
     if collect_gpu:
         gpu = _gpu_snapshot()
+        if not gpu:
+            gpu = _titan_snapshot()
         if gpu:
             summary["gpu"] = gpu
     return summary, points, refs

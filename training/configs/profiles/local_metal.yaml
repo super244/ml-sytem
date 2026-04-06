@@ -1,0 +1,31 @@
+profile_name: local_metal
+run_name: atlas_local_metal
+seed: 42
+description: "Apple Silicon friendly local profile without Linux-only quantization."
+refs:
+  model: ../components/models/qwen2_scratch_1b.yaml
+  adapter: ../components/adapters/lora_math.yaml
+  data: ../components/data/fast_iteration.yaml
+  runtime: ../components/runtime/hybrid_local.yaml
+  logging: ../components/logging/default.yaml
+  tracking: ../components/tracking/default.yaml
+  packaging: ../components/packaging/default.yaml
+model:
+  initialization: pretrained
+  base_model_name: Qwen/Qwen2.5-Math-1.5B-Instruct
+  trust_remote_code: false
+  use_4bit: false
+  use_8bit: false
+  use_full_precision: true
+  recommended_runtime_profile: hybrid_local
+  recommended_quantization: none
+training:
+  num_train_epochs: 1.0
+  learning_rate: 0.00008
+  per_device_train_batch_size: 1
+  per_device_eval_batch_size: 1
+  gradient_accumulation_steps: 8
+  dataloader_num_workers: 2
+  artifacts_dir: artifacts
+packaging:
+  publish_model_name: atlas-math-local-metal

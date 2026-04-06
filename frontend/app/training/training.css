@@ -247,19 +247,19 @@
   .training-container {
     padding: 1rem;
   }
-  
+
   .methods-grid {
     grid-template-columns: 1fr;
   }
-  
+
   .details-grid {
     grid-template-columns: 1fr;
   }
-  
+
   .action-buttons {
     flex-direction: column;
   }
-  
+
   .primary-button,
   .secondary-button {
     width: 100%;

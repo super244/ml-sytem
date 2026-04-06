@@ -6,9 +6,10 @@ import subprocess
 import sys
 import threading
 from pathlib import Path
+from typing import Any
 
 from ai_factory.core.execution.base import BaseExecutor, CommandSpec, RunnerPayload, decode_payload, encode_payload
-from ai_factory.core.instances.models import ExecutionHandle
+from ai_factory.core.instances.models import ExecutionHandle, InstanceManifest
 from ai_factory.core.instances.store import FileInstanceStore
 
 
@@ -17,7 +18,7 @@ class LocalExecutor(BaseExecutor):
 
     def start(
         self,
-        manifest,
+        manifest: InstanceManifest,
         command: CommandSpec,
         *,
         artifacts_dir: str | Path,
@@ -31,7 +32,7 @@ class LocalExecutor(BaseExecutor):
             manifest_metadata=manifest.metadata,
             command=command,
         )
-        process = subprocess.Popen(
+        process = subprocess.Popen(  # nosec B603 - internal runner bootstrap with explicit argv
             [
                 sys.executable,
                 "-m",
@@ -54,7 +55,7 @@ class LocalExecutor(BaseExecutor):
         )
 
 
-def _stream_pipe(pipe, path: Path) -> None:
+def _stream_pipe(pipe: Any, path: Path) -> None:
     with path.open("a") as handle:
         for line in iter(pipe.readline, ""):
             handle.write(line)
@@ -62,7 +63,9 @@ def _stream_pipe(pipe, path: Path) -> None:
     pipe.close()
 
 
-def _heartbeat_loop(manager, instance_id: str, attempt_id: str, stop_event: threading.Event, interval_s: int) -> None:
+def _heartbeat_loop(
+    manager: Any, instance_id: str, attempt_id: str, stop_event: threading.Event, interval_s: int
+) -> None:
     while not stop_event.wait(interval_s):
         try:
             manager.heartbeat_instance_attempt(instance_id, attempt_id)
@@ -81,7 +84,7 @@ def _run_payload(payload: RunnerPayload) -> int:
     attempt_id = (((manifest.execution or ExecutionHandle(backend="local")).metadata) or {}).get("attempt_id")
 
     try:
-        process = subprocess.Popen(
+        process = subprocess.Popen(  # nosec B603 - orchestrated command execution via validated payload argv
             payload.command.argv,
             cwd=payload.command.cwd,
             env={**os.environ, **payload.environment.env, **payload.command.env},

@@ -1,13 +1,12 @@
 from __future__ import annotations
 
 import importlib.util
-from functools import lru_cache
 from pathlib import Path
 from typing import Any
 
 import yaml
 
-from ai_factory.core.datasets import load_catalog, load_pack_summary
+from ai_factory.core.datasets import inspect_json_asset, load_catalog, load_pack_summary
 from ai_factory.core.discovery import list_training_runs, load_benchmark_registry
 from ai_factory.core.foundation import build_foundation_catalog
 
@@ -38,7 +37,6 @@ def _command_recipe(
     }
 
 
-@lru_cache(maxsize=1)
 def _load_model_catalog(repo_root: Path) -> list[dict[str, Any]]:
     try:
         from inference.app.model_catalog import list_model_catalog
@@ -48,7 +46,6 @@ def _load_model_catalog(repo_root: Path) -> list[dict[str, Any]]:
         return []
 
 
-@lru_cache(maxsize=1)
 def _load_orchestration_templates(repo_root: Path) -> list[dict[str, str]]:
     templates: list[dict[str, str]] = []
     try:
@@ -73,7 +70,6 @@ def _load_orchestration_templates(repo_root: Path) -> list[dict[str, str]]:
     return templates
 
 
-@lru_cache(maxsize=1)
 def _load_training_profiles(repo_root: Path) -> list[dict[str, str]]:
     training_profiles = []
     try:
@@ -93,7 +89,6 @@ def _load_training_profiles(repo_root: Path) -> list[dict[str, str]]:
     return training_profiles
 
 
-@lru_cache(maxsize=1)
 def _load_evaluation_configs(repo_root: Path) -> list[dict[str, str]]:
     evaluation_configs = []
     try:
@@ -112,8 +107,11 @@ def _load_evaluation_configs(repo_root: Path) -> list[dict[str, str]]:
     return evaluation_configs
 
 
-@lru_cache(maxsize=1)
 def _build_readiness_checks(repo_root: Path) -> list[dict[str, Any]]:
+    catalog_status = inspect_json_asset(repo_root / "data" / "catalog.json")
+    manifest_status = inspect_json_asset(repo_root / "data" / "processed" / "manifest.json")
+    pack_summary_status = inspect_json_asset(repo_root / "data" / "processed" / "pack_summary.json")
+
     return [
         {
             "id": "python-deps",
@@ -134,10 +132,24 @@ def _build_readiness_checks(repo_root: Path) -> list[dict[str, Any]]:
             "detail": "The workspace UI is ready when frontend/node_modules is present.",
         },
         {
+            "id": "dataset-catalog",
+            "label": "Dataset catalog",
+            "ok": catalog_status["ok"],
+            "detail": (
+                "Dataset metadata is available for the workspace and API summaries."
+                if catalog_status["ok"]
+                else catalog_status["detail"]
+            ),
+        },
+        {
             "id": "processed-corpus",
             "label": "Processed corpus",
-            "ok": (repo_root / "data" / "processed" / "manifest.json").exists(),
-            "detail": ("Training and dataset browsing expect the processed manifest and pack summary outputs."),
+            "ok": manifest_status["ok"] and pack_summary_status["ok"],
+            "detail": (
+                "Training and dataset browsing expect valid processed manifest and pack summary outputs."
+                if manifest_status["ok"] and pack_summary_status["ok"]
+                else (f"manifest: {manifest_status['detail']}; pack summary: {pack_summary_status['detail']}")
+            ),
         },
         {
             "id": "benchmark-registry",
@@ -148,14 +160,23 @@ def _build_readiness_checks(repo_root: Path) -> list[dict[str, Any]]:
     ]
 
 
-@lru_cache(maxsize=1)
 def _build_command_recipes() -> list[dict[str, str]]:
     return [
+        _command_recipe(
+            "bootstrap-train",
+            "Bootstrap training",
+            (
+                "Run dataset prep, tokenizer readiness, preflight, "
+                "and the selected training command from one operator entrypoint."
+            ),
+            "ai-factory bootstrap-train --config training/configs/profiles/failure_aware.yaml --dry-run",
+            "training",
+        ),
         _command_recipe(
             "doctor",
             "Workspace doctor",
             ("Inspect dependency readiness, dataset state, run discovery, and frontend installation in one pass."),
-            "python scripts/doctor.py --json",
+            "ai-factory doctor --json",
             "setup",
         ),
         _command_recipe(
@@ -165,14 +186,14 @@ def _build_command_recipes() -> list[dict[str, str]]:
                 "Regenerate data artifacts, validate the corpus, refresh notebooks, "
                 "and optionally run dry validation/tests."
             ),
-            "python scripts/refresh_lab.py",
+            "ai-factory refresh-lab",
             "orchestration",
         ),
         _command_recipe(
             "serve-api",
             "Serve API",
             ("Start the FastAPI layer that powers the solve workspace, compare lab, and metadata routes."),
-            "uvicorn inference.app.main:app --reload",
+            "ai-factory serve --host 127.0.0.1 --port 8000",
             "serve",
         ),
         _command_recipe(
@@ -183,10 +204,24 @@ def _build_command_recipes() -> list[dict[str, str]]:
             "serve",
         ),
         _command_recipe(
+            "train-preflight",
+            "Training preflight",
+            "Validate training inputs, artifacts, hardware, and tokenizer readiness before a real launch.",
+            "ai-factory train-preflight --config training/configs/profiles/failure_aware.yaml",
+            "training",
+        ),
+        _command_recipe(
             "baseline-dry-run",
             "Baseline dry-run",
             ("Validate the default local specialist profile without entering a full training loop."),
             ("python -m training.train --config training/configs/profiles/baseline_qlora.yaml --dry-run"),
+            "training",
+        ),
+        _command_recipe(
+            "local-metal-dry-run",
+            "Local Metal dry-run",
+            "Validate the Apple Silicon-safe profile without Linux-only quantization requirements.",
+            "python -m training.train --config training/configs/profiles/local_metal.yaml --dry-run",
             "training",
         ),
         _command_recipe(
@@ -228,7 +263,6 @@ def _build_command_recipes() -> list[dict[str, str]]:
     ]
 
 
-@lru_cache(maxsize=1)
 def _build_orchestration_capabilities() -> list[dict[str, str]]:
     return [
         {
@@ -279,41 +313,73 @@ def _build_orchestration_capabilities() -> list[dict[str, str]]:
 def build_workspace_overview(root: Path | None = None) -> dict[str, Any]:
     """Build workspace overview with optimized loading and caching."""
     repo_root = (root or REPO_ROOT).resolve()
+    errors: list[str] = []
+    catalog_status = inspect_json_asset(repo_root / "data" / "catalog.json")
+    pack_summary_status = inspect_json_asset(repo_root / "data" / "processed" / "pack_summary.json")
 
-    # Load core data with error handling
-    try:
-        catalog = load_catalog(repo_root / "data" / "catalog.json")
-    except Exception:
+    if catalog_status["ok"]:
+        try:
+            catalog = load_catalog(repo_root / "data" / "catalog.json")
+        except Exception as exc:
+            errors.append(f"catalog: {exc}")
+            catalog = {"summary": {"num_datasets": 0}}
+    else:
+        errors.append(f"catalog: {catalog_status['detail']}")
         catalog = {"summary": {"num_datasets": 0}}
 
-    try:
-        packs = load_pack_summary(repo_root / "data" / "processed" / "pack_summary.json").get("packs", [])
-    except Exception:
+    if pack_summary_status["ok"]:
+        try:
+            packs = load_pack_summary(repo_root / "data" / "processed" / "pack_summary.json").get("packs", [])
+        except Exception as exc:
+            errors.append(f"pack summary: {exc}")
+            packs = []
+    else:
+        errors.append(f"pack summary: {pack_summary_status['detail']}")
         packs = []
 
     try:
         runs = list_training_runs(str(repo_root / "artifacts"))
-    except Exception:
+    except Exception as exc:
+        errors.append(f"training runs: {exc}")
         runs = []
 
     try:
         benchmarks = load_benchmark_registry(repo_root / "evaluation" / "benchmarks" / "registry.yaml")
-    except Exception:
+    except Exception as exc:
+        errors.append(f"benchmark registry: {exc}")
         benchmarks = []
 
     try:
         foundation = build_foundation_catalog(repo_root)
-    except Exception:
-        # Create empty foundation if loading fails
-        from types import SimpleNamespace
+        interfaces = [item.model_dump(mode="json") for item in foundation.interfaces]
+        experience_tiers = [item.model_dump(mode="json") for item in foundation.experience_tiers]
+        extension_points = [item.model_dump(mode="json") for item in foundation.extension_points]
+    except Exception as exc:
+        errors.append(f"foundation catalog: {exc}")
+        interfaces = []
+        experience_tiers = []
+        extension_points = []
 
-        foundation = SimpleNamespace(interfaces=[], experience_tiers=[], extension_points=[])
-
-    # Use cached components
-    models = _load_model_catalog(repo_root)
-    orchestration_templates = _load_orchestration_templates(repo_root)
-    training_profiles = _load_training_profiles(repo_root)
-    evaluation_configs = _load_evaluation_configs(repo_root)
+    try:
+        models = _load_model_catalog(repo_root)
+    except Exception as exc:
+        errors.append(f"model catalog: {exc}")
+        models = []
+    try:
+        orchestration_templates = _load_orchestration_templates(repo_root)
+    except Exception as exc:
+        errors.append(f"orchestration templates: {exc}")
+        orchestration_templates = []
+    try:
+        training_profiles = _load_training_profiles(repo_root)
+    except Exception as exc:
+        errors.append(f"training profiles: {exc}")
+        training_profiles = []
+    try:
+        evaluation_configs = _load_evaluation_configs(repo_root)
+    except Exception as exc:
+        errors.append(f"evaluation configs: {exc}")
+        evaluation_configs = []
     readiness_checks = _build_readiness_checks(repo_root)
     command_recipes = _build_command_recipes()
     orchestration_capabilities = _build_orchestration_capabilities()
@@ -321,6 +387,8 @@ def build_workspace_overview(root: Path | None = None) -> dict[str, Any]:
     ready_count = sum(1 for item in readiness_checks if item["ok"])
 
     return {
+        "status": "available" if not errors else "degraded",
+        "errors": errors,
         "repo_root": str(repo_root),
         "summary": {
             "datasets": catalog.get("summary", {}).get("num_datasets", 0),
@@ -331,17 +399,17 @@ def build_workspace_overview(root: Path | None = None) -> dict[str, Any]:
             "training_profiles": len(training_profiles),
             "evaluation_configs": len(evaluation_configs),
             "orchestration_templates": len(orchestration_templates),
-            "interfaces": len(foundation.interfaces),
-            "experience_tiers": len(foundation.experience_tiers),
-            "extension_points": len(foundation.extension_points),
+            "interfaces": len(interfaces),
+            "experience_tiers": len(experience_tiers),
+            "extension_points": len(extension_points),
             "ready_checks": ready_count,
             "total_checks": len(readiness_checks),
         },
         "models": models,
         "readiness_checks": readiness_checks,
-        "interfaces": [item.model_dump(mode="json") for item in foundation.interfaces],
-        "experience_tiers": [item.model_dump(mode="json") for item in foundation.experience_tiers],
-        "extension_points": [item.model_dump(mode="json") for item in foundation.extension_points],
+        "interfaces": interfaces,
+        "experience_tiers": experience_tiers,
+        "extension_points": extension_points,
         "command_recipes": command_recipes,
         "orchestration_capabilities": orchestration_capabilities,
         "orchestration_templates": orchestration_templates,
@@ -350,26 +418,47 @@ def build_workspace_overview(root: Path | None = None) -> dict[str, Any]:
     }
 
 
-@lru_cache(maxsize=1)
 def build_workspace_overview_fast(root: Path | None = None) -> dict[str, Any]:
     """Fast version that returns minimal data for quick responses."""
     repo_root = (root or REPO_ROOT).resolve()
+    errors: list[str] = []
 
-    # Only load essential data quickly
     readiness_checks = _build_readiness_checks(repo_root)
     ready_count = sum(1 for item in readiness_checks if item["ok"])
+    try:
+        model_count = len(_load_model_catalog(repo_root))
+    except Exception as exc:
+        errors.append(f"model catalog: {exc}")
+        model_count = 0
+    try:
+        template_count = len(_load_orchestration_templates(repo_root))
+    except Exception as exc:
+        errors.append(f"orchestration templates: {exc}")
+        template_count = 0
+    try:
+        training_profile_count = len(_load_training_profiles(repo_root))
+    except Exception as exc:
+        errors.append(f"training profiles: {exc}")
+        training_profile_count = 0
+    try:
+        evaluation_config_count = len(_load_evaluation_configs(repo_root))
+    except Exception as exc:
+        errors.append(f"evaluation configs: {exc}")
+        evaluation_config_count = 0
 
     return {
+        "status": "available" if not errors else "degraded",
+        "errors": errors,
         "repo_root": str(repo_root),
         "summary": {
             "datasets": 0,
             "packs": 0,
-            "models": 0,
+            "models": model_count,
             "benchmarks": 0,
             "runs": 0,
-            "training_profiles": 0,
-            "evaluation_configs": 0,
-            "orchestration_templates": 0,
+            "training_profiles": training_profile_count,
+            "evaluation_configs": evaluation_config_count,
+            "orchestration_templates": template_count,
             "interfaces": 0,
             "experience_tiers": 0,
             "extension_points": 0,

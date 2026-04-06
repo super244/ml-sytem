@@ -40,6 +40,21 @@ The public registry currently tracks five calculus-oriented dataset families thr
 
 `data/prepare_dataset.py` accepts composable source specs in `data/configs/processing.yaml`. In addition to legacy local file paths and globs, sources can be declared as `local`, `huggingface`, `s3`, or `web`, and nested under `composite` groups with per-source `sample_ratio` and `version` metadata.
 
+## Cache Integration
+
+The `ai_factory/core/cache/` layer provides:
+- LRU eviction for bounded memory
+- Disk-backed persistence for large datasets
+- Automatic invalidation on source changes
+- Cross-process cache sharing via Redis
+
+## Security Considerations
+
+Sensitive data in datasets is handled by `ai_factory/core/security/`:
+- Credential redaction before training
+- Encrypted storage for PII-containing datasets
+- Access control via `ai_factory/core/security/config.py`
+
 ## Derived Packs
 
 The corpus builder emits these fixed pack ids:
@@ -56,12 +71,21 @@ The corpus builder emits these fixed pack ids:
 `data/prepare_dataset.py` writes:
 
 - processed train/eval/test splits
+- `corpus.sqlite` with `records` and `metadata` tables
 - `manifest.json`
 - `card.md`
 - `size_report.md`
 - `pack_summary.json`
 - per-pack manifests and cards under `data/processed/packs/`
 - source summaries, version metadata, and optional source warnings in the manifest metadata
+
+The SQLite corpus is intended for:
+
+- indexed local inspection
+- easier downstream dataset tooling
+- DB-backed training reads when you point the training config at `data/processed/corpus.sqlite`
+
+It is separate from the orchestration/control-plane SQLite database under `artifacts/control_plane/`.
 
 ## Key Commands
 
@@ -70,5 +94,6 @@ python3 data/generator/generate_calculus_datasets.py --config data/configs/gener
 python3 data/public/normalize_public_datasets.py --registry data/public/registry.yaml
 python3 data/prepare_dataset.py --config data/configs/processing.yaml
 python3 data/tools/validate_dataset.py --input data/processed/train.jsonl
+python3 data/tools/validate_dataset.py --input data/processed/corpus.sqlite --split train
 python3 data/tools/build_benchmark_pack.py --input data/processed/test.jsonl --output /tmp/benchmark_pack
 ```

@@ -19,6 +19,9 @@ class DatasetSpec:
     difficulty_mix: dict[str, float]
     pedagogical_focus: list[str]
     reasoning_style: str = "chain_of_thought"
+    target_share: float | None = None
+    target_size_mb: float | None = None
+    target_size_bytes: int | None = None
 
 
 def choose_weighted(rng: random.Random, weights: dict[str, float]) -> str:

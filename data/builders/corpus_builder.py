@@ -5,10 +5,13 @@ import glob
 import io
 import json
 import math
+import os
 import random
 import re
-from collections import Counter
+import sqlite3
+from collections import Counter, defaultdict
 from collections.abc import Iterable
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
@@ -16,6 +19,7 @@ from urllib.parse import urlparse
 from urllib.request import Request, urlopen
 
 import yaml
+from pydantic import ValidationError
 
 from ai_factory.core.artifacts import current_git_sha, sha256_file, sha256_text, write_json, write_jsonl, write_markdown
 from ai_factory.core.hashing import normalize_text, stable_question_fingerprint
@@ -31,6 +35,12 @@ from ai_factory.core.schemas import (
 from data.builders.pack_registry import build_derived_packs
 from data.quality.contamination import apply_contamination_status, deduplicate_near_duplicates
 from data.quality.difficulty import difficulty_score, estimate_difficulty, normalize_difficulty
+from data.quality.profiles import (
+    build_dataset_profile,
+    build_source_conflict_report,
+    build_validation_summary,
+    make_validation_issue,
+)
 from data.quality.scoring import estimate_quality_score
 from data.quality.stats import compute_record_stats
 from data.reports.cards import pack_card_text, size_report_markdown
@@ -67,6 +77,9 @@ class ProcessingConfig:
     require_final_answer: bool = True
     output_subdir: str | None = None
     derived_packs: list[str] | None = None
+    emit_sqlite: bool = True
+    sqlite_output_path: str | None = "corpus.sqlite"
+    source_load_workers: int = 0
 
 
 @dataclass
@@ -107,10 +120,11 @@ def resolve_source_paths(paths: list[str] | None) -> list[Path]:
 def read_records(path: Path) -> Iterable[dict[str, Any]]:
     suffix = path.suffix.lower()
     if suffix == ".jsonl":
-        for line in path.read_text().splitlines():
-            line = line.strip()
-            if line:
-                yield json.loads(line)
+        with path.open(encoding="utf-8") as handle:
+            for line in handle:
+                line = line.strip()
+                if line:
+                    yield json.loads(line)
         return
     if suffix == ".json":
         payload = json.loads(path.read_text())
@@ -143,6 +157,15 @@ def _coerce_ratio(value: Any) -> float | None:
     if ratio < 0:
         return 0.0
     return min(ratio, 1.0)
+
+
+def _stable_row_payload(row: dict[str, Any]) -> str:
+    return json.dumps(row, sort_keys=True, ensure_ascii=False, default=str)
+
+
+def _row_sampling_rank(row: dict[str, Any], *, seed: int, source_id: str) -> str:
+    payload = f"{seed}:{source_id}:{_stable_row_payload(row)}"
+    return sha256_text(payload)
 
 
 def _source_kind_from_value(value: str | None) -> str:
@@ -258,6 +281,8 @@ def _load_local_source_rows(spec: SourceSpec) -> list[dict[str, Any]]:
     if not spec.path:
         return []
     paths = resolve_source_paths([spec.path])
+    if not paths:
+        return []
     rows: list[dict[str, Any]] = []
     for path in paths:
         rows.extend(dict(row) for row in read_records(path))
@@ -330,23 +355,90 @@ def _sample_source_rows(rows: list[dict[str, Any]], spec: SourceSpec, seed: int)
     if ratio <= 0:
         return []
     sample_size = min(len(rows), max(1, math.ceil(len(rows) * ratio)))
-    rng = random.Random(f"{seed}:{spec.id}")
-    chosen_indexes = sorted(rng.sample(range(len(rows)), sample_size))
-    return [rows[index] for index in chosen_indexes]
+    ranked_rows = sorted(
+        (
+            _row_sampling_rank(row, seed=seed, source_id=spec.id),
+            row,
+        )
+        for row in rows
+    )
+    return [row for _, row in ranked_rows[:sample_size]]
+
+
+def _load_and_sample_source(spec: SourceSpec, *, seed: int) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
+    raw_rows = load_source_rows(spec)
+    selected_rows = _sample_source_rows(raw_rows, spec, seed)
+    return raw_rows, selected_rows
 
 
 def load_source_records(
     specs: list[SourceSpec],
     *,
     seed: int,
+    max_workers: int = 0,
 ) -> tuple[list[tuple[SourceSpec, dict[str, Any]]], list[dict[str, Any]], list[str]]:
     loaded_rows: list[tuple[SourceSpec, dict[str, Any]]] = []
     summaries: list[dict[str, Any]] = []
     warnings: list[str] = []
-    for spec in specs:
+
+    def record_source_result(
+        spec: SourceSpec,
+        raw_rows: list[dict[str, Any]],
+        selected_rows: list[dict[str, Any]],
+    ) -> None:
+        if not raw_rows:
+            warning = f"Source '{spec.id}' loaded 0 rows from {spec.path or '<unknown>'}."
+            if spec.optional:
+                warning = f"Optional source '{spec.id}' loaded 0 rows from {spec.path or '<unknown>'}."
+            warnings.append(warning)
+        summaries.append(
+            {
+                "id": spec.id,
+                "kind": spec.kind,
+                "path": spec.path,
+                "version": spec.version,
+                "sample_ratio": spec.sample_ratio,
+                "sample_strategy": "deterministic_hash_rank" if spec.sample_ratio is not None else "full_source",
+                "sample_seed": seed,
+                "optional": spec.optional,
+                "status": "loaded",
+                "rows_loaded": len(raw_rows),
+                "rows_selected": len(selected_rows),
+            }
+        )
+        loaded_rows.extend((spec, row) for row in selected_rows)
+
+    worker_count = max_workers
+    if worker_count <= 0:
+        worker_count = min(len(specs), max(1, min(os.cpu_count() or 1, 8)))
+    worker_count = max(1, min(worker_count, len(specs) or 1))
+
+    indexed_results: dict[int, tuple[list[dict[str, Any]], list[dict[str, Any]]]] = {}
+    indexed_errors: dict[int, Exception] = {}
+    if worker_count == 1:
+        for index, spec in enumerate(specs):
+            try:
+                indexed_results[index] = _load_and_sample_source(spec, seed=seed)
+            except Exception as exc:  # noqa: BLE001
+                indexed_errors[index] = exc
+    else:
+        with ThreadPoolExecutor(max_workers=worker_count) as executor:
+            future_map = {
+                executor.submit(_load_and_sample_source, spec, seed=seed): (index, spec)
+                for index, spec in enumerate(specs)
+            }
+            for future in as_completed(future_map):
+                index, spec = future_map[future]
+                try:
+                    indexed_results[index] = future.result()
+                except Exception as exc:  # noqa: BLE001
+                    indexed_errors[index] = exc
+
+    for index, spec in enumerate(specs):
         try:
-            raw_rows = load_source_rows(spec)
-            selected_rows = _sample_source_rows(raw_rows, spec, seed)
+            if index in indexed_errors:
+                raise indexed_errors[index]
+            raw_rows, selected_rows = indexed_results[index]
         except Exception as exc:  # noqa: BLE001
             if spec.optional:
                 warnings.append(f"Skipped optional source '{spec.id}': {exc}")
@@ -357,6 +449,8 @@ def load_source_records(
                         "path": spec.path,
                         "version": spec.version,
                         "sample_ratio": spec.sample_ratio,
+                        "sample_strategy": "deterministic_hash_rank",
+                        "sample_seed": seed,
                         "optional": True,
                         "status": "skipped",
                         "rows_loaded": 0,
@@ -366,20 +460,7 @@ def load_source_records(
                 )
                 continue
             raise
-        summaries.append(
-            {
-                "id": spec.id,
-                "kind": spec.kind,
-                "path": spec.path,
-                "version": spec.version,
-                "sample_ratio": spec.sample_ratio,
-                "optional": spec.optional,
-                "status": "loaded",
-                "rows_loaded": len(raw_rows),
-                "rows_selected": len(selected_rows),
-            }
-        )
-        loaded_rows.extend((spec, row) for row in selected_rows)
+        record_source_result(spec, raw_rows, selected_rows)
     return loaded_rows, summaries, warnings
 
 
@@ -537,10 +618,28 @@ def normalize_record(
     record: dict[str, Any],
     default_source: str,
     source_meta: dict[str, Any] | None = None,
+    *,
+    validation_issues: list[dict[str, Any]] | None = None,
 ) -> dict[str, Any] | None:
     question = first_text(record, QUESTION_KEYS)
     solution = first_text(record, SOLUTION_KEYS)
     if not question or not solution:
+        if validation_issues is not None:
+            validation_issues.append(
+                make_validation_issue(
+                    stage="normalize_record",
+                    source=str((source_meta or {}).get("source_spec_id") or default_source),
+                    record_id=str(record.get("id") or stable_question_fingerprint(question or solution or "")),
+                    reason="missing_required_text",
+                    message=(
+                        "Record must include a non-empty question and solution."
+                        f" question_present={bool(question)} solution_present={bool(solution)}"
+                    ),
+                    question=question or solution,
+                    topic=record.get("topic") or first_text(record, TOPIC_KEYS),
+                    difficulty=record.get("difficulty"),
+                )
+            )
         return None
     topic = normalize_topic(first_text(record, TOPIC_KEYS))
     source = first_text(record, SOURCE_KEYS) or default_source
@@ -612,7 +711,32 @@ def normalize_record(
     }
     if normalized["quality_score"] <= 0.0:
         normalized["quality_score"] = estimate_quality_score(normalized)
-    return MathRecord.model_validate(normalized).model_dump()
+    try:
+        return MathRecord.model_validate(normalized).model_dump()
+    except ValidationError as exc:
+        issue = make_validation_issue(
+            stage="normalize_record",
+            source=str((source_meta or {}).get("source_spec_id") or default_source),
+            record_id=str(normalized.get("id") or record.get("id") or stable_question_fingerprint(question)),
+            reason="schema_validation_error",
+            message=str(exc).splitlines()[0],
+            question=normalized.get("question"),
+            topic=normalized.get("topic"),
+            difficulty=normalized.get("difficulty"),
+        )
+        issue["validation_error"] = exc.errors()
+        issue["record_preview"] = {
+            "source": normalized.get("source"),
+            "pack_id": normalized.get("pack_id"),
+            "tags": normalized.get("tags", [])[:5],
+        }
+        if validation_issues is not None:
+            validation_issues.append(issue)
+            return None
+        raise ValueError(
+            f"Failed to normalize record from source '{issue['source']}' "
+            f"(record_id={issue.get('record_id')}): {issue['message']}"
+        ) from exc
 
 
 def filter_records(records: list[dict[str, Any]], config: ProcessingConfig) -> list[dict[str, Any]]:
@@ -705,10 +829,87 @@ def package_record(record: dict[str, Any], system_prompt: str) -> dict[str, Any]
     return PackagedMathRecord.model_validate(packaged).model_dump()
 
 
+def _write_sqlite_corpus(
+    path: Path,
+    *,
+    train_records: list[dict[str, Any]],
+    eval_records: list[dict[str, Any]],
+    test_records: list[dict[str, Any]],
+    metadata: dict[str, Any],
+) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    if path.exists():
+        path.unlink()
+    connection = sqlite3.connect(path)
+    try:
+        connection.execute("PRAGMA journal_mode=WAL")
+        connection.execute("PRAGMA synchronous=NORMAL")
+        connection.execute("PRAGMA temp_store=MEMORY")
+        connection.execute("PRAGMA cache_size=-200000")
+        connection.execute(
+            """
+            CREATE TABLE records (
+                dataset_split TEXT NOT NULL,
+                sequence_id INTEGER NOT NULL,
+                id TEXT NOT NULL,
+                topic TEXT,
+                difficulty TEXT,
+                source TEXT,
+                payload_json TEXT NOT NULL,
+                PRIMARY KEY (dataset_split, sequence_id)
+            )
+            """
+        )
+        connection.execute("CREATE INDEX idx_records_split ON records(dataset_split)")
+        connection.execute("CREATE INDEX idx_records_topic ON records(topic)")
+        connection.execute("CREATE INDEX idx_records_source ON records(source)")
+        connection.execute(
+            """
+            CREATE TABLE metadata (
+                key TEXT PRIMARY KEY,
+                value_json TEXT NOT NULL
+            )
+            """
+        )
+        for split_name, rows in (("train", train_records), ("eval", eval_records), ("test", test_records)):
+            connection.executemany(
+                """
+                INSERT INTO records(dataset_split, sequence_id, id, topic, difficulty, source, payload_json)
+                VALUES (?, ?, ?, ?, ?, ?, ?)
+                """,
+                [
+                    (
+                        split_name,
+                        index,
+                        str(row.get("id", f"{split_name}-{index}")),
+                        row.get("topic"),
+                        row.get("difficulty"),
+                        row.get("source"),
+                        json.dumps(row, ensure_ascii=False),
+                    )
+                    for index, row in enumerate(rows)
+                ],
+            )
+        connection.executemany(
+            "INSERT INTO metadata(key, value_json) VALUES (?, ?)",
+            [(key, json.dumps(value, ensure_ascii=False)) for key, value in metadata.items()],
+        )
+        connection.commit()
+    finally:
+        connection.close()
+
+
 def _build_file_info(path: Path) -> DatasetFileInfo:
     num_rows = 0
     if path.exists() and path.suffix.lower() == ".jsonl":
-        num_rows = sum(1 for line in path.read_text().splitlines() if line.strip())
+        with path.open(encoding="utf-8") as handle:
+            num_rows = sum(1 for line in handle if line.strip())
+    elif path.exists() and path.suffix.lower() in {".sqlite", ".db"}:
+        connection = sqlite3.connect(path)
+        try:
+            num_rows = int(connection.execute("SELECT COUNT(*) FROM records").fetchone()[0])
+        finally:
+            connection.close()
     return DatasetFileInfo(
         path=str(path),
         sha256=sha256_file(path) if path.exists() else "",
@@ -719,8 +920,13 @@ def _build_file_info(path: Path) -> DatasetFileInfo:
 
 def build_corpus(config: ProcessingConfig, config_path: str | Path) -> dict[str, Any]:
     all_records: list[dict[str, Any]] = []
+    validation_issues: list[dict[str, Any]] = []
     source_specs = coerce_source_specs(config.sources)
-    source_rows, source_summaries, source_warnings = load_source_records(source_specs, seed=config.seed)
+    source_rows, source_summaries, source_warnings = load_source_records(
+        source_specs,
+        seed=config.seed,
+        max_workers=config.source_load_workers,
+    )
     summary_lookup = {
         (summary["id"], summary.get("path"), summary.get("version")): summary for summary in source_summaries
     }
@@ -734,12 +940,21 @@ def build_corpus(config: ProcessingConfig, config_path: str | Path) -> dict[str,
                 "source_spec_version": config.source_spec_version,
             },
         )
-        normalized = normalize_record(raw, default_source=spec.id, source_meta=source_meta)
+        normalized = normalize_record(
+            raw,
+            default_source=spec.id,
+            source_meta=source_meta,
+            validation_issues=validation_issues,
+        )
         if normalized:
             all_records.append(normalized)
     for path in resolve_source_paths(config.failure_logs):
         for raw in read_records(path):
-            normalized = normalize_record(dict(raw, failure_case=True), default_source=f"failure_log::{path.stem}")
+            normalized = normalize_record(
+                dict(raw, failure_case=True),
+                default_source=f"failure_log::{path.stem}",
+                validation_issues=validation_issues,
+            )
             if normalized:
                 normalized["failure_case"] = True
                 normalized["reasoning_style"] = "verification"
@@ -748,12 +963,13 @@ def build_corpus(config: ProcessingConfig, config_path: str | Path) -> dict[str,
                 all_records.append(normalized)
 
     all_records = filter_records(all_records, config)
+    pre_dedupe_records = list(all_records)
     all_records, dedupe_report = deduplicate_near_duplicates(all_records)
 
     benchmark_records: list[dict[str, Any]] = []
     for path in resolve_source_paths(config.contamination_sources):
         for raw in read_records(path):
-            normalized = normalize_record(raw, default_source=path.stem)
+            normalized = normalize_record(raw, default_source=path.stem, validation_issues=validation_issues)
             if normalized:
                 benchmark_records.append(normalized)
     if benchmark_records:
@@ -773,6 +989,29 @@ def build_corpus(config: ProcessingConfig, config_path: str | Path) -> dict[str,
     train_packaged = [package_record(item, config.system_prompt) for item in train_records]
     eval_packaged = [package_record(item, config.system_prompt) for item in eval_records]
     test_packaged = [package_record(item, config.system_prompt) for item in test_records]
+    final_source_groups: dict[tuple[str, str | None, str | None], list[dict[str, Any]]] = defaultdict(list)
+    for record in normalized_all:
+        metadata = record.get("metadata") if isinstance(record.get("metadata"), dict) else {}
+        source_spec_id = str(metadata.get("source_spec_id") or record.get("source") or "unknown")
+        final_source_groups[(source_spec_id, metadata.get("source_path"), metadata.get("source_version"))].append(
+            record
+        )
+    validation_counts = Counter(str(issue.get("source", "unknown")) for issue in validation_issues)
+    for summary in source_summaries:
+        summary_key = (summary["id"], summary.get("path"), summary.get("version"))
+        retained_records = final_source_groups.get(summary_key, [])
+        summary["rows_retained"] = len(retained_records)
+        summary["validation_issue_count"] = validation_counts.get(summary["id"], 0)
+        summary["profile_summary"] = build_dataset_profile(
+            retained_records,
+            title=summary["id"],
+        )
+    conflict_report = build_source_conflict_report(pre_dedupe_records)
+    profile_summary = build_dataset_profile(
+        normalized_all,
+        title="core_train_mix",
+        source_summaries=source_summaries,
+    )
 
     output_dir = Path(config.output_dir)
     if config.output_subdir:
@@ -783,10 +1022,29 @@ def build_corpus(config: ProcessingConfig, config_path: str | Path) -> dict[str,
     train_path = output_dir / "train.jsonl"
     eval_path = output_dir / "eval.jsonl"
     test_path = output_dir / "test.jsonl"
+    sqlite_path = None
     write_jsonl(normalized_path, normalized_all)
     write_jsonl(train_path, train_packaged)
     write_jsonl(eval_path, eval_packaged)
     write_jsonl(test_path, test_packaged)
+    if config.emit_sqlite and config.sqlite_output_path:
+        sqlite_path = output_dir / config.sqlite_output_path
+        _write_sqlite_corpus(
+            sqlite_path,
+            train_records=train_packaged,
+            eval_records=eval_packaged,
+            test_records=test_packaged,
+            metadata={
+                "build_id": config.build_id or "",
+                "dataset_version": config.dataset_version,
+                "processing_version": config.processing_version,
+                "source_spec_version": config.source_spec_version,
+                "system_prompt": config.system_prompt,
+                "train_rows": len(train_packaged),
+                "eval_rows": len(eval_packaged),
+                "test_rows": len(test_packaged),
+            },
+        )
 
     stats = {
         "all": compute_record_stats(normalized_all),
@@ -794,12 +1052,24 @@ def build_corpus(config: ProcessingConfig, config_path: str | Path) -> dict[str,
         "eval": compute_record_stats(eval_packaged),
         "test": compute_record_stats(test_packaged),
         "dedupe": dedupe_report,
+        "profile": profile_summary,
+    }
+    stats["split_profiles"] = {
+        "all": build_dataset_profile(normalized_all, title="all"),
+        "train": build_dataset_profile(train_packaged, title="train"),
+        "eval": build_dataset_profile(eval_packaged, title="eval"),
+        "test": build_dataset_profile(test_packaged, title="test"),
     }
     stats_path = output_dir / "stats.json"
     write_json(stats_path, stats)
     lineage_summary = _build_lineage_summary(normalized_all)
     lineage_summary_path = output_dir / "lineage_summary.json"
     write_json(lineage_summary_path, lineage_summary)
+    conflict_report_path = output_dir / "conflict_report.json"
+    write_json(conflict_report_path, conflict_report)
+    validation_report = build_validation_summary(validation_issues)
+    validation_report_path = output_dir / "validation_report.json"
+    write_json(validation_report_path, validation_report)
 
     repo_root = Path(__file__).resolve().parents[2]
     config_text = Path(config_path).read_text()
@@ -826,7 +1096,18 @@ def build_corpus(config: ProcessingConfig, config_path: str | Path) -> dict[str,
         ],
         outputs=[
             _build_file_info(path)
-            for path in [normalized_path, train_path, eval_path, test_path, stats_path, lineage_summary_path]
+            for path in [
+                normalized_path,
+                train_path,
+                eval_path,
+                test_path,
+                stats_path,
+                lineage_summary_path,
+                conflict_report_path,
+                validation_report_path,
+                output_dir / "profile_summary.json",
+            ]
+            + ([sqlite_path] if sqlite_path is not None else [])
         ],
         source_lineage=[SourceLineage.model_validate(record["lineage"]) for record in normalized_all[:1000]],
         stats=stats,
@@ -836,11 +1117,16 @@ def build_corpus(config: ProcessingConfig, config_path: str | Path) -> dict[str,
             "processing_version": config.processing_version,
             "source_spec_version": config.source_spec_version,
             "lineage_summary_path": str(lineage_summary_path),
+            "conflict_report_path": str(conflict_report_path),
+            "validation_report_path": str(validation_report_path),
+            "profile_summary_path": str(output_dir / "profile_summary.json"),
+            "sqlite_path": str(sqlite_path) if sqlite_path is not None else None,
             "source_summaries": source_summaries,
             "source_warnings": source_warnings,
         },
     )
     manifest_path = output_dir / "manifest.json"
+    write_json(output_dir / "profile_summary.json", profile_summary)
     write_json(manifest_path, manifest.model_dump())
 
     card_body = pack_card_text(
@@ -872,6 +1158,13 @@ def build_corpus(config: ProcessingConfig, config_path: str | Path) -> dict[str,
         "stats": stats,
         "manifest_path": str(manifest_path),
         "lineage_summary_path": str(lineage_summary_path),
+        "conflict_report_path": str(conflict_report_path),
+        "validation_report_path": str(validation_report_path),
+        "validation_report": validation_report,
+        "validation_issue_count": validation_report["total_issues"],
+        "validation_issues_sample": validation_report["sample_issues"],
+        "profile_summary_path": str(output_dir / "profile_summary.json"),
+        "sqlite_path": str(sqlite_path) if sqlite_path is not None else None,
         "derived_packs": derived_pack_summaries,
         "source_summaries": source_summaries,
         "source_warnings": source_warnings,

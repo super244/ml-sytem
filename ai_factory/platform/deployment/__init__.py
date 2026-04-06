@@ -5,10 +5,15 @@ and deployment scenarios.
 """
 
 from .manager import DeploymentManager
+from .models import DeploymentManifest, DeploymentRollbackReadiness, DeploymentRolloutStage, DeploymentVersionSummary
 from .targets import CustomAPITarget, EdgeDeviceTarget, HuggingFaceTarget, LMStudioTarget, OllamaTarget
 
 __all__ = [
     "DeploymentManager",
+    "DeploymentManifest",
+    "DeploymentVersionSummary",
+    "DeploymentRolloutStage",
+    "DeploymentRollbackReadiness",
     "HuggingFaceTarget",
     "OllamaTarget",
     "LMStudioTarget",

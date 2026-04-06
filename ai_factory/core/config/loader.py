@@ -12,7 +12,12 @@ from ai_factory.core.instances.models import EnvironmentSpec
 
 
 def _load_yaml(path: Path) -> dict[str, Any]:
-    return yaml.safe_load(path.read_text()) or {}
+    if not path.exists():
+        raise FileNotFoundError(f"Config file not found: {path}")
+    payload = yaml.safe_load(path.read_text()) or {}
+    if not isinstance(payload, dict):
+        raise ValueError(f"Config file must contain a mapping: {path}")
+    return payload
 
 
 def _resolve_ref(config_path: Path, ref: str | None) -> str | None:
@@ -41,34 +46,27 @@ def _coerce_environment(raw: dict[str, Any]) -> dict[str, Any]:
 
 def _is_training_profile(raw: dict[str, Any]) -> bool:
     """Check if the config appears to be a training profile."""
-    return bool(
-        raw.get("profile_name")
-        and raw.get("refs")
-        and not raw.get("instance")
-        and not raw.get("subsystem")
-    )
+    return bool(raw.get("profile_name") and raw.get("refs") and not raw.get("instance") and not raw.get("subsystem"))
 
 
 def _wrap_profile_as_orchestration(raw: dict[str, Any], config_path: str) -> dict[str, Any]:
     """Wrap a training profile with required orchestration structure."""
     # Determine instance type from profile context or default to finetune
     instance_type = "finetune"  # Default for training profiles
-    
+
     # Calculate relative path from repo root
     config_path_obj = Path(config_path).resolve()
     repo_root = config_path_obj.parent.parent.parent  # training/configs/profiles -> repo root
     relative_path = config_path_obj.relative_to(repo_root)
-    
+
     # Create the orchestration wrapper
     wrapped = {
         "instance": {
             "type": instance_type,
             "name": raw.get("run_name", raw.get("profile_name", "training-instance")),
-            "environment": {"kind": "local"}
+            "environment": {"kind": "local"},
         },
-        "subsystem": {
-            "config_ref": str(relative_path)
-        },
+        "subsystem": {"config_ref": str(relative_path)},
         "orchestration_mode": "single",
         "experience": {"level": "hobbyist"},
         "lifecycle": {"stage": "finetune"},
@@ -77,8 +75,8 @@ def _wrap_profile_as_orchestration(raw: dict[str, Any], config_path: str) -> dic
         "metadata": {
             "profile_name": raw.get("profile_name"),
             "description": raw.get("description", ""),
-            "generated_from_profile": True
-        }
+            "generated_from_profile": True,
+        },
     }
     return wrapped
 
@@ -89,7 +87,7 @@ def build_orchestration_config(payload: dict[str, Any], *, config_path: str | No
         if not config_path:
             raise ValueError("config_path is required for training profiles")
         payload = _wrap_profile_as_orchestration(payload, config_path)
-    
+
     instance_payload = _coerce_environment(dict(payload.get("instance", {})))
     raw = dict(payload)
     raw["instance"] = instance_payload
@@ -102,7 +100,7 @@ def load_orchestration_config(path: str) -> OrchestrationConfig:
     config_path = Path(path).resolve()
     raw = _load_yaml(config_path)
     config = build_orchestration_config(raw, config_path=str(config_path))
-    
+
     # For profile-based configs, the subsystem config is the profile itself
     if config.metadata.get("generated_from_profile"):
         config.resolved_subsystem_config_path = str(config_path)
@@ -111,9 +109,12 @@ def load_orchestration_config(path: str) -> OrchestrationConfig:
         # Normal orchestration config - resolve the subsystem reference
         resolved_ref = _resolve_ref(config_path, config.subsystem.config_ref)
         config.resolved_subsystem_config_path = resolved_ref
-        if resolved_ref and Path(resolved_ref).exists():
-            config.resolved_subsystem_config = _load_yaml(Path(resolved_ref))
-    
+        if resolved_ref:
+            resolved_path = Path(resolved_ref)
+            if not resolved_path.exists():
+                raise FileNotFoundError(f"Referenced subsystem config not found: {resolved_path}")
+            config.resolved_subsystem_config = _load_yaml(resolved_path)
+
     return config
 
 

@@ -2,13 +2,22 @@ profile_name: multitask_learning
 run_name: atlas_multitask_learning
 seed: 42
 refs:
-  model: ../components/models/qwen25_math_1p5b.yaml
-  adapter: ../components/adapters/multitask.yaml
-  data: ../components/data/multitask_mix.yaml
+  model: ../components/models/qwen2_scratch_2b.yaml
+  adapter: ../components/adapters/qlora_math.yaml
+  data: ../components/data/baseline.yaml
   runtime: ../components/runtime/hybrid_local.yaml
   logging: ../components/logging/default.yaml
   tracking: ../components/tracking/default.yaml
   packaging: ../components/packaging/default.yaml
+model:
+  initialization: pretrained
+  base_model_name: Qwen/Qwen2.5-Math-1.5B-Instruct
+  trust_remote_code: false
+  use_4bit: true
+  use_8bit: false
+  use_full_precision: false
+  recommended_runtime_profile: hybrid_local
+  recommended_quantization: 4bit
 training:
   num_train_epochs: 5.0
   learning_rate: 0.00003

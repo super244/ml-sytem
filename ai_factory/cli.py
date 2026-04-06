@@ -1,3 +1,10 @@
+"""
+Command-line interface for the AI-Factory operating system.
+
+Provides a comprehensive suite of commands to orchestrate, monitor, evaluate,
+and deploy machine learning models across various environments.
+"""
+
 from __future__ import annotations
 
 import argparse
@@ -19,7 +26,6 @@ from ai_factory.core.instances.models import (
 )
 from ai_factory.core.platform.container import build_platform_container
 from ai_factory.titan import detect_titan_status, write_hardware_markdown
-from inference.app.workspace import build_workspace_overview
 
 _STATUS_ICONS = {
     "running": "*",
@@ -262,6 +268,22 @@ def _render_ready_summary(payload: dict[str, Any]) -> None:
         print(f"\n{total - ready} check(s) need attention before full operation.")
 
 
+def _render_training_preflight(payload: dict[str, Any]) -> None:
+    summary = payload.get("summary") or {}
+    print(f"Training preflight: {payload.get('status', 'unknown')}")
+    print(f"profile: {payload.get('profile_name', 'n/a')} | run: {payload.get('run_name', 'n/a')}")
+    print(f"config: {payload.get('config_path', 'n/a')}")
+    print(f"checks: ok={summary.get('ok', 0)} warn={summary.get('warn', 0)} error={summary.get('error', 0)}")
+    for check in payload.get("checks", []):
+        print(f"  [{check.get('status', 'unknown').upper():>5}] {check.get('label', check.get('id', 'check'))}")
+        print(f"         {check.get('detail', '')}")
+    commands = payload.get("recommended_commands") or []
+    if commands:
+        _print_section("Recommended commands")
+        for command in commands:
+            print(f"  - {command}")
+
+
 def _render_titan_status(payload: dict[str, Any]) -> None:
     print(f"Hardware: {payload['silicon']}")
     print(f"Mode: {payload['mode']}")
@@ -349,7 +371,7 @@ def _environment_from_args(args: argparse.Namespace) -> EnvironmentSpec | None:
     user = args.cloud_user or (_prompt("Cloud user") if interactive else None)
     key_path = args.cloud_key_path or (_prompt("SSH key path", "") if interactive else "")
     remote_repo_root = args.remote_repo_root or (
-        _prompt("Remote repo root", "/tmp/ai-factory") if interactive else None
+        _prompt("Remote repo root", "/home/ubuntu/ai-factory") if interactive else None
     )
     python_bin = args.python_bin or (_prompt("Remote python", "python3") if interactive else "python3")
     port_forwards = []
@@ -467,6 +489,12 @@ def _tail_file(path: Path, *, initial: str = "") -> None:
 
 
 def parse_args() -> argparse.Namespace:
+    """
+    Parse the command-line arguments.
+
+    Returns:
+        argparse.Namespace: The parsed arguments.
+    """
     parser = argparse.ArgumentParser(prog="ai-factory", description="Unified instance control plane for AI-Factory.")
     parser.add_argument("--repo-root")
     parser.add_argument("--artifacts-dir")
@@ -604,6 +632,26 @@ def parse_args() -> argparse.Namespace:
     ready_parser = subparsers.add_parser("ready", parents=[common_json])
     ready_parser.add_argument("--root")
 
+    bootstrap_parser = subparsers.add_parser("bootstrap-train")
+    bootstrap_parser.add_argument("--config", required=True)
+    bootstrap_parser.add_argument("--dataset-config", default="data/configs/processing.yaml")
+    bootstrap_parser.add_argument("--tokenizer-output-dir")
+    bootstrap_parser.add_argument("--skip-ready", action="store_true")
+    bootstrap_parser.add_argument("--skip-doctor", action="store_true")
+    bootstrap_parser.add_argument("--skip-dataset", action="store_true")
+    bootstrap_parser.add_argument("--skip-tokenizer", action="store_true")
+    bootstrap_parser.add_argument("--skip-preflight", action="store_true")
+    bootstrap_parser.add_argument("--skip-training", action="store_true")
+    bootstrap_parser.add_argument("--force-tokenizer", action="store_true")
+    bootstrap_parser.add_argument("--ensure-tokenizer", action="store_true")
+    bootstrap_parser.add_argument("--dry-run", action="store_true")
+    bootstrap_parser.add_argument("--validate-model-load", action="store_true")
+    bootstrap_parser.add_argument("--resume-from-latest-checkpoint", action="store_true")
+    bootstrap_parser.add_argument("--train-arg", dest="train_args", action="append", default=[])
+
+    preflight_parser = subparsers.add_parser("train-preflight", parents=[common_json])
+    preflight_parser.add_argument("--config", required=True)
+
     compare_parser = subparsers.add_parser("compare", parents=[common_json])
     compare_parser.add_argument("left_instance_id")
     compare_parser.add_argument("right_instance_id", nargs="?")
@@ -654,8 +702,17 @@ def parse_args() -> argparse.Namespace:
     titan_doc_parser = titan_subparsers.add_parser("hardware-doc", parents=[common_json])
     titan_doc_parser.add_argument("--path", default="HARDWARE.md")
 
+    # Ultimate Optimization commands
+    optimize_parser = subparsers.add_parser("optimize", parents=[common_json])
+    optimize_subparsers = optimize_parser.add_subparsers(dest="optimize_command", required=True)
+    
+    optimize_detect_parser = optimize_subparsers.add_parser("detect", parents=[common_json])
+    optimize_benchmark_parser = optimize_subparsers.add_parser("benchmark", parents=[common_json])
+    optimize_profile_parser = optimize_subparsers.add_parser("profile", parents=[common_json])
+    optimize_profile_parser.add_argument("--device", choices=["m5_max", "a100", "h100", "auto"], default="auto")
+
     serve_parser = subparsers.add_parser("serve", parents=[common_json])
-    serve_parser.add_argument("--host", default="0.0.0.0")
+    serve_parser.add_argument("--host", default="127.0.0.1")
     serve_parser.add_argument("--port", type=int, default=8000)
     serve_parser.add_argument("--reload", action="store_true", default=True)
 
@@ -663,6 +720,12 @@ def parse_args() -> argparse.Namespace:
 
 
 def main() -> None:
+    """
+    Main entry point for the CLI.
+
+    Routes the command to the appropriate handler or service method based on
+    parsed arguments.
+    """
     args = parse_args()
     if args.command == "tui":
         from ai_factory.tui import run_tui
@@ -675,6 +738,8 @@ def main() -> None:
         return
 
     if args.command in {"workspace", "ready"}:
+        from inference.app.workspace import build_workspace_overview
+
         root = Path(getattr(args, "root", None) or ".") if hasattr(args, "root") and args.root else None
         payload = build_workspace_overview(root)
         if args.json:
@@ -686,7 +751,19 @@ def main() -> None:
             _render_workspace_overview(payload)
         return
 
-    if args.command in {"doctor", "api-smoke", "latest-run", "refresh-lab"}:
+    if args.command == "train-preflight":
+        from training.src.preflight import build_training_preflight_report
+
+        payload = build_training_preflight_report(args.config)
+        if args.json:
+            _render_payload(payload, as_json=True)
+        else:
+            _render_training_preflight(payload)
+        if (payload.get("summary") or {}).get("error", 0):
+            raise SystemExit(1)
+        return
+
+    if args.command in {"doctor", "api-smoke", "latest-run", "refresh-lab", "bootstrap-train"}:
         from ai_factory import cli_scripts
 
         if args.command == "doctor":
@@ -697,6 +774,8 @@ def main() -> None:
             cli_scripts.cmd_latest_run(args)
         elif args.command == "refresh-lab":
             cli_scripts.cmd_refresh_lab(args)
+        elif args.command == "bootstrap-train":
+            cli_scripts.cmd_bootstrap_train(args)
         return
 
     if args.command == "titan":
@@ -714,6 +793,53 @@ def main() -> None:
         _render_titan_status(status)
         return
 
+    if args.command == "optimize":
+        if args.optimize_command == "detect":
+            from training.src.optimization import HardwareDetector
+            
+            hardware = HardwareDetector.detect()
+            if args.json:
+                _render_payload(hardware.to_dict(), as_json=True)
+            else:
+                HardwareDetector.print_hardware_summary()
+            return
+        
+        if args.optimize_command == "benchmark":
+            from training.src.ultimate_harness import quick_benchmark
+            
+            results = quick_benchmark()
+            if args.json:
+                _render_payload(results, as_json=True)
+            return
+        
+        if args.optimize_command == "profile":
+            profile_map = {
+                "m5_max": "training/configs/profiles/m5_max_ultimate.yaml",
+                "a100": "training/configs/profiles/cuda_ultimate_a100.yaml",
+                "h100": "training/configs/profiles/cuda_ultimate_h100.yaml",
+            }
+            
+            if args.device == "auto":
+                from training.src.optimization import HardwareDetector, BackendType
+                
+                hardware = HardwareDetector.detect()
+                if hardware.backend == BackendType.METAL:
+                    profile_path = profile_map["m5_max"]
+                elif hardware.backend == BackendType.CUDA:
+                    # Default to A100 for CUDA, could be smarter here
+                    profile_path = profile_map["a100"]
+                else:
+                    print("No ultimate profile available for CPU-only systems.")
+                    return
+            else:
+                profile_path = profile_map.get(args.device)
+            
+            if profile_path:
+                print(f"Recommended ultimate profile: {profile_path}")
+                if args.json:
+                    _render_payload({"profile_path": profile_path, "device": args.device}, as_json=True)
+            return
+
     if args.command == "serve":
         import subprocess
 
@@ -721,7 +847,7 @@ def main() -> None:
         if args.reload:
             cmd.append("--reload")
         print(f"Starting AI-Factory API server on {args.host}:{args.port}")
-        subprocess.run(cmd)
+        subprocess.run(cmd)  # nosec B603 - controlled local dev command, shell=False argv execution
         return
 
     control = _build_control_service(args)
@@ -920,14 +1046,21 @@ def main() -> None:
         if args.platform_command == "status":
             from ai_factory.platform import get_platform_status
 
-            status = get_platform_status()
+            status = get_platform_status(
+                repo_root=args.repo_root,
+                artifacts_dir=args.artifacts_dir,
+            )
             _render_payload(status, as_json=args.json)
             return
 
         if args.platform_command == "scale":
             from ai_factory.platform import scale_platform
 
-            result = scale_platform(args.target_nodes)
+            result = scale_platform(
+                args.target_nodes,
+                repo_root=args.repo_root,
+                artifacts_dir=args.artifacts_dir,
+            )
             _render_payload(result, as_json=args.json)
             return
 

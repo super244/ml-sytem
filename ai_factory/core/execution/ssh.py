@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import argparse
 import shlex
+import shutil
 import subprocess
 import sys
 import threading
@@ -9,10 +10,10 @@ from pathlib import Path
 from typing import Any
 
 from ai_factory.core.execution.base import BaseExecutor, CommandSpec, RunnerPayload, decode_payload, encode_payload
-from ai_factory.core.instances.models import ExecutionHandle, InstanceManifest
+from ai_factory.core.instances.models import EnvironmentSpec, ExecutionHandle, InstanceManifest
 
 
-def _ssh_target(environment) -> str:
+def _ssh_target(environment: EnvironmentSpec) -> str:
     if not environment.host or not environment.user:
         raise ValueError("SSH execution requires environment.host and environment.user")
     return f"{environment.user}@{environment.host}"
@@ -48,15 +49,18 @@ def _port_forward_args(metadata: dict[str, Any]) -> list[str]:
     return argv
 
 
-def _build_ssh_argv(environment, metadata: dict[str, Any]) -> list[str]:
-    argv = ["ssh", "-p", str(environment.port)]
+def _build_ssh_argv(environment: EnvironmentSpec, metadata: dict[str, Any]) -> list[str]:
+    ssh_bin = shutil.which("ssh")
+    if ssh_bin is None:
+        raise FileNotFoundError("ssh executable not found in PATH")
+    argv = [ssh_bin, "-p", str(environment.port)]
     if environment.key_path:
         argv.extend(["-i", environment.key_path])
     argv.extend(_port_forward_args(metadata))
     return argv
 
 
-def _stream_pipe(pipe, path: Path) -> None:
+def _stream_pipe(pipe: Any, path: Path) -> None:
     with path.open("a") as handle:
         for line in iter(pipe.readline, ""):
             handle.write(line)
@@ -64,7 +68,9 @@ def _stream_pipe(pipe, path: Path) -> None:
     pipe.close()
 
 
-def _heartbeat_loop(manager, instance_id: str, attempt_id: str, stop_event: threading.Event, interval_s: int) -> None:
+def _heartbeat_loop(
+    manager: Any, instance_id: str, attempt_id: str, stop_event: threading.Event, interval_s: int
+) -> None:
     while not stop_event.wait(interval_s):
         try:
             manager.heartbeat_instance_attempt(instance_id, attempt_id)
@@ -91,7 +97,7 @@ class SshExecutor(BaseExecutor):
             manifest_metadata=manifest.metadata,
             command=command,
         )
-        process = subprocess.Popen(
+        process = subprocess.Popen(  # nosec B603 - internal runner bootstrap with explicit argv
             [
                 sys.executable,
                 "-m",
@@ -115,7 +121,7 @@ class SshExecutor(BaseExecutor):
         target = _ssh_target(manifest.environment)
         argv = _build_ssh_argv(manifest.environment, manifest.metadata)
         argv.extend([target, f"cat {shlex.quote(path)}"])
-        result = subprocess.run(argv, capture_output=True, text=True, check=True)
+        result = subprocess.run(argv, capture_output=True, text=True, check=True)  # nosec B603 - ssh argv with shell=False
         return result.stdout
 
 
@@ -132,7 +138,7 @@ def _run_payload(payload: RunnerPayload) -> int:
     ssh_command = _build_ssh_argv(payload.environment, payload.manifest_metadata)
     ssh_command.extend([_ssh_target(payload.environment), _build_remote_command(payload)])
 
-    process = subprocess.Popen(
+    process = subprocess.Popen(  # nosec B603 - ssh command constructed from validated environment and argv
         ssh_command,
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,

@@ -1,22 +1,23 @@
 from __future__ import annotations
 
 import json
+from pathlib import Path
 
 from ai_factory.core.artifacts import prepare_run_layout
-from training.src.checkpoints import find_latest_checkpoint
+from training.src.checkpoints import find_latest_checkpoint, resolve_resume_checkpoint
 from training.src.config import load_experiment_config
 from training.src.environment import collect_environment_snapshot
 from training.src.tracking import build_tracker
 
 
-def test_profile_config_loads_tracking_component():
+def test_profile_config_loads_tracking_component() -> None:
     config = load_experiment_config("training/configs/profiles/baseline_qlora.yaml")
     assert config.tracking.provider == "none"
     assert config.tracking.capture_environment is True
     assert config.tracking.log_summary_artifact is True
 
 
-def test_environment_snapshot_writes_runtime_metadata(tmp_path):
+def test_environment_snapshot_writes_runtime_metadata(tmp_path) -> None:
     config = load_experiment_config("training/configs/profiles/baseline_qlora.yaml")
     config.training.artifacts_dir = str(tmp_path)
     config.tracking.capture_installed_packages = False
@@ -32,7 +33,7 @@ def test_environment_snapshot_writes_runtime_metadata(tmp_path):
     assert snapshot["files"]["config"]["exists"] is True
 
 
-def test_json_tracker_writes_context_events_and_summary(tmp_path):
+def test_json_tracker_writes_context_events_and_summary(tmp_path) -> None:
     config = load_experiment_config("training/configs/profiles/baseline_qlora.yaml")
     config.training.artifacts_dir = str(tmp_path)
     layout = prepare_run_layout(tmp_path, "unit-tracker")
@@ -55,7 +56,7 @@ def test_json_tracker_writes_context_events_and_summary(tmp_path):
     assert summary["summary"]["eval_loss"] == 0.2
 
 
-def test_find_latest_checkpoint_prefers_highest_step(tmp_path):
+def test_find_latest_checkpoint_prefers_highest_step(tmp_path) -> None:
     base = tmp_path / "checkpoints"
     (base / "checkpoint-4").mkdir(parents=True)
     (base / "checkpoint-10").mkdir()
@@ -64,3 +65,25 @@ def test_find_latest_checkpoint_prefers_highest_step(tmp_path):
 
     assert latest is not None
     assert latest.name == "checkpoint-10"
+
+
+def test_resolve_resume_checkpoint_uses_latest_prior_run_checkpoint(tmp_path: Path) -> None:
+    artifacts_dir = tmp_path / "artifacts"
+    previous = artifacts_dir / "runs" / "demo-run-20260101-010101" / "checkpoints" / "checkpoint-25"
+    previous.mkdir(parents=True)
+    (previous / "trainer_state.json").write_text('{"global_step": 25}')
+    (previous / "adapter_model.safetensors").write_text("weights")
+
+    current = artifacts_dir / "runs" / "demo-run-20260102-020202" / "checkpoints"
+    current.mkdir(parents=True)
+
+    resolved, report = resolve_resume_checkpoint(
+        current,
+        resume_from_latest=True,
+        artifacts_dir=artifacts_dir,
+        run_name="demo-run",
+        exclude_run_id="demo-run-20260102-020202",
+    )
+
+    assert resolved == str(previous)
+    assert report["source"] == "artifacts_runs"

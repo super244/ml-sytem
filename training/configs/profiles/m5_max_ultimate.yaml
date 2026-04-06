@@ -1,0 +1,78 @@
+# M5 Max Ultimate Profile
+# Optimized for Apple M5 Max with 40-core GPU and 614 GB/s unified memory
+
+profile_name: m5_max_ultimate
+run_name: atlas_m5_max_ultimate
+seed: 42
+description: "Ultimate optimization profile for Apple M5 Max - harnessing 614 GB/s unified memory bandwidth"
+
+refs:
+  model: ../components/models/qwen2_scratch_1b.yaml
+  adapter: ../components/adapters/lora_math.yaml
+  data: ../components/data/fast_iteration.yaml
+  runtime: ../components/runtime/ultimate_metal.yaml
+  logging: ../components/logging/default.yaml
+  tracking: ../components/tracking/default.yaml
+  packaging: ../components/packaging/default.yaml
+
+model:
+  initialization: pretrained
+  base_model_name: Qwen/Qwen2.5-Math-1.5B-Instruct
+  trust_remote_code: false
+  use_4bit: false
+  use_8bit: false
+  use_full_precision: true
+  recommended_runtime_profile: ultimate_metal
+  recommended_quantization: none
+
+training:
+  num_train_epochs: 3.0
+  learning_rate: 0.0001
+  per_device_train_batch_size: 4  # Optimized for M5 Max unified memory
+  per_device_eval_batch_size: 4
+  gradient_accumulation_steps: 2   # Reduced due to larger batch
+  dataloader_num_workers: 2       # Optimized for macOS
+  gradient_checkpointing: false   # Not needed with unified memory
+  max_grad_norm: 1.0
+  warmup_ratio: 0.03
+  lr_scheduler_type: cosine
+  
+  # Memory-optimized settings
+  group_by_length: true
+  save_safetensors: true
+  save_strategy: steps
+  save_steps: 500
+  save_total_limit: 3
+  
+  # Evaluation
+  evaluation_strategy: steps
+  eval_steps: 250
+  load_best_model_at_end: true
+  
+  artifacts_dir: artifacts
+
+runtime:
+  torch_compile: false  # MPS doesn't support torch.compile yet
+  deepspeed_config: null
+  validate_model_load: true
+
+packaging:
+  publish_model_name: atlas-math-m5-max-ultimate
+
+# M5 Max specific optimizations
+hardware:
+  platform: darwin
+  device: Apple M5 Max
+  unified_memory: true
+  memory_gb: 128
+  gpu_cores: 40
+  bandwidth_gbps: 614
+  zero_copy: true
+  backend: metal
+
+# Optimization flags
+optimizations:
+  mixed_precision: false  # MPS doesn't support FP16 training
+  gradient_fusion: true   # Fuse gradient operations
+  memory_layout: nhwc     # Optimized memory layout
+  kernel_fusion: true     # Enable kernel fusion

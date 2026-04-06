@@ -31,34 +31,36 @@ async def test_dataset_telemetry_routes_support_promote_and_discard(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ):
+    from ai_factory.core.orchestration.sqlite import SqliteControlPlane
     from inference.app.routers import datasets as datasets_router
 
-    telemetry_dir = tmp_path / "data" / "telemetry"
-    promoted_file = telemetry_dir / "promoted.jsonl"
-    discarded_file = telemetry_dir / "discarded.jsonl"
-    _write_jsonl(
-        telemetry_dir / "flagged.jsonl",
-        [
-            {
-                "timestamp": 101.0,
-                "prompt": "bad prompt",
-                "assistant_output": "wrong answer",
-                "expected_output": "right answer",
-                "model_variant": "demo",
-            },
-            {
-                "timestamp": 99.0,
-                "prompt": "another prompt",
-                "assistant_output": "bad answer",
-                "expected_output": "better answer",
-                "model_variant": "demo-2",
-            },
-        ],
-    )
+    # Use a real DB in the tmp_path
+    control_db_path = tmp_path / "control_plane.db"
+    db = SqliteControlPlane(control_db_path)
+
+    # Insert test records
+    from inference.app.routers.datasets import _telemetry_record_id
+
+    rec1 = {
+        "timestamp": 101.0,
+        "prompt": "bad prompt",
+        "assistant_output": "wrong answer",
+        "expected_output": "right answer",
+        "model_variant": "demo",
+    }
+    rec2 = {
+        "timestamp": 99.0,
+        "prompt": "another prompt",
+        "assistant_output": "bad answer",
+        "expected_output": "better answer",
+        "model_variant": "demo-2",
+    }
+    db.upsert_telemetry_record(_telemetry_record_id(rec1), rec1, status="flagged", timestamp=101.0)
+    db.upsert_telemetry_record(_telemetry_record_id(rec2), rec2, status="flagged", timestamp=99.0)
+
+    # Mock _get_db in the router to return our local DB
+    app.dependency_overrides[datasets_router._get_db] = lambda: db
     monkeypatch.setattr(datasets_router, "REPO_ROOT", tmp_path)
-    monkeypatch.setattr(datasets_router, "TELEMETRY_DIR", telemetry_dir)
-    monkeypatch.setattr(datasets_router, "PROMOTED_TELEMETRY_FILE", promoted_file)
-    monkeypatch.setattr(datasets_router, "DISCARDED_TELEMETRY_FILE", discarded_file)
 
     transport = httpx.ASGITransport(app=app)
     async with httpx.AsyncClient(transport=transport, base_url="http://testserver") as client:
@@ -74,12 +76,16 @@ async def test_dataset_telemetry_routes_support_promote_and_discard(
 
     assert promote_response.status_code == 200
     assert promote_response.json()["status"] == "promoted"
-    assert "promoted.jsonl" in promote_response.json()["destination"]
-    assert promoted_file.exists()
+    assert "db:promoted" in promote_response.json()["destination"]
+
+    promoted = db.list_telemetry("promoted")
+    assert len(promoted) == 1
 
     assert discard_response.status_code == 200
     assert discard_response.json()["status"] == "discarded"
-    assert discarded_file.exists()
+
+    discarded = db.list_telemetry("discarded")
+    assert len(discarded) == 1
 
     assert remaining_response.status_code == 200
     assert remaining_response.json()["telemetry"] == []
@@ -93,6 +99,20 @@ async def test_agent_routes_support_updating_registered_agents(
     from inference.app.routers import agents as agents_router
 
     registry = tmp_path / "data" / "agents" / "registry.jsonl"
+    _write_jsonl(
+        registry,
+        [
+            {
+                "id": "agent-data-01",
+                "name": "Data Curator",
+                "role": "Curates rows and promotes telemetry examples.",
+                "model": "gpt-4o",
+                "status": "active",
+                "created_at": 10.0,
+                "tokens_used": 123,
+            }
+        ],
+    )
     monkeypatch.setattr(agents_router, "AGENTS_FILE", registry)
 
     transport = httpx.ASGITransport(app=app)
@@ -117,6 +137,112 @@ async def test_agent_routes_support_updating_registered_agents(
 
     refreshed = refreshed_response.json()["swarm"]
     assert any(item["id"] == agent["id"] and item["status"] == "sleeping" for item in refreshed)
+
+
+@pytest.mark.anyio
+async def test_automl_routes_expose_persisted_sweeps_without_demo_mode(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+):
+    from inference.app.routers import automl as automl_router
+
+    sweeps_file = tmp_path / "data" / "automl" / "sweeps.jsonl"
+    _write_jsonl(
+        sweeps_file,
+        [
+            {
+                "id": "sweep-001",
+                "name": "Baseline Sweep",
+                "base_model": "base",
+                "strategy": "bayesian",
+                "status": "running",
+                "num_trials": 4,
+                "completed_trials": 2,
+                "created_at": 10.0,
+                "best_trial": {
+                    "trial_id": "trial-01",
+                    "status": "completed",
+                    "params": {
+                        "learning_rate": 0.0001,
+                        "batch_size": 8,
+                        "warmup_ratio": 0.03,
+                        "lora_rank": 8,
+                    },
+                    "metrics": {
+                        "final_loss": 0.42,
+                        "accuracy": 0.88,
+                        "perplexity": 1.52,
+                    },
+                    "duration_s": 120,
+                },
+                "trials": [],
+            }
+        ],
+    )
+    monkeypatch.setattr(automl_router, "SWEEPS_FILE", sweeps_file)
+
+    transport = httpx.ASGITransport(app=app)
+    async with httpx.AsyncClient(transport=transport, base_url="http://testserver") as client:
+        list_response = await client.get("/v1/automl/sweeps")
+        detail_response = await client.get("/v1/automl/sweeps/sweep-001")
+
+    assert list_response.status_code == 200
+    list_payload = list_response.json()
+    assert list_payload["write_enabled"] is False
+    assert list_payload["sweeps"][0]["id"] == "sweep-001"
+
+    assert detail_response.status_code == 200
+    assert detail_response.json()["name"] == "Baseline Sweep"
+
+
+@pytest.mark.anyio
+async def test_autonomous_routes_plan_and_persist_campaigns(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+):
+    from inference.app.routers import autonomous as autonomous_router
+    from inference.app.services.instance_service import InstanceService
+
+    settings = AppSettings(
+        title="test",
+        version="0.0.0",
+        repo_root=str(tmp_path),
+        cors_origins=["*"],
+        model_registry_path=str(tmp_path / "inference" / "configs" / "model_registry.yaml"),
+        prompt_library_path=str(tmp_path / "inference" / "configs" / "prompt_presets.yaml"),
+        benchmark_registry_path=str(tmp_path / "evaluation" / "benchmarks" / "registry.yaml"),
+        artifacts_dir=str(tmp_path / "artifacts"),
+        cache_dir=str(tmp_path / "artifacts" / "cache"),
+        telemetry_path=str(tmp_path / "artifacts" / "inference" / "telemetry" / "requests.jsonl"),
+        cache_enabled=False,
+        telemetry_enabled=False,
+    )
+    service = InstanceService(settings)
+    app.dependency_overrides[autonomous_router.get_settings] = lambda: settings
+    app.dependency_overrides[autonomous_router.get_instance_service] = lambda: service
+
+    transport = httpx.ASGITransport(app=app)
+    async with httpx.AsyncClient(transport=transport, base_url="http://testserver") as client:
+        create_response = await client.post(
+            "/v1/experiments/autonomous/campaigns/run",
+            json={
+                "experiment_name": "Expo Autonomy",
+                "goal": "Keep the loop moving",
+                "auto_start": False,
+            },
+        )
+        list_response = await client.get("/v1/experiments/autonomous/campaigns")
+
+    assert create_response.status_code == 202
+    created = create_response.json()
+    assert created["campaign"]["plan"][0]["kind"] == "train"
+    assert created["campaign"]["status"] == "planned"
+
+    assert list_response.status_code == 200
+    payload = list_response.json()
+    assert payload["count"] == 1
+    assert payload["ready_actions"][0]["kind"] == "train"
+    assert payload["campaigns"][0]["campaign_id"] == created["experiment_id"]
 
 
 @pytest.mark.anyio
@@ -281,7 +407,7 @@ async def test_dataset_dashboard_exposes_processed_and_pack_provenance(
         telemetry_enabled=False,
     )
     metadata_service = MetadataService(settings, [], {}, None)
-    monkeypatch.setattr(datasets_router, "get_metadata_service", lambda: metadata_service)
+    app.dependency_overrides[datasets_router.get_metadata_service] = lambda: metadata_service
 
     transport = httpx.ASGITransport(app=app)
     async with httpx.AsyncClient(transport=transport, base_url="http://testserver") as client:

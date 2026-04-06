@@ -1,4 +1,5 @@
 import json
+import sqlite3
 from pathlib import Path
 
 from ai_factory.core.io import write_jsonl
@@ -6,10 +7,12 @@ from ai_factory.core.schemas import DatasetBuildInfo
 from data.builders import corpus_builder
 from data.builders.corpus_builder import ProcessingConfig, coerce_source_specs, load_source_records, normalize_record
 from data.builders.pack_registry import build_derived_packs
+from data.quality.profiles import build_dataset_profile, build_source_conflict_report
 from data.tools.preview_dataset import preview_rows
+from training.src.data import load_records
 
 
-def test_normalize_record_accepts_legacy_step_strings():
+def test_normalize_record_accepts_legacy_step_strings() -> None:
     normalized = normalize_record(
         {
             "question": "Evaluate int_0^1 x dx.",
@@ -24,7 +27,18 @@ def test_normalize_record_accepts_legacy_step_strings():
     assert len(normalized["step_checks"]) == 2
 
 
-def test_build_derived_packs(tmp_path: Path):
+def test_normalize_record_collects_validation_issue_details() -> None:
+    issues: list[dict[str, object]] = []
+
+    normalized = normalize_record({"solution": "S"}, default_source="unit_test", validation_issues=issues)
+
+    assert normalized is None
+    assert issues
+    assert issues[0]["reason"] == "missing_required_text"
+    assert "question_present=False" in str(issues[0]["message"])
+
+
+def test_build_derived_packs(tmp_path: Path) -> None:
     rows = [
         {
             "id": "a",
@@ -48,9 +62,42 @@ def test_build_derived_packs(tmp_path: Path):
     manifest = json.loads((tmp_path / "calculus_hard_pack" / "manifest.json").read_text())
     assert manifest["build"]["build_id"] == "unit-test"
     assert manifest["metadata"]["card_path"].endswith("card.md")
+    assert manifest["metadata"]["profile_summary"]["num_records"] == 1
+    assert manifest["stats"]["quality_summary"]["mean"] >= 0.0
 
 
-def test_coerce_source_specs_flattens_composite_ratios():
+def test_build_dataset_profile_and_conflict_report_surface_quality_metadata() -> None:
+    records = [
+        {
+            "id": "a",
+            "question": "Q1",
+            "solution": "S1",
+            "source": "s1",
+            "topic": "calculus",
+            "difficulty": "hard",
+            "quality_score": 0.8,
+        },
+        {
+            "id": "b",
+            "question": "Q1",
+            "solution": "S2",
+            "source": "s2",
+            "topic": "calculus",
+            "difficulty": "hard",
+            "quality_score": 0.6,
+        },
+    ]
+
+    profile = build_dataset_profile(records, title="demo")
+    conflicts = build_source_conflict_report(records)
+
+    assert profile["num_records"] == 2
+    assert profile["quality_summary"]["mean"] == 0.7
+    assert conflicts["cross_source_conflict_count"] == 1
+    assert conflicts["exact_question_conflicts"][0]["record_count"] == 2
+
+
+def test_coerce_source_specs_flattens_composite_ratios() -> None:
     specs = coerce_source_specs(
         [
             {"kind": "local", "path": "data/examples/math_reasoning_examples.jsonl", "sample_ratio": 0.5},
@@ -71,7 +118,17 @@ def test_coerce_source_specs_flattens_composite_ratios():
     assert specs[1].version == "bundle-v1"
 
 
-def test_build_corpus_tracks_source_versions_and_ratios(tmp_path: Path, monkeypatch):
+def test_deterministic_sampling_is_stable_across_input_order() -> None:
+    spec = corpus_builder.SourceSpec(id="demo", kind="local", path="demo.jsonl", sample_ratio=0.5)
+    rows = [{"id": f"r{i}", "question": f"Q{i}", "solution": f"S{i}"} for i in range(6)]
+
+    sample_a = corpus_builder._sample_source_rows(rows, spec, seed=13)
+    sample_b = corpus_builder._sample_source_rows(list(reversed(rows)), spec, seed=13)
+
+    assert [row["id"] for row in sample_a] == [row["id"] for row in sample_b]
+
+
+def test_build_corpus_tracks_source_versions_and_ratios(tmp_path: Path, monkeypatch) -> None:
     source_a = tmp_path / "source_a.jsonl"
     source_b = tmp_path / "source_b.jsonl"
     write_jsonl(
@@ -123,13 +180,33 @@ def test_build_corpus_tracks_source_versions_and_ratios(tmp_path: Path, monkeypa
     assert manifest["metadata"]["source_summaries"][0]["version"] == "2026.03"
     assert manifest["metadata"]["source_summaries"][1]["sample_ratio"] == 0.5
     assert manifest["metadata"]["lineage_summary_path"].endswith("lineage_summary.json")
+    assert manifest["metadata"]["profile_summary_path"].endswith("profile_summary.json")
+    assert manifest["metadata"]["conflict_report_path"].endswith("conflict_report.json")
+    assert manifest["metadata"]["validation_report_path"].endswith("validation_report.json")
+    assert manifest["metadata"]["sqlite_path"].endswith("corpus.sqlite")
     assert "processing_version=v1" in manifest["build"]["notes"]
+    assert manifest["stats"]["profile"]["num_records"] == 4
+    assert manifest["stats"]["split_profiles"]["all"]["num_records"] == 4
     assert lineage_summary["total_records"] == 4
     assert lineage_summary["contamination"]["contaminated_records"] == 0
     assert lineage_summary["groups"][0]["record_count"] == 2
+    assert json.loads(Path(result["profile_summary_path"]).read_text())["num_records"] == 4
+    assert json.loads(Path(result["validation_report_path"]).read_text())["total_issues"] == 0
+    sqlite_path = Path(result["sqlite_path"])
+    assert sqlite_path.exists()
+    connection = sqlite3.connect(sqlite_path)
+    try:
+        counts = dict(
+            connection.execute("SELECT dataset_split, COUNT(*) FROM records GROUP BY dataset_split").fetchall()
+        )
+    finally:
+        connection.close()
+    assert counts["train"] == 3
+    assert counts["eval"] == 1
+    assert len(load_records(str(sqlite_path), split="train")) == 3
 
 
-def test_web_source_loader_reads_jsonl_payload(monkeypatch):
+def test_web_source_loader_reads_jsonl_payload(monkeypatch) -> None:
     payload = '{"id":"web-1","question":"Q","solution":"S","difficulty":"hard","topic":"calculus"}\n'
 
     class FakeHeaders:
@@ -169,7 +246,7 @@ def test_web_source_loader_reads_jsonl_payload(monkeypatch):
     assert loaded[0][1]["id"] == "web-1"
 
 
-def test_optional_source_load_failure_is_skipped(monkeypatch):
+def test_optional_source_load_failure_is_skipped(monkeypatch) -> None:
     def raise_runtime(spec):
         raise RuntimeError("missing dependency")
 
@@ -184,7 +261,35 @@ def test_optional_source_load_failure_is_skipped(monkeypatch):
     assert warnings and "Skipped optional source" in warnings[0]
 
 
-def test_preview_rows_includes_tokenization_preview():
+def test_load_source_records_warns_on_empty_required_source(monkeypatch) -> None:
+    monkeypatch.setattr(corpus_builder, "load_source_rows", lambda spec: [])
+    loaded, summaries, warnings = load_source_records(
+        [corpus_builder.SourceSpec(id="empty-local", kind="local", path="data/public/normalized/*.jsonl")],
+        seed=1,
+    )
+
+    assert loaded == []
+    assert summaries[0]["rows_loaded"] == 0
+    assert warnings == ["Source 'empty-local' loaded 0 rows from data/public/normalized/*.jsonl."]
+
+
+def test_load_source_records_warns_on_empty_optional_source(monkeypatch) -> None:
+    monkeypatch.setattr(corpus_builder, "load_source_rows", lambda spec: [])
+    loaded, summaries, warnings = load_source_records(
+        [
+            corpus_builder.SourceSpec(
+                id="optional-empty", kind="local", path="data/public/normalized/*.jsonl", optional=True
+            )
+        ],
+        seed=1,
+    )
+
+    assert loaded == []
+    assert summaries[0]["optional"] is True
+    assert warnings == ["Optional source 'optional-empty' loaded 0 rows from data/public/normalized/*.jsonl."]
+
+
+def test_preview_rows_includes_tokenization_preview() -> None:
     class FakeTokenizer:
         def tokenize(self, text: str):
             return text.replace("?", " ?").split()

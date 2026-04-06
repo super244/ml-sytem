@@ -5,8 +5,10 @@ import subprocess
 import sys
 from pathlib import Path
 
+from ai_factory.core.datasets import inspect_json_asset
 
-def run_command(cmd, description):
+
+def run_command(cmd: str, description: str) -> bool:
     """Run a command and return success status."""
     print(f"Checking {description}...")
     try:
@@ -18,7 +20,17 @@ def run_command(cmd, description):
         return False
 
 
-def main():
+def check_json_asset(path: Path, description: str) -> bool:
+    print(f"Checking {description}...")
+    status = inspect_json_asset(path)
+    if status["ok"]:
+        print(f"✓ {description}")
+        return True
+    print(f"✗ {description}: {status['detail']}")
+    return False
+
+
+def main() -> int:
     """Run system health checks."""
     print("🏭 AI-Factory System Health Check")
     print("=" * 40)
@@ -38,12 +50,16 @@ def main():
     checks.append(("ruff check --quiet", "Code linting"))
 
     # Type checking (optional)
-    checks.append(("mypy ai_factory/ --no-error-summary", "Type checking"))
+    checks.append(("mypy . --no-error-summary", "Type checking"))
 
     # Frontend dependencies
     frontend_path = Path("frontend")
+    node_modules_path = frontend_path / "node_modules"
     if frontend_path.exists():
-        checks.append(("cd frontend && npm list --depth=0 >/dev/null", "Frontend dependencies"))
+        if node_modules_path.exists():
+            checks.append(("cd frontend && npm list --depth=0 >/dev/null", "Frontend dependencies"))
+        else:
+            print("! Skipping frontend dependency check (node_modules not found)")
 
     # Configuration files
     config_files = [
@@ -63,6 +79,19 @@ def main():
 
     for cmd, desc in checks:
         if run_command(cmd, desc):
+            passed += 1
+        print()
+
+    json_asset_checks = [
+        (Path("data/catalog.json"), "Dataset catalog JSON"),
+        (Path("data/processed/manifest.json"), "Processed manifest JSON"),
+        (Path("data/processed/pack_summary.json"), "Pack summary JSON"),
+    ]
+
+    total += len(json_asset_checks)
+
+    for path, desc in json_asset_checks:
+        if check_json_asset(path, desc):
             passed += 1
         print()
 

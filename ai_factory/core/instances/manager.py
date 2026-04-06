@@ -5,7 +5,7 @@ import uuid
 from copy import deepcopy
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any
+from typing import Any, Literal
 
 import yaml
 
@@ -15,17 +15,25 @@ from ai_factory.core.config.loader import (
     load_orchestration_config,
     resolve_path_from_config,
 )
+from ai_factory.core.config.schema import OrchestrationConfig
 from ai_factory.core.decisions.rules import build_feedback_recommendations, decide_next_step
+from ai_factory.core.execution.base import CommandSpec
 from ai_factory.core.execution.commands import UnsupportedInstanceTypeError, build_command
 from ai_factory.core.execution.local import LocalExecutor
 from ai_factory.core.execution.ssh import SshExecutor
 from ai_factory.core.instances.models import (
+    DecisionAction,
+    DecisionResult,
+    DeploymentTarget,
     EnvironmentSpec,
     ExecutionHandle,
     FeedbackRecommendation,
     InstanceError,
     InstanceManifest,
+    InstanceStatus,
+    InstanceType,
     LifecycleProfile,
+    LifecycleStage,
     ProgressSnapshot,
     UserLevel,
     utc_now_iso,
@@ -39,6 +47,7 @@ from ai_factory.core.instances.utils import (
     _stage_for_instance_type,
 )
 from ai_factory.core.io import write_json
+from ai_factory.core.model_scales import DEFAULT_FOUNDATION_MODEL
 from ai_factory.core.monitoring.collectors import collect_metrics_for_instance
 from ai_factory.core.monitoring.events import InstanceEvent
 from ai_factory.core.orchestration.service import OrchestrationService
@@ -56,7 +65,7 @@ class InstanceManager:
         orchestration: OrchestrationService | None = None,
         platform_settings: PlatformSettings | None = None,
         plugin_registry: PluginRegistry | None = None,
-    ):
+    ) -> None:
         self.store = store
         self.queries = InstanceQueryService(store)
         self.platform_settings = platform_settings or get_platform_settings(artifacts_dir=store.artifacts_dir)
@@ -67,7 +76,7 @@ class InstanceManager:
         )
         self.state = LifecycleStateManager(self.store, self.orchestration)
 
-    def _make_instance_id(self, instance_type: str) -> str:
+    def _make_instance_id(self, instance_type: InstanceType) -> str:
         return (
             f"{instance_type}-"
             f"{utc_now_iso().replace(':', '').replace('+00:00', 'z').replace('-', '').replace('.', '')}-"
@@ -107,7 +116,12 @@ class InstanceManager:
         candidates.sort(key=lambda path: path.stat().st_mtime)
         return str(candidates[-1])
 
-    def _resume_command_if_available(self, manifest: InstanceManifest, config, command):
+    def _resume_command_if_available(
+        self,
+        manifest: InstanceManifest,
+        config: OrchestrationConfig,
+        command: CommandSpec,
+    ) -> CommandSpec:
         if manifest.type not in {"train", "finetune"}:
             return command
         if not config.resilience.enable_checkpoint_resume:
@@ -152,7 +166,7 @@ class InstanceManager:
 
     def _base_metadata(
         self,
-        config,
+        config: OrchestrationConfig,
         *,
         metadata_updates: dict[str, Any] | None = None,
     ) -> dict[str, Any]:
@@ -166,7 +180,7 @@ class InstanceManager:
         metadata.setdefault("automation_depth", 0)
         return metadata
 
-    def _resolved_lifecycle(self, config) -> LifecycleProfile:
+    def _resolved_lifecycle(self, config: OrchestrationConfig) -> LifecycleProfile:
         payload = config.lifecycle.model_dump(mode="json")
         if not payload.get("stage"):
             payload["stage"] = _stage_for_instance_type(config.instance.type)
@@ -174,7 +188,7 @@ class InstanceManager:
 
     def _apply_config_overrides(
         self,
-        config,
+        config: OrchestrationConfig,
         *,
         name_override: str | None = None,
         user_level_override: UserLevel | None = None,
@@ -182,7 +196,7 @@ class InstanceManager:
         subsystem_updates: dict[str, Any] | None = None,
         execution_updates: dict[str, Any] | None = None,
         metadata_updates: dict[str, Any] | None = None,
-    ):
+    ) -> OrchestrationConfig:
         merged = config.model_dump(mode="json")
         if name_override:
             merged.setdefault("instance", {})["name"] = name_override
@@ -202,7 +216,7 @@ class InstanceManager:
         self,
         source: InstanceManifest,
         *,
-        stage: str,
+        stage: LifecycleStage,
         evaluation_suite: dict[str, Any] | None = None,
     ) -> LifecycleProfile:
         payload = source.lifecycle.model_dump(mode="json")
@@ -213,7 +227,7 @@ class InstanceManager:
 
     def _base_manifest(
         self,
-        config,
+        config: OrchestrationConfig,
         *,
         config_path: str | None,
         parent_instance_id: str | None = None,
@@ -244,7 +258,7 @@ class InstanceManager:
         *,
         summary: dict[str, Any] | None = None,
         refs: dict[str, Any] | None = None,
-        decision=None,
+        decision: DecisionResult | None = None,
     ) -> dict[str, Any]:
         context: dict[str, Any] = {
             "instance_id": manifest.id,
@@ -310,7 +324,7 @@ class InstanceManager:
             metadata = _deep_merge(metadata, extra)
         return metadata
 
-    def _can_spawn_children(self, manifest: InstanceManifest, config) -> bool:
+    def _can_spawn_children(self, manifest: InstanceManifest, config: OrchestrationConfig) -> bool:
         current_children = len(self.queries.get_children(manifest.id))
         if current_children >= config.pipeline.max_auto_children:
             return False
@@ -318,7 +332,11 @@ class InstanceManager:
             return False
         return int(manifest.metadata.get("automation_depth", 0)) < config.pipeline.max_auto_cycles
 
-    def _workload_enabled(self, config, workload: str) -> bool:
+    def _workload_enabled(
+        self,
+        config: OrchestrationConfig,
+        workload: Literal["preprocess", "metrics", "evaluation", "finetune", "publish"],
+    ) -> bool:
         return bool(config.sub_agents.enabled and workload in config.sub_agents.workloads)
 
     def create_instance(
@@ -345,6 +363,8 @@ class InstanceManager:
             execution_updates=execution_updates,
             metadata_updates=metadata_updates,
         )
+        if environment_override is not None:
+            config.instance.environment = environment_override
 
         # Create the base instance using the original manager logic
         manifest = self._base_manifest(
@@ -379,9 +399,36 @@ class InstanceManager:
 
     def start_instance(self, instance_id: str) -> InstanceManifest:
         manifest = self.store.load(instance_id)
+        if manifest.status == "completed":
+            raise ValueError(f"Instance {instance_id} is already completed and cannot be started again.")
+        if manifest.status == "running":
+            return self._project_manifest(manifest)
         snapshot = self.store.load_config_snapshot(instance_id)
         config = build_orchestration_config(snapshot, config_path=manifest.config_path)
         self.orchestration.ensure_run_for_instance(manifest, snapshot)
+        task = self.orchestration.control_plane.get_task_by_legacy_instance(instance_id)
+        task_readiness = getattr(self.orchestration, "task_readiness", None)
+        if callable(task_readiness) and task is not None:
+            readiness = task_readiness(task.id)
+            if not readiness.get("ready", True):
+                blockers = [str(item) for item in readiness.get("blockers", []) if item]
+                blocker_text = ", ".join(blockers) if blockers else "orchestration blockers"
+                manifest.progress = self._progress(
+                    stage="blocked",
+                    message=f"Waiting for {blocker_text} before starting.",
+                    percent=0.0,
+                    metrics={"blockers": blockers},
+                )
+                self.store.save(self._project_manifest(manifest))
+                self.store.append_event(
+                    instance_id,
+                    InstanceEvent(
+                        type="instance.start_deferred",
+                        message=f"Waiting for {blocker_text} before starting.",
+                        payload={"blockers": blockers},
+                    ),
+                )
+                return self._project_manifest(manifest)
         self.orchestration.recover_stalled_tasks()
         try:
             command = build_command(config, manifest, plugin_registry=self.plugin_registry)
@@ -478,7 +525,7 @@ class InstanceManager:
         )
         return self._project_manifest(manifest)
 
-    def _retry_failed_instance(self, manifest: InstanceManifest, config) -> bool:
+    def _retry_failed_instance(self, manifest: InstanceManifest, config: OrchestrationConfig) -> bool:
         retry_limit = max(int(config.execution.retry_limit or 0), int(config.sub_agents.retry_limit or 0))
         if retry_limit <= 0:
             return False
@@ -523,7 +570,7 @@ class InstanceManager:
     def _schedule_report_instance(
         self,
         parent: InstanceManifest,
-        config,
+        config: OrchestrationConfig,
         *,
         context: dict[str, Any],
         reason: str,
@@ -546,9 +593,9 @@ class InstanceManager:
     def _schedule_publish_hooks(
         self,
         parent: InstanceManifest,
-        config,
+        config: OrchestrationConfig,
         *,
-        when: str,
+        when: Literal["manual", "on_success", "after_evaluation"],
         context: dict[str, Any],
     ) -> bool:
         if not self._can_spawn_children(parent, config):
@@ -563,7 +610,7 @@ class InstanceManager:
             )
             if not deploy_config:
                 continue
-            target = "custom_api" if hook.target == "api" else hook.target
+            target: DeploymentTarget = "custom_api" if hook.target == "api" else hook.target
             child = self.create_deployment_instance(
                 parent.id,
                 target=target,
@@ -580,7 +627,13 @@ class InstanceManager:
             scheduled = True
         return scheduled
 
-    def _queue_recommendations(self, manifest: InstanceManifest, config, *, context: dict[str, Any]) -> bool:
+    def _queue_recommendations(
+        self,
+        manifest: InstanceManifest,
+        config: OrchestrationConfig,
+        *,
+        context: dict[str, Any],
+    ) -> bool:
         if not self._can_spawn_children(manifest, config):
             return False
         scheduled = False
@@ -641,7 +694,7 @@ class InstanceManager:
     def _post_success_automation(
         self,
         manifest: InstanceManifest,
-        config,
+        config: OrchestrationConfig,
         *,
         summary: dict[str, Any],
         refs: dict[str, Any],
@@ -823,7 +876,12 @@ class InstanceManager:
             self._retry_failed_instance(manifest, config)
         return self._project_manifest(manifest)
 
-    def _auto_continue(self, manifest: InstanceManifest, config, action: str) -> None:
+    def _auto_continue(
+        self,
+        manifest: InstanceManifest,
+        config: OrchestrationConfig,
+        action: DecisionAction,
+    ) -> None:
         if not self._can_spawn_children(manifest, config):
             return
         if action == "deploy":
@@ -890,7 +948,7 @@ class InstanceManager:
             {
                 "name": generated_name,
                 "label": source.name,
-                "base_model": source.artifact_refs.get("base_model", "Qwen/Qwen2.5-Math-1.5B-Instruct"),
+                "base_model": source.artifact_refs.get("base_model", DEFAULT_FOUNDATION_MODEL),
                 "adapter_path": source_artifact,
                 "load_in_4bit": True,
                 "load_in_8bit": False,
@@ -999,7 +1057,8 @@ class InstanceManager:
             manifest.artifact_refs["source_instance_id"] = source.id
             self.store.save(manifest)
         eval_payload = snapshot.get("resolved_subsystem_config") or {}
-        models_payload = eval_payload.get("models") if isinstance(eval_payload.get("models"), dict) else {}
+        raw_models_payload = eval_payload.get("models")
+        models_payload: dict[str, Any] = raw_models_payload if isinstance(raw_models_payload, dict) else {}
         self._write_lifecycle(
             manifest.id,
             self._inherit_lifecycle(
@@ -1009,8 +1068,8 @@ class InstanceManager:
                     "id": Path(str(snapshot.get("resolved_subsystem_config_path") or config_path)).stem,
                     "label": source.name,
                     "benchmark_config": str(snapshot.get("resolved_subsystem_config_path") or config_path),
-                    "compare_to_models": [str(models_payload.get("primary_model"))]
-                    if models_payload.get("primary_model")
+                    "compare_to_models": [str(primary_model)]
+                    if isinstance(primary_model := models_payload.get("primary_model"), str)
                     else [],
                 },
             ),
@@ -1021,7 +1080,7 @@ class InstanceManager:
         self,
         source_instance_id: str,
         *,
-        target: str,
+        target: DeploymentTarget,
         config_path: str = "configs/deploy.yaml",
         start: bool = True,
         metadata_updates: dict[str, Any] | None = None,
@@ -1076,7 +1135,12 @@ class InstanceManager:
         self._write_lifecycle(manifest.id, self._inherit_lifecycle(source, stage="infer"))
         return self.start_instance(manifest.id) if start else manifest
 
-    def _default_config_path_for_action(self, source: InstanceManifest, action: str, config) -> str | None:
+    def _default_config_path_for_action(
+        self,
+        source: InstanceManifest,
+        action: str,
+        config: OrchestrationConfig,
+    ) -> str | None:
         mapping = {
             "prepare": config.pipeline.default_prepare_config,
             "train": config.pipeline.default_train_config,
@@ -1093,16 +1157,15 @@ class InstanceManager:
             return None
         return resolve_path_from_config(source.config_path, template) or template
 
-    def _default_deployment_target(self, manifest: InstanceManifest, config) -> str:
+    def _default_deployment_target(self, manifest: InstanceManifest, config: OrchestrationConfig) -> DeploymentTarget:
         for recommendation in manifest.recommendations:
             if recommendation.action == "deploy" and recommendation.deployment_target:
                 return recommendation.deployment_target
         if manifest.lifecycle.deployment_targets:
             return manifest.lifecycle.deployment_targets[0]
         for hook in config.publish_hooks:
-            target = getattr(hook, "target", None)
-            if target:
-                return str(target)
+            if hook.target:
+                return hook.target
         return "ollama"
 
     def execute_action(
@@ -1111,7 +1174,7 @@ class InstanceManager:
         *,
         action: str,
         config_path: str | None = None,
-        deployment_target: str | None = None,
+        deployment_target: DeploymentTarget | None = None,
         start: bool = True,
     ) -> InstanceManifest:
         source = self.get_instance(instance_id)
@@ -1174,8 +1237,8 @@ class InstanceManager:
     def list_instances(
         self,
         *,
-        instance_type: str | None = None,
-        status: str | None = None,
+        instance_type: InstanceType | None = None,
+        status: InstanceStatus | None = None,
         parent_instance_id: str | None = None,
     ) -> list[InstanceManifest]:
         return [
@@ -1210,9 +1273,9 @@ class InstanceManager:
             label: str,
             description: str,
             *,
-            target_instance_type: str | None = None,
+            target_instance_type: InstanceType | None = None,
             config_path: str | None = None,
-            deployment_target: str | None = None,
+            deployment_target: DeploymentTarget | None = None,
         ) -> None:
             key = (action, target_instance_type, config_path, deployment_target)
             if key in seen:
@@ -1269,13 +1332,13 @@ class InstanceManager:
             )
 
         if manifest.type == "evaluate":
-            targets: list[str] = []
+            targets: list[DeploymentTarget] = []
             targets.extend(manifest.lifecycle.deployment_targets)
             targets.extend(
                 item.deployment_target for item in manifest.recommendations if item.deployment_target is not None
             )
-            targets.extend(str(hook.target) for hook in config.publish_hooks if getattr(hook, "target", None))
-            deduped_targets: list[str] = []
+            targets.extend(hook.target for hook in config.publish_hooks if hook.target)
+            deduped_targets: list[DeploymentTarget] = []
             for target in targets:
                 if target not in deduped_targets:
                     deduped_targets.append(target)
@@ -1352,7 +1415,7 @@ class InstanceManager:
             "run": run.model_dump(mode="json"),
             "tasks": tasks,
             "events": events,
-            "summary": self.orchestration.monitoring_summary(),
+            "summary": self.orchestration.summarize_run(run.id),
         }
 
     def list_orchestration_events(self, legacy_or_run_id: str, *, limit: int | None = None) -> list[dict[str, Any]]:
@@ -1360,15 +1423,40 @@ class InstanceManager:
 
     def cancel_instance(self, instance_id: str) -> InstanceManifest:
         legacy_instance_id = self._legacy_instance_id(instance_id)
+        run = self.orchestration.control_plane.get_run(
+            legacy_instance_id
+        ) or self.orchestration.control_plane.get_run_by_legacy_instance(legacy_instance_id)
+        if run is not None and run.status in {"completed", "failed", "cancelled"}:
+            return self._project_manifest(self.store.load(legacy_instance_id))
         self.orchestration.cancel_run(legacy_instance_id)
         manifest = self.store.load(legacy_instance_id)
         manifest.status = "failed"
+        if manifest.execution is None:
+            manifest.execution = ExecutionHandle(
+                backend="ssh" if manifest.environment.kind == "cloud" else "local",
+                stdout_path=str(self.store.stdout_path(legacy_instance_id)),
+                stderr_path=str(self.store.stderr_path(legacy_instance_id)),
+            )
+        manifest.execution.ended_at = utc_now_iso()
+        if manifest.execution.exit_code is None:
+            manifest.execution.exit_code = 130
+        if manifest.error is None:
+            manifest.error = InstanceError(
+                code="cancelled",
+                message="Instance was cancelled.",
+                details={"instance_id": legacy_instance_id},
+            )
         manifest.progress = self._progress(stage="cancelled", message="Instance was cancelled.")
         self.store.save(self._project_manifest(manifest))
         return self._project_manifest(manifest)
 
     def retry_instance(self, instance_id: str) -> InstanceManifest:
         legacy_instance_id = self._legacy_instance_id(instance_id)
+        task = self.orchestration.control_plane.get_task_by_legacy_instance(legacy_instance_id)
+        if task is None:
+            raise FileNotFoundError(f"Unknown orchestration task for {legacy_instance_id}")
+        if task.status not in {"retry_waiting", "dead_lettered", "failed"}:
+            raise ValueError(f"Instance {legacy_instance_id} is not retryable while task status is '{task.status}'.")
         self.orchestration.retry_task(legacy_instance_id)
         return self.start_instance(legacy_instance_id)
 
@@ -1378,7 +1466,7 @@ class InstanceManager:
 
     def dispatch_ready_tasks(self) -> list[str]:
         started: list[str] = []
-        for task in self.orchestration.ready_tasks():
+        for task in asyncio.run(self.orchestration.dispatch_ready_legacy_tasks()):
             legacy_instance_id = task.legacy_instance_id
             if not legacy_instance_id:
                 continue

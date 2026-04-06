@@ -104,7 +104,7 @@ def collect_environment_snapshot(
             "trl",
             "wandb",
         ),
-        "runtime_config": asdict(config.runtime),
+        "runtime_config": config.runtime.model_dump(),
         "files": {
             "config": _file_snapshot(config.config_path),
             "train_file": _file_snapshot(config.data.train_file),

@@ -1,23 +1,14 @@
 # Runbook
 
-This runbook describes the default local workflow for AI-Factory. It assumes local development with optional public-dataset access and a runnable math model such as `Qwen2.5-Math-1.5B-Instruct`.
+This runbook describes the default local workflow for AI-Factory. It assumes local development with optional public-dataset access and a configured math model entry from `inference/configs/model_registry.yaml` or a local scratch template.
 
 ## 1. Install Dependencies
 
 ```bash
-python -m venv .venv
-source .venv/bin/activate
-pip install -U pip
-pip install -e .[dev]
+bash scripts/start_cloud_linux.sh
 ```
 
-Frontend dependencies:
-
-```bash
-cd frontend
-npm install
-cd ..
-```
+Use `bash scripts/start_local_macos.sh` on Apple Silicon local machines. Both bootstrap scripts install the runtime, fetch dependencies, and prepare the training entry points without a manual virtual environment step.
 
 ## 2. Generate Local Synthetic Packs
 
@@ -49,6 +40,8 @@ under `data/public/normalized/`.
 python3 data/prepare_dataset.py --config data/configs/processing.yaml
 ```
 
+The processing pipeline now spends less time in the tokenizer and dataset assembly stages, so large corpora should move through this step faster than before.
+
 Outputs in `data/processed/`:
 
 - `normalized_all.jsonl`
@@ -67,7 +60,7 @@ Outputs in `data/processed/`:
 If you want a tokenization-aware quick look at the corpus, run:
 
 ```bash
-python3 data/tools/preview_dataset.py --input data/processed/train.jsonl --tokenizer Qwen/Qwen2.5-Math-1.5B-Instruct
+python3 data/tools/preview_dataset.py --input data/processed/train.jsonl --tokenizer artifacts/tokenizers/qwen2_math_2b
 ```
 
 ## 5. Validate Training Configuration
@@ -85,6 +78,7 @@ Dry-run validates:
 - prompt rendering
 - tokenizer wiring
 - artifact directory creation
+- the hardware-aware bootstrap assumptions used by the cloud Linux and macOS local start scripts
 
 ## 6. Train A Specialist Profile
 
@@ -92,11 +86,13 @@ Examples:
 
 ```bash
 python3 -m training.train --config training/configs/profiles/baseline_qlora.yaml
-python3 -m training.train --config training/configs/profiles/calculus_specialist.yaml
+python3 -m training.train --config training/configs/profiles/math_specialist.yaml
 python3 -m training.train --config training/configs/profiles/failure_aware.yaml
 ```
 
 Training runs write standardized artifacts under `artifacts/runs/<run_id>/` and publish packaged model assets under `artifacts/models/<name>/`.
+
+For fresh runs on cloud GPU hosts, start from the Linux bootstrap script so the CUDA dependencies, tokenizer artifacts, and launch environment are all aligned before training begins. For Apple Silicon local runs, use the macOS bootstrap script so the same workflow lands on the Metal-aware local path.
 
 Managed control-plane alternative:
 
