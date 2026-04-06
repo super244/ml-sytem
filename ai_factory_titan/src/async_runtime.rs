@@ -182,8 +182,8 @@ impl Default for WorkStealingScheduler {
     }
 }
 
-/// Thread-local task queue for work stealing
 thread_local! {
+    /// Thread-local task queue for work stealing
     static LOCAL_QUEUE: std::cell::RefCell<Vec<Arc<Task>>> = std::cell::RefCell::new(Vec::new());
 }
 

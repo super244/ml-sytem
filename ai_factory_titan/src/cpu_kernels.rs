@@ -12,7 +12,6 @@
 
 use anyhow::{anyhow, ensure};
 use rayon::prelude::*;
-use std::sync::atomic::{AtomicUsize, Ordering};
 
 #[cfg(feature = "cpp")]
 use crate::cpp;

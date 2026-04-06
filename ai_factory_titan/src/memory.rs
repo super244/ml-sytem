@@ -11,7 +11,6 @@ use std::alloc::{alloc, dealloc, Layout};
 use std::collections::HashMap;
 use std::ptr::NonNull;
 use std::sync::atomic::{AtomicUsize, Ordering};
-use std::sync::Arc;
 use parking_lot::Mutex;
 
 /// Memory pool for efficient allocation/deallocation

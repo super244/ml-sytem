@@ -7,7 +7,6 @@
 
 use anyhow::Result;
 use serde::{Deserialize, Serialize};
-use std::sync::Arc;
 
 /// Configuration for distributed training
 #[derive(Clone, Debug, Serialize, Deserialize)]
