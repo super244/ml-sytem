@@ -15,7 +15,9 @@ pub mod telemetry;
 pub mod tensor;
 
 pub use backend::{BackendKind, TitanBackend};
-pub use cpu_kernels::{dot_f32, matmul_f32};
+pub use cpu_kernels::{
+    dot_f32, matmul_f32, vec_add_f32, vec_mul_f32, rms_norm_f32, softmax_f32, silu_f32
+};
 pub use detect::{detect_hardware, HardwareProfile};
 pub use engine::{CacheStrategy, NativeAcceleration, TitanEngineDescriptor};
 pub use gguf::{parse_gguf_header, GgufHeader};

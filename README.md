@@ -60,6 +60,7 @@ AI-Factory is a comprehensive platform designed to manage the entire lifecycle o
 - **Prompt Management**: Configurable prompt presets and templates
 - **Model Registry**: Centralized model versioning and management
 - **Accelerator Awareness**: Titan runtime reporting surfaces CUDA, Metal, and CPU fallback capability for hardware-aware launches. The Titan Rust core natively accelerates operations and provides robust telemetry for both NVIDIA and Apple Silicon.
+- **Titan Engine with C++/Rust Acceleration**: Native SIMD kernels (AVX2/AVX512/NEON) for dot products, matrix multiplication, vector operations, RMS normalization, softmax, and SiLU activation functions. Zero-copy memory layouts with Q4_0/Q4K/Q8_0 quantization support.
 - **Durable Control Plane**: Local-first SQLite control plane for orchestration runs, tasks, and telemetry, paired with a SQLite-backed corpus.
 
 ## 🏗️ **Architecture Overview**
@@ -80,7 +81,8 @@ AI-Factory/
 ├── 📓 notebooks/       # Research notebooks and tutorials
 ├── 📚 docs/           # Documentation and guides
 ├── 🧪 tests/          # Comprehensive test suite
-└── ⚙️ configs/        # Configuration files and profiles
+├── ⚙️ configs/        # Configuration files and profiles
+└── ⚡ ai_factory_titan/ # Rust-based inference engine with C++ acceleration
 ```
 
 ## 🚀 **Quick Start**
