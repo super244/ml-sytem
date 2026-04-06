@@ -25,8 +25,8 @@ It now also performs stricter config validation, emits richer run reports/manife
 
 Bootstrap-first entry points:
 
-- `scripts/start_cloud_linux.sh`: Linux cloud GPU startup, dependency install, CUDA checks, tokenizer setup, and training launch.
-- `scripts/start_local_macos.sh`: Apple Silicon local startup, dependency install, Metal-aware checks, tokenizer setup, and training launch.
+- `scripts/start-linux.sh`: Linux cloud GPU startup, dependency install, CUDA checks, tokenizer setup, and training launch.
+- `scripts/start-mac.sh`: Apple Silicon local startup, dependency install, Metal-aware checks, tokenizer setup, and training launch.
 - `training/configs/profiles/local_metal.yaml`: Apple Silicon-friendly local profile that disables Linux-only quantization defaults.
 
 ## Config Layout

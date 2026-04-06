@@ -65,10 +65,10 @@ git clone https://github.com/super244/ai-factory.git
 cd ai-factory
 
 # Linux cloud GPU instance
-bash scripts/start_cloud_linux.sh
+bash scripts/start-linux.sh
 
 # Apple Silicon local machine
-bash scripts/start_local_macos.sh
+bash scripts/start-mac.sh
 ```
 
 The bootstrap scripts install dependencies, download tokenizer and model prerequisites, handle the common CUDA and platform checks, and launch the appropriate training path without a manual virtualenv step.
@@ -662,7 +662,7 @@ Recommended flow:
 
 ```bash
 tmux new -s ai-factory
-bash scripts/start_cloud_linux.sh
+bash scripts/start-linux.sh
 export AI_FACTORY_REPO_ROOT="$PWD"
 export ARTIFACTS_DIR="/mnt/ai-factory-artifacts"
 python data/prepare_dataset.py --config data/configs/processing.yaml

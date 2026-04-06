@@ -5,10 +5,10 @@ This runbook describes the default local workflow for AI-Factory. It assumes loc
 ## 1. Install Dependencies
 
 ```bash
-bash scripts/start_cloud_linux.sh
+bash scripts/start-linux.sh
 ```
 
-Use `bash scripts/start_local_macos.sh` on Apple Silicon local machines. Both bootstrap scripts install the runtime, fetch dependencies, and prepare the training entry points without a manual virtual environment step.
+Use `bash scripts/start-mac.sh` on Apple Silicon local machines. Both bootstrap scripts install the runtime, fetch dependencies, and prepare the training entry points without a manual virtual environment step.
 
 ## 2. Generate Local Synthetic Packs
 

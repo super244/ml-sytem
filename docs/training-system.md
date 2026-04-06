@@ -18,8 +18,8 @@ Profiles combine these pieces to define the full experiment.
 
 The recommended first step for a new run is to use the platform-specific bootstrap script:
 
-- Linux cloud GPU hosts: `bash scripts/start_cloud_linux.sh`
-- Apple Silicon local hosts: `bash scripts/start_local_macos.sh`
+- Linux cloud GPU hosts: `bash scripts/start-linux.sh`
+- Apple Silicon local hosts: `bash scripts/start-mac.sh`
 
 Those scripts are designed to install dependencies, prepare tokenizer assets, and hand off to the selected training profile with minimal manual setup.
 
