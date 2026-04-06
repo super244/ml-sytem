@@ -11,13 +11,13 @@ from typing import Any
 
 class AIFactoryError(Exception):
     """Base exception for all AI-Factory errors.
-    
+
     Provides structured error information including error codes, contexts,
     and suggestions for resolution.
     """
-    
+
     error_code: str = "UNKNOWN_ERROR"
-    
+
     def __init__(
         self,
         message: str,
@@ -31,7 +31,7 @@ class AIFactoryError(Exception):
         self.error_code = error_code or self.error_code
         self.context = context or {}
         self.suggestion = suggestion
-    
+
     def __str__(self) -> str:
         parts = [f"[{self.error_code}] {self.message}"]
         if self.context:
@@ -39,7 +39,7 @@ class AIFactoryError(Exception):
         if self.suggestion:
             parts.append(f"Suggestion: {self.suggestion}")
         return " | ".join(parts)
-    
+
     def to_dict(self) -> dict[str, Any]:
         """Convert exception to dictionary for serialization."""
         return {
@@ -55,15 +55,18 @@ class AIFactoryError(Exception):
 # Resource Not Found Errors
 # =============================================================================
 
+
 class ResourceNotFoundError(AIFactoryError):
     """Base class for resource not found errors."""
+
     error_code = "RESOURCE_NOT_FOUND"
 
 
 class JobNotFound(ResourceNotFoundError):
     """Raised when a job/orchestration run cannot be found."""
+
     error_code = "JOB_NOT_FOUND"
-    
+
     def __init__(
         self,
         job_id: str,
@@ -74,7 +77,7 @@ class JobNotFound(ResourceNotFoundError):
         ctx = {"job_id": job_id, **(context or {})}
         if available_jobs:
             ctx["available_jobs"] = available_jobs[:10]
-        
+
         super().__init__(
             f"Job not found: {job_id}",
             error_code=self.error_code,
@@ -85,8 +88,9 @@ class JobNotFound(ResourceNotFoundError):
 
 class DatasetNotFound(ResourceNotFoundError):
     """Raised when a dataset cannot be found."""
+
     error_code = "DATASET_NOT_FOUND"
-    
+
     def __init__(
         self,
         dataset_id: str,
@@ -97,7 +101,7 @@ class DatasetNotFound(ResourceNotFoundError):
         ctx = {"dataset_id": dataset_id, **(context or {})}
         if dataset_path:
             ctx["dataset_path"] = dataset_path
-        
+
         super().__init__(
             f"Dataset not found: {dataset_id}",
             error_code=self.error_code,
@@ -108,8 +112,9 @@ class DatasetNotFound(ResourceNotFoundError):
 
 class ModelNotFound(ResourceNotFoundError):
     """Raised when a model cannot be found."""
+
     error_code = "MODEL_NOT_FOUND"
-    
+
     def __init__(
         self,
         model_id: str,
@@ -120,7 +125,7 @@ class ModelNotFound(ResourceNotFoundError):
         ctx = {"model_id": model_id, **(context or {})}
         if model_path:
             ctx["model_path"] = model_path
-        
+
         super().__init__(
             f"Model not found: {model_id}",
             error_code=self.error_code,
@@ -131,8 +136,9 @@ class ModelNotFound(ResourceNotFoundError):
 
 class SearchNotFound(ResourceNotFoundError):
     """Raised when a search operation returns no results."""
+
     error_code = "SEARCH_NOT_FOUND"
-    
+
     def __init__(
         self,
         query: str,
@@ -150,8 +156,9 @@ class SearchNotFound(ResourceNotFoundError):
 
 class ConfigNotFound(ResourceNotFoundError):
     """Raised when a configuration file cannot be found."""
+
     error_code = "CONFIG_NOT_FOUND"
-    
+
     def __init__(
         self,
         config_path: str,
@@ -171,15 +178,18 @@ class ConfigNotFound(ResourceNotFoundError):
 # Infrastructure Errors
 # =============================================================================
 
+
 class InfrastructureError(AIFactoryError):
     """Base class for infrastructure-related errors."""
+
     error_code = "INFRASTRUCTURE_ERROR"
 
 
 class ClusterError(InfrastructureError):
     """Raised when cluster operations fail."""
+
     error_code = "CLUSTER_ERROR"
-    
+
     def __init__(
         self,
         message: str,
@@ -193,7 +203,7 @@ class ClusterError(InfrastructureError):
             ctx["cluster_id"] = cluster_id
         if operation:
             ctx["operation"] = operation
-        
+
         super().__init__(
             message,
             error_code=self.error_code,
@@ -204,8 +214,9 @@ class ClusterError(InfrastructureError):
 
 class GPUError(InfrastructureError):
     """Raised when GPU operations fail."""
+
     error_code = "GPU_ERROR"
-    
+
     def __init__(
         self,
         message: str,
@@ -216,7 +227,7 @@ class GPUError(InfrastructureError):
         ctx = context or {}
         if gpu_id is not None:
             ctx["gpu_id"] = gpu_id
-        
+
         super().__init__(
             message,
             error_code=self.error_code,
@@ -229,18 +240,22 @@ class GPUError(InfrastructureError):
 # Validation Errors
 # =============================================================================
 
+
 class ValidationError(AIFactoryError):
     """Base class for validation errors."""
+
     error_code = "VALIDATION_ERROR"
 
 
 class ConfigValidationError(ValidationError):
     """Raised when configuration validation fails."""
+
     error_code = "CONFIG_VALIDATION_ERROR"
 
 
 class SchemaValidationError(ValidationError):
     """Raised when data schema validation fails."""
+
     error_code = "SCHEMA_VALIDATION_ERROR"
 
 
@@ -248,15 +263,18 @@ class SchemaValidationError(ValidationError):
 # Runtime Errors
 # =============================================================================
 
+
 class RuntimeError(AIFactoryError):
     """Base class for runtime errors."""
+
     error_code = "RUNTIME_ERROR"
 
 
 class TimeoutError(RuntimeError):
     """Raised when an operation times out."""
+
     error_code = "TIMEOUT_ERROR"
-    
+
     def __init__(
         self,
         operation: str,
@@ -267,11 +285,11 @@ class TimeoutError(RuntimeError):
         ctx = {"operation": operation, **(context or {})}
         if timeout_seconds:
             ctx["timeout_seconds"] = timeout_seconds
-        
+
         message = f"Operation timed out: {operation}"
         if timeout_seconds:
             message += f" (limit: {timeout_seconds}s)"
-        
+
         super().__init__(
             message,
             error_code=self.error_code,
@@ -282,8 +300,9 @@ class TimeoutError(RuntimeError):
 
 class CircuitBreakerOpenError(RuntimeError):
     """Raised when a circuit breaker is open."""
+
     error_code = "CIRCUIT_BREAKER_OPEN"
-    
+
     def __init__(
         self,
         service: str,
@@ -302,15 +321,18 @@ class CircuitBreakerOpenError(RuntimeError):
 # Security Errors
 # =============================================================================
 
+
 class SecurityError(AIFactoryError):
     """Base class for security-related errors."""
+
     error_code = "SECURITY_ERROR"
 
 
 class AuthenticationError(SecurityError):
     """Raised when authentication fails."""
+
     error_code = "AUTHENTICATION_ERROR"
-    
+
     def __init__(
         self,
         message: str = "Authentication failed",
@@ -327,8 +349,9 @@ class AuthenticationError(SecurityError):
 
 class AuthorizationError(SecurityError):
     """Raised when authorization fails."""
+
     error_code = "AUTHORIZATION_ERROR"
-    
+
     def __init__(
         self,
         resource: str,
@@ -339,7 +362,7 @@ class AuthorizationError(SecurityError):
         ctx = {"resource": resource, **(context or {})}
         if required_permission:
             ctx["required_permission"] = required_permission
-        
+
         super().__init__(
             f"Insufficient permissions for resource: {resource}",
             error_code=self.error_code,
@@ -352,36 +375,41 @@ class AuthorizationError(SecurityError):
 # API Errors
 # =============================================================================
 
+
 class APIError(AIFactoryError):
     """Base class for API-related errors."""
+
     error_code = "API_ERROR"
-    
+
     def __init__(
         self,
         message: str,
         *,
         status_code: int | None = None,
         endpoint: str | None = None,
+        error_code: str | None = None,
         context: dict[str, Any] | None = None,
+        suggestion: str | None = None,
     ) -> None:
         ctx = context or {}
         if status_code:
             ctx["status_code"] = status_code
         if endpoint:
             ctx["endpoint"] = endpoint
-        
+
         super().__init__(
             message,
-            error_code=self.error_code,
+            error_code=error_code or self.error_code,
             context=ctx,
-            suggestion="Check API documentation and verify request format.",
+            suggestion=suggestion or "Check API documentation and verify request format.",
         )
 
 
 class RateLimitError(APIError):
     """Raised when API rate limits are exceeded."""
+
     error_code = "RATE_LIMIT_EXCEEDED"
-    
+
     def __init__(
         self,
         *,
@@ -391,11 +419,11 @@ class RateLimitError(APIError):
         ctx = context or {}
         if retry_after:
             ctx["retry_after"] = retry_after
-        
+
         message = "Rate limit exceeded"
         if retry_after:
             message += f". Retry after {retry_after} seconds."
-        
+
         super().__init__(
             message,
             error_code=self.error_code,
@@ -408,13 +436,16 @@ class RateLimitError(APIError):
 # Data Processing Errors
 # =============================================================================
 
+
 class DataProcessingError(AIFactoryError):
     """Base class for data processing errors."""
+
     error_code = "DATA_PROCESSING_ERROR"
 
 
 class ParseError(DataProcessingError):
     """Raised when data parsing fails."""
+
     error_code = "PARSE_ERROR"
 
 
@@ -422,20 +453,24 @@ class ParseError(DataProcessingError):
 # Training Errors
 # =============================================================================
 
+
 class TrainingError(AIFactoryError):
     """Base class for training-related errors."""
+
     error_code = "TRAINING_ERROR"
 
 
 class CheckpointError(TrainingError):
     """Raised when checkpoint operations fail."""
+
     error_code = "CHECKPOINT_ERROR"
 
 
 class OOMError(TrainingError):
     """Raised when out-of-memory occurs during training."""
+
     error_code = "OUT_OF_MEMORY"
-    
+
     def __init__(
         self,
         *,
@@ -448,7 +483,7 @@ class OOMError(TrainingError):
             ctx["requested_memory_gb"] = requested_memory_gb
         if available_memory_gb:
             ctx["available_memory_gb"] = available_memory_gb
-        
+
         super().__init__(
             "Out of memory during training",
             error_code=self.error_code,

@@ -27,17 +27,18 @@ def test_distributed_orchestrator_launch_invokes_subprocess(monkeypatch) -> None
     orchestrator = DistributedTrainingOrchestrator(DistributedConfig(num_nodes=1, num_gpus_per_node=2))
     captured: dict[str, object] = {}
 
-    def fake_run(cmd, env, check, stdout, stderr):
+    def fake_run(cmd, env, check, stdout, stderr, timeout=None):
         captured["cmd"] = cmd
         captured["env"] = env
         captured["check"] = check
         captured["stdout"] = stdout
         captured["stderr"] = stderr
+        captured["timeout"] = timeout
         return subprocess.CompletedProcess(args=cmd, returncode=0)
 
     monkeypatch.setattr(subprocess, "run", fake_run)
 
-    exit_code = orchestrator.launch("training/train.py", ["--config", "configs/train.yaml"])
+    exit_code = orchestrator.launch("training/train.py", ["--config", "configs/train.yaml"], check=True)
     assert exit_code == 0
     assert isinstance(captured["cmd"], list)
     assert captured["check"] is True

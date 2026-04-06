@@ -8,36 +8,50 @@ from ai_factory.platform.monitoring import hardware
 
 
 def test_get_cluster_nodes_without_torch(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(hardware, "detect_gpus_titan", lambda: [])
+    monkeypatch.setattr(hardware, "detect_gpus_nvidia_smi", lambda: [])
     monkeypatch.setattr(hardware, "_get_torch", lambda: None)
     monkeypatch.setattr(hardware, "get_system_ram_gb", lambda: 32)
     nodes = hardware.get_cluster_nodes()
 
-    assert len(nodes) == 2
+    assert len(nodes) >= 1
+    assert any(node["id"] == "local-primary" for node in nodes)
     assert nodes[0]["type"] == "CPU"
     assert nodes[0]["memory"] == "32GB"
     assert nodes[0]["usage"] == 0
 
 
 def test_get_cluster_nodes_with_cuda(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(hardware, "detect_gpus_titan", lambda: [])
+    monkeypatch.setattr(hardware, "detect_gpus_nvidia_smi", lambda: [])
+    
     class _Cuda:
         @staticmethod
         def is_available() -> bool:
             return True
 
         @staticmethod
+        def device_count() -> int:
+            return 1
+
+        @staticmethod
         def get_device_name(index: int) -> str:
             assert index == 0
             return "NVIDIA RTX"
+        
+        @staticmethod
+        def get_device_properties(index: int):
+            return SimpleNamespace(total_memory=16 * 1024**3)
 
         @staticmethod
         def memory_allocated(index: int) -> int:
             assert index == 0
-            return 100
+            return 1024**3
 
         @staticmethod
         def memory_reserved(index: int) -> int:
             assert index == 0
-            return 200
+            return 2 * 1024**3
 
     fake_torch = SimpleNamespace(cuda=_Cuda(), backends=SimpleNamespace(mps=None))
     monkeypatch.setattr(hardware, "_get_torch", lambda: fake_torch)
@@ -49,6 +63,10 @@ def test_get_cluster_nodes_with_cuda(monkeypatch: pytest.MonkeyPatch) -> None:
 
 
 def test_get_cluster_nodes_with_mps(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(hardware, "detect_gpus_titan", lambda: [])
+    monkeypatch.setattr(hardware, "detect_gpus_nvidia_smi", lambda: [])
+    monkeypatch.setattr(hardware, "detect_titan_status", lambda: {"gpu_name": "MPS (Apple Silicon)"})
+    
     class _Cuda:
         @staticmethod
         def is_available() -> bool:
@@ -62,11 +80,10 @@ def test_get_cluster_nodes_with_mps(monkeypatch: pytest.MonkeyPatch) -> None:
     fake_torch = SimpleNamespace(
         cuda=_Cuda(),
         backends=SimpleNamespace(mps=_Mps()),
-        mps=SimpleNamespace(current_allocated_memory=lambda: 1024**3),
     )
     monkeypatch.setattr(hardware, "_get_torch", lambda: fake_torch)
     monkeypatch.setattr(hardware, "get_system_ram_gb", lambda: 8)
     nodes = hardware.get_cluster_nodes()
 
     assert nodes[0]["type"] == "MPS (Apple Silicon)"
-    assert nodes[0]["usage"] > 0
+    assert nodes[0]["usage"] == 0

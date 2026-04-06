@@ -37,15 +37,17 @@ logger = logging.getLogger(__name__)
 
 class BackendType(Enum):
     """Available compute backends."""
+
     METAL = auto()  # Apple Metal Performance Shaders
-    CUDA = auto()   # NVIDIA CUDA
-    ROCM = auto()   # AMD ROCm
-    CPU = auto()    # CPU with SIMD
+    CUDA = auto()  # NVIDIA CUDA
+    ROCM = auto()  # AMD ROCm
+    CPU = auto()  # CPU with SIMD
 
 
 @dataclass
 class HardwareProfile:
     """Detected hardware capabilities."""
+
     platform: str
     device_name: str
     backend: BackendType
@@ -64,28 +66,28 @@ class HardwareProfile:
 
 class HardwareDetector:
     """Detect and profile available hardware."""
-    
+
     @staticmethod
     def detect() -> HardwareProfile:
         """Detect optimal backend and hardware capabilities."""
         system = platform.system()
-        
+
         # Check for Apple Silicon
         if system == "Darwin":
             return HardwareDetector._detect_apple_silicon()
-        
+
         # Check for CUDA
         if torch.cuda.is_available():
             return HardwareDetector._detect_cuda()
-        
+
         # CPU fallback
         return HardwareDetector._detect_cpu()
-    
+
     @staticmethod
     def _detect_apple_silicon() -> HardwareProfile:
         """Detect Apple Silicon capabilities."""
         import subprocess
-        
+
         # Get chip name
         try:
             result = subprocess.run(
@@ -97,13 +99,13 @@ class HardwareDetector:
             chip_name = result.stdout.strip()
         except subprocess.SubprocessError:
             chip_name = "Apple Silicon"
-        
+
         # Parse generation and cores
         generation = "Unknown"
         gpu_cores = 0
         memory_gb = 0.0
         bandwidth = 0.0
-        
+
         if "M5" in chip_name:
             generation = "M5"
             if "Max" in chip_name:
@@ -138,7 +140,7 @@ class HardwareDetector:
             gpu_cores = 8
             bandwidth = 68.0
             memory_gb = 16.0
-        
+
         # Get actual memory
         try:
             mem_result = subprocess.run(
@@ -148,16 +150,16 @@ class HardwareDetector:
                 check=True,
             )
             memory_bytes = int(mem_result.stdout.strip())
-            memory_gb = memory_bytes / (1024 ** 3)
+            memory_gb = memory_bytes / (1024**3)
         except (subprocess.SubprocessError, ValueError):
             pass
-        
+
         # Check MPS availability
         mps_available = hasattr(torch.backends, "mps") and torch.backends.mps.is_available()
-        
+
         # Unified memory means zero-copy between CPU and GPU
         unified_memory = True
-        
+
         return HardwareProfile(
             platform="Darwin",
             device_name=f"Apple {chip_name}",
@@ -178,31 +180,31 @@ class HardwareDetector:
                 "zero_copy": unified_memory,
             },
         )
-    
+
     @staticmethod
     def _detect_cuda() -> HardwareProfile:
         """Detect NVIDIA GPU capabilities."""
         device_count = torch.cuda.device_count()
         if device_count == 0:
             return HardwareDetector._detect_cpu()
-        
+
         # Get info from first GPU
         device_name = torch.cuda.get_device_name(0)
         props = torch.cuda.get_device_properties(0)
-        
-        memory_gb = props.total_memory / (1024 ** 3)
+
+        memory_gb = props.total_memory / (1024**3)
         major = props.major
         minor = props.minor
-        
+
         # Determine capabilities based on compute capability
-        supports_fp16 = (major >= 7)  # Volta+
-        supports_bf16 = (major >= 8)  # Ampere+
-        supports_tf32 = (major >= 8)  # Ampere+
-        tensor_cores = (major >= 7)   # Volta+
-        
+        supports_fp16 = major >= 7  # Volta+
+        supports_bf16 = major >= 8  # Ampere+
+        supports_tf32 = major >= 8  # Ampere+
+        tensor_cores = major >= 7  # Volta+
+
         # Estimate bandwidth based on architecture
         bandwidth = HardwareDetector._estimate_cuda_bandwidth(device_name)
-        
+
         return HardwareProfile(
             platform="Linux/Windows",
             device_name=device_name,
@@ -223,23 +225,25 @@ class HardwareDetector:
                 "max_threads_per_sm": props.max_threads_per_multi_processor,
             },
         )
-    
+
     @staticmethod
     def _detect_cpu() -> HardwareProfile:
         """Detect CPU capabilities."""
         import multiprocessing
-        
+
         cpu_count = multiprocessing.cpu_count()
-        
+
         # Try to get memory info
         try:
             import psutil
-            memory_gb = psutil.virtual_memory().total / (1024 ** 3)
+
+            memory_gb = psutil.virtual_memory().total / (1024**3)
         except ImportError:
             memory_gb = 16.0  # Conservative default
-        
+
         # Check for AVX2/AVX512
         import subprocess
+
         simd_support = "basic"
         try:
             result = subprocess.run(
@@ -254,7 +258,7 @@ class HardwareDetector:
                 simd_support = "avx2"
         except subprocess.SubprocessError:
             pass
-        
+
         return HardwareProfile(
             platform=platform.system(),
             device_name=platform.processor() or "CPU",
@@ -274,12 +278,12 @@ class HardwareDetector:
                 "cpu_count": cpu_count,
             },
         )
-    
+
     @staticmethod
     def _estimate_cuda_bandwidth(device_name: str) -> float:
         """Estimate memory bandwidth for CUDA devices."""
         device_lower = device_name.lower()
-        
+
         bandwidths = {
             "h200": 4900.0,
             "h100": 3350.0,
@@ -289,13 +293,13 @@ class HardwareDetector:
             "rtx 3090": 936.0,
             "v100": 900.0,
         }
-        
+
         for key, bw in bandwidths.items():
             if key in device_lower:
                 return bw
-        
+
         return 500.0  # Conservative default
-    
+
     @staticmethod
     def _optimal_batch_size_metal(generation: str) -> int:
         """Determine optimal batch size for Metal devices."""
@@ -307,7 +311,7 @@ class HardwareDetector:
             "M1": 1,
         }
         return batch_sizes.get(generation, 1)
-    
+
     @staticmethod
     def _optimal_batch_size_cuda(major: int, memory_gb: float) -> int:
         """Determine optimal batch size for CUDA devices."""
@@ -324,16 +328,18 @@ class HardwareDetector:
 
 class TrainingOptimizer:
     """Hardware-aware training optimization."""
-    
+
     def __init__(self, hardware: HardwareProfile | None = None):
         self.hardware = hardware or HardwareDetector.detect()
         self.optimization_level = self._determine_optimization_level()
-        
+
         logger.info(f"TrainingOptimizer initialized with {self.hardware.device_name}")
-        logger.info(f"Backend: {self.hardware.backend.name}, "
-                   f"Memory: {self.hardware.memory_gb:.1f}GB, "
-                   f"Bandwidth: {self.hardware.bandwidth_gbps:.0f}GB/s")
-    
+        logger.info(
+            f"Backend: {self.hardware.backend.name}, "
+            f"Memory: {self.hardware.memory_gb:.1f}GB, "
+            f"Bandwidth: {self.hardware.bandwidth_gbps:.0f}GB/s"
+        )
+
     def _determine_optimization_level(self) -> str:
         """Determine optimization level based on hardware."""
         if self.hardware.backend == BackendType.METAL:
@@ -343,34 +349,34 @@ class TrainingOptimizer:
                 return "ultimate"
             return "high"
         return "standard"
-    
+
     def configure_torch(self) -> None:
         """Apply PyTorch optimizations for detected hardware."""
         backend = self.hardware.backend
-        
+
         if backend == BackendType.METAL:
             self._configure_metal()
         elif backend == BackendType.CUDA:
             self._configure_cuda()
         else:
             self._configure_cpu()
-    
+
     def _configure_metal(self) -> None:
         """Configure PyTorch for Apple Metal."""
         if not torch.backends.mps.is_available():
             logger.warning("MPS not available, using CPU")
             return
-        
+
         # Set default device
         torch.set_default_device("mps")
-        
+
         # Memory optimization settings for unified memory
         if self.hardware.unified_memory:
             # Zero-copy path available
             os.environ["PYTORCH_ENABLE_MPS_FALLBACK"] = "1"
-            
+
         logger.info("Configured PyTorch for Apple Metal (MPS)")
-    
+
     def _configure_cuda(self) -> None:
         """Configure PyTorch for CUDA."""
         # Enable TF32 for Ampere+
@@ -378,30 +384,30 @@ class TrainingOptimizer:
             torch.backends.cuda.matmul.allow_tf32 = True
             torch.backends.cudnn.allow_tf32 = True
             logger.info("Enabled TF32 for Tensor Core acceleration")
-        
+
         # Enable cudnn benchmarking
         torch.backends.cudnn.benchmark = True
-        
+
         # Enable TF32/FP16 autocast
         if self.hardware.supports_fp16:
             logger.info("FP16 support available for mixed precision")
-        
+
         logger.info("Configured PyTorch for CUDA")
-    
+
     def _configure_cpu(self) -> None:
         """Configure PyTorch for CPU."""
         # Enable MKL-DNN if available
         torch.backends.mkldnn.enabled = True
-        
+
         # Set thread count
         torch.set_num_threads(self.hardware.compute_units // 2)
-        
+
         logger.info(f"Configured PyTorch for CPU ({self.hardware.compute_units} cores)")
-    
+
     def get_training_config(self, base_config: dict[str, Any]) -> dict[str, Any]:
         """Generate optimized training configuration."""
         config = base_config.copy()
-        
+
         # Apply backend-specific optimizations
         if self.hardware.backend == BackendType.METAL:
             config = self._optimize_for_metal(config)
@@ -409,35 +415,31 @@ class TrainingOptimizer:
             config = self._optimize_for_cuda(config)
         else:
             config = self._optimize_for_cpu(config)
-        
+
         return config
-    
+
     def _optimize_for_metal(self, config: dict[str, Any]) -> dict[str, Any]:
         """Apply Metal-specific optimizations."""
         # Disable mixed precision (Metal doesn't support FP16 training well yet)
         config["bf16"] = False
         config["fp16"] = False
-        
+
         # Optimize batch size for unified memory
         config["per_device_train_batch_size"] = min(
-            config.get("per_device_train_batch_size", 1),
-            self.hardware.recommended_batch_size
+            config.get("per_device_train_batch_size", 1), self.hardware.recommended_batch_size
         )
-        
+
         # Reduce gradient accumulation steps
-        config["gradient_accumulation_steps"] = max(
-            1,
-            config.get("gradient_accumulation_steps", 8) // 2
-        )
-        
+        config["gradient_accumulation_steps"] = max(1, config.get("gradient_accumulation_steps", 8) // 2)
+
         # DataLoader workers
         config["dataloader_num_workers"] = self.hardware.recommended_workers
-        
+
         # Enable MPS device
         config["use_mps_device"] = True
-        
+
         return config
-    
+
     def _optimize_for_cuda(self, config: dict[str, Any]) -> dict[str, Any]:
         """Apply CUDA-specific optimizations."""
         # Enable mixed precision
@@ -447,22 +449,21 @@ class TrainingOptimizer:
         elif self.hardware.supports_fp16:
             config["bf16"] = False
             config["fp16"] = True
-        
+
         # Optimize batch size
         config["per_device_train_batch_size"] = min(
-            config.get("per_device_train_batch_size", 1),
-            self.hardware.recommended_batch_size
+            config.get("per_device_train_batch_size", 1), self.hardware.recommended_batch_size
         )
-        
+
         # Use more workers for CUDA
         config["dataloader_num_workers"] = self.hardware.recommended_workers
-        
+
         # Enable gradient checkpointing for large models
         if self.hardware.memory_gb < 24:
             config["gradient_checkpointing"] = True
-        
+
         return config
-    
+
     def _optimize_for_cpu(self, config: dict[str, Any]) -> dict[str, Any]:
         """Apply CPU-specific optimizations."""
         config["bf16"] = False
@@ -470,9 +471,9 @@ class TrainingOptimizer:
         config["use_cpu"] = True
         config["per_device_train_batch_size"] = 1
         config["dataloader_num_workers"] = self.hardware.recommended_workers
-        
+
         return config
-    
+
     def create_optimized_dataloader(
         self,
         dataset: Any,
@@ -482,7 +483,7 @@ class TrainingOptimizer:
     ) -> DataLoader:
         """Create a hardware-optimized DataLoader."""
         pin_memory = self.hardware.backend == BackendType.CUDA
-        
+
         return DataLoader(
             dataset,
             batch_size=batch_size,
@@ -492,7 +493,7 @@ class TrainingOptimizer:
             collate_fn=collate_fn,
             persistent_workers=self.hardware.recommended_workers > 0,
         )
-    
+
     def apply_model_optimizations(self, model: nn.Module) -> nn.Module:
         """Apply hardware-specific model optimizations."""
         if self.hardware.backend == BackendType.CUDA:
@@ -503,15 +504,15 @@ class TrainingOptimizer:
                     logger.info("Applied torch.compile with max-autotune")
                 except Exception as e:
                     logger.warning(f"torch.compile failed: {e}")
-        
+
         elif self.hardware.backend == BackendType.METAL:
             # Metal-specific optimizations
             if hasattr(model, "gradient_checkpointing_enable"):
                 # Disable gradient checkpointing on Metal for now
                 pass
-        
+
         return model
-    
+
     def get_memory_efficient_optimizer(
         self,
         model_parameters: Any,
@@ -522,13 +523,14 @@ class TrainingOptimizer:
             # Use fused AdamW for CUDA
             try:
                 from torch_optimizer import AdamW
+
                 return AdamW(model_parameters, lr=lr, fused=True)
             except ImportError:
                 return torch.optim.AdamW(model_parameters, lr=lr, fused=True)
-        
+
         # Standard AdamW for other backends
         return torch.optim.AdamW(model_parameters, lr=lr)
-    
+
     def to_json(self) -> str:
         """Serialize hardware profile to JSON."""
         data = {
@@ -552,23 +554,23 @@ class TrainingOptimizer:
 
 class FusedOptimizer:
     """Wrapper for fused optimizer operations."""
-    
+
     def __init__(self, optimizer: torch.optim.Optimizer, hardware: HardwareProfile):
         self.optimizer = optimizer
         self.hardware = hardware
         self.step_count = 0
-    
+
     def step(self) -> None:
         """Perform optimization step with hardware-specific optimizations."""
         self.step_count += 1
-        
+
         # Gradient scaling for mixed precision
         if self.hardware.backend == BackendType.CUDA:
             # CUDA handles this automatically with GradScaler
             pass
-        
+
         self.optimizer.step()
-    
+
     def zero_grad(self, set_to_none: bool = True) -> None:
         """Zero gradients with optional memory optimization."""
         self.optimizer.zero_grad(set_to_none=set_to_none)
@@ -579,37 +581,37 @@ def create_ultimate_trainer_config(
     hardware_override: HardwareProfile | None = None,
 ) -> ExperimentConfig:
     """Create an ultimate-optimized training configuration.
-    
+
     Args:
         base_config: Base experiment configuration
         hardware_override: Optional hardware profile to use
-        
+
     Returns:
         Optimized experiment configuration
     """
     from training.src.config import ExperimentConfig
-    
+
     optimizer = TrainingOptimizer(hardware_override)
     optimizer.configure_torch()
-    
+
     # Convert config to dict, apply optimizations, convert back
     config_dict = base_config.to_dict()
     optimized_dict = optimizer.get_training_config(config_dict)
-    
+
     # Create new config with optimized values
     optimized_config = ExperimentConfig.from_dict(optimized_dict)
     optimized_config.config_path = base_config.config_path
-    
+
     logger.info("Created ultimate-optimized training configuration")
     logger.info(f"Optimization level: {optimizer.optimization_level}")
-    
+
     return optimized_config
 
 
 def print_hardware_summary() -> None:
     """Print a summary of detected hardware."""
     hardware = HardwareDetector.detect()
-    
+
     print("=" * 60)
     print("HARDWARE DETECTION SUMMARY")
     print("=" * 60)

@@ -10,28 +10,25 @@
 //! Target hardware: A100, H100, H200, RTX 4090/5090
 
 use anyhow::{anyhow, Result};
+use cudarc::driver::{CudaDevice, CudaFunction, CudaModule, CudaSlice, LaunchAsync, LaunchConfig, CudaStream};
 use std::sync::Arc;
 
 /// CUDA kernel cache for efficient kernel launching
 #[cfg(feature = "cuda")]
 pub struct CudaKernelCache {
-    device: Arc<cudarc::driver::CudaDevice>,
-    // PTX modules stored for kernel launching
-    modules: std::collections::HashMap<String, cudarc::driver::CudaModule>,
+    device: Arc<CudaDevice>,
 }
 
 #[cfg(feature = "cuda")]
 impl CudaKernelCache {
     /// Initialize CUDA context and load kernel modules
     pub fn new(device_id: usize) -> Result<Self> {
-        let device = cudarc::driver::CudaDevice::new(device_id)
+        let device = CudaDevice::new(device_id)
             .map_err(|e| anyhow!("Failed to initialize CUDA device {}: {:?}", device_id, e))?;
-        
-        let mut modules = std::collections::HashMap::new();
         
         // Load compiled PTX modules
         let kernel_ptx = include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/src/cuda/kernels.ptx"));
-        let module = device
+        device
             .load_ptx(kernel_ptx.into(), "titan_kernels", &[
                 "matmul_tf32",
                 "matmul_fp16_tc",
@@ -44,26 +41,20 @@ impl CudaKernelCache {
             ])
             .map_err(|e| anyhow!("Failed to load CUDA module: {:?}", e))?;
         
-        modules.insert("titan_kernels".to_string(), module);
-        
         Ok(Self {
-            device: Arc::new(device),
-            modules,
+            device,
         })
     }
     
     /// Get reference to CUDA device
-    pub fn device(&self) -> &Arc<cudarc::driver::CudaDevice> {
+    pub fn device(&self) -> &Arc<CudaDevice> {
         &self.device
     }
     
     /// Get kernel function
-    pub fn get_kernel(&self, name: &str) -> Result<cudarc::driver::CudaFunction> {
-        let module = self.modules.get("titan_kernels")
-            .ok_or_else(|| anyhow!("Kernel module not found"))?;
-        
-        module.get_func("titan_kernels", name)
-            .map_err(|e| anyhow!("Failed to get kernel {}: {:?}", name, e))
+    pub fn get_kernel(&self, name: &str) -> Result<CudaFunction> {
+        self.device.get_func("titan_kernels", name)
+            .ok_or_else(|| anyhow!("Failed to get kernel {}: not found in module", name))
     }
 }
 
@@ -169,45 +160,37 @@ pub struct TileSizes {
 /// Detect CUDA-capable GPUs
 #[cfg(feature = "cuda")]
 pub fn detect_cuda_gpus() -> Result<Vec<GpuArchitecture>> {
-    use cudarc::driver::sys::{cuDeviceGetAttribute, CUdevice_attribute};
+    use cudarc::driver::sys::CUdevice_attribute;
     
-    let count = cudarc::driver::CudaDevice::count()
+    let count = CudaDevice::count()
         .map_err(|e| anyhow!("Failed to get device count: {:?}", e))?;
     
     let mut gpus = Vec::with_capacity(count as usize);
     
     for i in 0..count {
-        let device = cudarc::driver::CudaDevice::new(i as usize)
+        let device = CudaDevice::new(i as usize)
             .map_err(|e| anyhow!("Failed to get device {}: {:?}", i, e))?;
         
-        let raw_dev = *device.cu_device();
-        
         // Get compute capability
-        let mut major = 0i32;
-        let mut minor = 0i32;
-        unsafe {
-            cuDeviceGetAttribute(&mut major, CUdevice_attribute::CU_DEVICE_ATTRIBUTE_COMPUTE_CAPABILITY_MAJOR, raw_dev);
-            cuDeviceGetAttribute(&mut minor, CUdevice_attribute::CU_DEVICE_ATTRIBUTE_COMPUTE_CAPABILITY_MINOR, raw_dev);
-        }
+        let major = device.attribute(CUdevice_attribute::CU_DEVICE_ATTRIBUTE_COMPUTE_CAPABILITY_MAJOR)
+            .map_err(|e| anyhow!("Failed to get major CC: {:?}", e))?;
+        let minor = device.attribute(CUdevice_attribute::CU_DEVICE_ATTRIBUTE_COMPUTE_CAPABILITY_MINOR)
+            .map_err(|e| anyhow!("Failed to get minor CC: {:?}", e))?;
         
         let cc = ComputeCapability::new(major, minor);
         
         // Get memory info
-        let mem_info = device.memory_info()
+        let mem_info = device.as_ref().memory_info()
             .map_err(|e| anyhow!("Failed to get memory info: {:?}", e))?;
         let memory_gb = mem_info.total as f64 / (1024.0 * 1024.0 * 1024.0);
         
         // Get SM count
-        let mut sm_count = 0i32;
-        unsafe {
-            cuDeviceGetAttribute(&mut sm_count, CUdevice_attribute::CU_DEVICE_ATTRIBUTE_MULTIPROCESSOR_COUNT, raw_dev);
-        }
+        let sm_count = device.attribute(CUdevice_attribute::CU_DEVICE_ATTRIBUTE_MULTIPROCESSOR_COUNT)
+            .map_err(|e| anyhow!("Failed to get SM count: {:?}", e))?;
         
         // Get max threads per SM
-        let mut max_threads = 0i32;
-        unsafe {
-            cuDeviceGetAttribute(&mut max_threads, CUdevice_attribute::CU_DEVICE_ATTRIBUTE_MAX_THREADS_PER_MULTIPROCESSOR, raw_dev);
-        }
+        let max_threads = device.attribute(CUdevice_attribute::CU_DEVICE_ATTRIBUTE_MAX_THREADS_PER_MULTIPROCESSOR)
+            .map_err(|e| anyhow!("Failed to get max threads: {:?}", e))?;
         
         // Tensor core version
         let tc_version = if cc.major >= 9 {
@@ -268,7 +251,7 @@ pub fn matmul_tf32_cuda(
     // Pack dimensions as u32 array
     let dims = [m as u32, k as u32, n as u32];
     
-    let cfg = cudarc::driver::LaunchConfig {
+    let cfg = LaunchConfig {
         grid_dim: (grid_x, grid_y, 1),
         block_dim: (block_size, block_size, 1),
         shared_mem_bytes: 0,
@@ -310,7 +293,7 @@ pub fn matmul_fp16_tc_cuda(
     
     let dims = [m as u32, k as u32, n as u32];
     
-    let cfg = cudarc::driver::LaunchConfig {
+    let cfg = LaunchConfig {
         grid_dim: (((n / 16) as u32 + 3) / 4, ((m / 16) as u32 + 3) / 4, 1),
         block_dim: (128, 1, 1), // 4 warps, each handling 16x16 tile
         shared_mem_bytes: 32 * 1024, // Shared memory for tiles
@@ -358,7 +341,7 @@ pub fn adamw_fused_cuda(
     let kernel = cache.get_kernel("adamw_fused")?;
     
     let numel = params.len() as u32;
-    let cfg = cudarc::driver::LaunchConfig {
+    let cfg = LaunchConfig {
         grid_dim: ((numel + 255) / 256, 1, 1),
         block_dim: (256, 1, 1),
         shared_mem_bytes: 0,
@@ -410,7 +393,7 @@ pub fn flash_attention_cuda(
     let dims = [seq_len as u32, head_dim as u32];
     
     // Each block handles one sequence position
-    let cfg = cudarc::driver::LaunchConfig {
+    let cfg = LaunchConfig {
         grid_dim: ((seq_len as u32 + 127) / 128, 1, 1),
         block_dim: (128, 1, 1),
         shared_mem_bytes: 3 * 32 * 1024, // Q, K, V tiles
@@ -436,14 +419,14 @@ pub mod distributed {
     /// All-reduce operation across multiple GPUs
     pub fn allreduce_sum(
         data: &[f32],
-        local_rank: usize,
-        world_size: usize,
+        _local_rank: usize,
+        _world_size: usize,
     ) -> Result<Vec<f32>> {
         // Simplified implementation - in production use NCCL
         // This is a placeholder for the actual NCCL integration
         
         // For single GPU, just return data
-        if world_size == 1 {
+        if _world_size == 1 {
             return Ok(data.to_vec());
         }
         
@@ -454,9 +437,9 @@ pub mod distributed {
     
     /// Ring all-reduce algorithm for bandwidth efficiency
     pub fn ring_allreduce(
-        data: &mut [f32],
-        local_rank: usize,
-        world_size: usize,
+        _data: &mut [f32],
+        _local_rank: usize,
+        _world_size: usize,
     ) -> Result<()> {
         // Ring algorithm reduces bandwidth requirement from O(n) to O(2*(n-1)/n)
         // Implementation would use NCCL or custom CUDA kernels
@@ -468,34 +451,34 @@ pub mod distributed {
 /// Memory-efficient gradient accumulation
 #[cfg(feature = "cuda")]
 pub struct GradientAccumulator {
-    device: Arc<cudarc::driver::CudaDevice>,
-    accumulated: cudarc::driver::CudaSlice<f32>,
-    count: usize,
+    _device: Arc<CudaDevice>,
+    accumulated: CudaSlice<f32>,
+    _count: usize,
 }
 
 #[cfg(feature = "cuda")]
 impl GradientAccumulator {
-    pub fn new(device: Arc<cudarc::driver::CudaDevice>, num_params: usize) -> Result<Self> {
+    pub fn new(device: Arc<CudaDevice>, num_params: usize) -> Result<Self> {
         let accumulated = device.alloc_zeros::<f32>(num_params)
             .map_err(|e| anyhow!("Failed to allocate accumulator: {:?}", e))?;
         
         Ok(Self {
-            device,
+            _device: device,
             accumulated,
-            count: 0,
+            _count: 0,
         })
     }
     
-    pub fn accumulate(&mut self, grads: &cudarc::driver::CudaSlice<f32>) -> Result<()> {
+    pub fn accumulate(&mut self, _grads: &CudaSlice<f32>) -> Result<()> {
         // Launch kernel to add grads to accumulator
-        self.count += 1;
+        self._count += 1;
         Ok(())
     }
     
-    pub fn average_and_reset(&mut self) -> Result<cudarc::driver::CudaSlice<f32>> {
+    pub fn average_and_reset(&mut self) -> Result<CudaSlice<f32>> {
         // Divide by count and return, reset to zero
-        let count = self.count;
-        self.count = 0;
+        let _count = self._count;
+        self._count = 0;
         
         // Would launch division kernel here
         Ok(self.accumulated.clone())
@@ -505,13 +488,13 @@ impl GradientAccumulator {
 /// CUDA stream management for async execution
 #[cfg(feature = "cuda")]
 pub struct CudaStreamPool {
-    streams: Vec<cudarc::driver::CudaStream>,
+    streams: Vec<CudaStream>,
     current: usize,
 }
 
 #[cfg(feature = "cuda")]
 impl CudaStreamPool {
-    pub fn new(device: &cudarc::driver::CudaDevice, num_streams: usize) -> Result<Self> {
+    pub fn new(device: &CudaDevice, num_streams: usize) -> Result<Self> {
         let mut streams = Vec::with_capacity(num_streams);
         for _ in 0..num_streams {
             let stream = device.fork_default_stream()
@@ -523,7 +506,7 @@ impl CudaStreamPool {
     }
     
     /// Get next stream in round-robin fashion
-    pub fn next_stream(&mut self) -> &cudarc::driver::CudaStream {
+    pub fn next_stream(&mut self) -> &CudaStream {
         let stream = &self.streams[self.current];
         self.current = (self.current + 1) % self.streams.len();
         stream
