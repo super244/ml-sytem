@@ -136,8 +136,14 @@ def build_training_arguments(config: ExperimentConfig, layout) -> TrainingArgume
         "group_by_length": training.group_by_length,
         "save_safetensors": training.save_safetensors,
         "seed": config.seed,
-        "deepspeed": config.runtime.deepspeed_config,
+        "deepspeed": (
+            config.runtime.deepspeed_config
+            if torch.cuda.is_available() or HardwareDetector._is_rocm_available()
+            else None
+        ),
         "torch_compile": config.runtime.torch_compile,
+        "dataloader_num_workers": 0 if _mps_available() else training.dataloader_num_workers,
+        "dataloader_pin_memory": not _mps_available(),
     }
     if "use_mps_device" in _TRAINING_ARGUMENT_PARAMETERS and _mps_available():
         training_arguments["use_mps_device"] = True
@@ -486,7 +492,7 @@ def main() -> None:
         hardware = HardwareDetector.detect()
         harness_config = HarnessConfig(
             enable_mixed_precision=config.training.bf16 or config.training.fp16,
-            enable_gradient_checkpointing=config.training.gradient_checkpointing,
+            enable_gradient_checkpointing=config.training.gradient_checkpointing or config.model.gradient_checkpointing,
             enable_torch_compile=config.runtime.torch_compile,
             enable_memory_profiling=os.environ.get("AI_FACTORY_MEMORY_PROFILE", "0") == "1",
         )

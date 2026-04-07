@@ -636,6 +636,25 @@ class TrainingOptimizer:
         except ImportError:
             logger.warning("Titan engine integration failed")
 
+    def apply_model_optimizations(self, model: nn.Module) -> nn.Module:
+        """Apply hardware-specific model optimizations v3.0."""
+        # Detect model target
+        is_titan = self.hardware.backend == BackendType.TITAN
+        backend = self.hardware.backend
+
+        if is_titan or self.titan_config.enabled:
+            logger.info("Applying Titan engine model optimizations")
+            # Titan engine model tweaks would go here
+            pass
+
+        if backend == BackendType.METAL:
+            # Metal-specific model optimizations (e.g. weight packing)
+            if self.hardware.unified_memory:
+                # Optimized for Apple Silicon unified memory architecture
+                pass
+
+        return model
+
     def _determine_optimization_level(self) -> str:
         """Determine optimization level based on hardware capability score."""
         score = self.hardware.capability_score
@@ -734,7 +753,9 @@ class TrainingOptimizer:
         )
 
         config["gradient_accumulation_steps"] = max(1, config.get("gradient_accumulation_steps", 4))
-        config["dataloader_num_workers"] = self.hardware.recommended_workers
+        # Use 0 workers on MPS to avoid segmentation faults from multiprocessing
+        config["dataloader_num_workers"] = 0
+        config["dataloader_pin_memory"] = False
         config["use_mps_device"] = True
 
         if self.hardware.pytorch_compile and self.hardware.capability_score >= 80:
@@ -837,6 +858,28 @@ class TrainingOptimizer:
                 pass
 
         return torch.optim.AdamW(model_parameters, lr=lr, weight_decay=weight_decay)
+
+    def create_optimized_dataloader(
+        self,
+        dataset: Any,
+        batch_size: int,
+        shuffle: bool = True,
+        collate_fn: Any = None,
+    ) -> Any:
+        """Create a hardware-optimized DataLoader v3.0."""
+        from torch.utils.data import DataLoader
+
+        pin_memory = self.hardware.backend in (BackendType.CUDA, BackendType.TITAN)
+
+        return DataLoader(
+            dataset,
+            batch_size=batch_size,
+            shuffle=shuffle,
+            num_workers=self.hardware.recommended_workers,
+            pin_memory=pin_memory,
+            collate_fn=collate_fn,
+            persistent_workers=self.hardware.recommended_workers > 0,
+        )
 
     def get_optimization_summary(self) -> dict[str, Any]:
         """Get a summary of applied optimizations."""

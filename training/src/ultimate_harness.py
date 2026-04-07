@@ -277,7 +277,11 @@ class UltimateTrainingHarness:
             "group_by_length": training.group_by_length,
             "save_safetensors": training.save_safetensors,
             "seed": self.config.seed,
-            "deepspeed": self.config.runtime.deepspeed_config,
+            "deepspeed": (
+                self.config.runtime.deepspeed_config
+                if self.hardware.backend in (BackendType.CUDA, BackendType.ROCM)
+                else None
+            ),
             "torch_compile": False,
         }
 

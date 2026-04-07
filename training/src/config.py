@@ -107,6 +107,7 @@ class TrainingConfig(BaseModel):
     save_safetensors: bool = True
     max_validation_train_rows: int = 32
     max_validation_eval_rows: int = 16
+    gradient_checkpointing: bool = True
 
 
 class AdapterConfig(BaseModel):
