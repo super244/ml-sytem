@@ -30,6 +30,34 @@ evaluation/results/*
 data/processed/*.jsonl
 data/processed/*.json
 
+# Datasets and caches (prevent large files from being committed)
+data/custom/*.jsonl
+data/custom/*.json
+data/custom/*.manifest.json
+data/processed/corpus.sqlite
+data/processed/corpus.sqlite*
+data/processed/packs/
+data/processed/*.parquet
+data/processed/*.arrow
+data/cache/
+data/tmp/
+data/raw/failure_cases.jsonl
+data/public/downloaded/
+data/public/cache/
+
+# Model artifacts and checkpoints
+artifacts/models/
+artifacts/runs/
+artifacts/checkpoints/
+artifacts/tokenizers/
+artifacts/foundation/
+artifacts/instances/
+artifacts/metrics/
+artifacts/control_plane/
+artifacts/inference/
+artifacts/lineage/
+artifacts/tmp/
+
 # Node.js/Frontend
 node_modules/
 .next/
