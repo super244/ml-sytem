@@ -94,11 +94,15 @@ class MathGenerator:
                 ),
             },
         ]
-        if hasattr(tokenizer, "apply_chat_template"):
-            return (
-                tokenizer.apply_chat_template(messages, tokenize=False, add_generation_prompt=True),
-                preset,
-            )
+        if hasattr(tokenizer, "apply_chat_template") and getattr(tokenizer, "chat_template", None):
+            try:
+                return (
+                    tokenizer.apply_chat_template(messages, tokenize=False, add_generation_prompt=True),
+                    preset,
+                )
+            except ValueError:
+                # Fallback to simple template if chat template is not set
+                pass
         prompt = "".join(f"<|{item['role']}|>\n{item['content']}\n" for item in messages)
         return prompt + "<|assistant|>\n", preset
 

@@ -7,13 +7,21 @@
 - Reasoning style: `chain_of_thought`
 - Usage: `n/a`
 - Default weight: `1.0`
-- Rows: `2019`
-- Approx size: `3250592 bytes`
+- Rows: `220056`
+- Approx size: `357914655 bytes`
 - Benchmark tags: `[]`
 
 ## Focus
 
 product rule / chain rule / logarithmic differentiation
+
+## Profile Summary
+
+- Records: `220056`
+- Unique sources: `1`
+- Unique topics: `1`
+- Quality mean / p50 / p90: `0.0` / `0.0` / `0.0`
+- Failure cases / verification-ready / contaminated: `0` / `220056` / `0`
 
 ## Preview
 

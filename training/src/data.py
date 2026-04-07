@@ -79,12 +79,16 @@ def curriculum_sort(records: list[dict[str, Any]], phases: list[str]) -> list[di
 
 
 def render_chat(tokenizer: Any, messages: list[dict[str, str]], add_generation_prompt: bool = False) -> str:
-    if hasattr(tokenizer, "apply_chat_template"):
-        return tokenizer.apply_chat_template(
-            messages,
-            tokenize=False,
-            add_generation_prompt=add_generation_prompt,
-        )
+    if hasattr(tokenizer, "apply_chat_template") and getattr(tokenizer, "chat_template", None):
+        try:
+            return tokenizer.apply_chat_template(
+                messages,
+                tokenize=False,
+                add_generation_prompt=add_generation_prompt,
+            )
+        except ValueError:
+            # Fallback to simple template if chat template is not set
+            pass
     segments = []
     for message in messages:
         segments.append(f"<|{message['role']}|>\n{message['content']}\n")
