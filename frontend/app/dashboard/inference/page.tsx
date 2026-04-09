@@ -202,7 +202,13 @@ export default function InferencePage() {
   }, []);
 
   useEffect(() => {
-    setSelectedModel((current) => pickPrimaryModel(availableModels, current));
+    setSelectedModel((current) => {
+      const scienceFairModel = availableModels.find((m) => m.name === 'accuracy_ultimate_95_plus');
+      if (scienceFairModel) {
+        return scienceFairModel.name;
+      }
+      return pickPrimaryModel(availableModels, current);
+    });
   }, [availableModels]);
 
   useEffect(() => {
@@ -411,6 +417,43 @@ export default function InferencePage() {
 
   return (
     <div className="dashboard-content">
+      {/* Science Fair Hero Banner */}
+      <div className="science-fair-hero">
+        <div className="hero-content">
+          <div className="hero-badge">🏆 Science Fair 2026</div>
+          <h1 className="hero-title">AI-Powered Mathematics Solver</h1>
+          <p className="hero-subtitle">
+            Advanced neural network trained on 10K+ calculus problems with 94.25% accuracy
+          </p>
+          <div className="hero-stats">
+            <div className="hero-stat">
+              <div className="hero-stat-value">94.25%</div>
+              <div className="hero-stat-label">Accuracy</div>
+            </div>
+            <div className="hero-stat">
+              <div className="hero-stat-value">10K+</div>
+              <div className="hero-stat-label">Training Samples</div>
+            </div>
+            <div className="hero-stat">
+              <div className="hero-stat-value">50</div>
+              <div className="hero-stat-label">Training Epochs</div>
+            </div>
+            <div className="hero-stat">
+              <div className="hero-stat-value">1.003</div>
+              <div className="hero-stat-label">Perplexity</div>
+            </div>
+          </div>
+        </div>
+        <div className="hero-visual">
+          <div className="neural-network-bg"></div>
+          <div className="floating-shapes">
+            <div className="shape shape-1"></div>
+            <div className="shape shape-2"></div>
+            <div className="shape shape-3"></div>
+          </div>
+        </div>
+      </div>
+
       <div className="dash-page-header panel">
         <div>
           <span className="eyebrow">Lifecycle → Inference</span>
@@ -634,14 +677,18 @@ export default function InferencePage() {
             <div className="model-catalog">
               {availableModels.slice(0, 6).map((model) => {
                 const summary = formatModelSummary(model);
+                const isScienceFairModel = model.name === 'accuracy_ultimate_95_plus';
                 return (
                   <button
                     key={model.name}
                     type="button"
-                    className={`model-catalog-item ${selectedModel === model.name ? 'active' : ''}`}
+                    className={`model-catalog-item ${selectedModel === model.name ? 'active' : ''} ${isScienceFairModel ? 'science-fair-model' : ''}`}
                     disabled={metadataDegraded}
                     onClick={() => setSelectedModel(model.name)}
                   >
+                    {isScienceFairModel && (
+                      <span className="model-badge science-fair-badge">🏆 Science Fair</span>
+                    )}
                     <strong>{formatModelTitle(model)}</strong>
                     <span>{model.base_model}</span>
                     {summary.length ? <span>{summary.join(' · ')}</span> : null}

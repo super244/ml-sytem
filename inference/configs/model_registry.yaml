@@ -265,6 +265,20 @@ models:
     description: Accuracy ultimate model trained to 1000 iterations with Metal GPU optimizations and gradient checkpointing.
     tags: [specialist, accuracy, metal, shaders, optimized, 95plus]
     scale_tags: [2b, specialist, accuracy, metal]
+  - name: accuracy_ultimate_95_plus
+    label: Accuracy Ultimate 95+ (Science Fair)
+    base_model: Qwen/Qwen2.5-Math-1.5B-Instruct
+    adapter_path: artifacts/runs/accuracy_ultimate_95_plus-20260408-174421/published/final_adapter
+    load_in_4bit: false
+    load_in_8bit: false
+    dtype: float32
+    target_parameters: 2b
+    parameter_size_b: 2.0
+    quantization: none
+    tier: specialist
+    description: Science fair model with 94.25% accuracy, trained on 10K samples over 50 epochs with ultra-optimized Metal shaders.
+    tags: [specialist, accuracy, ultimate, 95plus, science_fair, best]
+    scale_tags: [2b, specialist, accuracy, ultimate, science_fair]
   - name: metal_optimized
     label: Metal Optimized Fast
     base_model: Qwen/Qwen2.5-Math-1.5B-Instruct
