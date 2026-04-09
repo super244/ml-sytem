@@ -1,0 +1,28 @@
+name: optimization_suite_eval
+prompt_library_path: inference/configs/prompt_presets.yaml
+output_dir: evaluation/results/optimization_suite_eval
+
+benchmark:
+  registry_path: evaluation/benchmarks/registry.yaml
+  benchmark_id: core_eval
+
+models:
+  registry_path: inference/configs/model_registry.yaml
+  primary_model: optimization_finetune_01
+  secondary_model: optimization_full_params
+  primary_label: Atlas Optimization Finetune 01
+  secondary_label: Atlas Optimization Full Params
+
+generation:
+  prompt_preset: atlas_rigorous
+  temperature: 0.0
+  top_p: 0.9
+  max_new_tokens: 128
+  num_samples: 1
+  show_reasoning: false
+  difficulty_target: mixed
+  use_calculator: false
+  solver_mode: fast
+  output_format: text
+  use_cache: true
+  max_eval_samples: 10

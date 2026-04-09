@@ -184,7 +184,7 @@ def compute_step_correctness(prediction: str, step_checks: Iterable[Any] | None)
 
 
 def detect_formatting_failure(prediction_text: str) -> bool:
-    return "Final Answer:" not in prediction_text and "\\boxed" not in prediction_text
+    return "Final Answer:" not in prediction_text and r"\boxed" not in prediction_text
 
 
 def detect_arithmetic_slip(prediction_text: str, reference_answer: str | None) -> bool:

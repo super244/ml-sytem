@@ -1,0 +1,68 @@
+run_name: accuracy_full_param
+
+model:
+  base_model_name: Qwen/Qwen2.5-Math-1.5B-Instruct
+  trust_remote_code: false
+  use_4bit: false
+  use_8bit: false
+  use_full_precision: true
+
+training:
+  num_train_epochs: 25.0
+  learning_rate: 0.000005
+  artifacts_dir: artifacts
+  warmup_ratio: 0.3
+  weight_decay: 0.0001
+  lr_scheduler_type: cosine
+  per_device_train_batch_size: 1
+  per_device_eval_batch_size: 1
+  gradient_accumulation_steps: 8
+  logging_steps: 5
+  evaluation_strategy: "no"
+  save_strategy: epoch
+  save_total_limit: 5
+  load_best_model_at_end: false
+  group_by_length: true
+  dataloader_pin_memory: false
+  dataloader_num_workers: 0
+  save_safetensors: true
+  max_grad_norm: 0.5
+  fp16: false
+  bf16: false
+  gradient_checkpointing: true
+  optim: adamw_torch
+  max_steps: -1
+  
+  # Maximum accuracy-focused settings for 100% target
+  formatting_reward_weight: 15.0
+  answer_token_weight: 30.0
+  
+logging:
+  log_level: INFO
+  report_to: [none]
+  logging_first_step: true
+  watch_model: false
+
+runtime:
+  device: mps
+  seed: 42
+  torch_compile: false
+  dataloader_pin_memory: false
+
+# Full parameter training - no adapter
+adapter:
+  method: full
+
+data:
+  train_file: data/processed/train.jsonl
+  eval_file: data/processed/eval.jsonl
+  max_length: 4096
+  pack: true
+  shuffle: true
+  stream: false
+  max_samples: -1
+  curriculum_learning: true
+  sequential_curriculum: true
+
+packaging:
+  publish_model_name: atlas-accuracy-full-param

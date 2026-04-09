@@ -1,0 +1,3 @@
+method: full
+# Full training configuration - no LoRA adapters
+# This enables training all model parameters instead of just LoRA adapters

@@ -1,0 +1,92 @@
+run_name: accuracy_ultimate_hyper_95
+
+model:
+  base_model_name: artifacts/runs/accuracy_ultimate_final-20260408-003835/published/final_adapter
+  trust_remote_code: false
+  use_4bit: false
+  use_8bit: false
+  use_full_precision: true
+
+training:
+  # MAX TRAINING for 1000+ steps
+  num_train_epochs: 50.0
+  max_steps: 1500
+  learning_rate: 0.00015
+  artifacts_dir: artifacts
+  warmup_ratio: 0.02
+  weight_decay: 0.0
+  lr_scheduler_type: constant_with_warmup
+  
+  # MAXIMIZE memory usage - batch size 16 to fill M5 Max 64GB
+  per_device_train_batch_size: 16
+  per_device_eval_batch_size: 8
+  gradient_accumulation_steps: 2
+  
+  # MINIMAL overhead - speed focused
+  logging_steps: 50
+  evaluation_strategy: "no"
+  save_strategy: "no"
+  save_total_limit: 1
+  load_best_model_at_end: false
+  
+  # SPEED optimizations
+  group_by_length: false
+  dataloader_pin_memory: false
+  dataloader_num_workers: 0
+  dataloader_drop_last: true
+  
+  save_safetensors: false
+  max_grad_norm: 1.0
+  fp16: false
+  bf16: false
+  gradient_checkpointing: false
+  optim: adamw_torch
+  
+  # MAX accuracy rewards
+  formatting_reward_weight: 100.0
+  answer_token_weight: 100.0
+  
+logging:
+  log_level: ERROR
+  report_to: [none]
+  logging_first_step: false
+  watch_model: false
+
+runtime:
+  device: mps
+  seed: 42
+  torch_compile: false
+
+adapter:
+  method: lora
+  r: 64
+  alpha: 128
+  dropout: 0.0
+  target_modules:
+    - q_proj
+    - v_proj
+    - k_proj
+    - o_proj
+    - gate_proj
+    - up_proj
+    - down_proj
+    - lm_head
+
+data:
+  train_file: data/processed/train.jsonl
+  eval_file: data/processed/eval.jsonl
+  max_length: 512
+  pack: true
+  shuffle: true
+  stream: false
+  max_samples: -1
+  curriculum_learning: false
+  sequential_curriculum: false
+  
+  # PRE-CACHED for 20s load time
+  use_tokenized_cache: false
+  tokenization_num_proc: 1
+  tokenization_batch_size: 256
+
+packaging:
+  publish_model_name: atlas-accuracy-95-hyper

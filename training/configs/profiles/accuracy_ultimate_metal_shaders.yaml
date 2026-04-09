@@ -1,0 +1,92 @@
+run_name: accuracy_ultimate_metal_shaders_95
+
+model:
+  base_model_name: artifacts/runs/accuracy_ultimate_final-20260408-003835/published/final_adapter
+  trust_remote_code: false
+  use_4bit: false
+  use_8bit: false
+  use_full_precision: true
+
+training:
+  # 1000 iterations as requested
+  num_train_epochs: 40.0
+  max_steps: 1000
+  learning_rate: 0.00012
+  artifacts_dir: artifacts
+  warmup_ratio: 0.05
+  weight_decay: 0.001
+  lr_scheduler_type: cosine_with_restarts
+  
+  # Optimized batch size for M5 Max 64GB - balance memory and speed
+  per_device_train_batch_size: 12
+  per_device_eval_batch_size: 6
+  gradient_accumulation_steps: 2
+  
+  # Minimal overhead for speed
+  logging_steps: 20
+  evaluation_strategy: "no"
+  save_strategy: "epoch"
+  save_total_limit: 2
+  load_best_model_at_end: false
+  
+  # Metal/MPS optimizations
+  group_by_length: true
+  dataloader_pin_memory: false
+  dataloader_num_workers: 0
+  
+  save_safetensors: true
+  max_grad_norm: 1.0
+  fp16: false
+  bf16: false
+  gradient_checkpointing: true
+  optim: adamw_torch_fused
+  
+  # High accuracy rewards
+  formatting_reward_weight: 100.0
+  answer_token_weight: 100.0
+  
+logging:
+  log_level: WARNING
+  report_to: [none]
+  logging_first_step: false
+  watch_model: false
+
+runtime:
+  device: mps
+  seed: 42
+  torch_compile: false  # Disabled due to model compatibility
+  dataloader_pin_memory: false
+
+adapter:
+  method: lora
+  r: 32
+  alpha: 64
+  dropout: 0.02
+  target_modules:
+    - q_proj
+    - v_proj
+    - k_proj
+    - o_proj
+    - gate_proj
+    - up_proj
+    - down_proj
+    - lm_head
+
+data:
+  train_file: data/processed/train.jsonl
+  eval_file: data/processed/eval.jsonl
+  max_length: 1024
+  pack: true
+  shuffle: true
+  stream: false
+  max_samples: -1
+  curriculum_learning: true
+  sequential_curriculum: true
+  
+  # Optimized tokenization
+  use_tokenized_cache: true
+  tokenization_num_proc: 2
+  tokenization_batch_size: 64
+
+packaging:
+  publish_model_name: atlas-accuracy-95-metal-shaders
