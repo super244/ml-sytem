@@ -3,12 +3,12 @@ models:
     label: Base 2B
     base_model: Qwen/Qwen2.5-Math-1.5B-Instruct
     adapter_path:
-    load_in_4bit: true
+    load_in_4bit: false  # Disabled for Metal
     load_in_8bit: false
-    dtype: bfloat16
+    dtype: float32  # Full precision for Metal
     target_parameters: 2b
     parameter_size_b: 2.0
-    quantization: 4bit
+    quantization: none
     tier: baseline
     description: Untuned base math model for side-by-side comparison.
     tags: [baseline, local, 2b]
@@ -16,17 +16,101 @@ models:
   - name: finetuned
     label: Atlas Failure-Aware 2B
     base_model: Qwen/Qwen2.5-Math-1.5B-Instruct
-    adapter_path: artifacts/models/atlas-math-failure-aware/latest
-    load_in_4bit: true
+    adapter_path: artifacts/runs/atlas_failure_aware-20260407-005436/published/final_adapter
+    load_in_4bit: false  # Disabled for Metal
     load_in_8bit: false
-    dtype: bfloat16
+    dtype: float32  # Full precision for Metal
     target_parameters: 2b
     parameter_size_b: 2.0
-    quantization: 4bit
+    quantization: none
     tier: specialist
     description: Failure-aware calculus and verification specialist adapter.
     tags: [specialist, failure_aware, local, 2b]
     scale_tags: [2b, specialist, failure_aware, local]
+  - name: enhanced
+    label: Atlas Enhanced V2
+    base_model: Qwen/Qwen2.5-Math-1.5B-Instruct
+    adapter_path: artifacts/runs/atlas_enhanced_finetune_v2-20260407-010350/published/final_adapter
+    load_in_4bit: false  # Disabled for Metal
+    load_in_8bit: false
+    dtype: float32  # Full precision for Metal
+    target_parameters: 2b
+    parameter_size_b: 2.0
+    quantization: none
+    tier: specialist
+    description: Enhanced V2 model with optimized training.
+    tags: [specialist, enhanced, local, 2b]
+    scale_tags: [2b, specialist, enhanced, local]
+  - name: enhanced_v3
+    label: Atlas Enhanced V3
+    base_model: Qwen/Qwen2.5-Math-1.5B-Instruct
+    adapter_path: artifacts/runs/atlas_enhanced_finetune_v3-20260407-015206/published/final_adapter
+    load_in_4bit: false  # Disabled for Metal
+    load_in_8bit: false
+    dtype: float32  # Full precision for Metal
+    target_parameters: 2b
+    parameter_size_b: 2.0
+    quantization: none
+    tier: specialist
+    description: Enhanced V3 model with format optimization.
+    tags: [specialist, enhanced_v3, local, 2b]
+    scale_tags: [2b, specialist, enhanced_v3, local]
+  - name: optimization_full_params
+    label: Atlas Optimization Full Params
+    base_model: artifacts/runs/atlas_optimization_full_params-20260407-025620/published/final_adapter
+    adapter_path:
+    load_in_4bit: false
+    load_in_8bit: false
+    dtype: float32
+    target_parameters: 2b
+    parameter_size_b: 2.0
+    quantization: none
+    tier: specialist
+    description: Full parameter trained model from optimization suite.
+    tags: [specialist, optimization, full_params, local, 2b]
+    scale_tags: [2b, specialist, optimization, full_params, local]
+  - name: optimization_finetune_01
+    label: Atlas Optimization Finetune 01
+    base_model: Qwen/Qwen2.5-Math-1.5B-Instruct
+    adapter_path: artifacts/runs/atlas_optimization_finetune_01-20260407-030423/published/final_adapter
+    load_in_4bit: false
+    load_in_8bit: false
+    dtype: float32
+    target_parameters: 2b
+    parameter_size_b: 2.0
+    quantization: none
+    tier: specialist
+    description: First fine-tuning iteration from optimization suite.
+    tags: [specialist, optimization, finetune_01, local, 2b]
+    scale_tags: [2b, specialist, optimization, finetune_01, local]
+  - name: optimization_finetune_02
+    label: Atlas Optimization Finetune 02
+    base_model: Qwen/Qwen2.5-Math-1.5B-Instruct
+    adapter_path: artifacts/runs/atlas_optimization_finetune_02-20260407-031401/published/final_adapter
+    load_in_4bit: false
+    load_in_8bit: false
+    dtype: float32
+    target_parameters: 2b
+    parameter_size_b: 2.0
+    quantization: none
+    tier: specialist
+    description: Second fine-tuning iteration from optimization suite.
+    tags: [specialist, optimization, finetune_02, local, 2b]
+    scale_tags: [2b, specialist, optimization, finetune_02, local]
+  - name: optimization_teacher_final
+    label: Atlas Optimization Teacher Final
+    base_model: Qwen/Qwen2.5-Math-1.5B-Instruct
+    adapter_path: artifacts/runs/atlas_optimization_teacher_final-20260407-032620/published/final_adapter
+    load_in_4bit: false
+    load_in_8bit: false
+    dtype: float32
+    target_parameters: 2b
+    parameter_size_b: 2.0
+    quantization: none
+    tier: specialist
+    description: Final teacher-guided model with best performance (loss 1274).
+    tags: [specialist, optimization, teacher_final, best, local, 2b]
+    scale_tags: [2b, specialist, optimization, teacher_final, best, local]
   - name: calculus_specialist
     label: Atlas Calculus Specialist 2B
     base_model: Qwen/Qwen2.5-Math-1.5B-Instruct
@@ -83,6 +167,118 @@ models:
     description: Small fast-iteration adapter for rapid local experimentation.
     tags: [specialist, fast_iteration, local, 1b]
     scale_tags: [1b, fast_iteration, specialist, local]
+  - name: qwen3_4b_teacher
+    label: Qwen3-4B Teacher
+    base_model: Qwen/Qwen3-4B-Instruct
+    adapter_path:
+    load_in_4bit: false
+    load_in_8bit: false
+    dtype: bfloat16
+    target_parameters: 4b
+    parameter_size_b: 4.0
+    quantization: none
+    tier: teacher
+    description: Qwen3-4B-Instruct used as teacher model for knowledge distillation.
+    tags: [teacher, qwen3, 4b, instruct]
+    scale_tags: [4b, teacher]
+  - name: boss_qwen3_5
+    label: BOSS Qwen3.5 Conversational
+    base_model: Qwen/Qwen2.5-Math-1.5B-Instruct
+    adapter_path: artifacts/runs/atlas_boss_teacher_student_final-20260407-042110/published/final_adapter
+    load_in_4bit: false
+    load_in_8bit: false
+    dtype: float32
+    target_parameters: 2b
+    parameter_size_b: 2.0
+    quantization: none
+    tier: specialist
+    description: Ultimate BOSS model with Qwen3.5 conversational teacher-student training.
+    tags: [specialist, boss, qwen3_5, conversational, ultimate, best]
+    scale_tags: [2b, specialist, boss, ultimate, conversational]
+  - name: formatting_focus
+    label: Formatting Focus Final
+    base_model: Qwen/Qwen2.5-Math-1.5B-Instruct
+    adapter_path: artifacts/runs/formatting_focus_final-20260407-224806/published/final_adapter
+    load_in_4bit: false
+    load_in_8bit: false
+    dtype: float32
+    target_parameters: 2b
+    parameter_size_b: 2.0
+    quantization: none
+    tier: specialist
+    description: Model trained with explicit formatting focus for boxed answer output.
+    tags: [specialist, formatting, boxed_answers, final]
+    scale_tags: [2b, specialist, formatting, final]
+  - name: accuracy_hardened
+    label: Accuracy Hardened Final
+    base_model: Qwen/Qwen2.5-Math-1.5B-Instruct
+    adapter_path: artifacts/runs/accuracy_hardened_final-20260408-000634/published/final_adapter
+    load_in_4bit: false
+    load_in_8bit: false
+    dtype: float32
+    target_parameters: 2b
+    parameter_size_b: 2.0
+    quantization: none
+    tier: specialist
+    description: Model fine-tuned for 95%+ accuracy with hardened training.
+    tags: [specialist, accuracy, hardened, final, best]
+    scale_tags: [2b, specialist, accuracy, hardened, best]
+  - name: accuracy_ultimate
+    label: Accuracy Ultimate Final
+    base_model: Qwen/Qwen2.5-Math-1.5B-Instruct
+    adapter_path: artifacts/runs/accuracy_ultimate_final-20260408-003835/published/final_adapter
+    load_in_4bit: false
+    load_in_8bit: false
+    dtype: float32
+    target_parameters: 2b
+    parameter_size_b: 2.0
+    quantization: none
+    tier: specialist
+    description: Ultimate model fine-tuned for maximum accuracy with extended training.
+    tags: [specialist, accuracy, ultimate, final, best]
+    scale_tags: [2b, specialist, accuracy, ultimate, best]
+  - name: accuracy_perfect
+    label: Accuracy Perfect Final
+    base_model: Qwen/Qwen2.5-Math-1.5B-Instruct
+    adapter_path: artifacts/runs/accuracy_perfect_final-20260408-014151/published/final_adapter
+    load_in_4bit: false
+    load_in_8bit: false
+    dtype: float32
+    target_parameters: 2b
+    parameter_size_b: 2.0
+    quantization: none
+    tier: specialist
+    description: Perfect accuracy model trained for 95-100% accuracy with maximum reward weights.
+    tags: [specialist, accuracy, perfect, final, best]
+    scale_tags: [2b, specialist, accuracy, perfect, best]
+  - name: accuracy_metal_shaders_95
+    label: Accuracy Metal Shaders 95+
+    base_model: Qwen/Qwen2.5-Math-1.5B-Instruct
+    adapter_path: artifacts/runs/accuracy_ultimate_metal_shaders_95-20260408-161422/published/final_adapter
+    load_in_4bit: false
+    load_in_8bit: false
+    dtype: float32
+    target_parameters: 2b
+    parameter_size_b: 2.0
+    quantization: none
+    tier: specialist
+    description: Accuracy ultimate model trained to 1000 iterations with Metal GPU optimizations and gradient checkpointing.
+    tags: [specialist, accuracy, metal, shaders, optimized, 95plus]
+    scale_tags: [2b, specialist, accuracy, metal]
+  - name: metal_optimized
+    label: Metal Optimized Fast
+    base_model: Qwen/Qwen2.5-Math-1.5B-Instruct
+    adapter_path: artifacts/runs/metal_minimal_fast-20260408-044556/published/final_adapter
+    load_in_4bit: false
+    load_in_8bit: false
+    dtype: float32
+    target_parameters: 2b
+    parameter_size_b: 2.0
+    quantization: none
+    tier: specialist
+    description: Metal-optimized fast training with minimal overhead for quick iteration.
+    tags: [specialist, metal, optimized, fast, mac]
+    scale_tags: [2b, specialist, metal, optimized]
   - name: long_context_base
     label: Scale-Up Base 12B
     base_model: artifacts/foundation/qwen2-12b

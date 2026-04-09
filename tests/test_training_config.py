@@ -1,6 +1,7 @@
 import subprocess
 import sys
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 
@@ -8,7 +9,12 @@ import training.train as training_train
 from training.src.config import ConfigValidationError, load_experiment_config, validate_experiment_config
 from training.src.data import build_messages, build_training_text, load_jsonl
 from training.src.hardware import TrainingHardware
-from training.src.modeling import build_quantization_config, resolve_attention_implementation, resolve_device_map
+from training.src.modeling import (
+    build_quantization_config,
+    load_model_for_training,
+    resolve_attention_implementation,
+    resolve_device_map,
+)
 from training.src.preflight import build_training_preflight_report
 from training.src.scaling import resolve_scratch_architecture
 from training.src.validation import build_validation_data_config
@@ -204,6 +210,61 @@ def test_resolve_device_map_disables_auto_on_non_cuda(monkeypatch: pytest.Monkey
     )
 
     assert resolve_device_map(config) is None
+
+
+def test_load_model_for_training_can_resume_from_adapter_artifact(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    adapter_dir = tmp_path / "adapter"
+    adapter_dir.mkdir()
+    (adapter_dir / "adapter_config.json").write_text("{}")
+
+    config = load_experiment_config("training/configs/profiles/baseline_qlora.yaml")
+    config.model.base_model_name = str(adapter_dir)
+    config.model.use_4bit = False
+    config.model.use_8bit = False
+    config.model.use_full_precision = True
+
+    calls: dict[str, object] = {}
+
+    class FakeBaseModel:
+        def __init__(self) -> None:
+            self.config = SimpleNamespace(use_cache=True)
+            self.gradient_checkpointing = False
+
+        def gradient_checkpointing_enable(self) -> None:
+            self.gradient_checkpointing = True
+
+    base_model = FakeBaseModel()
+
+    monkeypatch.setattr(
+        "training.src.modeling.PeftConfig.from_pretrained",
+        lambda path: SimpleNamespace(base_model_name_or_path="Qwen/Qwen2.5-Math-1.5B-Instruct"),
+    )
+
+    def fake_base_loader(*args, **kwargs):
+        calls["base_loader_args"] = args
+        calls["base_loader_kwargs"] = kwargs
+        return base_model
+
+    monkeypatch.setattr("training.src.modeling.AutoModelForCausalLM.from_pretrained", fake_base_loader)
+
+    def fake_adapter_loader(model, adapter_path, is_trainable=False, **kwargs):
+        calls["adapter_model"] = model
+        calls["adapter_path"] = adapter_path
+        calls["is_trainable"] = is_trainable
+        return "resumed-peft-model"
+
+    monkeypatch.setattr("training.src.modeling.PeftModel.from_pretrained", fake_adapter_loader)
+
+    model = load_model_for_training(config)
+
+    assert model == "resumed-peft-model"
+    assert calls["adapter_model"] is base_model
+    assert calls["adapter_path"] == str(adapter_dir)
+    assert calls["is_trainable"] is True
+    assert base_model.config.use_cache is False
+    assert base_model.gradient_checkpointing is True
 
 
 def test_build_training_arguments_uses_installed_transformers_api(tmp_path: Path) -> None:

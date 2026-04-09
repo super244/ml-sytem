@@ -1,12 +1,14 @@
 from __future__ import annotations
 
-from dataclasses import asdict, dataclass, field, fields
+import torch
+import yaml
+from dataclasses import dataclass, asdict, field, fields
 from pathlib import Path
 from threading import Lock
 from typing import TYPE_CHECKING, Any
 
-import torch
-import yaml
+from peft import PeftModel
+from transformers import AutoModelForCausalLM, AutoTokenizer
 
 from inference.app.model_catalog import normalize_model_record
 
@@ -118,12 +120,21 @@ class MathModelRuntime:
                 tokenizer.pad_token = tokenizer.eos_token
             tokenizer.padding_side = "left"
 
+            # Metal-specific optimizations
+            device_map = "auto"
+            if torch.backends.mps.is_available():
+                device_map = "mps"  # Force Metal device
+                torch_dtype = torch.float32  # Full precision for Metal
+            else:
+                torch_dtype = resolve_dtype(self.spec.dtype)
+
             model = AutoModelForCausalLM.from_pretrained(
                 self.spec.base_model,
                 trust_remote_code=self.spec.trust_remote_code,
-                device_map="auto",
-                torch_dtype=resolve_dtype(self.spec.dtype),
+                device_map=device_map,
+                torch_dtype=torch_dtype,
                 quantization_config=build_quant_config(self.spec),
+                low_cpu_mem_usage=True,  # Memory optimization
             )
             if self.spec.adapter_path:
                 model = PeftModel.from_pretrained(model, self.spec.adapter_path)

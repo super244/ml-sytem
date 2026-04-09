@@ -11,6 +11,15 @@ from pathlib import Path
 import torch
 from transformers import TrainingArguments, set_seed
 
+# MPS/Metal optimizations for Apple Silicon
+if hasattr(torch.backends, 'mps') and torch.backends.mps.is_available():
+    # Enable tensor float-32 for faster computation on M1/M2/M3
+    os.environ['PYTORCH_ENABLE_MPS_FALLBACK'] = '1'
+    os.environ['PYTORCH_MPS_HIGH_WATERMARK_RATIO'] = '0.0'
+    # Enable MPS memory optimization
+    if hasattr(torch.backends.mps, 'allow_tensor_float32'):
+        torch.backends.mps.allow_tensor_float32 = True
+
 from ai_factory.core.artifacts import prepare_run_layout, write_json
 from ai_factory.orchestration.distributed import DistributedConfig, DistributedTrainingOrchestrator
 from training.src.analysis import dataset_summary
@@ -27,7 +36,7 @@ from training.src.data import build_dataset
 from training.src.environment import collect_environment_snapshot
 from training.src.modeling import load_model_for_training, load_tokenizer, trainable_parameter_report
 from training.src.optimization import HardwareDetector
-from training.src.packaging import publish_model_artifacts, write_run_manifest, write_training_summary
+from training.src.model_packaging import publish_model_artifacts, write_run_manifest, write_training_summary
 from training.src.tracking import build_tracker
 from training.src.ultimate_harness import (
     HarnessConfig,

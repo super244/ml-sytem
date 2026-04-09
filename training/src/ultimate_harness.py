@@ -267,6 +267,7 @@ class UltimateTrainingHarness:
             "bf16": False,
             "fp16": False,
             "save_strategy": training.save_strategy,
+            "evaluation_strategy": training.evaluation_strategy,
             "load_best_model_at_end": training.load_best_model_at_end,
             "report_to": self.config.logging.report_to,
             "dataloader_num_workers": training.dataloader_num_workers,
@@ -444,6 +445,43 @@ def build_ultimate_trainer_with_harness(
             eval_dataset=eval_dataset,
             data_collator=data_collator,
             tokenizer=tokenizer,
+            callbacks=all_callbacks,
+        )
+
+    # Check if we need teacher-student training
+    if (hasattr(config, 'teacher_student') and 
+        config.teacher_student is not None and
+        config.teacher_student.teacher_model_name and 
+        config.teacher_student.teacher_model_name.strip()):
+        from training.src.teacher_student import create_teacher_student_trainer, TeacherStudentConfig
+        
+        # Create teacher-student config
+        teacher_config = TeacherStudentConfig(
+            teacher_model_name=config.teacher_student.teacher_model_name,
+            temperature=config.teacher_student.temperature,
+            alpha=config.teacher_student.alpha,
+            use_kl_divergence=config.teacher_student.use_kl_divergence,
+            teacher_cache_dir=config.teacher_student.teacher_cache_dir,
+            max_teacher_sequence_length=config.teacher_student.max_teacher_sequence_length,
+            teacher_batch_size=config.teacher_student.teacher_batch_size,
+        )
+        
+        # Create data collator for teacher-student training
+        from training.src.collators import WeightedDataCollator
+        data_collator = WeightedDataCollator(
+            tokenizer=tokenizer,
+            label_pad_token_id=-100,
+            pad_to_multiple_of=8,
+        )
+        
+        return create_teacher_student_trainer(
+            model=model,
+            args=args,
+            train_dataset=train_dataset,
+            eval_dataset=eval_dataset,
+            tokenizer=tokenizer,
+            teacher_config=teacher_config,
+            data_collator=data_collator,
             callbacks=all_callbacks,
         )
 

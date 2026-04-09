@@ -1,12 +1,13 @@
 from __future__ import annotations
 
 import logging
+import os
 from importlib.util import find_spec
 from pathlib import Path
 from typing import Any
 
 import torch
-from peft import LoraConfig, get_peft_model, prepare_model_for_kbit_training
+from peft import LoraConfig, PeftConfig, PeftModel, get_peft_model, prepare_model_for_kbit_training
 from transformers import AutoConfig, AutoModelForCausalLM, AutoTokenizer, BitsAndBytesConfig
 from transformers.utils import is_flash_attn_2_available
 
@@ -188,6 +189,44 @@ def build_model_from_scratch(config: ExperimentConfig, tokenizer: Any | None = N
     return model
 
 
+def _is_adapter_artifact(path: str) -> bool:
+    base_path = Path(path).expanduser()
+    return base_path.exists() and (base_path / "adapter_config.json").exists()
+
+
+def _load_existing_adapter_for_training(
+    config: ExperimentConfig,
+    *,
+    adapter_path: str,
+    quantization_config: BitsAndBytesConfig | None,
+    dtype: torch.dtype,
+) -> Any:
+    adapter_config = PeftConfig.from_pretrained(adapter_path)
+    base_model_name = adapter_config.base_model_name_or_path
+    local_files_only = os.path.exists(base_model_name)
+    logger.info("Loading existing adapter for continued training from %s", adapter_path)
+    logger.info("Resolved adapter base model: %s", base_model_name)
+    model = AutoModelForCausalLM.from_pretrained(
+        base_model_name,
+        trust_remote_code=config.model.trust_remote_code,
+        quantization_config=quantization_config,
+        device_map=resolve_device_map(config),
+        torch_dtype=dtype,
+        low_cpu_mem_usage=config.runtime.low_cpu_mem_usage,
+        attn_implementation=resolve_attention_implementation(config),
+        local_files_only=local_files_only,
+    )
+    model.config.use_cache = False
+    if config.model.gradient_checkpointing:
+        model.gradient_checkpointing_enable()
+    if quantization_config is not None:
+        model = prepare_model_for_kbit_training(
+            model,
+            use_gradient_checkpointing=config.model.gradient_checkpointing,
+        )
+    return PeftModel.from_pretrained(model, adapter_path, is_trainable=True)
+
+
 def load_model_for_training(config: ExperimentConfig, tokenizer: Any | None = None) -> Any:
     if config.model.initialization.lower() == "scratch":
         if build_quantization_config(config) is not None:
@@ -205,6 +244,22 @@ def load_model_for_training(config: ExperimentConfig, tokenizer: Any | None = No
     if quantization_config is None and _mps_available():
         dtype = torch.float32
 
+    if _is_adapter_artifact(config.model.base_model_name):
+        if method not in {"lora", "qlora"}:
+            raise ValueError("Continued adapter training requires method=lora or method=qlora.")
+        return _load_existing_adapter_for_training(
+            config,
+            adapter_path=config.model.base_model_name,
+            quantization_config=quantization_config,
+            dtype=dtype,
+        )
+
+    # Check if base_model_name is a local path
+    local_files_only = False
+    base_model_path = config.model.base_model_name
+    if os.path.exists(base_model_path):
+        local_files_only = True
+
     model = AutoModelForCausalLM.from_pretrained(
         config.model.base_model_name,
         trust_remote_code=config.model.trust_remote_code,
@@ -213,6 +268,7 @@ def load_model_for_training(config: ExperimentConfig, tokenizer: Any | None = No
         torch_dtype=dtype,
         low_cpu_mem_usage=config.runtime.low_cpu_mem_usage,
         attn_implementation=resolve_attention_implementation(config),
+        local_files_only=local_files_only,
     )
     model.config.use_cache = False
     if config.model.gradient_checkpointing:
@@ -224,6 +280,7 @@ def load_model_for_training(config: ExperimentConfig, tokenizer: Any | None = No
         )
 
     if method in {"full", "sft"}:
+        logger.info(f"Using full parameter training with method: {method}")
         return model
     if method not in {"lora", "qlora"}:
         raise ValueError(f"Unsupported adapter method: {config.lora.method}")

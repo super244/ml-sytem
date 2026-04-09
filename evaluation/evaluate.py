@@ -4,10 +4,10 @@ import argparse
 import json
 import sys
 import time
+import yaml
 from pathlib import Path
 from typing import Any
 
-import yaml
 from tqdm import tqdm
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
@@ -169,6 +169,12 @@ def main() -> None:
         benchmark_file=benchmark_config.get("benchmark_file"),
     )
     benchmark = read_jsonl(benchmark_file)
+    
+    # Apply max_eval_samples limit if specified
+    max_samples = config.get("generation", {}).get("max_eval_samples")
+    if max_samples and isinstance(max_samples, int) and max_samples > 0:
+        benchmark = benchmark[:max_samples]
+    
     generator, model_registry = build_generator(config)
     output_dir = Path(output_dir_value).expanduser()
     output_dir.mkdir(parents=True, exist_ok=True)

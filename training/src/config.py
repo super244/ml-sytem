@@ -3,8 +3,7 @@ from __future__ import annotations
 import os
 import sys
 from pathlib import Path
-from typing import Any
-
+from typing import Any, Dict, List, Optional, Union
 import yaml
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -180,6 +179,17 @@ class PackagingConfig(BaseModel):
     merged_model_subdir: str = "published/merged_model"
 
 
+class TeacherStudentConfig(BaseModel):
+    model_config = ConfigDict(strict=True)
+    teacher_model_name: str = "Qwen/Qwen2.5-7B-Instruct"
+    temperature: float = 2.0
+    alpha: float = 0.7
+    use_kl_divergence: bool = True
+    teacher_cache_dir: str | None = None
+    max_teacher_sequence_length: int = 2048
+    teacher_batch_size: int = 4
+
+
 class PreferenceConfig(BaseModel):
     model_config = ConfigDict(strict=True)
     enabled: bool = False
@@ -201,6 +211,7 @@ class ExperimentConfig(BaseModel):
     data: DataConfig
     training: TrainingConfig
     adapter: AdapterConfig
+    teacher_student: Optional[TeacherStudentConfig] = Field(default=None)
     preference: PreferenceConfig = Field(default_factory=PreferenceConfig)
     runtime: RuntimeConfig = Field(default_factory=RuntimeConfig)
     logging: LoggingConfig = Field(default_factory=LoggingConfig)
@@ -257,7 +268,7 @@ def _apply_refs(config_path: Path, raw: dict[str, Any]) -> dict[str, Any]:
         merged[section] = _load_yaml(resolved)
     if "lora" in raw and "adapter" not in raw:
         raw["adapter"] = raw["lora"]
-    for section in ("model", "data", "training", "adapter", "runtime", "logging", "tracking", "packaging"):
+    for section in ("model", "data", "training", "adapter", "teacher_student", "runtime", "logging", "tracking", "packaging"):
         if section in raw:
             merged[section] = _deep_merge(merged.get(section, {}), raw[section])
     if raw.get("overrides"):
