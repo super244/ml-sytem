@@ -31,6 +31,10 @@ data/processed/*.jsonl
 data/processed/*.json
 
 # Datasets and caches (prevent large files from being committed)
+cache/
+data/processed/.tokenized_cache/
+desktop/macos/**/.build/
+
 data/custom/*.jsonl
 data/custom/*.json
 data/custom/*.manifest.json
