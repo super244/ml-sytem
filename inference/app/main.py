@@ -11,10 +11,12 @@ Improvements over v0.2:
 from __future__ import annotations
 
 import logging
+import sqlite3
 import time
 import uuid
 from collections.abc import AsyncIterator, Iterable
 from contextlib import asynccontextmanager
+from pathlib import Path
 
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
@@ -31,16 +33,22 @@ settings = get_settings()
 
 
 @asynccontextmanager
-async def lifespan(_app: FastAPI) -> AsyncIterator[None]:
+async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     """Run startup work before yielding; teardown on exit."""
     logger.info("AI-Factory API starting up (v%s)", settings.version)
-    # Warm the orchestration service so the first request is fast.
-    try:
-        from ai_factory.core.orchestration.service import OrchestrationService
+    from ai_factory.core.platform.container import build_platform_container
 
-        OrchestrationService()  # initialises singletons
-    except Exception as exc:  # noqa: BLE001
-        logger.warning("Orchestration warm-up skipped: %s", exc)
+    try:
+        repo_root = Path(settings.repo_root).resolve()
+        container = build_platform_container(
+            repo_root=str(repo_root),
+            artifacts_dir=settings.artifacts_dir,
+        )
+        container.orchestration.monitoring_summary()
+        app.state.platform_container = container
+        logger.info("Orchestration layer warm-up complete.")
+    except (OSError, sqlite3.Error) as exc:
+        logger.warning("Orchestration warm-up skipped (environment): %s", exc)
     yield
     logger.info("AI-Factory API shut down cleanly.")
 

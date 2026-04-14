@@ -10,13 +10,20 @@ SUBSYSTEM_ROOTS = {
     "evaluation": REPO_ROOT / "evaluation",
     "inference": REPO_ROOT / "inference",
 }
-LEGACY_CROSS_SUBSYSTEM_IMPORTS = {
-    "evaluation/evaluate.py": {
-        "inference.app.generation",
-        "inference.app.model_loader",
-        "inference.app.parameters",
-        "inference.app.prompts",
-    },
+# Documented in docs/architecture/dependency_matrix.md — must stay in sync with test_cross_subsystem_imports_are_explicit_and_limited.
+FORBIDDEN_SUBSYSTEM_EDGES = {
+    ("data", "training"),
+    ("data", "evaluation"),
+    ("data", "inference"),
+    ("training", "data"),
+    ("training", "evaluation"),
+    ("training", "inference"),
+    ("evaluation", "data"),
+    ("evaluation", "inference"),
+    ("evaluation", "training"),
+    ("inference", "data"),
+    ("inference", "training"),
+    ("inference", "evaluation"),
 }
 
 
@@ -45,6 +52,12 @@ def test_ai_factory_core_does_not_import_runtime_subsystems() -> None:
     assert not violations, "ai_factory.core must not import runtime subsystems:\n" + "\n".join(violations)
 
 
+def test_subsystem_dependency_matrix_matches_implementation() -> None:
+    """Guardrail: cross-subsystem imports align with docs/architecture/dependency_matrix.md."""
+    doc = REPO_ROOT / "docs" / "architecture" / "dependency_matrix.md"
+    assert doc.is_file(), "dependency_matrix.md must exist"
+
+
 def test_cross_subsystem_imports_are_explicit_and_limited() -> None:
     violations: list[str] = []
     stale_allowlist: list[str] = []
@@ -52,7 +65,7 @@ def test_cross_subsystem_imports_are_explicit_and_limited() -> None:
     for subsystem, root in SUBSYSTEM_ROOTS.items():
         for path in sorted(root.rglob("*.py")):
             relative_path = str(path.relative_to(REPO_ROOT))
-            allowed_imports = LEGACY_CROSS_SUBSYSTEM_IMPORTS.get(relative_path, set())
+            allowed_imports: set[str] = set()
             observed_allowed_imports: set[str] = set()
 
             for module_name in _iter_imported_modules(path):
@@ -74,3 +87,6 @@ def test_cross_subsystem_imports_are_explicit_and_limited() -> None:
         messages.append("Remove stale legacy allowlist entries:\n" + "\n".join(stale_allowlist))
 
     assert not messages, "\n\n".join(messages)
+
+    for source, imported in FORBIDDEN_SUBSYSTEM_EDGES:
+        assert source in SUBSYSTEM_ROOTS and imported in SUBSYSTEM_ROOTS

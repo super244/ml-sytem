@@ -4,14 +4,14 @@ Generate advanced, polished graphs for training run analysis.
 """
 
 import argparse
+from pathlib import Path
 
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import seaborn as sns
-from pathlib import Path
 from matplotlib.gridspec import GridSpec
-from matplotlib.patches import Circle, FancyBboxPatch, Rectangle
+from matplotlib.patches import Circle, FancyBboxPatch
 
 from graph_generation.cli import (
     add_run_dir_argument,
@@ -688,7 +688,7 @@ def _generate_advanced_figures(
     print("6. Performance Comparison Analysis")
     print("7. Final Summary Dashboard")
 
-    print(f"\nKey Performance Metrics:")
+    print("\nKey Performance Metrics:")
     print(f"- Eval Loss: {final_metrics['eval_loss']:.6f}")
     print(f"- Perplexity: {final_perplexity:.4f}")
     print(f"- Estimated Accuracy: {accuracy_pct:.2f}%")

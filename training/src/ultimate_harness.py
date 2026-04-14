@@ -449,12 +449,14 @@ def build_ultimate_trainer_with_harness(
         )
 
     # Check if we need teacher-student training
-    if (hasattr(config, 'teacher_student') and 
-        config.teacher_student is not None and
-        config.teacher_student.teacher_model_name and 
-        config.teacher_student.teacher_model_name.strip()):
-        from training.src.teacher_student import create_teacher_student_trainer, TeacherStudentConfig
-        
+    if (
+        hasattr(config, "teacher_student")
+        and config.teacher_student is not None
+        and config.teacher_student.teacher_model_name
+        and config.teacher_student.teacher_model_name.strip()
+    ):
+        from training.src.teacher_student import TeacherStudentConfig, create_teacher_student_trainer
+
         # Create teacher-student config
         teacher_config = TeacherStudentConfig(
             teacher_model_name=config.teacher_student.teacher_model_name,
@@ -465,15 +467,16 @@ def build_ultimate_trainer_with_harness(
             max_teacher_sequence_length=config.teacher_student.max_teacher_sequence_length,
             teacher_batch_size=config.teacher_student.teacher_batch_size,
         )
-        
+
         # Create data collator for teacher-student training
         from training.src.collators import WeightedDataCollator
+
         data_collator = WeightedDataCollator(
             tokenizer=tokenizer,
             label_pad_token_id=-100,
             pad_to_multiple_of=8,
         )
-        
+
         return create_teacher_student_trainer(
             model=model,
             args=args,

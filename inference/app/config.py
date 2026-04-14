@@ -4,6 +4,8 @@ import os
 from dataclasses import dataclass, field
 from pathlib import Path
 
+from ai_factory.version import VERSION
+
 
 @dataclass
 class AppSettings:
@@ -53,7 +55,7 @@ def get_settings() -> AppSettings:
     )
     return AppSettings(
         title="AI-Factory API",
-        version="0.2.0",
+        version=os.getenv("AI_FACTORY_API_VERSION", VERSION),
         repo_root=str(repo_root),
         cors_origins=cors_origins,
         model_registry_path=_resolve_repo_path(

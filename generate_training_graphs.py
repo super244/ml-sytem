@@ -4,12 +4,12 @@ Generate 7 different types of graphs for training run analysis.
 """
 
 import argparse
+from pathlib import Path
 
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import seaborn as sns
-from pathlib import Path
 
 from graph_generation.cli import add_run_dir_argument, resolve_output_dir, resolve_run_dir
 from graph_generation.loader import load_training_run

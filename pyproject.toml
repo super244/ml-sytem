@@ -69,6 +69,13 @@ build-backend = "setuptools.build_meta"
 [tool.ruff]
 line-length = 120
 target-version = "py311"
+# Root-level visualization generators are not part of default CI product paths; keep lint focused elsewhere.
+extend-exclude = [
+  "generate_advanced_graphs.py",
+  "generate_training_graphs.py",
+  "generate_ultra_advanced_graphs.py",
+  "generate_visualizations.py",
+]
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "B", "UP", "C4"]

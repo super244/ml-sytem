@@ -12,10 +12,11 @@ New workflow:
 from __future__ import annotations
 
 import json
+from collections.abc import Iterable
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Dict, Iterable, List, Optional
+from typing import Any
 
 import matplotlib.dates as mdates
 import matplotlib.patches as mpatches
@@ -37,27 +38,27 @@ class TrainingRun:
     profile_name: str
     created_at: datetime
     path: Path
-    final_loss: Optional[float]
+    final_loss: float | None
     loss_history: list[float]
-    train_runtime_min: Optional[float]
-    train_samples_per_second: Optional[float]
-    train_steps_per_second: Optional[float]
-    eval_loss: Optional[float]
-    eval_runtime: Optional[float]
-    epoch: Optional[float]
-    learning_rate: Optional[float]
-    grad_accum: Optional[int]
-    total_parameters: Optional[int]
+    train_runtime_min: float | None
+    train_samples_per_second: float | None
+    train_steps_per_second: float | None
+    eval_loss: float | None
+    eval_runtime: float | None
+    epoch: float | None
+    learning_rate: float | None
+    grad_accum: int | None
+    total_parameters: int | None
 
 
 @dataclass
 class EvaluationEntry:
     label: str
-    accuracy: Optional[float]
-    avg_latency: Optional[float]
-    avg_quality: Optional[float]
-    formatting_failure_rate: Optional[float]
-    step_correctness: Optional[float]
+    accuracy: float | None
+    avg_latency: float | None
+    avg_quality: float | None
+    formatting_failure_rate: float | None
+    step_correctness: float | None
     run_name: str
     side: str
 
@@ -66,7 +67,7 @@ def ensure_output_dir() -> None:
     OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
 
 
-def safe_load_json(path: Path) -> Optional[Dict[str, Any]]:
+def safe_load_json(path: Path) -> dict[str, Any] | None:
     if not path.exists():
         return None
     try:
@@ -76,7 +77,7 @@ def safe_load_json(path: Path) -> Optional[Dict[str, Any]]:
         return None
 
 
-def parse_iso_datetime(value: Optional[str]) -> Optional[datetime]:
+def parse_iso_datetime(value: str | None) -> datetime | None:
     if not value:
         return None
     try:
@@ -85,7 +86,7 @@ def parse_iso_datetime(value: Optional[str]) -> Optional[datetime]:
         return None
 
 
-def parse_training_metrics(log_path: Path) -> Dict[str, Any]:
+def parse_training_metrics(log_path: Path) -> dict[str, Any]:
     result = {
         "loss_history": [],
         "final_loss": None,
@@ -121,8 +122,8 @@ def parse_training_metrics(log_path: Path) -> Dict[str, Any]:
     return result
 
 
-def collect_training_runs() -> List[TrainingRun]:
-    runs: List[TrainingRun] = []
+def collect_training_runs() -> list[TrainingRun]:
+    runs: list[TrainingRun] = []
     if not RUNS_ROOT.exists():
         return runs
 
@@ -166,8 +167,8 @@ def collect_training_runs() -> List[TrainingRun]:
     return runs
 
 
-def collect_evaluation_entries() -> List[EvaluationEntry]:
-    entries: List[EvaluationEntry] = []
+def collect_evaluation_entries() -> list[EvaluationEntry]:
+    entries: list[EvaluationEntry] = []
     if not EVAL_RESULTS_ROOT.exists():
         return entries
     for summary_path in sorted(EVAL_RESULTS_ROOT.rglob("summary.json")):
@@ -210,9 +211,9 @@ def normalize_label(value: str) -> str:
     return "".join(ch if ch.isalnum() else " " for ch in value).lower()
 
 
-def accuracy_for_run(run: TrainingRun, entries: Iterable[EvaluationEntry]) -> Optional[float]:
+def accuracy_for_run(run: TrainingRun, entries: Iterable[EvaluationEntry]) -> float | None:
     needle = normalize_label(run.run_name)
-    candidates: List[EvaluationEntry] = []
+    candidates: list[EvaluationEntry] = []
     for entry in entries:
         normalized = normalize_label(entry.label)
         if needle and (needle in normalized or normalized in needle):
@@ -222,7 +223,7 @@ def accuracy_for_run(run: TrainingRun, entries: Iterable[EvaluationEntry]) -> Op
     return max((entry.accuracy or 0.0) for entry in candidates)
 
 
-def plot_final_loss(runs: List[TrainingRun]) -> None:
+def plot_final_loss(runs: list[TrainingRun]) -> None:
     selected = sorted(
         [run for run in runs if run.final_loss is not None],
         key=lambda run: run.final_loss or float("inf"),
@@ -253,7 +254,7 @@ def plot_final_loss(runs: List[TrainingRun]) -> None:
     print("✓ Graph 1: Final loss comparison")
 
 
-def plot_training_time(runs: List[TrainingRun]) -> None:
+def plot_training_time(runs: list[TrainingRun]) -> None:
     selected = [
         run for run in runs if run.train_runtime_min is not None and run.train_runtime_min > 0
     ]
@@ -283,7 +284,7 @@ def plot_training_time(runs: List[TrainingRun]) -> None:
     print("✓ Graph 2: Training time comparison")
 
 
-def plot_loss_curves(runs: List[TrainingRun]) -> None:
+def plot_loss_curves(runs: list[TrainingRun]) -> None:
     selected = [
         run for run in runs if run.loss_history and len(run.loss_history) > 1
     ][:TOP_RUNS]
@@ -314,7 +315,7 @@ def plot_loss_curves(runs: List[TrainingRun]) -> None:
     print("✓ Graph 3: Loss curves")
 
 
-def plot_accuracy_line(entries: List[EvaluationEntry]) -> None:
+def plot_accuracy_line(entries: list[EvaluationEntry]) -> None:
     usable = [entry for entry in entries if entry.accuracy is not None]
     if not usable:
         print("No accuracy entries found; skipping accuracy line graph.")
@@ -340,7 +341,7 @@ def plot_accuracy_line(entries: List[EvaluationEntry]) -> None:
     print("✓ Graph 4: Accuracy progression")
 
 
-def plot_heatmap(runs: List[TrainingRun]) -> None:
+def plot_heatmap(runs: list[TrainingRun]) -> None:
     selected = [
         run for run in runs if run.final_loss is not None
     ][:TOP_RUNS]
@@ -391,7 +392,7 @@ def plot_heatmap(runs: List[TrainingRun]) -> None:
     print("✓ Graph 5: Performance heatmap")
 
 
-def plot_timeline(runs: List[TrainingRun]) -> None:
+def plot_timeline(runs: list[TrainingRun]) -> None:
     selected = sorted(
         [run for run in runs if run.final_loss is not None],
         key=lambda run: run.created_at,
@@ -424,7 +425,7 @@ def plot_timeline(runs: List[TrainingRun]) -> None:
     print("✓ Graph 6: Training timeline")
 
 
-def plot_quadrant(entries: List[EvaluationEntry]) -> None:
+def plot_quadrant(entries: list[EvaluationEntry]) -> None:
     data = [
         entry
         for entry in entries
@@ -476,13 +477,13 @@ def plot_quadrant(entries: List[EvaluationEntry]) -> None:
     print("✓ Graph 7: Speed vs accuracy quadrant")
 
 
-def plot_radar(runs: List[TrainingRun], entries: Iterable[EvaluationEntry]) -> None:
+def plot_radar(runs: list[TrainingRun], entries: Iterable[EvaluationEntry]) -> None:
     radar_runs = [run for run in runs if run.total_parameters and run.loss_history][:3]
     if not radar_runs:
         print("Radar chart skipped because radar runs are missing required metrics.")
         return
     categories = ["Accuracy", "Speed", "Loss Efficiency", "Eval Stability", "Size"]
-    metrics_data: List[List[float]] = []
+    metrics_data: list[list[float]] = []
     for run in radar_runs:
         accuracy = accuracy_for_run(run, entries) or 0.0
         speed = run.train_steps_per_second or run.train_samples_per_second or 0.0
@@ -516,7 +517,7 @@ def plot_radar(runs: List[TrainingRun], entries: Iterable[EvaluationEntry]) -> N
     print("✓ Graph 8: Radar comparison")
 
 
-def write_summary(runs: List[TrainingRun], entries: List[EvaluationEntry]) -> None:
+def write_summary(runs: list[TrainingRun], entries: list[EvaluationEntry]) -> None:
     summary_path = OUTPUT_DIR / "SUMMARY.txt"
     lines = [
         "AI-Factory Visualization Summary",

@@ -8,7 +8,11 @@
     "start": "next start",
     "typecheck": "node -e \"const fs=require('fs'); fs.rmSync('tsconfig.tsbuildinfo',{force:true}); fs.mkdirSync('.next/types',{recursive:true}); fs.closeSync(fs.openSync('.next/types/cache-life.d.ts','a'));\" && next typegen && tsc --noEmit",
     "lint": "eslint . --max-warnings=0",
-    "format": "prettier --write ."
+    "format": "prettier --write .",
+    "api:export": "python3 ../scripts/export_openapi.py",
+    "api:codegen": "openapi-typescript ./lib/api/generated/openapi.json -o ./lib/api/generated/schema.d.ts",
+    "api:sync": "npm run api:export && npm run api:codegen",
+    "api:check": "npm run api:sync && git diff --exit-code ./lib/api/generated/"
   },
   "dependencies": {
     "clsx": "^2.1.1",
@@ -35,6 +39,7 @@
     "eslint-plugin-prettier": "^5.5.5",
     "eslint-plugin-react": "^7.37.5",
     "eslint-plugin-react-hooks": "^7.0.1",
+    "openapi-typescript": "^7.13.0",
     "postcss": "^8.5.8",
     "prettier": "^3.8.1",
     "tailwindcss": "^3.4.19",

@@ -5,4 +5,8 @@ types (schemas), hashing/fingerprints, and artifact/manifest helpers used by
 data/training/inference/evaluation.
 """
 
-__version__ = "0.2.0"
+from ai_factory.version import VERSION
+
+__version__ = VERSION
+
+__all__ = ["VERSION", "__version__"]

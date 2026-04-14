@@ -1,8 +1,8 @@
 from __future__ import annotations
 
-from inference.app.generation import MathGenerator
-from inference.app.parameters import GenerationParameters
-from inference.app.prompts import PromptPreset
+import ai_factory.core.math_stack.generation as math_stack_generation
+from ai_factory.core.math_stack import GenerationParameters, MathGenerator
+from ai_factory.core.math_stack.prompts import PromptPreset
 
 
 class DummyRegistry:
@@ -21,7 +21,8 @@ def test_generate_reports_python_fallback_when_rust_canary_not_enabled(monkeypat
     generator = MathGenerator(DummyRegistry(), prompt_presets={"atlas_rigorous": preset})
 
     monkeypatch.setattr(
-        "inference.app.generation.titan_diagnostics",
+        math_stack_generation,
+        "titan_diagnostics",
         lambda: {
             "runtime": {
                 "selected": "rust-canary",

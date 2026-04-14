@@ -5,6 +5,7 @@ from typing import Any
 from fastapi import APIRouter, Depends
 
 from ai_factory.titan import detect_titan_status
+from ai_factory.version import VERSION
 from inference.app.config import get_settings
 from inference.app.dependencies import get_metadata_service
 
@@ -62,7 +63,7 @@ def metrics() -> dict[str, Any]:
         titan_status = detect_titan_status(settings.repo_root)
 
         return {
-            "api_version": "0.2.0",
+            "api_version": VERSION,
             "status": workspace_status.get("status", "unknown"),
             "uptime_seconds": workspace_status.get("uptime_seconds", 0),
             "ready_checks": workspace_status.get("summary", {}).get("ready_checks", 0),
@@ -74,7 +75,7 @@ def metrics() -> dict[str, Any]:
         }
     except Exception as exc:
         return {
-            "api_version": "0.2.0",
+            "api_version": VERSION,
             "status": "error",
             "error": str(exc),
             "ready_checks": 0,
@@ -91,7 +92,7 @@ def status(service: Any = Depends(get_metadata_service)) -> dict[str, Any]:
     except Exception as exc:
         return {
             "title": "AI-Factory API",
-            "version": "0.2.0",
+            "version": VERSION,
             "status": "degraded",
             "error": str(exc),
             "models": [],

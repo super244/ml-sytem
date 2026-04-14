@@ -71,7 +71,9 @@ def parse_args() -> argparse.Namespace:
         help="Optional sample cap applied across the evaluation suite.",
     )
     parser.add_argument("--skip-cleanup", action="store_true", help="Do not remove transient caches before training.")
-    parser.add_argument("--skip-training", action="store_true", help="Do not launch training; use --run-dir or the latest run.")
+    parser.add_argument(
+        "--skip-training", action="store_true", help="Do not launch training; use --run-dir or the latest run."
+    )
     parser.add_argument("--skip-eval", action="store_true", help="Skip the final evaluation suite.")
     parser.add_argument("--skip-inference", action="store_true", help="Skip the inference smoke test.")
     parser.add_argument("--skip-visualizations", action="store_true", help="Skip chart regeneration.")
@@ -95,7 +97,9 @@ def main() -> None:
     current_run_dir = Path(args.run_dir).resolve() if args.run_dir else None
 
     if args.dry_run and current_run_dir is None and args.skip_training:
-        raise ValueError("--dry-run with --skip-training requires --run-dir so the suite knows which adapter to inspect.")
+        raise ValueError(
+            "--dry-run with --skip-training requires --run-dir so the suite knows which adapter to inspect."
+        )
 
     if not args.skip_cleanup:
         run_command([sys.executable, "scripts/cleanup_training_cache.py"], dry_run=args.dry_run)
@@ -109,7 +113,9 @@ def main() -> None:
             current_run_dir = None
 
         if args.dry_run and current_run_dir is None:
-            print("Dry run complete for training stage. Re-run with --run-dir or without --dry-run to continue the suite.")
+            print(
+                "Dry run complete for training stage. Re-run with --run-dir or without --dry-run to continue the suite."
+            )
             return
 
         if current_run_dir is None or not current_run_dir.exists():

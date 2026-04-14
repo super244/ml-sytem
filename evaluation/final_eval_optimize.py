@@ -9,9 +9,10 @@ import os
 import subprocess
 import sys
 import tempfile
+from collections.abc import Mapping
 from pathlib import Path
 from statistics import mean
-from typing import Any, Dict, Mapping, Optional
+from typing import Any
 
 import yaml
 
@@ -43,7 +44,7 @@ def parse_args() -> argparse.Namespace:
     )
     parser.add_argument(
         "--secondary-model",
-        help="Optional override for the comparison model name (defaults to what the suite defines)." ,
+        help="Optional override for the comparison model name (defaults to what the suite defines).",
     )
     parser.add_argument(
         "--max-eval-samples",
@@ -78,21 +79,17 @@ def deep_merge(left: Mapping[str, Any], right: Mapping[str, Any]) -> dict[str, A
 
 def make_temp_registry(
     base_registry: Path,
-    adapter_path: Optional[str],
+    adapter_path: str | None,
     name: str,
     label: str,
     base_model: str,
-) -> Optional[Path]:
+) -> Path | None:
     if not adapter_path:
         return None
     if not Path(adapter_path).exists():
         raise FileNotFoundError(f"Adapter missing: {adapter_path}")
     base_payload = yaml.safe_load(base_registry.read_text()) or {}
-    models = [
-        entry
-        for entry in base_payload.get("models", [])
-        if entry.get("name") != name
-    ]
+    models = [entry for entry in base_payload.get("models", []) if entry.get("name") != name]
     models.append(
         {
             "name": name,
@@ -118,7 +115,7 @@ def build_run_config(
     entry: dict[str, Any],
     run_label: str,
     output_dir: Path,
-    temp_registry: Optional[Path],
+    temp_registry: Path | None,
     args: argparse.Namespace,
 ) -> dict[str, Any]:
     merged = deep_merge(suite_base, {k: v for k, v in entry.items() if k not in {"label", "description"}})
@@ -177,7 +174,7 @@ def build_suite_summary(results: list[dict[str, Any]]) -> dict[str, Any]:
     }
 
 
-def describe_error_types(entry: dict[str, Any]) -> Optional[str]:
+def describe_error_types(entry: dict[str, Any]) -> str | None:
     errors = entry.get("error_types") or {}
     if not errors:
         return None
@@ -206,15 +203,14 @@ def build_recommendation(summary: dict[str, Any]) -> dict[str, Any]:
         if top_error:
             adjustments.append(f"Target the {top_error} error type by replaying similar failure cases.")
         note_sections.append(
-            f"Weakest suite leg: " f"{weakest['label']} ({weakest.get('benchmark_id')}) @ {accuracy*100:.1f}% accuracy."
+            f"Weakest suite leg: {weakest['label']} ({weakest.get('benchmark_id')}) @ {accuracy * 100:.1f}% accuracy."
         )
     rerun_command = "python -m training.train --config training/configs/profiles/codex_accuracy_final.yaml"
     return {
         "weakest_run": weakest["label"] if weakest else None,
         "mean_accuracy": summary.get("mean_accuracy"),
-        "adjustments": adjustments or [
-            "Re-run codex_accuracy_final with the default final weights if no single bottleneck is visible."
-        ],
+        "adjustments": adjustments
+        or ["Re-run codex_accuracy_final with the default final weights if no single bottleneck is visible."],
         "notes": note_sections,
         "rerun_command": rerun_command,
         "rerun_profile": "training/configs/profiles/codex_accuracy_final.yaml",

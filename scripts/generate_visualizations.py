@@ -2,9 +2,11 @@
 """Generate visualizations for model evaluation results."""
 
 import json
+from pathlib import Path
+
 import matplotlib.pyplot as plt
 import numpy as np
-from pathlib import Path
+
 
 def load_summary(eval_dir):
     """Load evaluation summary JSON."""
@@ -64,7 +66,7 @@ def plot_improvement_delta(results_dict, output_path):
     ax.grid(axis='x', alpha=0.3)
     
     # Add value labels
-    for i, (bar, delta) in enumerate(zip(bars, deltas)):
+    for _, (bar, delta) in enumerate(zip(bars, deltas, strict=True)):
         width = bar.get_width()
         ax.annotate(f'{delta:+.1f}%',
                    xy=(width, bar.get_y() + bar.get_height()/2),

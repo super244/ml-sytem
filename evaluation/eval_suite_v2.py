@@ -24,9 +24,9 @@ from transformers import AutoModelForCausalLM, AutoTokenizer
 project_root = Path(__file__).parent.parent.parent
 sys.path.insert(0, str(project_root))
 
+from ai_factory.core.runtime import HardwareDetector, TrainingOptimizer  # noqa: E402
 from evaluation.benchmark_registry import BenchmarkRegistry  # noqa: E402
 from evaluation.error_taxonomy import ErrorTaxonomy  # noqa: E402
-from training.src.optimization import HardwareDetector, TrainingOptimizer  # noqa: E402
 
 logging.basicConfig(
     level=logging.INFO,

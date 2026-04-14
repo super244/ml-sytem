@@ -4,10 +4,10 @@ import argparse
 import json
 import sys
 import time
-import yaml
 from pathlib import Path
 from typing import Any
 
+import yaml
 from tqdm import tqdm
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
@@ -15,13 +15,16 @@ if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
 from ai_factory.core.io import read_jsonl, write_json, write_jsonl  # noqa: E402
+from ai_factory.core.math_stack import (  # noqa: E402
+    GenerationParameters,
+    MathGenerator,
+    MathModelRegistry,
+    load_prompt_presets,
+    load_registry_from_yaml,
+)
 from evaluation.benchmark_registry import resolve_benchmark_file  # noqa: E402
 from evaluation.metrics import score_prediction  # noqa: E402
 from evaluation.reporting import build_summary, write_markdown_report  # noqa: E402
-from inference.app.generation import MathGenerator  # noqa: E402
-from inference.app.model_loader import MathModelRegistry, load_registry_from_yaml  # noqa: E402
-from inference.app.parameters import GenerationParameters  # noqa: E402
-from inference.app.prompts import load_prompt_presets  # noqa: E402
 
 
 def parse_args() -> argparse.Namespace:
@@ -169,12 +172,12 @@ def main() -> None:
         benchmark_file=benchmark_config.get("benchmark_file"),
     )
     benchmark = read_jsonl(benchmark_file)
-    
+
     # Apply max_eval_samples limit if specified
     max_samples = config.get("generation", {}).get("max_eval_samples")
     if max_samples and isinstance(max_samples, int) and max_samples > 0:
         benchmark = benchmark[:max_samples]
-    
+
     generator, model_registry = build_generator(config)
     output_dir = Path(output_dir_value).expanduser()
     output_dir.mkdir(parents=True, exist_ok=True)

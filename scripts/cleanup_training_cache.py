@@ -6,8 +6,8 @@ Only removes the directories that are explicitly listed below, nothing under
 `artifacts/runs` or the dataset folders that hold the current training/eval data.
 """
 
-from pathlib import Path
 import shutil
+from pathlib import Path
 
 TARGETS = [
     Path("cache"),

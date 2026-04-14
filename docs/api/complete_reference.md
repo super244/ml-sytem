@@ -49,7 +49,7 @@ curl -sS http://127.0.0.1:8000/v1/health | jq
 {
   "status": "ok",
   "service": "ai-factory-inference",
-  "version": "0.2.0"
+  "version": "0.3.0"
 }
 ```
 

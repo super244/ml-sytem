@@ -13,11 +13,14 @@ import yaml
 from peft import PeftConfig
 
 from ai_factory.core.io import read_jsonl, write_json
-from inference.app.generation import MathGenerator
-from inference.app.model_loader import MathModelRegistry, load_registry_from_yaml
-from inference.app.parameters import GenerationParameters
-from inference.app.prompts import load_prompt_presets
-from training.src.config import ExperimentConfig, load_experiment_config
+from ai_factory.core.math_stack import (
+    GenerationParameters,
+    MathGenerator,
+    MathModelRegistry,
+    load_prompt_presets,
+    load_registry_from_yaml,
+)
+from training.src.config import ExperimentConfig
 
 logger = logging.getLogger(__name__)
 
@@ -447,9 +450,7 @@ def prune_irrelevant_artifacts(
     config: ExperimentConfig, *, execute: bool, current_run_dir: str | Path | None = None
 ) -> dict[str, list[str]]:
     keep_paths = {
-        str(_resolve_repo_path(config.data.tokenized_cache_dir))
-        for value in [config.data.tokenized_cache_dir]
-        if value
+        str(_resolve_repo_path(config.data.tokenized_cache_dir)) for value in [config.data.tokenized_cache_dir] if value
     }
     keep_paths.update(
         {
@@ -490,4 +491,3 @@ def prune_irrelevant_artifacts(
         else:
             skipped.append(f"dry-run:{resolved}")
     return {"removed": removed, "skipped": skipped}
-

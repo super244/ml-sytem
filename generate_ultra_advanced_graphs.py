@@ -4,16 +4,15 @@ Generate ultra-advanced, publication-quality graphs for training run analysis.
 """
 
 import argparse
+from pathlib import Path
 
 import matplotlib.patheffects as path_effects
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
-import seaborn as sns
-from pathlib import Path
 from matplotlib.colors import LinearSegmentedColormap
 from matplotlib.gridspec import GridSpec
-from matplotlib.patches import Circle, FancyBboxPatch, Rectangle
+from matplotlib.patches import Circle, FancyBboxPatch
 
 from graph_generation.cli import (
     add_run_dir_argument,

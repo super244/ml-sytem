@@ -3,7 +3,8 @@ from __future__ import annotations
 import os
 import sys
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Union
+from typing import Any
+
 import yaml
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -211,7 +212,7 @@ class ExperimentConfig(BaseModel):
     data: DataConfig
     training: TrainingConfig
     adapter: AdapterConfig
-    teacher_student: Optional[TeacherStudentConfig] = Field(default=None)
+    teacher_student: TeacherStudentConfig | None = Field(default=None)
     preference: PreferenceConfig = Field(default_factory=PreferenceConfig)
     runtime: RuntimeConfig = Field(default_factory=RuntimeConfig)
     logging: LoggingConfig = Field(default_factory=LoggingConfig)
@@ -268,7 +269,17 @@ def _apply_refs(config_path: Path, raw: dict[str, Any]) -> dict[str, Any]:
         merged[section] = _load_yaml(resolved)
     if "lora" in raw and "adapter" not in raw:
         raw["adapter"] = raw["lora"]
-    for section in ("model", "data", "training", "adapter", "teacher_student", "runtime", "logging", "tracking", "packaging"):
+    for section in (
+        "model",
+        "data",
+        "training",
+        "adapter",
+        "teacher_student",
+        "runtime",
+        "logging",
+        "tracking",
+        "packaging",
+    ):
         if section in raw:
             merged[section] = _deep_merge(merged.get(section, {}), raw[section])
     if raw.get("overrides"):

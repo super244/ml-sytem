@@ -1,6 +1,7 @@
 import { titanStatusSchema, type TitanStatus } from '@/lib/titan-schema';
 
 export type { TitanStatus } from '@/lib/titan-schema';
+export type { components, paths } from '@/lib/api/contract';
 
 export type ModelVariant = string;
 export type Difficulty = 'easy' | 'medium' | 'hard' | 'olympiad';
