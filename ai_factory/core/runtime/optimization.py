@@ -72,7 +72,7 @@ class HardwareDetector:
         try:
             import ai_factory_titan as titan
 
-            return True, titan.VERSION
+            return True, getattr(titan, "VERSION", "unknown")
         except ImportError:
             return False, ""
 
@@ -518,7 +518,7 @@ class AutoTuner:
                 loss = output.mean()
                 loss.backward()
 
-                if end:
+                if end is not None and start is not None:
                     end.record()
                     torch.cuda.synchronize()
                     elapsed_ms = start.elapsed_time(end)
@@ -621,7 +621,7 @@ class TrainingOptimizer:
             f"Capability: {self.hardware.capability_score:.0f}"
         )
 
-    def _init_titan(self):
+    def _init_titan(self) -> None:
         """Initialize Titan engine integration."""
         try:
             import ai_factory_titan as titan
@@ -629,7 +629,7 @@ class TrainingOptimizer:
             self.titan_config.enabled = True
             self.titan_config.use_cuda = self.hardware.backend == BackendType.CUDA
             self.titan_config.use_metal = self.hardware.backend == BackendType.METAL
-            logger.info(f"Titan engine v{titan.VERSION} integrated")
+            logger.info(f"Titan engine v{getattr(titan, 'VERSION', 'unknown')} integrated")
         except ImportError:
             logger.warning("Titan engine integration failed")
 
@@ -718,7 +718,7 @@ class TrainingOptimizer:
 
     def _configure_cpu(self) -> None:
         """Configure PyTorch for CPU."""
-        torch.backends.mkldnn.enabled = True
+        torch.backends.mkldnn.enabled = True  # type: ignore[assignment]
 
         threads = min(self.hardware.compute_units, 32)
         torch.set_num_threads(threads)

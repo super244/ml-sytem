@@ -1,4 +1,4 @@
-run_name: accuracy_full_param
+run_name: finetune_lora
 
 model:
   base_model_name: Qwen/Qwen2.5-Math-1.5B-Instruct
@@ -8,35 +8,31 @@ model:
   use_full_precision: true
 
 training:
-  num_train_epochs: 25.0
-  learning_rate: 0.000005
+  num_train_epochs: 3.0
+  learning_rate: 0.00015
   artifacts_dir: artifacts
-  warmup_ratio: 0.3
-  weight_decay: 0.0001
+  warmup_ratio: 0.1
+  weight_decay: 0.01
   lr_scheduler_type: cosine
-  per_device_train_batch_size: 1
-  per_device_eval_batch_size: 1
-  gradient_accumulation_steps: 8
-  logging_steps: 5
-  evaluation_strategy: "no"
-  save_strategy: epoch
-  save_total_limit: 5
-  load_best_model_at_end: false
+  per_device_train_batch_size: 6
+  per_device_eval_batch_size: 6
+  gradient_accumulation_steps: 3
+  logging_steps: 10
+  evaluation_strategy: "epoch"
+  save_strategy: "epoch"
+  save_total_limit: 3
+  load_best_model_at_end: true
   group_by_length: true
   dataloader_pin_memory: false
   dataloader_num_workers: 0
   save_safetensors: true
-  max_grad_norm: 0.5
+  max_grad_norm: 1.0
   fp16: false
   bf16: false
   gradient_checkpointing: true
   optim: adamw_torch
   max_steps: -1
-  
-  # Maximum accuracy-focused settings for 100% target
-  formatting_reward_weight: 15.0
-  answer_token_weight: 30.0
-  
+
 logging:
   log_level: INFO
   report_to: [none]
@@ -49,20 +45,33 @@ runtime:
   torch_compile: false
   dataloader_pin_memory: false
 
-# Full parameter training - no adapter
 adapter:
-  method: full
+  method: lora
+  r: 16
+  alpha: 32
+  dropout: 0.05
+  target_modules:
+    - q_proj
+    - v_proj
+    - k_proj
+    - o_proj
+    - gate_proj
+    - up_proj
+    - down_proj
 
 data:
   train_file: data/processed/train.jsonl
   eval_file: data/processed/eval.jsonl
-  max_length: 4096
+  max_length: 2048
   pack: true
   shuffle: true
   stream: false
   max_samples: -1
-  curriculum_learning: true
-  sequential_curriculum: true
+  curriculum_learning: false
+  sequential_curriculum: false
+  use_tokenized_cache: true
+  tokenization_num_proc: 2
+  tokenization_batch_size: 32
 
 packaging:
-  publish_model_name: atlas-accuracy-full-param
+  publish_model_name: atlas-finetune-lora

@@ -135,7 +135,7 @@ class MathModelRuntime:
                 low_cpu_mem_usage=True,  # Memory optimization
             )
             if self.spec.adapter_path:
-                model = PeftModel.from_pretrained(model, self.spec.adapter_path)
+                model = PeftModel.from_pretrained(model, self.spec.adapter_path)  # type: ignore[assignment]
             model.eval()
             self._loaded = LoadedModel(model=model, tokenizer=tokenizer)
             return self._loaded

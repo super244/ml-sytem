@@ -9,21 +9,22 @@ experience:
 lifecycle:
   stage: finetune
   origin: existing_model
-  learning_mode: qlora
-  source_model: artifacts/foundation/qwen2-2b
+  learning_mode: lora
+  source_model: Qwen/Qwen2.5-Math-1.5B-Instruct
   evaluation_suite:
-    id: base_vs_finetuned
-    label: Baseline Vs Finetuned
+    id: lora_vs_full
+    label: LoRA Vs Full
     benchmark_config: evaluation/configs/base_vs_finetuned.yaml
     compare_to_models:
-      - base
+      - lora
+      - full
   deployment_targets:
     - ollama
     - huggingface
 execution:
   backend: local
 subsystem:
-  config_ref: ../training/configs/profiles/baseline_qlora.yaml
+  config_ref: ../training/configs/profiles/finetune_lora.yaml
   dry_run: true
 monitoring:
   collect_gpu: true

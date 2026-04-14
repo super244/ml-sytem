@@ -1,0 +1,84 @@
+run_name: upgraded_training
+
+model:
+  base_model_name: artifacts/runs/accuracy_ultimate_95_plus-20260408-174421/published/final_adapter
+  trust_remote_code: false
+  use_4bit: false
+  use_8bit: false
+  use_full_precision: true
+
+training:
+  num_train_epochs: 5.0
+  learning_rate: 0.00004
+  artifacts_dir: artifacts
+  warmup_ratio: 0.08
+  weight_decay: 0.005
+  lr_scheduler_type: cosine_with_restarts
+  per_device_train_batch_size: 6
+  per_device_eval_batch_size: 6
+  gradient_accumulation_steps: 3
+  logging_steps: 5
+  evaluation_strategy: "steps"
+  eval_steps: 100
+  save_strategy: "steps"
+  save_steps: 100
+  save_total_limit: 3
+  load_best_model_at_end: true
+  group_by_length: true
+  dataloader_pin_memory: false
+  dataloader_num_workers: 0
+  save_safetensors: true
+  max_grad_norm: 1.0
+  fp16: false
+  bf16: false
+  gradient_checkpointing: true
+  optim: adamw_torch_fused
+  max_steps: -1
+
+  # Enhanced pipeline features
+  formatting_reward_weight: 10.0
+  answer_token_weight: 20.0
+
+logging:
+  log_level: INFO
+  report_to: [none]
+  logging_first_step: true
+  watch_model: false
+
+runtime:
+  device: mps
+  seed: 42
+  torch_compile: false
+  dataloader_pin_memory: false
+
+adapter:
+  method: lora
+  r: 24
+  alpha: 48
+  dropout: 0.03
+  target_modules:
+    - q_proj
+    - v_proj
+    - k_proj
+    - o_proj
+    - gate_proj
+    - up_proj
+    - down_proj
+    - lm_head
+
+data:
+  train_file: data/processed/train.jsonl
+  eval_file: data/processed/eval.jsonl
+  max_length: 2048
+  pack: true
+  shuffle: true
+  stream: false
+  max_samples: -1
+  curriculum_learning: true
+  sequential_curriculum: false
+  use_tokenized_cache: true
+  tokenization_num_proc: 2
+  tokenization_batch_size: 48
+
+packaging:
+  publish_model_name: atlas-upgraded-training

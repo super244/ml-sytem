@@ -9,21 +9,22 @@ experience:
 lifecycle:
   stage: train
   origin: existing_model
-  learning_mode: qlora
-  source_model: artifacts/foundation/qwen2-2b
+  learning_mode: lora
+  source_model: artifacts/runs/accuracy_ultimate_95_plus-20260408-174421/published/final_adapter
   evaluation_suite:
-    id: base_vs_finetuned
-    label: Baseline Vs Finetuned
+    id: basic_vs_upgraded
+    label: Basic Vs Upgraded
     benchmark_config: evaluation/configs/base_vs_finetuned.yaml
     compare_to_models:
-      - base
+      - basic
+      - upgraded
   deployment_targets:
     - ollama
     - huggingface
 execution:
   backend: local
 subsystem:
-  config_ref: ../training/configs/profiles/baseline_qlora.yaml
+  config_ref: ../training/configs/profiles/basic_training.yaml
   dry_run: true
 monitoring:
   collect_gpu: true

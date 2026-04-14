@@ -15,7 +15,6 @@ execution:
 subsystem:
   provider: ollama
   provider_options:
-    dry_run: true
     model_name: atlas-local
     modelfile: Modelfile
 monitoring:

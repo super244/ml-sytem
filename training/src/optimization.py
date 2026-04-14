@@ -33,9 +33,9 @@ __all__ = [
 
 
 def create_supercharged_trainer_config(
-    base_config: "ExperimentConfig",
+    base_config: ExperimentConfig,
     hardware_override: HardwareProfile | None = None,
-) -> "ExperimentConfig":
+) -> ExperimentConfig:
     """Create a supercharged-optimized training configuration."""
     from training.src.config import ExperimentConfig
 

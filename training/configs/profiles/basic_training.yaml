@@ -1,27 +1,27 @@
-run_name: accuracy_ultimate_to_95
+run_name: basic_training
 
 model:
-  base_model_name: artifacts/runs/accuracy_ultimate_final-20260408-003835/published/final_adapter
+  base_model_name: artifacts/runs/accuracy_ultimate_95_plus-20260408-174421/published/final_adapter
   trust_remote_code: false
   use_4bit: false
   use_8bit: false
   use_full_precision: true
 
 training:
-  num_train_epochs: 15.0
+  num_train_epochs: 3.0
   learning_rate: 0.00005
   artifacts_dir: artifacts
   warmup_ratio: 0.1
   weight_decay: 0.01
   lr_scheduler_type: cosine
-  per_device_train_batch_size: 1
-  per_device_eval_batch_size: 1
+  per_device_train_batch_size: 4
+  per_device_eval_batch_size: 4
   gradient_accumulation_steps: 4
-  logging_steps: 1
+  logging_steps: 10
   evaluation_strategy: "epoch"
   save_strategy: "epoch"
   save_total_limit: 3
-  load_best_model_at_end: false
+  load_best_model_at_end: true
   group_by_length: true
   dataloader_pin_memory: false
   dataloader_num_workers: 0
@@ -32,11 +32,7 @@ training:
   gradient_checkpointing: true
   optim: adamw_torch
   max_steps: -1
-  
-  # High accuracy focus
-  formatting_reward_weight: 30.0
-  answer_token_weight: 50.0
-  
+
 logging:
   log_level: INFO
   report_to: [none]
@@ -51,8 +47,8 @@ runtime:
 
 adapter:
   method: lora
-  r: 8
-  alpha: 16
+  r: 16
+  alpha: 32
   dropout: 0.05
   target_modules:
     - q_proj
@@ -71,11 +67,11 @@ data:
   shuffle: true
   stream: false
   max_samples: -1
-  curriculum_learning: true
-  sequential_curriculum: true
+  curriculum_learning: false
+  sequential_curriculum: false
   use_tokenized_cache: true
-  tokenization_num_proc: 1
+  tokenization_num_proc: 2
   tokenization_batch_size: 32
 
 packaging:
-  publish_model_name: atlas-accuracy-95-plus
+  publish_model_name: atlas-basic-training

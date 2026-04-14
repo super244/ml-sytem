@@ -9,11 +9,12 @@ experience:
 lifecycle:
   stage: evaluate
   evaluation_suite:
-    id: base_vs_finetuned
-    label: Baseline Vs Finetuned
+    id: basic_vs_upgraded
+    label: Basic Vs Upgraded
     benchmark_config: evaluation/configs/base_vs_finetuned.yaml
     compare_to_models:
-      - base
+      - basic
+      - upgraded
   deployment_targets:
     - huggingface
     - ollama

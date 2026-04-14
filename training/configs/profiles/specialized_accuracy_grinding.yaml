@@ -1,44 +1,46 @@
-run_name: accuracy_perfect_final
+run_name: specialized_accuracy_grinding_math
 
 model:
-  base_model_name: artifacts/runs/accuracy_ultimate_final-20260408-003835/published/final_adapter
+  base_model_name: artifacts/runs/accuracy_ultimate_95_plus-20260408-174421/published/final_adapter
   trust_remote_code: false
   use_4bit: false
   use_8bit: false
   use_full_precision: true
 
 training:
-  num_train_epochs: 20.0
-  learning_rate: 0.00001
+  num_train_epochs: 15.0
+  learning_rate: 0.000025
   artifacts_dir: artifacts
-  warmup_ratio: 0.25
-  weight_decay: 0.0001
-  lr_scheduler_type: cosine
-  per_device_train_batch_size: 1
-  per_device_eval_batch_size: 1
-  gradient_accumulation_steps: 16
+  warmup_ratio: 0.05
+  weight_decay: 0.002
+  lr_scheduler_type: cosine_with_restarts
+  per_device_train_batch_size: 8
+  per_device_eval_batch_size: 8
+  gradient_accumulation_steps: 3
   logging_steps: 5
-  evaluation_strategy: steps
+  evaluation_strategy: "steps"
   eval_steps: 50
-  save_strategy: steps
+  save_strategy: "steps"
   save_steps: 50
-  save_total_limit: 5
-  load_best_model_at_end: false
+  save_total_limit: 4
+  load_best_model_at_end: true
   group_by_length: true
   dataloader_pin_memory: false
   dataloader_num_workers: 0
   save_safetensors: true
-  max_grad_norm: 0.3
+  max_grad_norm: 0.8
   fp16: false
   bf16: false
   gradient_checkpointing: true
-  optim: adamw_torch
+  optim: adamw_torch_fused
   max_steps: -1
-  
-  # Maximum accuracy-focused settings for 100% target
-  formatting_reward_weight: 10.0
-  answer_token_weight: 20.0
-  
+
+  # Pure accuracy grinding rewards
+  formatting_reward_weight: 100.0
+  answer_token_weight: 100.0
+  precision_reward_weight: 50.0
+  calculation_accuracy_weight: 75.0
+
 logging:
   log_level: INFO
   report_to: [none]
@@ -53,9 +55,9 @@ runtime:
 
 adapter:
   method: lora
-  r: 2
-  alpha: 4
-  dropout: 0.01
+  r: 48
+  alpha: 96
+  dropout: 0.02
   target_modules:
     - q_proj
     - v_proj
@@ -64,17 +66,21 @@ adapter:
     - gate_proj
     - up_proj
     - down_proj
+    - lm_head
 
 data:
   train_file: data/processed/train.jsonl
   eval_file: data/processed/eval.jsonl
-  max_length: 4096
+  max_length: 2048
   pack: true
   shuffle: true
   stream: false
   max_samples: -1
   curriculum_learning: true
   sequential_curriculum: true
+  use_tokenized_cache: true
+  tokenization_num_proc: 2
+  tokenization_batch_size: 64
 
 packaging:
-  publish_model_name: atlas-accuracy-perfect-final
+  publish_model_name: atlas-specialized-accuracy-grinding

@@ -1,42 +1,46 @@
-run_name: metal_optimized_accuracy
+run_name: specialized_long_context
 
 model:
-  base_model_name: artifacts/runs/accuracy_perfect_final-20260408-014151/published/final_adapter
+  base_model_name: artifacts/runs/accuracy_ultimate_95_plus-20260408-174421/published/final_adapter
   trust_remote_code: false
   use_4bit: false
   use_8bit: false
   use_full_precision: true
 
 training:
-  num_train_epochs: 10.0
+  num_train_epochs: 6.0
   learning_rate: 0.00003
   artifacts_dir: artifacts
   warmup_ratio: 0.1
   weight_decay: 0.01
-  lr_scheduler_type: linear
-  per_device_train_batch_size: 1
-  per_device_eval_batch_size: 1
-  gradient_accumulation_steps: 4
-  logging_steps: 1
-  evaluation_strategy: "no"
-  save_strategy: "epoch"
-  save_total_limit: 2
-  load_best_model_at_end: false
-  group_by_length: false
+  lr_scheduler_type: cosine
+  per_device_train_batch_size: 2
+  per_device_eval_batch_size: 2
+  gradient_accumulation_steps: 8
+  logging_steps: 10
+  evaluation_strategy: "steps"
+  eval_steps: 100
+  save_strategy: "steps"
+  save_steps: 100
+  save_total_limit: 3
+  load_best_model_at_end: true
+  group_by_length: true
   dataloader_pin_memory: false
   dataloader_num_workers: 0
   save_safetensors: true
   max_grad_norm: 1.0
   fp16: false
   bf16: false
-  gradient_checkpointing: false
+  gradient_checkpointing: true
   optim: adamw_torch
   max_steps: -1
-  
-  # Accuracy-focused settings
+
+  # Long context rewards
+  context_window_weight: 40.0
+  coherence_reward_weight: 30.0
   formatting_reward_weight: 20.0
-  answer_token_weight: 40.0
-  
+  answer_token_weight: 30.0
+
 logging:
   log_level: INFO
   report_to: [none]
@@ -51,9 +55,9 @@ runtime:
 
 adapter:
   method: lora
-  r: 2
-  alpha: 4
-  dropout: 0.0
+  r: 32
+  alpha: 64
+  dropout: 0.05
   target_modules:
     - q_proj
     - v_proj
@@ -66,7 +70,7 @@ adapter:
 data:
   train_file: data/processed/train.jsonl
   eval_file: data/processed/eval.jsonl
-  max_length: 2048
+  max_length: 8192
   pack: true
   shuffle: true
   stream: false
@@ -74,8 +78,8 @@ data:
   curriculum_learning: false
   sequential_curriculum: false
   use_tokenized_cache: true
-  tokenization_num_proc: 1
+  tokenization_num_proc: 2
   tokenization_batch_size: 16
 
 packaging:
-  publish_model_name: atlas-metal-optimized-accuracy
+  publish_model_name: atlas-specialized-long-context
