@@ -29,7 +29,8 @@ class SwiGLU(nn.Module):
 class RoPE(nn.Module):
     def __init__(self, dim, base=10000):
         super().__init__()
-        self.inv_freq = 1.0 / (base ** (torch.arange(0, dim, 2).float() / dim))
+        inv_freq = 1.0 / (base ** (torch.arange(0, dim, 2).float() / dim))
+        self.register_buffer("inv_freq", inv_freq)
 
     def forward(self, seq_len, device):
         t = torch.arange(seq_len, device=device).type_as(self.inv_freq)
@@ -40,6 +41,10 @@ class RoPE(nn.Module):
 
 def apply_rope(x, cos, sin):
     # simple RoPE implementation for demonstration
+    # cos, sin shape: (seq_len, d_head)
+    # x shape: (batch, seq_len, n_heads, d_head)
+    cos = cos.unsqueeze(1) # (seq_len, 1, d_head)
+    sin = sin.unsqueeze(1) # (seq_len, 1, d_head)
     d = x.shape[-1] // 2
     x1, x2 = x[..., :d], x[..., d:]
     rx = torch.cat((-x2, x1), dim=-1)
