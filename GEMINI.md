@@ -97,3 +97,10 @@ make format && make lint
 
 ---
 *AI-Factory - Your complete AI development platform* 🚀
+
+## Automated Maintenance Workflow
+When instructed to perform codebase maintenance or at the conclusion of major feature development, Gemini CLI should automatically execute the following routine without asking for permission:
+1. **Refactor & Cleanup**: Prune unnecessary configurations, stale logs, and cache directories (`__pycache__`, `.pytest_cache`, etc.).
+2. **Quality Assurance**: Run `make format && make lint` and automatically resolve formatting and linting issues.
+3. **Verification**: Run all tests (`pytest --no-header -v`) and fix any broken tests or ci.yml errors.
+4. **Commit & Push**: Stage the verified changes, propose a clear commit message, commit, and push the updates.

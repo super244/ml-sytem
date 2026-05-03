@@ -836,7 +836,7 @@ class TrainingOptimizer:
                 try:
                     import bitsandbytes as bnb
 
-                    return bnb.optim.Adam4bit(
+                    return bnb.optim.AdamW8bit(
                         model_parameters,
                         lr=lr,
                         weight_decay=weight_decay,

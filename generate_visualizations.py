@@ -83,8 +83,9 @@ def parse_iso_datetime(value: str | None) -> datetime | None:
 
 
 def parse_training_metrics(log_path: Path) -> dict[str, Any]:
-    result = {
-        "loss_history": [],
+    loss_history: list[float] = []
+    result: dict[str, Any] = {
+        "loss_history": loss_history,
         "final_loss": None,
         "train_runtime": None,
         "train_samples_per_second": None,
@@ -105,7 +106,7 @@ def parse_training_metrics(log_path: Path) -> dict[str, Any]:
         elif isinstance(row.get("loss"), (int, float)):
             loss_value = float(row["loss"])
         if loss_value is not None:
-            result["loss_history"].append(loss_value)
+            loss_history.append(loss_value)
             result["final_loss"] = loss_value
         if row.get("train_runtime") is not None:
             result["train_runtime"] = row["train_runtime"]
@@ -132,9 +133,7 @@ def collect_training_runs() -> list[TrainingRun]:
         training_cfg = config_report.get("training") or {}
         metrics_json = safe_load_json(candidate / "metrics" / "metrics.json") or {}
         model_report = safe_load_json(candidate / "metrics" / "model_report.json") or {}
-        created_at = parse_iso_datetime(manifest.get("created_at")) or datetime.fromtimestamp(
-            candidate.stat().st_mtime
-        )
+        created_at = parse_iso_datetime(manifest.get("created_at")) or datetime.fromtimestamp(candidate.stat().st_mtime)
         runs.append(
             TrainingRun(
                 run_id=manifest.get("run_id", candidate.name),
@@ -213,12 +212,14 @@ def accuracy_for_run(run: TrainingRun, entries: Iterable[EvaluationEntry]) -> fl
 def plot_aggregate_charts(output_dir: Path, runs: list[TrainingRun], entries: list[EvaluationEntry]) -> None:
     output_dir.mkdir(parents=True, exist_ok=True)
 
-    selected = sorted([run for run in runs if run.final_loss is not None], key=lambda run: run.final_loss or 0.0)[:TOP_RUNS]
+    selected = sorted([run for run in runs if run.final_loss is not None], key=lambda run: run.final_loss or 0.0)[
+        :TOP_RUNS
+    ]
     if selected:
         labels = [friendly_label(run.run_name) for run in selected]
         losses = [run.final_loss or 0.0 for run in selected]
         fig, ax = plt.subplots(figsize=(12, 6))
-        bars = ax.barh(labels, losses, color=plt.cm.viridis(np.linspace(0, 0.8, len(selected))))
+        bars = ax.barh(labels, losses, color=plt.get_cmap("viridis")(np.linspace(0, 0.8, len(selected))))
         for bar, loss in zip(bars, losses, strict=True):
             ax.text(loss + max(losses) * 0.01, bar.get_y() + bar.get_height() / 2, f"{loss:.4f}", va="center")
         ax.set_xlabel("Final Loss (lower is better)")
@@ -249,7 +250,7 @@ def plot_aggregate_charts(output_dir: Path, runs: list[TrainingRun], entries: li
         timeline = sorted([run for run in runs if run.final_loss is not None], key=lambda run: run.created_at)
         if timeline:
             fig, ax = plt.subplots(figsize=(14, 8))
-            ax.plot([r.created_at for r in timeline], [r.final_loss or 0.0 for r in timeline], "o-")
+            ax.plot([r.created_at for r in timeline], [r.final_loss or 0.0 for r in timeline], "o-")  # type: ignore
             ax.xaxis.set_major_formatter(mdates.DateFormatter("%Y-%m-%d %H:%M"))
             ax.set_title("Run Timeline vs Final Loss")
             ax.set_ylabel("Final Loss")
@@ -414,7 +415,9 @@ def plot_eval_summary_charts(output_dir: Path, eval_dirs: dict[str, Path]) -> No
     ax.set_title("Primary vs Secondary Accuracy Delta")
     ax.grid(axis="x", alpha=0.3)
     for bar, value in zip(bars, delta_acc, strict=True):
-        ax.text(value + (0.3 if value >= 0 else -0.3), bar.get_y() + bar.get_height() / 2, f"{value:+.2f}%", va="center")
+        ax.text(
+            value + (0.3 if value >= 0 else -0.3), bar.get_y() + bar.get_height() / 2, f"{value:+.2f}%", va="center"
+        )
     plt.tight_layout()
     plt.savefig(output_dir / "eval_delta_accuracy.png", dpi=150, bbox_inches="tight")
     plt.close(fig)

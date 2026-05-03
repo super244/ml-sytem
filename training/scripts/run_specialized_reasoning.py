@@ -9,14 +9,22 @@ REPO_ROOT = Path(__file__).resolve().parents[2]
 
 
 def parse_args() -> argparse.Namespace:
-    parser = argparse.ArgumentParser(description="Shortcut wrapper for specialized reasoning (chain-of-thought) training.")
+    parser = argparse.ArgumentParser(
+        description="Shortcut wrapper for specialized reasoning (chain-of-thought) training."
+    )
     parser.add_argument("passthrough", nargs=argparse.REMAINDER)
     return parser.parse_args()
 
 
 def main() -> None:
     args = parse_args()
-    command = [sys.executable, "training/train.py", "--config", "training/configs/profiles/specialized_reasoning.yaml", *args.passthrough]
+    command = [
+        sys.executable,
+        "training/train.py",
+        "--config",
+        "training/configs/profiles/specialized_reasoning.yaml",
+        *args.passthrough,
+    ]
     subprocess.run(command, cwd=REPO_ROOT, check=True)
 
 

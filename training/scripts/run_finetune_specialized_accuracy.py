@@ -16,7 +16,13 @@ def parse_args() -> argparse.Namespace:
 
 def main() -> None:
     args = parse_args()
-    command = [sys.executable, "training/train.py", "--config", "training/configs/profiles/finetune_specialized_accuracy.yaml", *args.passthrough]
+    command = [
+        sys.executable,
+        "training/train.py",
+        "--config",
+        "training/configs/profiles/finetune_specialized_accuracy.yaml",
+        *args.passthrough,
+    ]
     subprocess.run(command, cwd=REPO_ROOT, check=True)
 
 

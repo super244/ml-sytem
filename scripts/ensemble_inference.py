@@ -24,7 +24,8 @@ class EnsembleInference:
                 tokenizer.pad_token = tokenizer.eos_token
 
             # Load base model
-            model = AutoModelForCausalLM.from_pretrained(
+            from typing import Any, cast
+            model: Any = AutoModelForCausalLM.from_pretrained(
                 config["base_model"],
                 torch_dtype=torch.float32,
                 device_map="auto" if torch.cuda.is_available() else {"": "cpu"},
@@ -32,7 +33,7 @@ class EnsembleInference:
 
             # Load adapter if specified
             if config.get("adapter_path"):
-                model = PeftModel.from_pretrained(model, config["adapter_path"], is_trainable=False)
+                model = cast(Any, PeftModel.from_pretrained(model, config["adapter_path"], is_trainable=False))
 
             if torch.backends.mps.is_available():
                 model = model.to("mps")
@@ -94,7 +95,7 @@ class EnsembleInference:
         return {"answer": best_answer, "confidence": confidence, "predictions": predictions}
 
 
-def main():
+def main() -> None:
     """Run ensemble inference on evaluation set."""
     # Define ensemble models
     model_configs = [

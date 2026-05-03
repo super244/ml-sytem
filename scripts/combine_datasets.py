@@ -5,7 +5,7 @@ import json
 from pathlib import Path
 
 
-def combine_custom_datasets(output_path):
+def combine_custom_datasets(output_path: str | Path) -> int:
     """Combine all custom datasets from the catalog."""
     catalog_path = Path("data/catalog.json")
     with open(catalog_path) as f:
