@@ -333,7 +333,7 @@ def _interactive_enabled(args: argparse.Namespace) -> bool:
 
 def _new_config_path(args: argparse.Namespace) -> str | None:
     config = args.config
-    return config or "configs/finetune.yaml"
+    return config or "examples/orchestration/finetune.yaml"
 
 
 def _deploy_target_from_config(config_path: str) -> str | None:
@@ -599,7 +599,7 @@ def parse_args() -> argparse.Namespace:
 
     eval_parser = subparsers.add_parser("evaluate", parents=[common_json])
     eval_parser.add_argument("instance_id")
-    eval_parser.add_argument("--config", default="configs/eval.yaml")
+    eval_parser.add_argument("--config", default="examples/orchestration/eval.yaml")
     eval_parser.add_argument("--no-start", action="store_true")
 
     deploy_parser = subparsers.add_parser("deploy", parents=[common_json])
@@ -615,12 +615,12 @@ def parse_args() -> argparse.Namespace:
             "openai_compatible_api",
         ],
     )
-    deploy_parser.add_argument("--config", default="configs/deploy.yaml")
+    deploy_parser.add_argument("--config", default="examples/orchestration/deploy.yaml")
     deploy_parser.add_argument("--no-start", action="store_true")
 
     inference_parser = subparsers.add_parser("inference", parents=[common_json])
     inference_parser.add_argument("instance_id")
-    inference_parser.add_argument("--config", default="configs/inference.yaml")
+    inference_parser.add_argument("--config", default="examples/orchestration/inference.yaml")
     inference_parser.add_argument("--no-start", action="store_true")
 
     tui_parser = subparsers.add_parser("tui")
@@ -631,26 +631,6 @@ def parse_args() -> argparse.Namespace:
 
     ready_parser = subparsers.add_parser("ready", parents=[common_json])
     ready_parser.add_argument("--root")
-
-    bootstrap_parser = subparsers.add_parser("bootstrap-train")
-    bootstrap_parser.add_argument("--config", required=True)
-    bootstrap_parser.add_argument("--dataset-config", default="data/configs/processing.yaml")
-    bootstrap_parser.add_argument("--tokenizer-output-dir")
-    bootstrap_parser.add_argument("--skip-ready", action="store_true")
-    bootstrap_parser.add_argument("--skip-doctor", action="store_true")
-    bootstrap_parser.add_argument("--skip-dataset", action="store_true")
-    bootstrap_parser.add_argument("--skip-tokenizer", action="store_true")
-    bootstrap_parser.add_argument("--skip-preflight", action="store_true")
-    bootstrap_parser.add_argument("--skip-training", action="store_true")
-    bootstrap_parser.add_argument("--force-tokenizer", action="store_true")
-    bootstrap_parser.add_argument("--ensure-tokenizer", action="store_true")
-    bootstrap_parser.add_argument("--dry-run", action="store_true")
-    bootstrap_parser.add_argument("--validate-model-load", action="store_true")
-    bootstrap_parser.add_argument("--resume-from-latest-checkpoint", action="store_true")
-    bootstrap_parser.add_argument("--train-arg", dest="train_args", action="append", default=[])
-
-    preflight_parser = subparsers.add_parser("train-preflight", parents=[common_json])
-    preflight_parser.add_argument("--config", required=True)
 
     compare_parser = subparsers.add_parser("compare", parents=[common_json])
     compare_parser.add_argument("left_instance_id")
@@ -665,13 +645,6 @@ def parse_args() -> argparse.Namespace:
     api_smoke_parser.add_argument("--include-generate", action="store_true")
 
     subparsers.add_parser("latest-run", parents=[common_json])
-
-    refresh_lab_parser = subparsers.add_parser("refresh-lab")
-    refresh_lab_parser.add_argument("--skip-generate", action="store_true")
-    refresh_lab_parser.add_argument("--skip-notebooks", action="store_true")
-    refresh_lab_parser.add_argument("--skip-train-dry-run", action="store_true")
-    refresh_lab_parser.add_argument("--skip-tests", action="store_true")
-    refresh_lab_parser.add_argument("--profile", default="training/configs/profiles/baseline_qlora.yaml")
 
     domain_parser = subparsers.add_parser("domain", parents=[common_json])
     domain_subparsers = domain_parser.add_subparsers(dest="domain_command", required=True)
@@ -690,11 +663,6 @@ def parse_args() -> argparse.Namespace:
     platform_scale_parser = platform_subparsers.add_parser("scale", parents=[common_json])
     platform_scale_parser.add_argument("target_nodes", type=int)
 
-    multi_train_parser = subparsers.add_parser("multi-train", parents=[common_json])
-    multi_train_parser.add_argument("--domains", nargs="+", required=True)
-    multi_train_parser.add_argument("--config", default="configs/multi_domain.yaml")
-    multi_train_parser.add_argument("--no-start", action="store_true")
-
     titan_parser = subparsers.add_parser("titan", parents=[common_json])
     titan_subparsers = titan_parser.add_subparsers(dest="titan_command", required=True)
     titan_status_parser = titan_subparsers.add_parser("status", parents=[common_json])
@@ -707,9 +675,6 @@ def parse_args() -> argparse.Namespace:
     optimize_subparsers = optimize_parser.add_subparsers(dest="optimize_command", required=True)
 
     optimize_subparsers.add_parser("detect", parents=[common_json])
-    optimize_subparsers.add_parser("benchmark", parents=[common_json])
-    optimize_profile_parser = optimize_subparsers.add_parser("profile", parents=[common_json])
-    optimize_profile_parser.add_argument("--device", choices=["m5_max", "a100", "h100", "auto"], default="auto")
 
     serve_parser = subparsers.add_parser("serve", parents=[common_json])
     serve_parser.add_argument("--host", default="127.0.0.1")
@@ -751,19 +716,7 @@ def main() -> None:
             _render_workspace_overview(payload)
         return
 
-    if args.command == "train-preflight":
-        from training.src.preflight import build_training_preflight_report
-
-        payload = build_training_preflight_report(args.config)
-        if args.json:
-            _render_payload(payload, as_json=True)
-        else:
-            _render_training_preflight(payload)
-        if (payload.get("summary") or {}).get("error", 0):
-            raise SystemExit(1)
-        return
-
-    if args.command in {"doctor", "api-smoke", "latest-run", "refresh-lab", "bootstrap-train"}:
+    if args.command in {"doctor", "api-smoke", "latest-run"}:
         from ai_factory import cli_scripts
 
         if args.command == "doctor":
@@ -772,10 +725,6 @@ def main() -> None:
             cli_scripts.cmd_api_smoke(args)
         elif args.command == "latest-run":
             cli_scripts.cmd_latest_run(args)
-        elif args.command == "refresh-lab":
-            cli_scripts.cmd_refresh_lab(args)
-        elif args.command == "bootstrap-train":
-            cli_scripts.cmd_bootstrap_train(args)
         return
 
     if args.command == "titan":
@@ -795,49 +744,15 @@ def main() -> None:
 
     if args.command == "optimize":
         if args.optimize_command == "detect":
-            from training.src.optimization import HardwareDetector
+            import json
+
+            from ai_factory.core.runtime.optimization import HardwareDetector
 
             hardware = HardwareDetector.detect()
             if args.json:
-                _render_payload(hardware.to_dict(), as_json=True)
+                _render_payload(hardware.model_dump(), as_json=True)
             else:
-                HardwareDetector.print_hardware_summary()
-            return
-
-        if args.optimize_command == "benchmark":
-            from training.src.ultimate_harness import quick_benchmark
-
-            results = quick_benchmark()
-            if args.json:
-                _render_payload(results, as_json=True)
-            return
-
-        if args.optimize_command == "profile":
-            profile_map = {
-                "m5_max": "training/configs/profiles/m5_max_ultimate.yaml",
-                "a100": "training/configs/profiles/cuda_ultimate_a100.yaml",
-                "h100": "training/configs/profiles/cuda_ultimate_h100.yaml",
-            }
-
-            if args.device == "auto":
-                from training.src.optimization import BackendType, HardwareDetector
-
-                hardware = HardwareDetector.detect()
-                if hardware.backend == BackendType.METAL:
-                    profile_path = profile_map["m5_max"]
-                elif hardware.backend == BackendType.CUDA:
-                    # Default to A100 for CUDA, could be smarter here
-                    profile_path = profile_map["a100"]
-                else:
-                    print("No ultimate profile available for CPU-only systems.")
-                    return
-            else:
-                profile_path = profile_map.get(args.device)
-
-            if profile_path:
-                print(f"Recommended ultimate profile: {profile_path}")
-                if args.json:
-                    _render_payload({"profile_path": profile_path, "device": args.device}, as_json=True)
+                print(json.dumps(hardware.model_dump(), indent=2, ensure_ascii=False))
             return
 
     if args.command == "serve":
@@ -879,7 +794,7 @@ def main() -> None:
             _render_payload([_manifest_payload(item) for item in manifests], as_json=True)
             return
         if not manifests:
-            print("No instances found. Create one with: ai-factory new --config configs/finetune.yaml")
+            print("No instances found. Create one with: ai-factory new --config examples/orchestration/finetune.yaml")
             return
         print(f"Instances ({len(manifests)}):")
         rows = [_format_instance_row(item) for item in manifests]
@@ -1063,19 +978,6 @@ def main() -> None:
             )
             _render_payload(result, as_json=args.json)
             return
-
-    if args.command == "multi-train":
-        from ai_factory.platform import create_multi_domain_training
-
-        manifest = create_multi_domain_training(
-            domains=args.domains,
-            config_path=args.config,
-            start=not args.no_start,
-            repo_root=args.repo_root,
-            artifacts_dir=args.artifacts_dir,
-        )
-        _render_payload(_manifest_payload(manifest), as_json=args.json)
-        return
 
 
 if __name__ == "__main__":

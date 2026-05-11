@@ -268,7 +268,7 @@ class AutonomousLabService:
                         f"{flagged} flagged interaction(s) are waiting to be promoted into the curation loop. "
                         "Run the managed prepare pipeline before the next finetune wave."
                     ),
-                    config_path=self._resolve_repo_path("configs/prepare.yaml"),
+                    config_path=self._resolve_repo_path("examples/orchestration/prepare.yaml"),
                     metadata={"flagged_records": flagged, "goal": goal},
                 )
             )
@@ -283,7 +283,7 @@ class AutonomousLabService:
                         f"{completed_model.get('name', completed_model['id'])} finished without a managed evaluation child. "
                         "Create benchmark coverage before promoting it deeper into the loop."
                     ),
-                    config_path=self._resolve_repo_path("configs/eval.yaml"),
+                    config_path=self._resolve_repo_path("examples/orchestration/eval.yaml"),
                     source_instance_id=str(completed_model.get("id")),
                     metadata={"source_type": completed_model.get("type")},
                 )
@@ -299,7 +299,7 @@ class AutonomousLabService:
                         f"{latest_eval.get('name', latest_eval['id'])} is evaluation-complete. "
                         "Spin up an inference branch so telemetry can start feeding the next dataset cycle."
                     ),
-                    config_path=self._resolve_repo_path("configs/inference.yaml"),
+                    config_path=self._resolve_repo_path("examples/orchestration/inference.yaml"),
                     source_instance_id=str(latest_eval.get("id")),
                 )
             )
@@ -314,7 +314,7 @@ class AutonomousLabService:
                     detail=(
                         f"{latest_eval.get('name', latest_eval['id'])} meets the deployment gate according to the decision engine."
                     ),
-                    config_path=self._resolve_repo_path("configs/deploy.yaml"),
+                    config_path=self._resolve_repo_path("examples/orchestration/deploy.yaml"),
                     source_instance_id=str(latest_eval.get("id")),
                     depends_on=[f"inference-{latest_eval['id']}"],
                     metadata={"deployment_target": "huggingface"},
@@ -332,7 +332,7 @@ class AutonomousLabService:
                             "The telemetry backlog and the completed parent model are both ready. "
                             "Start a fresh finetune branch to continue the autonomous loop."
                         ),
-                        config_path=self._resolve_repo_path("configs/finetune.yaml"),
+                        config_path=self._resolve_repo_path("examples/orchestration/finetune.yaml"),
                         source_instance_id=str(completed_model.get("id")),
                         depends_on=["prepare-telemetry-replay"] if flagged > 0 else [],
                         metadata={"goal": goal, "idle_nodes": cluster_summary.get("idle_nodes", 0)},
@@ -345,7 +345,7 @@ class AutonomousLabService:
                         kind="train",
                         title="Seed the loop with a baseline training branch",
                         detail="No completed train or finetune branch exists yet, so the lab needs a baseline source model.",
-                        config_path=self._resolve_repo_path("configs/train.yaml"),
+                        config_path=self._resolve_repo_path("examples/orchestration/train.yaml"),
                         metadata={"goal": goal},
                     )
                 )
@@ -429,14 +429,14 @@ class AutonomousLabService:
         }
         if action.kind in {"prepare", "train"}:
             manifest = self.instance_service.control.create_instance(
-                self._config_path(action.config_path or "configs/train.yaml"),
+                self._config_path(action.config_path or "examples/orchestration/train.yaml"),
                 start=True,
                 metadata_updates={**metadata, **action.metadata},
             )
             return {"instance_id": manifest.id, "instance_type": manifest.type}
         if action.kind == "finetune":
             manifest = self.instance_service.control.create_instance(
-                self._config_path(action.config_path or "configs/finetune.yaml"),
+                self._config_path(action.config_path or "examples/orchestration/finetune.yaml"),
                 start=True,
                 parent_instance_id=action.source_instance_id,
                 metadata_updates={**metadata, **action.metadata},
@@ -455,7 +455,7 @@ class AutonomousLabService:
             manifest = self.instance_service.control.execute_action(
                 action.source_instance_id or "",
                 action=action_name,
-                config_path=self._config_path(action.config_path or f"configs/{action.kind}.yaml"),
+                config_path=self._config_path(action.config_path or f"examples/orchestration/{action.kind}.yaml"),
                 deployment_target=action.metadata.get("deployment_target"),
                 start=True,
             )

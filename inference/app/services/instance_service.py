@@ -151,7 +151,7 @@ class InstanceService:
 
     def evaluate_instance(self, instance_id: str, request: InstanceEvaluateRequest | None = None) -> InstanceDetail:
         request = request or InstanceEvaluateRequest()
-        config_path = self._ensure_config_path(request.config_path or "configs/eval.yaml")
+        config_path = self._ensure_config_path(request.config_path or "examples/orchestration/eval.yaml")
         try:
             manifest = self.control.create_evaluation_instance(
                 instance_id,
@@ -165,7 +165,7 @@ class InstanceService:
         return self._detail(manifest.id)
 
     def deploy_instance(self, instance_id: str, request: InstanceDeployRequest) -> InstanceDetail:
-        config_path = self._ensure_config_path(request.config_path or "configs/deploy.yaml")
+        config_path = self._ensure_config_path(request.config_path or "examples/orchestration/deploy.yaml")
         try:
             manifest = self.control.create_deployment_instance(
                 instance_id,
@@ -185,7 +185,7 @@ class InstanceService:
         request: InstanceInferenceRequest | None = None,
     ) -> InstanceDetail:
         request = request or InstanceInferenceRequest()
-        config_path = self._ensure_config_path(request.config_path or "configs/inference.yaml")
+        config_path = self._ensure_config_path(request.config_path or "examples/orchestration/inference.yaml")
         try:
             manifest = self.control.create_inference_instance(
                 instance_id,

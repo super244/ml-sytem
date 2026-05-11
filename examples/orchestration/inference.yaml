@@ -1,0 +1,14 @@
+instance:
+  type: inference
+  name: example-inference
+  environment:
+    kind: local
+orchestration_mode: single
+experience:
+  level: dev
+lifecycle: {}
+execution:
+  backend: local
+subsystem:
+  serve_host: 127.0.0.1
+  serve_port: 8000

@@ -1,0 +1,16 @@
+instance:
+  type: finetune
+  name: example-finetune
+  environment:
+    kind: local
+orchestration_mode: single
+experience:
+  level: dev
+lifecycle: {}
+execution:
+  backend: local
+subsystem:
+  command_override:
+    - python3
+    - "-c"
+    - "print('Replace subsystem.command_override with your training driver.')"

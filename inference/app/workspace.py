@@ -41,7 +41,7 @@ def _load_model_catalog(repo_root: Path) -> list[dict[str, Any]]:
     try:
         from inference.app.model_catalog import list_model_catalog
 
-        return list_model_catalog(repo_root / "inference" / "configs" / "model_registry.yaml")
+        return list_model_catalog(repo_root / "inference" / "app" / "defaults" / "model_registry.yaml")
     except Exception:
         return []
 
@@ -49,7 +49,7 @@ def _load_model_catalog(repo_root: Path) -> list[dict[str, Any]]:
 def _load_orchestration_templates(repo_root: Path) -> list[dict[str, str]]:
     templates: list[dict[str, str]] = []
     try:
-        for path in sorted((repo_root / "configs").glob("*.yaml")):
+        for path in sorted((repo_root / "examples" / "orchestration").glob("*.yaml")):
             payload = yaml.safe_load(path.read_text()) or {}
             relative = path.relative_to(repo_root)
             instance = payload.get("instance") or {}
@@ -71,40 +71,11 @@ def _load_orchestration_templates(repo_root: Path) -> list[dict[str, str]]:
 
 
 def _load_training_profiles(repo_root: Path) -> list[dict[str, str]]:
-    training_profiles = []
-    try:
-        for path in sorted((repo_root / "training" / "configs" / "profiles").glob("*.yaml")):
-            relative = path.relative_to(repo_root)
-            training_profiles.append(
-                {
-                    "id": path.stem,
-                    "title": _config_title(path),
-                    "path": str(relative),
-                    "dry_run_command": f"python -m training.train --config {relative} --dry-run",
-                    "train_command": f"python -m training.train --config {relative}",
-                }
-            )
-    except Exception:
-        pass
-    return training_profiles
+    return []
 
 
 def _load_evaluation_configs(repo_root: Path) -> list[dict[str, str]]:
-    evaluation_configs = []
-    try:
-        for path in sorted((repo_root / "evaluation" / "configs").glob("*.yaml")):
-            relative = path.relative_to(repo_root)
-            evaluation_configs.append(
-                {
-                    "id": path.stem,
-                    "title": _config_title(path),
-                    "path": str(relative),
-                    "run_command": f"python -m evaluation.evaluate --config {relative}",
-                }
-            )
-    except Exception:
-        pass
-    return evaluation_configs
+    return []
 
 
 def _build_readiness_checks(repo_root: Path) -> list[dict[str, Any]]:
@@ -128,8 +99,8 @@ def _build_readiness_checks(repo_root: Path) -> list[dict[str, Any]]:
         {
             "id": "frontend-install",
             "label": "Frontend dependencies",
-            "ok": (repo_root / "frontend" / "node_modules").exists(),
-            "detail": "The workspace UI is ready when frontend/node_modules is present.",
+            "ok": True,
+            "detail": "Optional; the repository framework no longer ships a bundled Next.js workspace.",
         },
         {
             "id": "dataset-catalog",
@@ -154,8 +125,8 @@ def _build_readiness_checks(repo_root: Path) -> list[dict[str, Any]]:
         {
             "id": "benchmark-registry",
             "label": "Benchmark registry",
-            "ok": (repo_root / "evaluation" / "benchmarks" / "registry.yaml").exists(),
-            "detail": ("Evaluation routes and comparisons depend on a discoverable benchmark registry."),
+            "ok": (repo_root / "inference" / "app" / "defaults" / "benchmarks_registry.yaml").exists(),
+            "detail": "Shipped defaults live under inference/app/defaults for local API discovery.",
         },
     ]
 
@@ -163,94 +134,31 @@ def _build_readiness_checks(repo_root: Path) -> list[dict[str, Any]]:
 def _build_command_recipes() -> list[dict[str, str]]:
     return [
         _command_recipe(
-            "bootstrap-train",
-            "Bootstrap training",
-            (
-                "Run dataset prep, tokenizer readiness, preflight, "
-                "and the selected training command from one operator entrypoint."
-            ),
-            "ai-factory bootstrap-train --config training/configs/profiles/failure_aware.yaml --dry-run",
-            "training",
-        ),
-        _command_recipe(
             "doctor",
             "Workspace doctor",
-            ("Inspect dependency readiness, dataset state, run discovery, and frontend installation in one pass."),
+            "Inspect dependency readiness, dataset state (optional), and run discovery.",
             "ai-factory doctor --json",
             "setup",
         ),
         _command_recipe(
-            "refresh-lab",
-            "Refresh lab",
-            (
-                "Regenerate data artifacts, validate the corpus, refresh notebooks, "
-                "and optionally run dry validation/tests."
-            ),
-            "ai-factory refresh-lab",
-            "orchestration",
-        ),
-        _command_recipe(
             "serve-api",
             "Serve API",
-            ("Start the FastAPI layer that powers the solve workspace, compare lab, and metadata routes."),
+            "Start the FastAPI layer for orchestration and inference routes.",
             "ai-factory serve --host 127.0.0.1 --port 8000",
             "serve",
         ),
         _command_recipe(
-            "serve-frontend",
-            "Serve frontend",
-            "Launch the Next.js workspace against the local API.",
-            "cd frontend && NEXT_PUBLIC_API_BASE_URL=http://localhost:8000 npm run dev",
-            "serve",
-        ),
-        _command_recipe(
-            "train-preflight",
-            "Training preflight",
-            "Validate training inputs, artifacts, hardware, and tokenizer readiness before a real launch.",
-            "ai-factory train-preflight --config training/configs/profiles/failure_aware.yaml",
-            "training",
-        ),
-        _command_recipe(
-            "baseline-dry-run",
-            "Baseline dry-run",
-            ("Validate the default local specialist profile without entering a full training loop."),
-            ("python -m training.train --config training/configs/profiles/baseline_qlora.yaml --dry-run"),
-            "training",
-        ),
-        _command_recipe(
-            "local-metal-dry-run",
-            "Local Metal dry-run",
-            "Validate the Apple Silicon-safe profile without Linux-only quantization requirements.",
-            "python -m training.train --config training/configs/profiles/local_metal.yaml --dry-run",
-            "training",
-        ),
-        _command_recipe(
-            "default-eval",
-            "Default evaluation",
-            "Run the main comparison config used for baseline-vs-finetuned benchmarking.",
-            "python -m evaluation.evaluate --config evaluation/configs/base_vs_finetuned.yaml",
-            "evaluation",
-        ),
-        _command_recipe(
             "orchestrated-finetune",
             "Orchestrated finetune",
-            "Create a managed finetune instance that records progress, lineage, "
-            "metrics, and follow-up recommendations.",
-            "ai-factory new --config configs/finetune.yaml",
-            "control-plane",
-        ),
-        _command_recipe(
-            "cloud-finetune",
-            "Cloud finetune",
-            "Create a cloud-backed finetune instance with SSH profile resolution and remote execution.",
-            "ai-factory new --config configs/finetune.yaml --environment cloud --cloud-profile default",
+            "Create a managed finetune instance (wire subsystem.command_override to your trainer).",
+            "ai-factory new --config examples/orchestration/finetune.yaml",
             "control-plane",
         ),
         _command_recipe(
             "managed-inference",
             "Managed inference sandbox",
             "Launch a child inference instance from an evaluated or finetuned branch.",
-            "ai-factory inference <instance-id> --config configs/inference.yaml",
+            "ai-factory inference <instance-id> --config examples/orchestration/inference.yaml",
             "control-plane",
         ),
         _command_recipe(
@@ -344,7 +252,7 @@ def build_workspace_overview(root: Path | None = None) -> dict[str, Any]:
         runs = []
 
     try:
-        benchmarks = load_benchmark_registry(repo_root / "evaluation" / "benchmarks" / "registry.yaml")
+        benchmarks = load_benchmark_registry(repo_root / "inference" / "app" / "defaults" / "benchmarks_registry.yaml")
     except Exception as exc:
         errors.append(f"benchmark registry: {exc}")
         benchmarks = []

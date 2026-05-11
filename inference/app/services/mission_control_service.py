@@ -513,7 +513,7 @@ class MissionControlService:
                     href="/dashboard/training",
                     metric_label="instances",
                     metric_value="0",
-                    command="python3 -m training.train --config training/configs/profiles/baseline_qlora.yaml --dry-run",
+                    command="python3 -m ai_factory.cli optimize detect",
                 )
             )
 

@@ -23,10 +23,6 @@ def _python_bin_from_runtime() -> str:
     return sys.executable
 
 
-def _subsystem_config_ref(config: OrchestrationConfig) -> str | None:
-    return config.resolved_subsystem_config_path or config.subsystem.config_ref
-
-
 def _command_env(config: OrchestrationConfig) -> dict[str, str]:
     env = dict(config.execution.env)
     env.setdefault("AI_FACTORY_USER_LEVEL", config.experience.level)
@@ -43,6 +39,16 @@ def _command_override(config: OrchestrationConfig, *, long_running: bool = False
         cwd=config.execution.cwd,
         env=_command_env(config),
         long_running=long_running,
+    )
+
+
+def _require_command_override(config: OrchestrationConfig, *, purpose: str) -> CommandSpec:
+    spec = _command_override(config)
+    if spec is not None:
+        return spec
+    raise ValueError(
+        f"{purpose}: set subsystem.command_override in your orchestration YAML to the argv "
+        "for your external driver (dataset prep, training, evaluation, or reporting)."
     )
 
 
@@ -72,12 +78,7 @@ class PrepareInstanceHandler:
         override = _command_override(config)
         if override is not None:
             return override
-        config_ref = _subsystem_config_ref(config)
-        if not config_ref:
-            raise ValueError("prepare instances require subsystem.config_ref")
-        argv = [_python_bin(config), "data/prepare_dataset.py", "--config", config_ref]
-        argv.extend(config.subsystem.extra_args)
-        return CommandSpec(argv=argv, cwd=config.execution.cwd, env=_command_env(config))
+        return _require_command_override(config, purpose="prepare")
 
 
 class TrainingInstanceHandler:
@@ -98,14 +99,7 @@ class TrainingInstanceHandler:
         override = _command_override(config)
         if override is not None:
             return override
-        config_ref = _subsystem_config_ref(config)
-        if not config_ref:
-            raise ValueError(f"{config.instance.type} instances require subsystem.config_ref")
-        argv = [_python_bin(config), "-m", "training.train", "--config", config_ref]
-        if config.subsystem.dry_run:
-            argv.append("--dry-run")
-        argv.extend(config.subsystem.extra_args)
-        return CommandSpec(argv=argv, cwd=config.execution.cwd, env=_command_env(config))
+        return _require_command_override(config, purpose=f"{config.instance.type} (train/finetune)")
 
 
 class EvaluationInstanceHandler:
@@ -126,12 +120,7 @@ class EvaluationInstanceHandler:
         override = _command_override(config)
         if override is not None:
             return override
-        config_ref = _subsystem_config_ref(config)
-        if not config_ref:
-            raise ValueError("evaluate instances require subsystem.config_ref")
-        argv = [_python_bin(config), "-m", "evaluation.evaluate", "--config", config_ref]
-        argv.extend(config.subsystem.extra_args)
-        return CommandSpec(argv=argv, cwd=config.execution.cwd, env=_command_env(config))
+        return _require_command_override(config, purpose="evaluate")
 
 
 class InferenceInstanceHandler:
@@ -194,19 +183,9 @@ class ReportInstanceHandler:
         if override is not None:
             return override
         input_path = config.subsystem.source_artifact_ref
-        output_path = config.subsystem.output_dir_override or "evaluation/results/failure_analysis.json"
         if not input_path:
             raise ValueError("report instances require subsystem.source_artifact_ref")
-        argv = [
-            _python_bin(config),
-            "evaluation/analysis/analyze_failures.py",
-            "--input",
-            input_path,
-            "--output",
-            output_path,
-        ]
-        argv.extend(config.subsystem.extra_args)
-        return CommandSpec(argv=argv, cwd=config.execution.cwd, env=_command_env(config))
+        return _require_command_override(config, purpose="report")
 
 
 class DeploymentInstanceHandler:

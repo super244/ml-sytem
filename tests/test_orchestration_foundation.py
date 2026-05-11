@@ -97,11 +97,11 @@ def test_repository_prepare_template_loads(monkeypatch: pytest.MonkeyPatch) -> N
     _prime_orchestration_packages(monkeypatch)
     loader = importlib.import_module("ai_factory.core.config.loader")
 
-    config = loader.load_orchestration_config("configs/prepare.yaml")
+    repo_root = Path(__file__).resolve().parents[1]
+    config = loader.load_orchestration_config(str(repo_root / "examples" / "orchestration" / "prepare.yaml"))
 
     assert config.instance.type == "prepare"
-    assert config.subsystem.config_ref == "../data/configs/processing.yaml"
-    assert config.resolved_subsystem_config_path.endswith("data/configs/processing.yaml")
+    assert config.subsystem.command_override is not None
 
 
 def test_save_cloud_profile_uses_nested_store_and_secure_permissions(
@@ -235,7 +235,8 @@ def test_command_builder_covers_instance_types(monkeypatch: pytest.MonkeyPatch) 
     config = schema.OrchestrationConfig.model_validate(
         {
             "instance": {"type": "finetune", "environment": {"kind": "local"}},
-            "subsystem": {"config_ref": "training/configs/profiles/baseline_qlora.yaml"},
+            "experience": {"level": "dev"},
+            "subsystem": {"command_override": ["python3", "-c", "print('train')"]},
         }
     )
     manifest = models.InstanceManifest(
@@ -250,7 +251,8 @@ def test_command_builder_covers_instance_types(monkeypatch: pytest.MonkeyPatch) 
         schema.OrchestrationConfig.model_validate(
             {
                 "instance": {"type": "evaluate", "environment": {"kind": "local"}},
-                "subsystem": {"config_ref": "evaluation/configs/base_vs_finetuned.yaml"},
+                "experience": {"level": "dev"},
+                "subsystem": {"command_override": ["python3", "-c", "print('eval')"]},
             }
         ),
         models.InstanceManifest(
@@ -284,7 +286,7 @@ def test_command_builder_covers_instance_types(monkeypatch: pytest.MonkeyPatch) 
                 "instance": {"type": "train", "environment": {"kind": "local"}},
                 "orchestration_mode": "hybrid",
                 "experience": {"level": "dev"},
-                "subsystem": {"config_ref": "training/configs/profiles/baseline_qlora.yaml"},
+                "subsystem": {"command_override": ["python3", "-c", "print('train')"]},
             }
         ),
         models.InstanceManifest(
@@ -298,7 +300,8 @@ def test_command_builder_covers_instance_types(monkeypatch: pytest.MonkeyPatch) 
         schema.OrchestrationConfig.model_validate(
             {
                 "instance": {"type": "prepare", "environment": {"kind": "local"}},
-                "subsystem": {"config_ref": "data/configs/processing.yaml"},
+                "experience": {"level": "dev"},
+                "subsystem": {"command_override": ["python3", "-c", "print('prep')"]},
             }
         ),
         models.InstanceManifest(
@@ -313,13 +316,12 @@ def test_command_builder_covers_instance_types(monkeypatch: pytest.MonkeyPatch) 
             {
                 "instance": {"type": "report", "environment": {"kind": "local"}},
                 "subsystem": {
+                    "source_artifact_ref": "artifacts/eval.jsonl",
                     "command_override": [
                         "python3",
-                        "-m",
-                        "evaluation.analysis.analyze_failures",
-                        "--input",
-                        "evaluation/results/latest/per_example.jsonl",
-                    ]
+                        "-c",
+                        "print('report')",
+                    ],
                 },
             }
         ),
@@ -349,12 +351,12 @@ def test_command_builder_covers_instance_types(monkeypatch: pytest.MonkeyPatch) 
         ),
     )
 
-    assert finetune_cmd.argv[-2:] == ["--config", "training/configs/profiles/baseline_qlora.yaml"]
-    assert evaluate_cmd.argv[-2:] == ["--config", "evaluation/configs/base_vs_finetuned.yaml"]
+    assert finetune_cmd.argv[:2] == ["python3", "-c"]
+    assert evaluate_cmd.argv[:2] == ["python3", "-c"]
     assert deploy_cmd.argv[1] == "-c"
-    assert train_cmd.argv[-2:] == ["--config", "training/configs/profiles/baseline_qlora.yaml"]
-    assert prepare_cmd.argv[-2:] == ["--config", "data/configs/processing.yaml"]
-    assert report_cmd.argv[:3] == ["python3", "-m", "evaluation.analysis.analyze_failures"]
+    assert train_cmd.argv[:2] == ["python3", "-c"]
+    assert prepare_cmd.argv[:2] == ["python3", "-c"]
+    assert report_cmd.argv[:2] == ["python3", "-c"]
     assert custom_api_cmd.argv[1] == "-c"
     assert train_cmd.env["AI_FACTORY_INSTANCE_TYPE"] == "train"
     assert train_cmd.env["AI_FACTORY_ORCHESTRATION_MODE"] == "hybrid"

@@ -1,0 +1,17 @@
+instance:
+  type: report
+  name: example-report
+  environment:
+    kind: local
+orchestration_mode: single
+experience:
+  level: dev
+lifecycle: {}
+execution:
+  backend: local
+subsystem:
+  source_artifact_ref: artifacts/eval_stub.jsonl
+  command_override:
+    - python3
+    - "-c"
+    - "print('Replace subsystem.command_override with your reporting driver.')"

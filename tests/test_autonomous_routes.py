@@ -25,7 +25,7 @@ def _seed_workspace(tmp_path: Path) -> AppSettings:
     _write(tmp_path / "data" / "processed" / "pack_summary.json", '{"packs": [{"id": "core_train_mix"}]}')
     _write(tmp_path / "data" / "processed" / "manifest.json", '{"schema_version": "v2"}')
     _write(
-        tmp_path / "evaluation" / "benchmarks" / "registry.yaml",
+        tmp_path / "inference" / "app" / "defaults" / "benchmarks_registry.yaml",
         (
             "benchmarks:\n"
             "  - id: benchmark_holdout\n"
@@ -36,54 +36,55 @@ def _seed_workspace(tmp_path: Path) -> AppSettings:
         ),
     )
     _write(
-        tmp_path / "training" / "configs" / "profiles" / "baseline_qlora.yaml",
-        "run_name: demo\ntraining:\n  artifacts_dir: artifacts\n",
-    )
-    _write(
-        tmp_path / "configs" / "train.yaml",
+        tmp_path / "examples" / "orchestration" / "train.yaml",
         (
             "instance:\n"
             "  type: train\n"
             "  environment: local\n"
+            "experience:\n"
+            "  level: dev\n"
             "subsystem:\n"
-            "  config_ref: ../training/configs/profiles/baseline_qlora.yaml\n"
+            "  command_override: [python, -c, \"print(1)\"]\n"
         ),
     )
     _write(
-        tmp_path / "configs" / "eval.yaml",
+        tmp_path / "examples" / "orchestration" / "eval.yaml",
         (
             "instance:\n"
             "  type: evaluate\n"
             "  environment: local\n"
+            "experience:\n"
+            "  level: dev\n"
             "subsystem:\n"
-            "  config_ref: ../evaluation/benchmarks/registry.yaml\n"
+            "  command_override: [python, -c, \"print(1)\"]\n"
         ),
     )
     _write(
-        tmp_path / "configs" / "finetune.yaml",
+        tmp_path / "examples" / "orchestration" / "finetune.yaml",
         (
             "instance:\n"
             "  type: finetune\n"
             "  environment: local\n"
+            "experience:\n"
+            "  level: dev\n"
             "subsystem:\n"
-            "  config_ref: ../training/configs/profiles/baseline_qlora.yaml\n"
+            "  command_override: [python, -c, \"print(1)\"]\n"
         ),
     )
     _write(
-        tmp_path / "inference" / "configs" / "model_registry.yaml",
+        tmp_path / "inference" / "app" / "defaults" / "model_registry.yaml",
         "models:\n  - name: base\n    base_model: Qwen/Qwen2.5-Math-1.5B-Instruct\n",
     )
-    _write(tmp_path / "inference" / "configs" / "prompt_presets.yaml", "presets: []\n")
-    (tmp_path / "frontend" / "node_modules").mkdir(parents=True, exist_ok=True)
+    _write(tmp_path / "inference" / "app" / "defaults" / "prompt_presets.yaml", "presets: []\n")
 
     return AppSettings(
         title="test",
         version="0.0.0",
         repo_root=str(tmp_path),
         cors_origins=["*"],
-        model_registry_path=str(tmp_path / "inference" / "configs" / "model_registry.yaml"),
-        prompt_library_path=str(tmp_path / "inference" / "configs" / "prompt_presets.yaml"),
-        benchmark_registry_path=str(tmp_path / "evaluation" / "benchmarks" / "registry.yaml"),
+        model_registry_path=str(tmp_path / "inference" / "app" / "defaults" / "model_registry.yaml"),
+        prompt_library_path=str(tmp_path / "inference" / "app" / "defaults" / "prompt_presets.yaml"),
+        benchmark_registry_path=str(tmp_path / "inference" / "app" / "defaults" / "benchmarks_registry.yaml"),
         artifacts_dir=str(tmp_path / "artifacts"),
         cache_dir=str(tmp_path / "artifacts" / "cache"),
         telemetry_path=str(tmp_path / "artifacts" / "inference" / "telemetry" / "requests.jsonl"),

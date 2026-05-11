@@ -1,6 +1,0 @@
-report_to:
-  - none
-logging_first_step: true
-jsonl_metrics_filename: training_metrics.jsonl
-summary_markdown_filename: run_summary.md
-manifest_filename: run_manifest.json

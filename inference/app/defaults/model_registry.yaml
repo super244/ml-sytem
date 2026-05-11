@@ -1,0 +1,15 @@
+models:
+  - name: base
+    label: Base math (HF)
+    base_model: Qwen/Qwen2.5-Math-1.5B-Instruct
+    adapter_path:
+    load_in_4bit: false
+    load_in_8bit: false
+    dtype: float32
+    target_parameters: 2b
+    parameter_size_b: 2.0
+    quantization: none
+    tier: baseline
+    description: Default base model entry for local inference.
+    tags: [baseline, local, 2b]
+    scale_tags: [2b, baseline, local]

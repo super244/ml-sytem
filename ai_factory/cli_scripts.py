@@ -1,9 +1,6 @@
 import argparse
 import importlib.util
 import json
-import os
-import shlex
-import subprocess
 import sys
 import urllib.error
 import urllib.request
@@ -21,7 +18,6 @@ from ai_factory.core.discovery import (
 try:
     from rich.console import Console
     from rich.panel import Panel
-    from rich.progress import Progress, SpinnerColumn, TextColumn
     from rich.table import Table
 
     console = Console()
@@ -51,23 +47,6 @@ def _print_rich_table(title: str, columns: list[str], rows: list[list[str]], sty
         print("-" * len(header))
         for row in rows:
             print(" | ".join(row))
-
-
-def run_step(label: str, command: list[str], cwd: Path | None = None) -> None:
-    rendered = " ".join(shlex.quote(part) for part in command)
-    if RICH_AVAILABLE:
-        with Progress(
-            SpinnerColumn(),
-            TextColumn("[progress.description]{task.description}"),
-            console=console,
-            transient=True,
-        ) as progress:
-            progress.add_task(description=f"Running {label}...", total=None)
-            subprocess.run(command, cwd=str(cwd or Path.cwd()), check=True)  # nosec B603 - internal argv execution
-        console.print(f"[green]✓[/green] {label}")
-    else:
-        print(f"[ai-factory] {label}: {rendered}")
-        subprocess.run(command, cwd=str(cwd or Path.cwd()), check=True)  # nosec B603 - internal argv execution
 
 
 def has_package(name: str) -> bool:
@@ -223,121 +202,6 @@ def cmd_latest_run(args: argparse.Namespace) -> None:
         _print_rich_table("Latest Run Summary", ["Metric", "Value"], rows, style="magenta")
 
 
-def cmd_refresh_lab(args: argparse.Namespace) -> None:
-    python = sys.executable
-    if not args.skip_generate:
-        run_step(
-            "Generate synthetic datasets",
-            [python, "data/generator/generate_calculus_datasets.py", "--config", "data/configs/generation.yaml"],
-        )
-    run_step(
-        "Prepare processed corpus",
-        [python, "data/prepare_dataset.py", "--config", "data/configs/processing.yaml"],
-    )
-    run_step(
-        "Validate processed corpus",
-        [
-            python,
-            "data/tools/validate_dataset.py",
-            "--input",
-            "data/processed/train.jsonl",
-            "--manifest",
-            "data/processed/manifest.json",
-        ],
-    )
-    if not args.skip_notebooks:
-        run_step("Refresh notebook lab", [python, "notebooks/build_notebooks.py"])
-    if not args.skip_train_dry_run:
-        run_step("Training dry-run", [python, "-m", "training.train", "--config", args.profile, "--dry-run"])
-    if not args.skip_tests:
-        run_step("Pytest suite", [python, "-m", "pytest"])
-
-    if RICH_AVAILABLE:
-        console.print(Panel("[bold green]Workspace refresh complete.[/bold green]"))
-    else:
-        print("[ai-factory] Workspace refresh complete.")
-
-
-def _tokenizer_artifact_ready(config: Any) -> bool:
-    from training.src.config import resolve_path_reference
-
-    tokenizer_path = resolve_path_reference(config.model.tokenizer_path, config.config_path)
-    if tokenizer_path is None or not tokenizer_path.exists():
-        return False
-    return all((tokenizer_path / name).exists() for name in ("tokenizer.json", "tokenizer_config.json"))
-
-
-def _resolve_bootstrap_tokenizer_dir(config: Any, explicit_output_dir: str | None) -> str | None:
-    from training.src.config import resolve_path_reference
-
-    candidate = explicit_output_dir or config.model.tokenizer_path
-    if not candidate:
-        return None
-    resolved = resolve_path_reference(candidate, config.config_path)
-    if resolved is not None:
-        return str(resolved)
-    return str(Path(candidate).expanduser().resolve())
-
-
-def cmd_bootstrap_train(args: argparse.Namespace) -> None:
-    from training.src.config import load_experiment_config, resolve_path_reference
-
-    repo_root = Path.cwd()
-    os.environ.setdefault("AI_FACTORY_REPO_ROOT", str(repo_root))
-
-    config = load_experiment_config(args.config)
-    artifacts_dir = resolve_path_reference(config.training.artifacts_dir, config.config_path)
-    os.environ.setdefault("ARTIFACTS_DIR", str(artifacts_dir or config.training.artifacts_dir))
-    python = sys.executable
-
-    if not args.skip_ready:
-        run_step("Workspace readiness", [python, "-m", "ai_factory.cli", "ready", "--root", str(repo_root)])
-    if not args.skip_doctor:
-        run_step("Workspace doctor", [python, "scripts/doctor.py"])
-    if not args.skip_dataset:
-        run_step("Prepare processed corpus", [python, "data/prepare_dataset.py", "--config", args.dataset_config])
-
-    tokenizer_output_dir = _resolve_bootstrap_tokenizer_dir(config, args.tokenizer_output_dir)
-    tokenizer_ready = _tokenizer_artifact_ready(config)
-    should_train_tokenizer = (
-        not args.skip_tokenizer
-        and tokenizer_output_dir is not None
-        and (
-            args.force_tokenizer
-            or (config.model.initialization.lower() == "scratch" and not tokenizer_ready)
-            or (args.ensure_tokenizer and not tokenizer_ready)
-        )
-    )
-    if should_train_tokenizer and tokenizer_output_dir:
-        run_step(
-            "Train tokenizer",
-            [
-                python,
-                "training/scripts/train_tokenizer.py",
-                "--config",
-                args.config,
-                "--output-dir",
-                str(tokenizer_output_dir),
-            ],
-        )
-
-    if not args.skip_preflight:
-        run_step("Training preflight", [python, "-m", "ai_factory.cli", "train-preflight", "--config", args.config])
-
-    if args.skip_training:
-        return
-
-    training_command = [python, "-m", "training.train", "--config", args.config]
-    if args.dry_run:
-        training_command.append("--dry-run")
-    if args.validate_model_load:
-        training_command.append("--validate-model-load")
-    if args.resume_from_latest_checkpoint:
-        training_command.append("--resume-from-latest-checkpoint")
-    training_command.extend(args.train_args or [])
-    run_step("Training run", training_command)
-
-
 def cmd_doctor(args: argparse.Namespace) -> None:
     root = Path(getattr(args, "root", None) or Path.cwd())
     catalog_status = inspect_json_asset(root / "data" / "catalog.json")
@@ -349,23 +213,16 @@ def cmd_doctor(args: argparse.Namespace) -> None:
         else []
     )
     runs = list_training_runs(str(root / "artifacts"))
-    benchmarks = load_benchmark_registry(root / "evaluation" / "benchmarks" / "registry.yaml")
-    frontend_ready = (root / "frontend" / "node_modules").exists()
+    benchmark_registry = root / "inference" / "app" / "defaults" / "benchmarks_registry.yaml"
+    benchmarks = load_benchmark_registry(benchmark_registry)
 
     recommended_next_steps = [
-        "ai-factory bootstrap-train --config training/configs/profiles/failure_aware.yaml --dry-run",
-        "ai-factory train-preflight --config training/configs/profiles/failure_aware.yaml",
+        "ai-factory new --config examples/orchestration/finetune.yaml",
         "ai-factory serve --host 127.0.0.1 --port 8000",
         "ai-factory api-smoke",
     ]
     if runs:
         recommended_next_steps.append("ai-factory latest-run")
-    else:
-        recommended_next_steps.append(
-            "python -m training.train --config training/configs/profiles/baseline_qlora.yaml --dry-run"
-        )
-    if not frontend_ready:
-        recommended_next_steps.append("cd frontend && npm install")
 
     packages = {
         "yaml": has_package("yaml"),
@@ -393,10 +250,7 @@ def cmd_doctor(args: argparse.Namespace) -> None:
         },
         "evaluation": {
             "num_benchmarks": len(benchmarks),
-        },
-        "frontend": {
-            "package_json_present": (root / "frontend" / "package.json").exists(),
-            "node_modules_present": frontend_ready,
+            "benchmark_registry": str(benchmark_registry),
         },
         "recommended_next_steps": recommended_next_steps,
     }
@@ -419,13 +273,11 @@ def cmd_doctor(args: argparse.Namespace) -> None:
     except ImportError:
         from inference.app.workspace_minimal import get_instant_status
 
-        # Fallback: build minimal workspace payload
         workspace_payload = {"readiness_checks": get_instant_status()["readiness_checks"]}
     else:
         workspace_payload = build_workspace_overview(root)
 
     if RICH_AVAILABLE:
-        # First display the workspace readiness summary cleanly
         readiness = workspace_payload.get("readiness_checks") or []
         ready = sum(1 for c in readiness if c.get("ok"))
         total = len(readiness)
@@ -441,7 +293,6 @@ def cmd_doctor(args: argparse.Namespace) -> None:
             table.add_row(mark, check.get("label", check.get("id", "?")), check.get("detail", ""))
         console.print(table)
 
-        # Display the rest of the doctor information
         pkg_rows = [[pkg, "[green]Yes[/green]" if ok else "[red]No[/red]"] for pkg, ok in packages.items()]
         _print_rich_table("Python Packages", ["Package", "Installed"], pkg_rows)
 

@@ -53,21 +53,22 @@ def get_settings() -> AppSettings:
         ),
         repo_root=repo_root,
     )
+    defaults_dir = Path(__file__).resolve().parent / "defaults"
     return AppSettings(
         title="AI-Factory API",
         version=os.getenv("AI_FACTORY_API_VERSION", VERSION),
         repo_root=str(repo_root),
         cors_origins=cors_origins,
         model_registry_path=_resolve_repo_path(
-            os.getenv("MODEL_REGISTRY_PATH", "inference/configs/model_registry.yaml"),
+            os.getenv("MODEL_REGISTRY_PATH", str(defaults_dir / "model_registry.yaml")),
             repo_root=repo_root,
         ),
         prompt_library_path=_resolve_repo_path(
-            os.getenv("PROMPT_LIBRARY_PATH", "inference/configs/prompt_presets.yaml"),
+            os.getenv("PROMPT_LIBRARY_PATH", str(defaults_dir / "prompt_presets.yaml")),
             repo_root=repo_root,
         ),
         benchmark_registry_path=_resolve_repo_path(
-            os.getenv("BENCHMARK_REGISTRY_PATH", "evaluation/benchmarks/registry.yaml"),
+            os.getenv("BENCHMARK_REGISTRY_PATH", str(defaults_dir / "benchmarks_registry.yaml")),
             repo_root=repo_root,
         ),
         artifacts_dir=artifacts_dir,

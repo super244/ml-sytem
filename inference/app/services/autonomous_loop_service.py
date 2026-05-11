@@ -158,7 +158,7 @@ class AutonomousLoopService:
                     ),
                     priority=100,
                     executable=True,
-                    config_path="configs/train.yaml",
+                    config_path="examples/orchestration/train.yaml",
                     surface="training",
                     href="/dashboard/training",
                     metadata={"reason": "bootstrap"},
@@ -334,7 +334,7 @@ class AutonomousLoopService:
                 if action.kind == "launch_training":
                     detail = self.instance_service.create_instance(
                         InstanceCreateRequest(
-                            config_path=action.config_path or "configs/train.yaml",
+                            config_path=action.config_path or "examples/orchestration/train.yaml",
                             start=start_instances,
                             user_level="hobbyist",
                             metadata={

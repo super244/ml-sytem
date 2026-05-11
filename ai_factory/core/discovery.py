@@ -116,3 +116,41 @@ def load_benchmark_registry(path: str | Path) -> list[dict[str, Any]]:
         return benchmarks if isinstance(benchmarks, list) else []
     except Exception:
         return []
+
+
+def resolve_benchmark_file(
+    registry_path: str | Path,
+    *,
+    benchmark_id: str | None = None,
+    benchmark_file: str | None = None,
+) -> tuple[str, dict[str, Any]]:
+    import yaml
+
+    registry = Path(registry_path)
+    payload = yaml.safe_load(registry.read_text()) or {}
+    benchmarks = payload.get("benchmarks", []) if isinstance(payload, dict) else []
+    if not isinstance(benchmarks, list):
+        benchmarks = []
+
+    base_dir = registry.parent
+
+    if benchmark_file:
+        candidate = Path(benchmark_file)
+        if not candidate.is_absolute():
+            candidate = (base_dir / candidate).resolve()
+        if not candidate.exists():
+            raise FileNotFoundError("Benchmark file not found")
+        rel = Path(benchmark_file)
+        return str(rel), {"id": rel.stem, "path": str(rel)}
+
+    if benchmark_id is None:
+        raise ValueError("benchmark_id or benchmark_file is required")
+
+    for item in benchmarks:
+        if isinstance(item, dict) and item.get("id") == benchmark_id:
+            path = str(item.get("path") or "")
+            if not path:
+                raise KeyError(benchmark_id)
+            return path, item
+
+    raise KeyError(benchmark_id)

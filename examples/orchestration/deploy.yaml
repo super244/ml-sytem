@@ -1,0 +1,17 @@
+instance:
+  type: deploy
+  name: example-deploy
+  environment:
+    kind: local
+orchestration_mode: single
+experience:
+  level: dev
+lifecycle: {}
+execution:
+  backend: local
+subsystem:
+  provider: huggingface
+  provider_options:
+    dry_run: true
+    repo_id: example/repo
+  source_artifact_ref: artifacts

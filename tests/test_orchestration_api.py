@@ -15,6 +15,12 @@ def _write(path: Path, body: str) -> None:
     path.write_text(body)
 
 
+def _seed_inference_defaults(tmp_path: Path) -> None:
+    _write(tmp_path / "inference" / "app" / "defaults" / "model_registry.yaml", "models: []\n")
+    _write(tmp_path / "inference" / "app" / "defaults" / "prompt_presets.yaml", "presets: []\n")
+    _write(tmp_path / "inference" / "app" / "defaults" / "benchmarks_registry.yaml", "benchmarks: []\n")
+
+
 @pytest.fixture
 def anyio_backend():
     return "asyncio"
@@ -24,18 +30,17 @@ def anyio_backend():
 async def test_orchestration_routes_expose_runs_tasks_and_summary(tmp_path: Path, monkeypatch) -> None:
     from inference.app.routers import orchestration as orchestration_router
 
-    _write(
-        tmp_path / "training" / "configs" / "profiles" / "baseline_qlora.yaml",
-        "run_name: baseline\ntraining:\n  artifacts_dir: artifacts\n",
-    )
+    _seed_inference_defaults(tmp_path)
     _write(
         tmp_path / "configs" / "finetune.yaml",
         (
             "instance:\n"
             "  type: finetune\n"
             "  environment: local\n"
+            "experience:\n"
+            "  level: dev\n"
             "subsystem:\n"
-            "  config_ref: ../training/configs/profiles/baseline_qlora.yaml\n"
+            "  command_override: [python, -c, \"print(1)\"]\n"
         ),
     )
     settings = AppSettings(
@@ -43,9 +48,9 @@ async def test_orchestration_routes_expose_runs_tasks_and_summary(tmp_path: Path
         version="0.0.0",
         repo_root=str(tmp_path),
         cors_origins=["*"],
-        model_registry_path=str(tmp_path / "inference" / "configs" / "model_registry.yaml"),
-        prompt_library_path=str(tmp_path / "inference" / "configs" / "prompt_presets.yaml"),
-        benchmark_registry_path=str(tmp_path / "evaluation" / "benchmarks" / "registry.yaml"),
+        model_registry_path=str(tmp_path / "inference" / "app" / "defaults" / "model_registry.yaml"),
+        prompt_library_path=str(tmp_path / "inference" / "app" / "defaults" / "prompt_presets.yaml"),
+        benchmark_registry_path=str(tmp_path / "inference" / "app" / "defaults" / "benchmarks_registry.yaml"),
         artifacts_dir=str(tmp_path / "artifacts"),
         cache_dir=str(tmp_path / "artifacts" / "cache"),
         telemetry_path=str(tmp_path / "artifacts" / "telemetry.jsonl"),
@@ -95,10 +100,7 @@ async def test_orchestration_routes_expose_runs_tasks_and_summary(tmp_path: Path
 async def test_orchestration_filters_and_recovery_endpoint(tmp_path: Path) -> None:
     from inference.app.routers import orchestration as orchestration_router
 
-    _write(
-        tmp_path / "training" / "configs" / "profiles" / "baseline_qlora.yaml",
-        "run_name: baseline\ntraining:\n  artifacts_dir: artifacts\n",
-    )
+    _seed_inference_defaults(tmp_path)
     _write(
         tmp_path / "configs" / "finetune.yaml",
         (
@@ -107,8 +109,10 @@ async def test_orchestration_filters_and_recovery_endpoint(tmp_path: Path) -> No
             "  environment: local\n"
             "execution:\n"
             "  retry_limit: 2\n"
+            "experience:\n"
+            "  level: dev\n"
             "subsystem:\n"
-            "  config_ref: ../training/configs/profiles/baseline_qlora.yaml\n"
+            "  command_override: [python, -c, \"print(1)\"]\n"
         ),
     )
     settings = AppSettings(
@@ -116,9 +120,9 @@ async def test_orchestration_filters_and_recovery_endpoint(tmp_path: Path) -> No
         version="0.0.0",
         repo_root=str(tmp_path),
         cors_origins=["*"],
-        model_registry_path=str(tmp_path / "inference" / "configs" / "model_registry.yaml"),
-        prompt_library_path=str(tmp_path / "inference" / "configs" / "prompt_presets.yaml"),
-        benchmark_registry_path=str(tmp_path / "evaluation" / "benchmarks" / "registry.yaml"),
+        model_registry_path=str(tmp_path / "inference" / "app" / "defaults" / "model_registry.yaml"),
+        prompt_library_path=str(tmp_path / "inference" / "app" / "defaults" / "prompt_presets.yaml"),
+        benchmark_registry_path=str(tmp_path / "inference" / "app" / "defaults" / "benchmarks_registry.yaml"),
         artifacts_dir=str(tmp_path / "artifacts"),
         cache_dir=str(tmp_path / "artifacts" / "cache"),
         telemetry_path=str(tmp_path / "artifacts" / "telemetry.jsonl"),
@@ -202,18 +206,17 @@ async def test_orchestration_filters_and_recovery_endpoint(tmp_path: Path) -> No
 async def test_orchestration_filters_reject_invalid_values(tmp_path: Path) -> None:
     from inference.app.routers import orchestration as orchestration_router
 
-    _write(
-        tmp_path / "training" / "configs" / "profiles" / "baseline_qlora.yaml",
-        "run_name: baseline\ntraining:\n  artifacts_dir: artifacts\n",
-    )
+    _seed_inference_defaults(tmp_path)
     _write(
         tmp_path / "configs" / "finetune.yaml",
         (
             "instance:\n"
             "  type: finetune\n"
             "  environment: local\n"
+            "experience:\n"
+            "  level: dev\n"
             "subsystem:\n"
-            "  config_ref: ../training/configs/profiles/baseline_qlora.yaml\n"
+            "  command_override: [python, -c, \"print(1)\"]\n"
         ),
     )
     settings = AppSettings(
@@ -221,9 +224,9 @@ async def test_orchestration_filters_reject_invalid_values(tmp_path: Path) -> No
         version="0.0.0",
         repo_root=str(tmp_path),
         cors_origins=["*"],
-        model_registry_path=str(tmp_path / "inference" / "configs" / "model_registry.yaml"),
-        prompt_library_path=str(tmp_path / "inference" / "configs" / "prompt_presets.yaml"),
-        benchmark_registry_path=str(tmp_path / "evaluation" / "benchmarks" / "registry.yaml"),
+        model_registry_path=str(tmp_path / "inference" / "app" / "defaults" / "model_registry.yaml"),
+        prompt_library_path=str(tmp_path / "inference" / "app" / "defaults" / "prompt_presets.yaml"),
+        benchmark_registry_path=str(tmp_path / "inference" / "app" / "defaults" / "benchmarks_registry.yaml"),
         artifacts_dir=str(tmp_path / "artifacts"),
         cache_dir=str(tmp_path / "artifacts" / "cache"),
         telemetry_path=str(tmp_path / "artifacts" / "telemetry.jsonl"),
@@ -257,18 +260,17 @@ async def test_orchestration_filters_reject_invalid_values(tmp_path: Path) -> No
 async def test_orchestration_create_route_uses_injected_service_and_preserves_not_found(tmp_path: Path) -> None:
     from inference.app.routers import orchestration as orchestration_router
 
-    _write(
-        tmp_path / "training" / "configs" / "profiles" / "baseline_qlora.yaml",
-        "run_name: baseline\ntraining:\n  artifacts_dir: artifacts\n",
-    )
+    _seed_inference_defaults(tmp_path)
     _write(
         tmp_path / "configs" / "finetune.yaml",
         (
             "instance:\n"
             "  type: finetune\n"
             "  environment: local\n"
+            "experience:\n"
+            "  level: dev\n"
             "subsystem:\n"
-            "  config_ref: ../training/configs/profiles/baseline_qlora.yaml\n"
+            "  command_override: [python, -c, \"print(1)\"]\n"
         ),
     )
     settings = AppSettings(
@@ -276,9 +278,9 @@ async def test_orchestration_create_route_uses_injected_service_and_preserves_no
         version="0.0.0",
         repo_root=str(tmp_path),
         cors_origins=["*"],
-        model_registry_path=str(tmp_path / "inference" / "configs" / "model_registry.yaml"),
-        prompt_library_path=str(tmp_path / "inference" / "configs" / "prompt_presets.yaml"),
-        benchmark_registry_path=str(tmp_path / "evaluation" / "benchmarks" / "registry.yaml"),
+        model_registry_path=str(tmp_path / "inference" / "app" / "defaults" / "model_registry.yaml"),
+        prompt_library_path=str(tmp_path / "inference" / "app" / "defaults" / "prompt_presets.yaml"),
+        benchmark_registry_path=str(tmp_path / "inference" / "app" / "defaults" / "benchmarks_registry.yaml"),
         artifacts_dir=str(tmp_path / "artifacts"),
         cache_dir=str(tmp_path / "artifacts" / "cache"),
         telemetry_path=str(tmp_path / "artifacts" / "telemetry.jsonl"),
@@ -310,18 +312,17 @@ async def test_orchestration_create_route_uses_injected_service_and_preserves_no
 async def test_instance_routes_support_control_center_creation_and_inference(tmp_path: Path, monkeypatch) -> None:
     from inference.app.routers import instances as instances_router
 
-    _write(
-        tmp_path / "training" / "configs" / "profiles" / "baseline_qlora.yaml",
-        "run_name: baseline\ntraining:\n  artifacts_dir: artifacts\n",
-    )
+    _seed_inference_defaults(tmp_path)
     _write(
         tmp_path / "configs" / "finetune.yaml",
         (
             "instance:\n"
             "  type: finetune\n"
             "  environment: local\n"
+            "experience:\n"
+            "  level: dev\n"
             "subsystem:\n"
-            "  config_ref: ../training/configs/profiles/baseline_qlora.yaml\n"
+            "  command_override: [python, -c, \"print(1)\"]\n"
         ),
     )
     _write(
@@ -332,13 +333,13 @@ async def test_instance_routes_support_control_center_creation_and_inference(tmp
             "  environment: local\n"
             "execution:\n"
             "  env:\n"
-            f"    MODEL_REGISTRY_PATH: {tmp_path / 'inference' / 'configs' / 'model_registry.yaml'}\n"
+            f"    MODEL_REGISTRY_PATH: {tmp_path / 'inference' / 'app' / 'defaults' / 'model_registry.yaml'}\n"
             "subsystem:\n"
             "  model_variant: finetuned\n"
         ),
     )
     _write(
-        tmp_path / "inference" / "configs" / "model_registry.yaml",
+        tmp_path / "inference" / "app" / "defaults" / "model_registry.yaml",
         "models:\n  - name: base\n    base_model: Qwen/Qwen2.5-Math-1.5B-Instruct\n",
     )
 
@@ -347,9 +348,9 @@ async def test_instance_routes_support_control_center_creation_and_inference(tmp
         version="0.0.0",
         repo_root=str(tmp_path),
         cors_origins=["*"],
-        model_registry_path=str(tmp_path / "inference" / "configs" / "model_registry.yaml"),
-        prompt_library_path=str(tmp_path / "inference" / "configs" / "prompt_presets.yaml"),
-        benchmark_registry_path=str(tmp_path / "evaluation" / "benchmarks" / "registry.yaml"),
+        model_registry_path=str(tmp_path / "inference" / "app" / "defaults" / "model_registry.yaml"),
+        prompt_library_path=str(tmp_path / "inference" / "app" / "defaults" / "prompt_presets.yaml"),
+        benchmark_registry_path=str(tmp_path / "inference" / "app" / "defaults" / "benchmarks_registry.yaml"),
         artifacts_dir=str(tmp_path / "artifacts"),
         cache_dir=str(tmp_path / "artifacts" / "cache"),
         telemetry_path=str(tmp_path / "artifacts" / "telemetry.jsonl"),
@@ -407,18 +408,17 @@ async def test_instance_routes_support_control_center_creation_and_inference(tmp
 async def test_instance_live_stream_and_foundation_routes(tmp_path: Path, monkeypatch) -> None:
     from inference.app.routers import instances as instances_router
 
-    _write(
-        tmp_path / "training" / "configs" / "profiles" / "baseline_qlora.yaml",
-        "run_name: baseline\ntraining:\n  artifacts_dir: artifacts\n",
-    )
+    _seed_inference_defaults(tmp_path)
     _write(
         tmp_path / "configs" / "finetune.yaml",
         (
             "instance:\n"
             "  type: finetune\n"
             "  environment: local\n"
+            "experience:\n"
+            "  level: dev\n"
             "subsystem:\n"
-            "  config_ref: ../training/configs/profiles/baseline_qlora.yaml\n"
+            "  command_override: [python, -c, \"print(1)\"]\n"
         ),
     )
     settings = AppSettings(
@@ -426,9 +426,9 @@ async def test_instance_live_stream_and_foundation_routes(tmp_path: Path, monkey
         version="0.0.0",
         repo_root=str(tmp_path),
         cors_origins=["*"],
-        model_registry_path=str(tmp_path / "inference" / "configs" / "model_registry.yaml"),
-        prompt_library_path=str(tmp_path / "inference" / "configs" / "prompt_presets.yaml"),
-        benchmark_registry_path=str(tmp_path / "evaluation" / "benchmarks" / "registry.yaml"),
+        model_registry_path=str(tmp_path / "inference" / "app" / "defaults" / "model_registry.yaml"),
+        prompt_library_path=str(tmp_path / "inference" / "app" / "defaults" / "prompt_presets.yaml"),
+        benchmark_registry_path=str(tmp_path / "inference" / "app" / "defaults" / "benchmarks_registry.yaml"),
         artifacts_dir=str(tmp_path / "artifacts"),
         cache_dir=str(tmp_path / "artifacts" / "cache"),
         telemetry_path=str(tmp_path / "artifacts" / "telemetry.jsonl"),
@@ -464,18 +464,17 @@ async def test_instance_live_stream_and_foundation_routes(tmp_path: Path, monkey
 async def test_instance_action_route_supports_generic_follow_up_actions(tmp_path: Path, monkeypatch) -> None:
     from inference.app.routers import instances as instances_router
 
-    _write(
-        tmp_path / "training" / "configs" / "profiles" / "baseline_qlora.yaml",
-        "run_name: baseline\ntraining:\n  artifacts_dir: artifacts\n",
-    )
+    _seed_inference_defaults(tmp_path)
     _write(
         tmp_path / "configs" / "finetune.yaml",
         (
             "instance:\n"
             "  type: finetune\n"
             "  environment: local\n"
+            "experience:\n"
+            "  level: dev\n"
             "subsystem:\n"
-            "  config_ref: ../training/configs/profiles/baseline_qlora.yaml\n"
+            "  command_override: [python, -c, \"print(1)\"]\n"
         ),
     )
 
@@ -484,9 +483,9 @@ async def test_instance_action_route_supports_generic_follow_up_actions(tmp_path
         version="0.0.0",
         repo_root=str(tmp_path),
         cors_origins=["*"],
-        model_registry_path=str(tmp_path / "inference" / "configs" / "model_registry.yaml"),
-        prompt_library_path=str(tmp_path / "inference" / "configs" / "prompt_presets.yaml"),
-        benchmark_registry_path=str(tmp_path / "evaluation" / "benchmarks" / "registry.yaml"),
+        model_registry_path=str(tmp_path / "inference" / "app" / "defaults" / "model_registry.yaml"),
+        prompt_library_path=str(tmp_path / "inference" / "app" / "defaults" / "prompt_presets.yaml"),
+        benchmark_registry_path=str(tmp_path / "inference" / "app" / "defaults" / "benchmarks_registry.yaml"),
         artifacts_dir=str(tmp_path / "artifacts"),
         cache_dir=str(tmp_path / "artifacts" / "cache"),
         telemetry_path=str(tmp_path / "artifacts" / "telemetry.jsonl"),

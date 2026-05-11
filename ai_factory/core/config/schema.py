@@ -158,13 +158,13 @@ class PipelineConfig(BaseModel):
     auto_continue: bool = False
     max_auto_cycles: int = 1
     max_auto_children: int = 6
-    default_prepare_config: str = "configs/prepare.yaml"
-    default_train_config: str = "configs/train.yaml"
-    default_eval_config: str = "configs/eval.yaml"
-    default_deploy_config: str = "configs/deploy.yaml"
-    default_finetune_config: str = "configs/finetune.yaml"
-    default_inference_config: str = "configs/inference.yaml"
-    default_report_config: str = "configs/report.yaml"
+    default_prepare_config: str = "examples/orchestration/prepare.yaml"
+    default_train_config: str = "examples/orchestration/train.yaml"
+    default_eval_config: str = "examples/orchestration/eval.yaml"
+    default_deploy_config: str = "examples/orchestration/deploy.yaml"
+    default_finetune_config: str = "examples/orchestration/finetune.yaml"
+    default_inference_config: str = "examples/orchestration/inference.yaml"
+    default_report_config: str = "examples/orchestration/report.yaml"
 
 
 class SubsystemConfig(BaseModel):

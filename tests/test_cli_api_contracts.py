@@ -62,50 +62,11 @@ def test_cli_parse_args_supports_tui_command(monkeypatch) -> None:
     assert args.command == "workspace"
     assert args.root == "/tmp/project"
 
-    monkeypatch.setattr(
-        "sys.argv",
-        ["ai-factory", "train-preflight", "--config", "training/configs/profiles/failure_aware.yaml"],
-    )
+    monkeypatch.setattr("sys.argv", ["ai-factory", "optimize", "detect", "--json"])
     args = ai_factory_cli.parse_args()
-    assert args.command == "train-preflight"
-    assert args.config == "training/configs/profiles/failure_aware.yaml"
-
-    monkeypatch.setattr(
-        "sys.argv",
-        [
-            "ai-factory",
-            "bootstrap-train",
-            "--config",
-            "training/configs/profiles/pretraining.yaml",
-            "--dataset-config",
-            "data/configs/processing.yaml",
-            "--dry-run",
-            "--validate-model-load",
-        ],
-    )
-    args = ai_factory_cli.parse_args()
-    assert args.command == "bootstrap-train"
-    assert args.config == "training/configs/profiles/pretraining.yaml"
-    assert args.dataset_config == "data/configs/processing.yaml"
-    assert args.dry_run is True
-    assert args.validate_model_load is True
-
-    monkeypatch.setattr(
-        "sys.argv",
-        [
-            "ai-factory",
-            "bootstrap-train",
-            "--config",
-            "training/configs/profiles/local_metal.yaml",
-            "--dry-run",
-            "--skip-doctor",
-        ],
-    )
-    args = ai_factory_cli.parse_args()
-    assert args.command == "bootstrap-train"
-    assert args.config == "training/configs/profiles/local_metal.yaml"
-    assert args.dry_run is True
-    assert args.skip_doctor is True
+    assert args.command == "optimize"
+    assert args.optimize_command == "detect"
+    assert args.json is True
 
 
 def test_cli_parse_args_supports_control_center_new_and_inference(monkeypatch) -> None:
@@ -115,7 +76,7 @@ def test_cli_parse_args_supports_control_center_new_and_inference(monkeypatch) -
             "ai-factory",
             "new",
             "--config",
-            "configs/train.yaml",
+            "examples/orchestration/train.yaml",
             "--name",
             "scratch-branch",
             "--user-level",
@@ -142,7 +103,7 @@ def test_cli_parse_args_supports_control_center_new_and_inference(monkeypatch) -
 
     monkeypatch.setattr(
         "sys.argv",
-        ["ai-factory", "inference", "instance-001", "--config", "configs/inference.yaml"],
+        ["ai-factory", "inference", "instance-001", "--config", "examples/orchestration/inference.yaml"],
     )
     args = ai_factory_cli.parse_args()
     assert args.command == "inference"
@@ -150,7 +111,7 @@ def test_cli_parse_args_supports_control_center_new_and_inference(monkeypatch) -
 
     monkeypatch.setattr(
         "sys.argv",
-        ["ai-factory", "action", "instance-001", "finetune", "--config", "configs/finetune.yaml", "--no-start"],
+        ["ai-factory", "action", "instance-001", "finetune", "--config", "examples/orchestration/finetune.yaml", "--no-start"],
     )
     args = ai_factory_cli.parse_args()
     assert args.command == "action"

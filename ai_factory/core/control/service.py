@@ -255,7 +255,7 @@ class FactoryControlService:
         self,
         source_instance_id: str,
         *,
-        config_path: str = "configs/eval.yaml",
+        config_path: str = "examples/orchestration/eval.yaml",
         start: bool = True,
         metadata_updates: dict[str, Any] | None = None,
     ) -> InstanceManifest:
@@ -271,7 +271,7 @@ class FactoryControlService:
         source_instance_id: str,
         *,
         target: DeploymentTarget,
-        config_path: str = "configs/deploy.yaml",
+        config_path: str = "examples/orchestration/deploy.yaml",
         start: bool = True,
         metadata_updates: dict[str, Any] | None = None,
     ) -> InstanceManifest:
@@ -287,7 +287,7 @@ class FactoryControlService:
         self,
         source_instance_id: str,
         *,
-        config_path: str = "configs/inference.yaml",
+        config_path: str = "examples/orchestration/inference.yaml",
         start: bool = True,
         metadata_updates: dict[str, Any] | None = None,
     ) -> InstanceManifest:

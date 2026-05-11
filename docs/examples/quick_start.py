@@ -14,7 +14,7 @@ def main() -> None:
     print("AI-Factory quick start")
     print("======================")
 
-    created = control.create_instance("configs/train.yaml", start=False)
+    created = control.create_instance("examples/orchestration/train.yaml", start=False)
     print(f"Created training instance: {created.id} ({created.name})")
     print(f"Status: {created.status}")
     print(f"Orchestration run: {created.orchestration_run_id}")

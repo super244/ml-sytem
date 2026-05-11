@@ -21,7 +21,7 @@ class MathTrainingProfiles:
                 domain="mathematics",
                 training_method="qlora",
                 datasets=["derivatives", "integrals", "limits_series"],
-                config_path="training/configs/profiles/baseline_qlora.yaml",
+                config_path="examples/orchestration/finetune.yaml",
                 model_requirements={
                     "architecture": "transformer",
                     "min_parameters": 1_000_000_000,  # 1B
@@ -35,7 +35,7 @@ class MathTrainingProfiles:
                 subdomain="calculus",
                 training_method="qlora",
                 datasets=["derivatives", "integrals", "limits_series", "multivariable"],
-                config_path="training/configs/profiles/calculus_specialist.yaml",
+                config_path="examples/orchestration/finetune.yaml",
                 model_requirements={
                     "architecture": "transformer",
                     "min_parameters": 3_000_000_000,  # 3B
@@ -49,7 +49,7 @@ class MathTrainingProfiles:
                 subdomain="olympiad",
                 training_method="full_finetune",
                 datasets=["olympiad_reasoning"],
-                config_path="training/configs/profiles/olympiad_reasoning.yaml",
+                config_path="examples/orchestration/finetune.yaml",
                 model_requirements={
                     "architecture": "transformer",
                     "min_parameters": 7_000_000_000,  # 7B
@@ -63,7 +63,7 @@ class MathTrainingProfiles:
                 domain="mathematics",
                 training_method="qlora",
                 datasets=["derivatives", "integrals", "limits_series", "olympiad_reasoning"],
-                config_path="training/configs/profiles/mathematics_curriculum.yaml",
+                config_path="examples/orchestration/finetune.yaml",
                 curriculum_order=["derivatives", "integrals", "limits_series", "olympiad_reasoning"],
                 model_requirements={
                     "architecture": "transformer",

@@ -127,7 +127,7 @@ def _training_extensions() -> list[ExtensionPoint]:
             label="Supervised Training",
             description="Standard managed training and instruction-style fine-tuning against curated datasets.",
             supported_instance_types=["train", "finetune"],
-            config_hint="configs/train.yaml",
+            config_hint="examples/orchestration/train.yaml",
         ),
         ExtensionPoint(
             id="unsupervised",
@@ -135,7 +135,7 @@ def _training_extensions() -> list[ExtensionPoint]:
             label="Unsupervised Training",
             description="Pretraining-style dataset iteration for continued base-model adaptation.",
             supported_instance_types=["train"],
-            config_hint="configs/train.yaml",
+            config_hint="examples/orchestration/train.yaml",
             maturity="beta",
         ),
         ExtensionPoint(
@@ -144,7 +144,7 @@ def _training_extensions() -> list[ExtensionPoint]:
             label="LoRA",
             description="Parameter-efficient adapter tuning using the existing training stack.",
             supported_instance_types=["finetune"],
-            config_hint="configs/finetune.yaml",
+            config_hint="examples/orchestration/finetune.yaml",
         ),
         ExtensionPoint(
             id="qlora",
@@ -152,7 +152,7 @@ def _training_extensions() -> list[ExtensionPoint]:
             label="QLoRA",
             description="Quantized LoRA path for resource-efficient local and remote iterations.",
             supported_instance_types=["finetune"],
-            config_hint="configs/finetune.yaml",
+            config_hint="examples/orchestration/finetune.yaml",
         ),
         ExtensionPoint(
             id="full_finetune",
@@ -160,7 +160,7 @@ def _training_extensions() -> list[ExtensionPoint]:
             label="Full Finetune",
             description="Full-parameter update path for larger iteration budgets and deeper specialization.",
             supported_instance_types=["finetune"],
-            config_hint="configs/finetune.yaml",
+            config_hint="examples/orchestration/finetune.yaml",
             maturity="beta",
         ),
         ExtensionPoint(
@@ -183,7 +183,7 @@ def _deployment_extensions() -> list[ExtensionPoint]:
             label="Hugging Face",
             description="Publish exported artifacts to a Hub repository.",
             supported_instance_types=["deploy"],
-            config_hint="configs/deploy.yaml",
+            config_hint="examples/orchestration/deploy.yaml",
         ),
         ExtensionPoint(
             id="ollama",
@@ -191,7 +191,7 @@ def _deployment_extensions() -> list[ExtensionPoint]:
             label="Ollama",
             description="Package or register a model for Ollama-based local serving.",
             supported_instance_types=["deploy"],
-            config_hint="configs/deploy.yaml",
+            config_hint="examples/orchestration/deploy.yaml",
         ),
         ExtensionPoint(
             id="lmstudio",
@@ -199,7 +199,7 @@ def _deployment_extensions() -> list[ExtensionPoint]:
             label="LM Studio",
             description="Export artifacts for LM Studio import flows and local desktop inference.",
             supported_instance_types=["deploy"],
-            config_hint="configs/deploy.yaml",
+            config_hint="examples/orchestration/deploy.yaml",
             maturity="beta",
         ),
         ExtensionPoint(
@@ -208,7 +208,7 @@ def _deployment_extensions() -> list[ExtensionPoint]:
             label="OpenAI-Compatible API",
             description="Register or publish an endpoint that exposes an OpenAI-style inference surface.",
             supported_instance_types=["deploy"],
-            config_hint="configs/deploy.yaml",
+            config_hint="examples/orchestration/deploy.yaml",
         ),
         ExtensionPoint(
             id="custom_api",
@@ -216,7 +216,7 @@ def _deployment_extensions() -> list[ExtensionPoint]:
             label="Custom API",
             description="Call an arbitrary API target as part of a managed deployment step.",
             supported_instance_types=["deploy"],
-            config_hint="configs/deploy.yaml",
+            config_hint="examples/orchestration/deploy.yaml",
             maturity="beta",
         ),
     ]
@@ -230,7 +230,7 @@ def _evaluation_extensions(repo_root: Path) -> list[ExtensionPoint]:
             label="Custom Dataset Evaluation",
             description="Run managed evaluations against user-provided or domain-specific datasets.",
             supported_instance_types=["evaluate"],
-            config_hint="configs/eval.yaml",
+            config_hint="examples/orchestration/eval.yaml",
         )
     ]
     registry_path = repo_root / "evaluation" / "benchmarks" / "registry.yaml"
@@ -247,7 +247,7 @@ def _evaluation_extensions(repo_root: Path) -> list[ExtensionPoint]:
                 ),
                 supported_instance_types=["evaluate"],
                 source="benchmark_registry",
-                config_hint="configs/eval.yaml",
+                config_hint="examples/orchestration/eval.yaml",
             )
         )
     return extensions

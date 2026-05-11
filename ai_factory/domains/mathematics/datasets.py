@@ -22,7 +22,7 @@ class MathDatasetRegistry:
                 "derivatives": DatasetSpec(
                     name="derivatives",
                     description="Synthetic calculus derivative problems",
-                    path="data/custom/custom_derivative_mastery.jsonl",
+                    path="datasets/derivatives.jsonl",
                     domain="mathematics",
                     subdomain="calculus",
                     difficulty_range=["easy", "medium", "hard"],
@@ -32,7 +32,7 @@ class MathDatasetRegistry:
                 "integrals": DatasetSpec(
                     name="integrals",
                     description="Synthetic calculus integration problems",
-                    path="data/custom/custom_integral_mastery.jsonl",
+                    path="datasets/integrals.jsonl",
                     domain="mathematics",
                     subdomain="calculus",
                     difficulty_range=["easy", "medium", "hard"],
@@ -42,7 +42,7 @@ class MathDatasetRegistry:
                 "limits_series": DatasetSpec(
                     name="limits_series",
                     description="Synthetic limits and series problems",
-                    path="data/custom/custom_limits_series.jsonl",
+                    path="datasets/limits_series.jsonl",
                     domain="mathematics",
                     subdomain="calculus",
                     difficulty_range=["easy", "medium", "hard"],
@@ -52,7 +52,7 @@ class MathDatasetRegistry:
                 "olympiad_reasoning": DatasetSpec(
                     name="olympiad_reasoning",
                     description="Olympiad-level mathematical reasoning problems",
-                    path="data/custom/custom_olympiad_reasoning.jsonl",
+                    path="datasets/olympiad_reasoning.jsonl",
                     domain="mathematics",
                     subdomain="olympiad",
                     difficulty_range=["medium", "hard", "expert"],

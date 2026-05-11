@@ -65,9 +65,6 @@ def test_manager_creates_runs_and_finalizes_instances(tmp_path: Path, monkeypatc
     store_mod = importlib.import_module("ai_factory.core.instances.store")
     manager_mod = importlib.import_module("ai_factory.core.instances.manager")
 
-    profile_dir = tmp_path / "training" / "configs" / "profiles"
-    profile_dir.mkdir(parents=True)
-    (profile_dir / "baseline_qlora.yaml").write_text("run_name: demo-run\ntraining:\n  artifacts_dir: artifacts\n")
     eval_config_path = tmp_path / "configs" / "eval.yaml"
     eval_config_path.parent.mkdir(parents=True, exist_ok=True)
     eval_config_path.write_text(
@@ -76,13 +73,13 @@ def test_manager_creates_runs_and_finalizes_instances(tmp_path: Path, monkeypatc
                 "instance:",
                 "  type: evaluate",
                 "  environment: local",
+                "experience:",
+                "  level: dev",
                 "subsystem:",
-                "  config_ref: ../evaluation/configs/base_vs_finetuned.yaml",
+                "  command_override: [python, -c, \"print(1)\"]",
             ]
         )
     )
-    (tmp_path / "evaluation" / "configs").mkdir(parents=True, exist_ok=True)
-    (tmp_path / "evaluation" / "configs" / "base_vs_finetuned.yaml").write_text("output_dir: evaluation/results/demo\n")
     config_path = tmp_path / "configs" / "finetune.yaml"
     config_path.write_text(
         "\n".join(
@@ -91,6 +88,8 @@ def test_manager_creates_runs_and_finalizes_instances(tmp_path: Path, monkeypatc
                 "  type: finetune",
                 "  environment: local",
                 "  name: demo-finetune",
+                "experience:",
+                "  level: dev",
                 "sub_agents:",
                 "  enabled: true",
                 "  workloads:",
@@ -101,7 +100,7 @@ def test_manager_creates_runs_and_finalizes_instances(tmp_path: Path, monkeypatc
                 "pipeline:",
                 f"  default_eval_config: {eval_config_path}",
                 "subsystem:",
-                "  config_ref: ../training/configs/profiles/baseline_qlora.yaml",
+                "  command_override: [python, -c, \"print(1)\"]",
             ]
         )
     )

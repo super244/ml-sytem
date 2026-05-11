@@ -17,9 +17,9 @@ services:
     environment:
       AI_FACTORY_REPO_ROOT: /app
       ARTIFACTS_DIR: ${ARTIFACTS_DIR:-/app/artifacts}
-      MODEL_REGISTRY_PATH: ${MODEL_REGISTRY_PATH:-inference/configs/model_registry.yaml}
-      PROMPT_LIBRARY_PATH: ${PROMPT_LIBRARY_PATH:-inference/configs/prompt_presets.yaml}
-      BENCHMARK_REGISTRY_PATH: ${BENCHMARK_REGISTRY_PATH:-evaluation/benchmarks/registry.yaml}
+      MODEL_REGISTRY_PATH: ${MODEL_REGISTRY_PATH:-inference/app/defaults/model_registry.yaml}
+      PROMPT_LIBRARY_PATH: ${PROMPT_LIBRARY_PATH:-inference/app/defaults/prompt_presets.yaml}
+      BENCHMARK_REGISTRY_PATH: ${BENCHMARK_REGISTRY_PATH:-inference/app/defaults/benchmarks_registry.yaml}
       CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:3000}
       OPENAI_API_KEYS: ${OPENAI_API_KEYS:-}
       # Promote to Rust-primary once Titan generation is wired

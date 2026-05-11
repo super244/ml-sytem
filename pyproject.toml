@@ -59,7 +59,7 @@ ai-factory = "ai_factory.cli:main"
 include-package-data = true
 
 [tool.setuptools.packages.find]
-include = ["ai_factory*", "training*", "inference*", "evaluation*", "data*"]
+include = ["ai_factory*", "inference*"]
 exclude = ["tests", "tests.*"]
 
 [build-system]
@@ -97,9 +97,6 @@ exclude = ["^tests/"]
 
 [[tool.mypy.overrides]]
 module = [
-    "data.*",
-    "evaluation.*",
-    "training.*",
     "inference.*",
     "ai_factory.interfaces.*",
     "ai_factory.cli",
@@ -116,7 +113,7 @@ asyncio_mode = "auto"
 
 [tool.coverage.run]
 branch = true
-source = ["ai_factory", "training", "inference", "evaluation", "data"]
+source = ["ai_factory", "inference"]
 omit = ["*/tests/*", "*/__pycache__/*"]
 
 [tool.coverage.report]

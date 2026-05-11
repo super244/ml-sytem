@@ -165,7 +165,7 @@ def test_write_markdown_report_creates_file(tmp_path: Path) -> None:
 
 
 def test_cluster_failures_counts_error_types() -> None:
-    from evaluation.error_taxonomy import cluster_failures
+    from ai_factory.core.error_taxonomy import cluster_failures
 
     results = [
         {"primary": {"correct": False, "error_type": "arithmetic"}},
@@ -179,7 +179,7 @@ def test_cluster_failures_counts_error_types() -> None:
 
 
 def test_cluster_failures_skips_correct() -> None:
-    from evaluation.error_taxonomy import cluster_failures
+    from ai_factory.core.error_taxonomy import cluster_failures
 
     results = [{"primary": {"correct": True, "error_type": "arithmetic"}}]
     counts = cluster_failures(results, "primary")
@@ -187,7 +187,7 @@ def test_cluster_failures_skips_correct() -> None:
 
 
 def test_summarize_failure_taxonomy_returns_primary_and_secondary() -> None:
-    from evaluation.error_taxonomy import summarize_failure_taxonomy
+    from ai_factory.core.error_taxonomy import summarize_failure_taxonomy
 
     results = [
         {
@@ -317,7 +317,7 @@ def test_ensure_latest_pointer_writes_json(tmp_path: Path) -> None:
 
 
 def test_load_benchmark_registry_returns_list(tmp_path: Path) -> None:
-    from evaluation.benchmark_registry import load_benchmark_registry
+    from ai_factory.core.discovery import load_benchmark_registry
 
     registry_path = tmp_path / "registry.yaml"
     registry_path.write_text("benchmarks:\n  - id: math500\n    path: data/math500.jsonl\n")
@@ -327,7 +327,7 @@ def test_load_benchmark_registry_returns_list(tmp_path: Path) -> None:
 
 
 def test_resolve_benchmark_file_by_id(tmp_path: Path) -> None:
-    from evaluation.benchmark_registry import resolve_benchmark_file
+    from ai_factory.core.discovery import resolve_benchmark_file
 
     benchmark_path = tmp_path / "data" / "math500.jsonl"
     benchmark_path.parent.mkdir(parents=True, exist_ok=True)
@@ -340,7 +340,7 @@ def test_resolve_benchmark_file_by_id(tmp_path: Path) -> None:
 
 
 def test_resolve_benchmark_file_by_path(tmp_path: Path) -> None:
-    from evaluation.benchmark_registry import resolve_benchmark_file
+    from ai_factory.core.discovery import resolve_benchmark_file
 
     benchmark_path = tmp_path / "custom" / "bench.jsonl"
     benchmark_path.parent.mkdir(parents=True, exist_ok=True)
@@ -352,7 +352,7 @@ def test_resolve_benchmark_file_by_path(tmp_path: Path) -> None:
 
 
 def test_resolve_benchmark_file_rejects_missing_path(tmp_path: Path) -> None:
-    from evaluation.benchmark_registry import resolve_benchmark_file
+    from ai_factory.core.discovery import resolve_benchmark_file
 
     registry_path = tmp_path / "registry.yaml"
     registry_path.write_text("benchmarks: []\n")
@@ -362,7 +362,7 @@ def test_resolve_benchmark_file_rejects_missing_path(tmp_path: Path) -> None:
 
 
 def test_resolve_benchmark_file_raises_for_unknown_id(tmp_path: Path) -> None:
-    from evaluation.benchmark_registry import resolve_benchmark_file
+    from ai_factory.core.discovery import resolve_benchmark_file
 
     registry_path = tmp_path / "registry.yaml"
     registry_path.write_text("benchmarks: []\n")
@@ -371,7 +371,7 @@ def test_resolve_benchmark_file_raises_for_unknown_id(tmp_path: Path) -> None:
 
 
 def test_resolve_benchmark_file_by_id_from_nested_registry_supports_repo_relative_path(tmp_path: Path) -> None:
-    from evaluation.benchmark_registry import resolve_benchmark_file
+    from ai_factory.core.discovery import resolve_benchmark_file
 
     (tmp_path / "pyproject.toml").write_text("[project]\nname = 'tmp'\nversion = '0.0.0'\n")
     benchmark_path = tmp_path / "data" / "processed" / "eval.jsonl"
